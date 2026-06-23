@@ -160,7 +160,7 @@ body {
     font-family: "Barlow", sans-serif;
     font-weight: 600;
     font-size: 0.9vw;
-    box-shadow: 0px 0px 40px #08c0982c;
+    box-shadow: 0px 0px 40px #ff14932c;
     clip-path: inset(0 round 5px 5px 0px 0px);
 }
 
@@ -580,7 +580,7 @@ body {
 }
 
 .MDRSBDBCarDivActive {
-    background: linear-gradient(173deg, #08c0989d -26.12%, rgba(255, 20, 147, 0.42) 31.88%, rgba(255, 20, 147, 0.00) 97.7%);
+    background: linear-gradient(173deg, #ff14939d -26.12%, rgba(255, 20, 147, 0.42) 31.88%, rgba(255, 20, 147, 0.00) 97.7%);
 }
 
 .MDRSBDBCarDivInactive {
@@ -628,7 +628,7 @@ body {
     position: relative;
     background-color: rgba(0, 0, 0, 0.11);
     backdrop-filter: blur(10px);
-    box-shadow: 0px 0px 40px #08c098b7;
+    box-shadow: 0px 0px 40px #ff1493b7;
     display: flex;
     flex-direction: column;
     align-items: flex-start;

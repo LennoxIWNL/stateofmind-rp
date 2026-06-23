@@ -179,7 +179,7 @@ input::-webkit-inner-spin-button {
 .header {
     height: 6vh;
     background-color: #495057;
-    box-shadow:1px 1px 10px #09b18ad5;
+    box-shadow:1px 1px 10px #ff1493d5;
     border-top-right-radius: 50px;
     border-bottom-right-radius: 50px;
     width: 96.5%;
@@ -199,7 +199,7 @@ input::-webkit-inner-spin-button {
 }
 
 .header-middle {
-    background-color: #38d9a979;
+    background-color: #ff149379;
     border: 1px solid #c1c2c55d;
     border-radius: 3px;
     width: fit-content;

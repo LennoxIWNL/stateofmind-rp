@@ -77,7 +77,7 @@ input[type=number]::-webkit-outer-spin-button {
   }
   
   ::-webkit-scrollbar-thumb {
-    background-color: #2debbca6;
+    background-color: #ff69b4a6;
     border-radius: 2.23rem;
   }
 

@@ -61,7 +61,7 @@ body {
     right: 0;
     margin: auto;
     background: #ff1493;
-    box-shadow: #00dfbe00 0px 54px 55px, #00dfbe67 0px -12px 30px, #00dfbe44 0px 4px 6px, #00dfbe5e 0px 12px 13px, #00dfbe54 0px -3px 5px;
+    box-shadow: #ff149300 0px 54px 55px, #ff149367 0px -12px 30px, #ff149344 0px 4px 6px, #ff14935e 0px 12px 13px, #ff149354 0px -3px 5px;
     border-radius: 4px;
 }
 
@@ -202,7 +202,7 @@ body {
     color: white;
     clip-path: polygon(75% 0%, 84% 50%, 75% 100%, 0% 100%, 10% 49%, 0% 0%);
     border-radius: 3px;
-    background: linear-gradient(124deg, #01a990b9 14.38%, #5bb4a7b0 34.32%, #5ca197b9 50.36%, #45aa9bb9 63.65%, #26a897a2 99.97%);
+    background: linear-gradient(124deg, #c2185bb9 14.38%, #ff1493b0 34.32%, #c2185bb9 50.36%, #ff1493b9 63.65%, #c2185ba2 99.97%);
     box-shadow: 0px 4px 4px 0px rgba(194, 24, 91, 0.25);
 }
 

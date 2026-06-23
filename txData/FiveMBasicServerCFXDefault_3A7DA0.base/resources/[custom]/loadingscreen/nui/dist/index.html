@@ -13,6 +13,51 @@
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
 
-    
+    <!-- State of Mind RP brand logo overlay -->
+    <style>
+      #som-brand-logo {
+        position: fixed;
+        top: 42%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: min(28vw, 360px);
+        max-width: 360px;
+        height: auto;
+        z-index: 9999;
+        pointer-events: none;
+        user-select: none;
+        filter: drop-shadow(0 0 24px rgba(255, 20, 147, 0.45));
+      }
+    </style>
+    <img id="som-brand-logo" src="./assets/som-logo.png" alt="State of Mind RP" />
+
+    <!-- Rebrand any leftover "NoPixel 4.0" wordmark (built from obfuscated
+         string fragments in the bundle) to State of Mind RP, live in the DOM. -->
+    <script>
+      (function () {
+        function rebrand() {
+          var walker = document.createTreeWalker(
+            document.body, NodeFilter.SHOW_TEXT, null);
+          var node;
+          while ((node = walker.nextNode())) {
+            var v = node.nodeValue;
+            if (!v) continue;
+            if (/no\s*pixel/i.test(v)) {
+              // "NoPixel 4.0" / "NoPixel" -> brand name (drops version too)
+              node.nodeValue = v
+                .replace(/no\s*pixel\s*\d+(\.\d+)*/ig, 'State of Mind RP')
+                .replace(/no\s*pixel/ig, 'State of Mind RP');
+            }
+          }
+        }
+        var tries = 0;
+        var iv = setInterval(function () {
+          rebrand();
+          if (++tries > 120) clearInterval(iv); // cover ~60s of load
+        }, 500);
+        document.addEventListener('DOMContentLoaded', rebrand);
+        window.addEventListener('load', rebrand);
+      })();
+    </script>
   </body>
 </html>

@@ -2,7 +2,7 @@ fx_version "cerulean"
 
 games { "gta5" }
 
-description "NoPixel Loading Screen"
+description "State of Mind RP Loading Screen"
 
 version "0.1.0"
 

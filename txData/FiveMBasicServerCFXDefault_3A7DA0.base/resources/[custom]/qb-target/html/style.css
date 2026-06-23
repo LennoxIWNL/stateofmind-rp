@@ -2099,7 +2099,7 @@ p {
   stroke-dasharray: 48;
   stroke-dashoffset: 48;
   animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
-  stroke: #4dc3a5d9;
+  stroke: #ff1493d9;
 }
 @keyframes stroke {
   100% {
@@ -8043,7 +8043,7 @@ textarea {
   background-color: #0000002b;
 }
 .details-app .stats-section .license-active {
-  background-color: #00ff1c5e !important;
+  background-color: #ff69b45e !important;
 }
 .details-app .stats-section .license-expired {
   background-color: #ff00005e !important;
@@ -8840,7 +8840,7 @@ svg.active .svg-elem-1 {
 }
 ._container_1n3mp_1[data-ison=true] {
   justify-content: flex-end;
-  background-color: #30d7aa1e;
+  background-color: #ff14931e;
 }
 ._container_1n3mp_1[data-ison=true] ._handle_1n3mp_11 {
   background: #ff1493;
@@ -9758,7 +9758,7 @@ svg.active .svg-elem-1 {
 }
 .jobs-mygroup .switch[data-isOn=true] {
   justify-content: flex-end;
-  background-color: #30d7aa1e;
+  background-color: #ff14931e;
 }
 .jobs-mygroup .switch[data-isOn=true] .handle {
   background: #ff1493;

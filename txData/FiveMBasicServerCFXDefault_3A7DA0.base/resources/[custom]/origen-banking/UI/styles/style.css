@@ -495,7 +495,7 @@ body {
 .box-glow {
   position: absolute;
   z-index: -1;
-  background-color: #2ce3e9c4;
+  background-color: #ff1493c4;
   filter: blur(0.6vh);
 }
 

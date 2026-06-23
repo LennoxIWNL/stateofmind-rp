@@ -13,9 +13,9 @@ body {
 }
 :focus {
     outline: 0;
-    border-color: #09b18a00;
-    -webkit-box-shadow: 0 0 0 0px #09b18a00;
-            box-shadow: 0 0 0 0px #09b18a00;
+    border-color: #ff149300;
+    -webkit-box-shadow: 0 0 0 0px #ff149300;
+            box-shadow: 0 0 0 0px #ff149300;
   }
 
   .mydict2{
@@ -147,12 +147,12 @@ body {
   }
   .mydict input[type="radio"]:checked+ span:hover{
     background-color: #cecece4b;
-    -webkit-box-shadow: 0 0 0 0.0625em #09b18ad5;
-            box-shadow: 0 0 0 0.0625em #09b18ad5;
+    -webkit-box-shadow: 0 0 0 0.0625em #ff1493d5;
+            box-shadow: 0 0 0 0.0625em #ff1493d5;
     transition: all 0.5s ease-in-out;
   }
   .mydict label span:hover{
-    background-color: #09b18ad5;
+    background-color: #ff1493d5;
     transition: all 0.5s ease-in-out;
   }
   
@@ -216,7 +216,7 @@ body {
     bottom: 50%;
     border-radius: 0px;
     background: #ff69b4;
-    box-shadow: 0px 5px 30px #1df0bb73, 0px -5px 30px #ff69b4;
+    box-shadow: 0px 5px 30px #ff69b473, 0px -5px 30px #ff69b4;
     /* padding: 10px; */
     margin-left: 45%;
 }
@@ -490,7 +490,7 @@ body {
 }
 
 #play:hover {
-    background-color: #09b18ad5;
+    background-color: #ff1493d5;
 }
 
 #info {
@@ -517,7 +517,7 @@ body {
 }
 
 #select:hover {
-    background-color: #09b18ad5;
+    background-color: #ff1493d5;
 }
 #delete {
     display: none;
@@ -916,7 +916,7 @@ body {
     width: 15vh;
     height: 2.5px;
     background: #ff69b4;
-    box-shadow: 0px 5px 30px #1df0bb73, 0px -5px 30px #ff69b4;
+    box-shadow: 0px 5px 30px #ff69b473, 0px -5px 30px #ff69b4;
     margin-left: 125px;
     overflow: visible !important;
 }
@@ -1010,7 +1010,7 @@ body {
     font-size: 15px;
     margin-top: 1vh;
     /* border: 0.1vh solid #cecece4b; */
-    background-color: #2d9b7fc7;
+    background-color: #c2185bc7;
     color: #2c2c2cc2;
     margin: 10px;
     border-radius: 1px;
@@ -1024,7 +1024,7 @@ body {
     font-size: 15px;
     margin-top: 1vh;
     /* border: 0.1vh solid #cecece4b; */
-    background-color: #2d9b7fc7;
+    background-color: #c2185bc7;
     color: #2c2c2cc2;
     margin: 10px;
     border-radius: 1px;
@@ -1038,7 +1038,7 @@ body {
     font-size: 15px;
     margin-top: 1vh;
     /* border: 0.1vh solid #cecece4b; */
-    background-color: #2d9b7fc7;
+    background-color: #c2185bc7;
     color: #2c2c2cc2;
     margin: 10px;
     border-radius: 1px;
