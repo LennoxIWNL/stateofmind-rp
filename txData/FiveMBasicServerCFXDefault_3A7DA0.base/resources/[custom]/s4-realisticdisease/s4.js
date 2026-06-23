@@ -150,8 +150,8 @@ $(window).ready(function() {
                                 <div class="stap">
                                     <svg viewBox="0 0 184 68" fill="none" xmlns="http://www.w3.org/2000/svg">
                                         <path d="M181.5 5.5C182.605 5.5 183.5 4.60457 183.5 3.5C183.5 2.39543 182.605 1.5 181.5 1.5V5.5ZM3.91421 66.4142L59.2635 11.065L56.435 8.23655L1.08579 63.5858L3.91421 66.4142ZM72.6985 5.5H181.5V1.5H72.6985V5.5ZM59.2635 11.065C62.8266 7.50178 67.6594 5.5 72.6985 5.5V1.5C66.5985 1.5 60.7484 3.92321 56.435 8.23655L59.2635 11.065Z" fill="white" fill-opacity="0.26"/>
-                                        <circle cx="3" cy="65" r="3" fill="#5CDBAD"/>
-                                        <circle cx="181" cy="3" r="3" fill="#5CDBAD"/>
+                                        <circle cx="3" cy="65" r="3" fill="#ff1493"/>
+                                        <circle cx="181" cy="3" r="3" fill="#ff1493"/>
                                     </svg>
                                 </div>
                             </div>
@@ -303,7 +303,7 @@ $(window).ready(function() {
                         .status-prog {
                             border: 1px solid rgba(255, 255, 255, 0.05);
                             color: #DB5C69;
-                            background: linear-gradient(180deg, rgba(93, 220, 174, 0.30) 0%, rgba(219, 92, 105, 0.30) 0.01%, rgba(219, 92, 105, 0.30) 100%);
+                            background: linear-gradient(180deg, rgba(255, 20, 147, 0.30) 0%, rgba(219, 92, 105, 0.30) 0.01%, rgba(219, 92, 105, 0.30) 100%);
                             text-shadow: 0px 0px 20px #db5c69;
                         }
                         .status-c {

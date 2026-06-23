@@ -7,7 +7,7 @@ html::-webkit-scrollbar {
         background-color: rgba(23, 23, 23, 90%);
         border-radius: 10px;
         box-shadow: 0rem 0rem 0.1rem 0.05rem #000000;
-        border-left: 0.5rem solid #20bb44;
+        border-left: 0.5rem solid #ff1493;
         font-size: 1.5vh;
     }
 
@@ -46,9 +46,9 @@ html::-webkit-scrollbar {
 }
 
 .success {
-    background-color: #20bb44;
+    background-color: #ff1493;
     border-radius: 5px;
-    border: 1px solid #6ae587;
+    border: 1px solid #ff1493;
 }
 
 .primary {

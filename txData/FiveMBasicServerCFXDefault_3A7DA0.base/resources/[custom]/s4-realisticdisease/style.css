@@ -312,7 +312,7 @@ body {
 
 .sup i {
     --fa-primary-color: #ffffff;
-    --fa-secondary-color: #16f31a;
+    --fa-secondary-color: #ff69b4;
     position: absolute;
     font-size: 2vh;
     color: green;
@@ -489,7 +489,7 @@ body {
 .com-ic-listx button {
     border-radius: 0.4375rem;
     border: 2px solid rgba(255, 255, 255, 0.19);
-    background: #5CDBAD;
+    background: #ff1493;
     width: -webkit-fill-available;
     font-size: 2vh;
     color: white;
@@ -500,7 +500,7 @@ body {
 }
 
 .com-ic-listx button:hover {
-    background: #58bd98;
+    background: #ff1493;
 }
 
 .rev-list {
@@ -603,7 +603,7 @@ body {
 }
 
 .circle-ic h1 {
-    color: #5DDCAE;
+    color: #ff1493;
     margin: 0;
     font-size: 1rem;
     font-style: normal;
@@ -779,7 +779,7 @@ body {
     font-size: .9vh;
     border-radius: 4px;
     border-radius: 0.4375rem 0rem 0rem 0.3125rem;
-    background: #5CDBAD;
+    background: #ff1493;
 
     box-shadow: 0px 0px 7px 0px #08e5b79e
 }
@@ -805,8 +805,8 @@ body {
     text-align: left;
     left: 30%;
     font-size: 1.1vh;
-    color: #5DDBAD;
-    text-shadow: 0px 0px 20px #5ddbad;
+    color: #ff1493;
+    text-shadow: 0px 0px 20px #ff1493;
     font-weight: 900;
     letter-spacing: 1px;
     text-transform: uppercase;
@@ -834,7 +834,7 @@ body {
     width: 0.5rem;
     height: 0.5rem;
     border-radius: 0.0625rem;
-    background: #5DDCAE;
+    background: #ff1493;
     position: absolute;
     top: 2vh;
 }
@@ -883,7 +883,7 @@ body {
     top: 0.9vh;
     font-size: 1.7vh;
     letter-spacing: 1px;
-    color: #5DDCAE;
+    color: #ff1493;
     font-size: 1rem;
     font-style: normal;
     font-weight: 600;
@@ -922,7 +922,7 @@ body {
     box-sizing: border-box;
     border-radius: 0.4375rem 0rem 0rem 0.4375rem;
     border: 2px solid rgba(255, 255, 255, 0.19);
-    background: #5CDBAD;
+    background: #ff1493;
 }
 
 .com-ic-list {
@@ -933,7 +933,7 @@ body {
     position: absolute;
     left: 0.5vw;
     top: 0.6vh;
-    color: #5DDCAE;
+    color: #ff1493;
     font-size: 1.3vh;
     letter-spacing: 1px;
 }
@@ -954,7 +954,7 @@ body {
     width: 10%;
     box-sizing: border-box;
     margin: 1% 1% 1% 2.5%;
-    background: #5CDBAD;
+    background: #ff1493;
     padding: 1vh;
     border-width: 1px;
     border-style: solid;
@@ -1025,11 +1025,11 @@ body {
     box-sizing: border-box;
     font-size: 1.2vh;
     font-weight: 800;
-    background: #5CDBAD;
+    background: #ff1493;
     border-radius: 0.1875rem;
     font-weight: 600;
     transform: scale(1.3);
-    box-shadow: 0px 0px 9px #5cdbad;
+    box-shadow: 0px 0px 9px #ff1493;
 }
 .com-list-item-count {
     margin: 0;
@@ -1043,10 +1043,10 @@ body {
     box-sizing: border-box;
     font-size: 1vh;
     font-weight: 800;
-    background: #5CDBAD;
+    background: #ff1493;
     border-radius: 0.1875rem;
     font-weight: 600;
-    box-shadow: 0px 0px 9px #5cdbad;
+    box-shadow: 0px 0px 9px #ff1493;
 }
 
 .right-top {
@@ -1083,8 +1083,8 @@ body {
     top: 0.2vh;
     left: 4.5vw;
     font-size: 2vh;
-    color: #5DDCAE;
-    text-shadow: 0px 0px 20px #5ddcae;
+    color: #ff1493;
+    text-shadow: 0px 0px 20px #ff1493;
 }
 
 .treatment-ui .title i {
@@ -1157,9 +1157,9 @@ body {
     position: absolute;
     border-radius: 0.3125rem;
     border: 1px solid rgba(255, 255, 255, 0.05);
-    background: linear-gradient(180deg, rgba(93, 220, 174, 0.30) 0%, rgba(93, 220, 174, 0.30) 100%);
-    color: #5ddcae;
-    text-shadow: 0px 0px 20px #5ddcae;
+    background: linear-gradient(180deg, rgba(255, 20, 147, 0.30) 0%, rgba(255, 20, 147, 0.30) 100%);
+    color: #ff1493;
+    text-shadow: 0px 0px 20px #ff1493;
     height: -webkit-fill-available;
 
     
@@ -1169,7 +1169,7 @@ body {
     position: absolute;
     left: 0.5vw;
     top: 0.5vh;
-    color: #5DDCAE;
+    color: #ff1493;
     letter-spacing: 1px;
 }
 
@@ -1189,7 +1189,7 @@ body {
     width: 10%;
     box-sizing: border-box;
     margin: 1% 1% 1% 2.5%;
-    background: #5CDBAD;
+    background: #ff1493;
     padding: 1vh;
     border-width: 1px;
     border-style: solid;

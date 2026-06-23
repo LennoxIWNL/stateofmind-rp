@@ -39,7 +39,7 @@ const BoilerPlate: React.FC<BoilerPlateProps> = ({ children }) => {
             onClick={() => setAppFullScreen(!isAppFullScreen)}
             className="w-3 h-3 rounded-full group cursor-pointer"
             style={{
-              backgroundColor: "#2BC840",
+              backgroundColor: "#ff1493",
             }}
           >
             <div className="font-bold flex items-center justify-center invisible group-hover:visible text-[8px] uppercase">

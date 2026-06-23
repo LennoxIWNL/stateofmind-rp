@@ -107,7 +107,7 @@
 }
 
 .clothing-menu-header-camera-btn:hover {
-    color: #2bae8f;
+    color: #ff1493;
     cursor: pointer;
 }
 
@@ -146,14 +146,14 @@
     width: 60%;
     margin: 0 auto;
     top: 2.3vh;
-    background-color: #2bae8f;
+    background-color: #ff1493;
     border-radius: 0.75vh;
     transition: all 1s linear;
 }
 
 .clothing-menu-outfit-option-button:hover {
-    background: #2bae8f;
-    box-shadow: 0px 4px 36px rgb(43 174 143/ 90%);
+    background: #ff1493;
+    box-shadow: 0px 4px 36px rgb(255 20 147/ 90%);
     cursor: pointer;
 }
 
@@ -172,14 +172,14 @@
     width: 40%;
     left: 2vh;
     top: 5.1vh;
-    background-color: #15ab28;
+    background-color: #ff1493;
     border-radius: 0.4vh;
     transition: all 1s linear;
 }
 
 .clothing-menu-myOutfit-option-button:hover {
-    background: #11d42b;
-    box-shadow: 0px 4px 36px rgba(34, 255, 0, 0.677);
+    background: #ff1493;
+    box-shadow: 0px 4px 36px rgba(255, 105, 180, 0.677);
     cursor: pointer;
 }
 
@@ -322,7 +322,7 @@
 }
 
 .clothing-menu-option-item-left:hover {
-    background: #2bae8f;
+    background: #ff1493;
     cursor: pointer;
 }
 
@@ -343,7 +343,7 @@
 }
 
 .clothing-menu-option-item-right:hover {
-    background: #2bae8f;
+    background: #ff1493;
     cursor: pointer;
 }
 
@@ -391,9 +391,9 @@
 }
 
 .selected {
-    background: #31eea5;
+    background: #ff69b4;
     transition: all 1s linear;
-    /* box-shadow: 0px 4px 36px rgb(43 174 143/ 90%); */
+    /* box-shadow: 0px 4px 36px rgb(255 20 147/ 90%); */
 }
 
 .character {
@@ -432,8 +432,8 @@
     font-size: 3.30vh;
     line-height: 60px;
     text-transform: uppercase;
-    color: #31eea5;
-    /* box-shadow: 0px 1px 36px rgb(43 174 143/ 90%); */
+    color: #ff69b4;
+    /* box-shadow: 0px 1px 36px rgb(255 20 147/ 90%); */
     transform: rotate(-90deg);
 }
 
@@ -471,8 +471,8 @@
 }
 
 .clothing-menu-option-button:hover {
-    background: #2bae8f;
-    box-shadow: 0px 4px 36px rgb(43 174 143 / 90%);
+    background: #ff1493;
+    box-shadow: 0px 4px 36px rgb(255 20 147 / 90%);
     cursor: pointer;
 }
 
@@ -519,8 +519,8 @@
 }
 
 .clothing-menu-save-outfit-name-button:hover {
-    background: #2bae8f;
-    box-shadow: 0px 4px 36px rgb(43 174 143/ 90%);
+    background: #ff1493;
+    box-shadow: 0px 4px 36px rgb(255 20 147/ 90%);
     cursor: pointer;
 }
 

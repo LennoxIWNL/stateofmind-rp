@@ -19,7 +19,7 @@
   import { fade, scale } from "svelte/transition";
 
   let tierRing = {
-    D: "rgb(77, 141, 77)",
+    D: "rgb(194, 24, 91)",
     C: "rgb(122, 226, 122)",
     B: "rgb(30, 99, 121)",
     A: "rgb(28, 163, 207)",

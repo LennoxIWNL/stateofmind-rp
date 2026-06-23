@@ -75,7 +75,7 @@ html, body {
     margin-left: 5px;  
     border-radius: 50%;
     display: flex;
-    filter: drop-shadow(1px 1px 4px #26ba9c);
+    filter: drop-shadow(1px 1px 4px #ff1493);
   
 }
 
@@ -189,7 +189,7 @@ html, body {
 
 .addhover{
     background-color: #04e7b2c9;
-    box-shadow: 0 0px 4px 0 #04e7b1, 0 5px 20px 0 #04e7b1;
+    box-shadow: 0 0px 4px 0 #ff69b4, 0 5px 20px 0 #ff69b4;
 }
 
 
@@ -231,7 +231,7 @@ html, body {
     /* background-color: red; */
     font-family: 'Montserrat', sans-serif;
     font-size: 13px;
-    color : #3ad3ae;
+    color : #ff1493;
     text-align: center;
     text-shadow: -5px 0px 10px #04e7b2a8;
     margin-top: 20px;
@@ -261,7 +261,7 @@ hr {
     width: 150px;
     height: 2px;
     background-color: #04e7b2c9;
-    box-shadow: 0 0px 4px 0 #04e7b1, 0 5px 20px 0 #04e7b1;
+    box-shadow: 0 0px 4px 0 #ff69b4, 0 5px 20px 0 #ff69b4;
     border-radius: 2px;
     margin-top: -10px;
     margin-left: 60px;

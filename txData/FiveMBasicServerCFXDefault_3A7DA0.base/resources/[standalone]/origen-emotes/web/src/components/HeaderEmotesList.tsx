@@ -13,7 +13,7 @@ const HeaderEmotesList: React.FC<{
                 width: "100%",
                 height: "10%",
                 
-                /* backgroundColor: "rgba(0, 255, 0, 0.5)", */
+                /* backgroundColor: "rgba(255, 105, 180, 0.5)", */
 
                 display: "flex",
                 justifyContent: "flex-start",

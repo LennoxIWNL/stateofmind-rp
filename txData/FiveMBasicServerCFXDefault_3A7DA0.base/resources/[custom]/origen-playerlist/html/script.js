@@ -73,7 +73,7 @@ $(document).on('click', '.online', function (e) {
   type = $(this).data("type");
   append(type)
   $(".online").css({color: "rgb(154 87 89)",textShadow: "0px 0px 10px rgb(122, 118, 118)",backgroundColor: "rgb(53 54 63)",border: "none"})
-  $(this).css({color: "rgb(66, 201, 176)",textShadow: "0px 0px 10px rgba(66, 201, 176)",backgroundColor: "rgba(10,242,184,0.1)",border: "1px solid rgb(42 117 108)" })
+  $(this).css({color: "rgb(255, 20, 147)",textShadow: "0px 0px 10px rgba(255, 20, 147)",backgroundColor: "rgba(255,105,180,0.1)",border: "1px solid rgb(42 117 108)" })
 })
 
 $(document).on('click', '.exit', function (e) {

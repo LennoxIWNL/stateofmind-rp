@@ -17,7 +17,7 @@
 
 #game {
     background-color: #000000;
-    color: #20c20e;
+    color: #ff1493;
     width: 80%;
     height: 86%;
     position: absolute;
@@ -56,7 +56,7 @@
 
 .sol {
     background-color: #d0f0d0;
-    color: #178f0a;
+    color: #c2185b;
 }
 
 .sol2 {

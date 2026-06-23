@@ -131,7 +131,7 @@
 		<div class="flex flex-row gap-2 items-center">
 			<p class="text-white mr-4">{option.component}</p>
 			{#each option.actions as action}
-			<button class="bg-[#0098A3] text-white p-2"
+			<button class="bg-[#c2185b] text-white p-2"
 				on:click={() => {
 
 					if (action.custom == true) {

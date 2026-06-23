@@ -6,7 +6,7 @@
         <radialGradient id="paint0_radial_4715_191" cx="0" cy="0" r="1"
             gradientUnits="userSpaceOnUse"
             gradientTransform="translate(13.8954 20.2819) scale(302.387 6858.87)">
-            <stop stop-color="#02E1A9" />
+            <stop stop-color="#ff1493" />
             <stop offset="1" stop-color="#003427" stop-opacity="0.66" />
         </radialGradient>
     </defs>

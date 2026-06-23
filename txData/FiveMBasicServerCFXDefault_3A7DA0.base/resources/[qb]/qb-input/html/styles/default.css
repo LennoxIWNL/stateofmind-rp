@@ -92,7 +92,7 @@ body {
 
 option {
     background: rgb(19,25,38);
-    color: rgb(7,203,155);
+    color: rgb(255,20,147);
 }
 
 option:hover {
@@ -136,7 +136,7 @@ option:hover {
     border-style: solid;
     border-radius: 3px;
     border-width: 0.15rem;
-    border-color: rgb(7,203,155);
+    border-color: rgb(255,20,147);
 }
 
 
@@ -238,7 +238,7 @@ option:hover {
 .form-select:focus {
     width: 100%;
     background: radial-gradient(circle, rgba(38, 94, 86, 0.684) 0%, rgba(31, 79, 72, 0.256) 100%);
-    border-color: rgb(7,203,155);
+    border-color: rgb(255,20,147);
     border-style: solid;
     border-width: 0.15rem;
     margin-top: 2.5px;
@@ -289,7 +289,7 @@ option:hover {
     border-style: solid;
     border-radius: 3px;
     border-width: 0.15rem;
-    border-color: rgb(77, 164, 151);
+    border-color: rgb(194, 24, 91);
     font-weight: 500;
     border-radius: 5px;
     transition-property: color, background-color;
@@ -303,7 +303,7 @@ option:hover {
     border-style: solid;
     border-radius: 3px;
     border-width: 0.15rem;
-    border-color: rgb(11, 218, 166);
+    border-color: rgb(255, 20, 147);
     background: radial-gradient(circle, rgba(38, 94, 86, 0.684) 0%, rgba(31, 79, 72, 0.256) 100%);
     outline: none;
     color: rgb(254,252,255);
@@ -314,7 +314,7 @@ option:hover {
     border-style: solid;
     border-radius: 3px;
     border-width: 0.15rem;
-    border-color: rgb(77, 164, 151);
+    border-color: rgb(194, 24, 91);
     padding: 10px;
     font-size: 14px;
     margin: 5px 0px;

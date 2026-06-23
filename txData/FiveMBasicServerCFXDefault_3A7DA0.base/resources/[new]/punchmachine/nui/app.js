@@ -36,7 +36,7 @@ const miniGame = (type) => {
         $('#progressbar').css('background-color', '#f98813')
       }
       if (newWidth === '80%') {
-        $('#progressbar').css('background-color', '#6eff6e')
+        $('#progressbar').css('background-color', '#ff69b4')
       }
       $('img').css('margin-left', mright + 'vh')
       $('#key').css('border-color', 'rgb(129 126 126)')

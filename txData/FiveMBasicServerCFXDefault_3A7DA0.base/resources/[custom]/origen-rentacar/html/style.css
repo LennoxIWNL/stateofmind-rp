@@ -100,8 +100,8 @@ inset 4. = left */
 .header{
   font-family: AkrobatExtraBold;
   font-size: 20px;
-  color: #30e1b7;
-  text-shadow: 0px 0px 10px #30e1b7;
+  color: #ff1493;
+  text-shadow: 0px 0px 10px #ff1493;
   inset: 3.2% 0% 0% 1.5%;
   position: absolute;
 }
@@ -130,7 +130,7 @@ inset 4. = left */
 }
 
 .search-input i{
-  color: #30e1b7;
+  color: #ff1493;
   position: absolute;
   inset: 4% 24% 34% 28.5%;
   z-index: 2;
@@ -202,16 +202,16 @@ inset 4. = left */
 }
 
 .category-box .item:hover{
-  color: #30e1b7;
+  color: #ff1493;
   background-color: rgb(9, 66, 57,0.5);
-  border: 1px solid #15c7a3;
+  border: 1px solid #ff1493;
 }
 .category-box .item:hover i{
-  color: #30e1b7;
+  color: #ff1493;
 }
 
 .category-box .item:hover .name{
-  color: #30e1b7;
+  color: #ff1493;
 }
 
 .car-box{
@@ -252,9 +252,9 @@ inset 4. = left */
 }
 
 .car-box .car-item:hover{
-  color: #30e1b7;
+  color: #ff1493;
   background-color: rgb(9, 66, 57,0.5);
-  border: 1px solid #15c7a3;
+  border: 1px solid #ff1493;
 }
 
 .car-box .car-item .car-name{
@@ -299,8 +299,8 @@ inset 4. = left */
   position: absolute;
   transition-duration: 0.5s;
   cursor: pointer;
-  background-color: #54bda7;
-  box-shadow: 0px 0px 2px #06ecba;
+  background-color: #ff1493;
+  box-shadow: 0px 0px 2px #ff69b4;
 }
 
 .car-box .car-item .car-img img{
@@ -329,7 +329,7 @@ inset 4. = left */
   font-size: 10px;
   left: 3%;
   top: 15%;
-  color: #06ecba;
+  color: #ff69b4;
   position: absolute;
   transition-duration: 0.5s;
   cursor: pointer;
@@ -381,7 +381,7 @@ inset 4. = left */
 }
 
 .rent-box .right-box i:hover{
-  color: rgba(11, 197, 151, 0.8);
+  color: rgba(255, 20, 147, 0.8);
 }
 
 .rent-box .left-box{
@@ -407,7 +407,7 @@ inset 4. = left */
 }
 
 .rent-box .left-box i:hover{
-  color: rgba(11, 197, 151, 0.8);
+  color: rgba(255, 20, 147, 0.8);
 }
 
 .rent-box .day-text{
@@ -415,7 +415,7 @@ inset 4. = left */
   font-size: 10px;
   left: 81%;
   top: 35%;
-  color: #06ecba;
+  color: #ff69b4;
   position: absolute;
   transition-duration: 0.5s;
   cursor: pointer;
@@ -426,8 +426,8 @@ inset 4. = left */
   font-size: 10px;
   left: 2%;
   top: 86%;
-  text-shadow: 0px 0px 10px #30e1b7;
-  color: #06ecba;
+  text-shadow: 0px 0px 10px #ff1493;
+  color: #ff69b4;
   position: absolute;
   transition-duration: 0.5s;
   cursor: pointer;
@@ -438,8 +438,8 @@ inset 4. = left */
   font-size: 10px;
   left: 36.2%;
   top: 86%;
-  text-shadow: 0px 0px 10px #30e1b7;
-  color: #06ecba;
+  text-shadow: 0px 0px 10px #ff1493;
+  color: #ff69b4;
   position: absolute;
   transition-duration: 0.5s;
   cursor: pointer;
@@ -475,7 +475,7 @@ inset 4. = left */
 }
 
 .pay-button:hover{
-  color: #06ecba;
+  color: #ff69b4;
   background-color: rgba(0, 0, 0, 0.8);
   cursor: pointer;
 }

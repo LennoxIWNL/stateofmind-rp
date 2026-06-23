@@ -98,7 +98,7 @@
     top: 3.1vh;
     width: 1.8vh;
     height: 1.8vh;
-    background-color: #00b09c;
+    background-color: #ff1493;
     border-radius: 50%;
     text-align: center;
     color: white;
@@ -117,7 +117,7 @@
     transition: all 0.15s ease 0s;
 }
 .whatsapp-chat:hover {
-    background: #00b09c;
+    background: #ff1493;
 }
 .whatsapp-chat-picture {
     position: absolute;
@@ -249,7 +249,7 @@
 .whatsapp-extra-button {
     background: none;
     border: none;
-    background: #00b09c;
+    background: #ff1493;
     color: white;
     width: 3.5vh;
     height: 3.5vh;
@@ -296,7 +296,7 @@
     color: white;
     text-align: center;
     line-height: 3.5vh;
-    background: #00b09c;
+    background: #ff1493;
     font-size: 1.5vh;
     width: 3.5vh;
     height: 3.5vh;

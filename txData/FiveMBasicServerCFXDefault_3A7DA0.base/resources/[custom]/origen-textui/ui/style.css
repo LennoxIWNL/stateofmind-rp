@@ -27,7 +27,7 @@
     width: 2vw;
     height: 2vw;
     border-radius: .1823vw;
-    border: .15vw solid rgba(4, 191, 158, 0.30);
+    border: .15vw solid rgba(255, 20, 147, 0.30);
     background: rgba(3, 60, 56, 0.55);
     box-shadow: 0vw .0521vw .5625vw 0vw rgba(10, 116, 103, 0.35);
     top: .5vw;
@@ -48,8 +48,8 @@
     width: 1.05vw;
     height: .1563vw;
     border-radius: .2083vw;
-    background: #04BF9E;
-    box-shadow: 0vw 0vw .1406vw 0vw #35C2BA;
+    background: #ff1493;
+    box-shadow: 0vw 0vw .1406vw 0vw #ff1493;
     margin-top: .5vw;
     margin-left: .35vw;
 }
@@ -98,7 +98,7 @@
     width: 2vw;
     height: 2vw;
     border-radius: .1823vw;
-    border: .15vw solid rgba(4, 191, 158, 0.30);
+    border: .15vw solid rgba(255, 20, 147, 0.30);
     background: rgba(3, 60, 56, 0.55);
     box-shadow: 0vw .0521vw .5625vw 0vw rgba(10, 116, 103, 0.35);
     top: .5vw;
@@ -120,8 +120,8 @@
     width: 1.05vw;
     height: .1563vw;
     border-radius: .2083vw;
-    background: #04BF9E;
-    box-shadow: 0vw 0vw .1406vw 0vw #35C2BA;
+    background: #ff1493;
+    box-shadow: 0vw 0vw .1406vw 0vw #ff1493;
     margin-top: .5vw;
     margin-left: .35vw;
 }

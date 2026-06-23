@@ -197,7 +197,7 @@
     width: 5.5vh;
     text-align: center;
     line-height: 5.8vh;
-    background-color: #27ae60;
+    background-color: #ff1493;
     color: white;
     border-radius: 50%;
     transition: .1s;
@@ -422,7 +422,7 @@
 }
 
 .phone-add-contact-name:valid {
-    border-bottom: 2px solid #6ab04c;
+    border-bottom: 2px solid #ff1493;
 }
 
 .phone-add-contact-number {
@@ -452,7 +452,7 @@
 }
 
 .phone-add-contact-number:valid {
-    border-bottom: 2px solid #6ab04c;
+    border-bottom: 2px solid #ff1493;
 }
 
 .phone-add-contact-iban {
@@ -482,7 +482,7 @@
 }
 
 .phone-add-contact-iban:valid {
-    border-bottom: 2px solid #6ab04c;
+    border-bottom: 2px solid #ff1493;
 }
 
 #phone-add-contact-number-icon {
@@ -578,7 +578,7 @@
 }
 
 .phone-edit-contact-name:valid {
-    border-bottom: 2px solid #6ab04c;
+    border-bottom: 2px solid #ff1493;
 }
 
 .phone-edit-contact-number {
@@ -608,7 +608,7 @@
 }
 
 .phone-edit-contact-number:valid {
-    border-bottom: 2px solid #6ab04c;
+    border-bottom: 2px solid #ff1493;
 }
 
 .phone-edit-contact-iban {
@@ -638,7 +638,7 @@
 }
 
 .phone-edit-contact-iban:valid {
-    border-bottom: 2px solid #6ab04c;
+    border-bottom: 2px solid #ff1493;
 }
 
 #phone-edit-contact-number-icon {

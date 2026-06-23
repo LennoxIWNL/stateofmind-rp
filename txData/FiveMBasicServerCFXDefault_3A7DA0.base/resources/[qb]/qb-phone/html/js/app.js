@@ -9,7 +9,7 @@ QB.Phone.ContactColors = {
     1: "#3498db",
     2: "#e67e22",
     3: "#e74c3c",
-    4: "#1abc9c",
+    4: "#ff1493",
     5: "#9c88ff",
 }
 

@@ -261,12 +261,12 @@ input::-webkit-inner-spin-button {
 }
 
 .nav-item:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
-    box-shadow: 1px 1px 4px #1df0bb;
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
+    box-shadow: 1px 1px 4px #ff69b4;
 }
 
 .active-nav {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
 }
 
 .warrants-container {
@@ -281,7 +281,7 @@ input::-webkit-inner-spin-button {
 }
 
 .warrants-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -312,7 +312,7 @@ input::-webkit-inner-spin-button {
 }
 
 .warrants-item {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     border: calc(0.092592592vh * 1.4) solid rgba(255, 255, 255, 0.15);
     border-radius: 0vh;
     width: 100%;
@@ -425,7 +425,7 @@ input::-webkit-inner-spin-button {
 }
 
 .bulletin-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -536,7 +536,7 @@ span.bulletin-item-info[contenteditable]:empty::before {
 }
 
 .dispatch-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -552,7 +552,7 @@ span.bulletin-item-info[contenteditable]:empty::before {
 }
 
 .active-unit-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -653,7 +653,7 @@ background-color: #2589cc;
     padding-right: 10px;
     padding-left: 10px;
     /* height: 3vh; */
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     display: flex;
     align-items: center;
     margin-bottom: 5px;
@@ -689,12 +689,12 @@ background-color: #2589cc;
     margin: auto;
     margin-left: 5px;
     margin-right: 0px;
-    background-color: #0B9509;
+    background-color: #c2185b;
     border-radius: 10px;
 }
 
 .green-status {
-    background-color: #099517;
+    background-color: #c2185b;
 }
 
 .yellow-status {
@@ -795,7 +795,7 @@ background-color: #2589cc;
 }
 
 .call-number {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     border: calc(0.092592592vh * 1.4) solid rgba(255, 255, 255, 0.15);
     color: white;
     font-size: 15px;
@@ -826,7 +826,7 @@ background-color: #2589cc;
 }
 
 .call-title {
-    color: #1df0bb;
+    color: #ff69b4;
     font-size: 20px;
     font-weight: bolder;
     padding: 2.5px;
@@ -920,7 +920,7 @@ a {
 
 
 .profile-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -994,7 +994,7 @@ a {
 }
 
 .profile-item:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     border: calc(0.092592592vh * 1.4) solid rgba(255, 255, 255, 0.15);
     border-radius: 0vh;
 }
@@ -1068,7 +1068,7 @@ a {
 }
 
 .manage-profile-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -1084,7 +1084,7 @@ a {
 }
 
 .manage-profile-editing-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 15px;
     font-weight: lighter;
@@ -1107,7 +1107,7 @@ a {
     font-weight: lighter;
     padding-top: 10px;
     padding-bottom: 10px;
-    background-color: #1b8f25;
+    background-color: #c2185b;
     margin: auto;
     margin-left: 5px;
     margin-top: 10px;
@@ -1119,7 +1119,7 @@ a {
 }
 
 .manage-profile-save:hover {
-    background-color: #1caa28;
+    background-color: #ff1493;
 }
 
 .manage-profile-info-container {
@@ -1317,7 +1317,7 @@ a {
 }
 
 .license-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -1371,7 +1371,7 @@ a {
 }
 
 .tags-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -1428,7 +1428,7 @@ a {
     color: white;
     font-size: 12px;
     font-weight: 600;
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     user-select: none;
     width: fit-content;
 }
@@ -1471,7 +1471,7 @@ span.tag-input[contenteditable]:empty::before {
 }
 
 .vehs-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -1525,7 +1525,7 @@ span.tag-input[contenteditable]:empty::before {
 }
 
 .houses-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -1578,7 +1578,7 @@ span.tag-input[contenteditable]:empty::before {
 }
 
 .gallery-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -1680,7 +1680,7 @@ span.tag-input[contenteditable]:empty::before {
 }
 
 .convictions-title:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
 }
 
 .convictions-holder {
@@ -1710,7 +1710,7 @@ span.tag-input[contenteditable]:empty::before {
 }
 
 .profile-incidents-title:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
 }
 
 .profile-incidents-holder {
@@ -1871,7 +1871,7 @@ span.tag-input[contenteditable]:empty::before {
 }
 
 .give-licence:hover {
-    background-color: #099517;
+    background-color: #c2185b;
 }
 
 .remove-image:hover {
@@ -1879,11 +1879,11 @@ span.tag-input[contenteditable]:empty::before {
 }
 
 .expand-image:hover {
-    background-color: #099517;
+    background-color: #c2185b;
 }
 
 .copy-image-link:hover {
-    background-color: #099517;
+    background-color: #c2185b;
 }
 
 .view-incident:hover {
@@ -2055,8 +2055,8 @@ span.tag-input[contenteditable]:empty::before {
 }
 
 .incidents-item:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
-box-shadow: 1px 1px 4px #1df0bb;
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
+box-shadow: 1px 1px 4px #ff69b4;
 }
 
 .incidents-top-holder {
@@ -2100,7 +2100,7 @@ box-shadow: 1px 1px 4px #1df0bb;
     font-size: 14px;
     font-weight: 900;
     color: black;
-    text-shadow: 1px 1px 3px #1df0bb;
+    text-shadow: 1px 1px 3px #ff69b4;
     margin: auto;
     margin-left: 5px;
     margin-bottom: 5px;
@@ -2110,7 +2110,7 @@ box-shadow: 1px 1px 4px #1df0bb;
     font-size: 14px;
     font-weight: 900;
     color: black;
-    text-shadow: 1px 1px 3px #1df0bb;
+    text-shadow: 1px 1px 3px #ff69b4;
     margin: auto;
     margin-right: 5px;
     margin-bottom: 5px;
@@ -2130,7 +2130,7 @@ box-shadow: 1px 1px 4px #1df0bb;
 }
 
 .manage-incidents-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -2180,7 +2180,7 @@ box-shadow: 1px 1px 4px #1df0bb;
     font-weight: lighter;
     padding-top: 5px;
     padding-bottom: 5px;
-    background-color: #1b8f25;
+    background-color: #c2185b;
     margin: auto;
     margin-left: 5px;
     margin-top: 10px;
@@ -2192,7 +2192,7 @@ box-shadow: 1px 1px 4px #1df0bb;
 }
 
 .manage-incidents-save:hover {
-    background-color: #1caa28;
+    background-color: #ff1493;
 }
 
 .manage-incidents-title-tag {
@@ -2262,7 +2262,7 @@ box-shadow: 1px 1px 4px #1df0bb;
 }
 
 .manage-incidents-tags-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -2279,7 +2279,7 @@ box-shadow: 1px 1px 4px #1df0bb;
 }
 
 .manage-incidents-tags-add-btn:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
 }
 
 .manage-incidents-tags-add-btn {
@@ -2345,7 +2345,7 @@ box-shadow: 1px 1px 4px #1df0bb;
 }
 
 .manage-incidents-officers-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -2409,7 +2409,7 @@ box-shadow: 1px 1px 4px #1df0bb;
 }
 
 .manage-incidents-civilians-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -2443,7 +2443,7 @@ box-shadow: 1px 1px 4px #1df0bb;
 }
 
 .manage-incidents-civilians-add-btn:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
 }
 
 .manage-incidents-civilians-holder {
@@ -2473,7 +2473,7 @@ box-shadow: 1px 1px 4px #1df0bb;
 }
 
 .manage-incidents-evidence-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -2562,7 +2562,7 @@ span.tag-incident-input[contenteditable]:empty::before {
 }
 
 .associated-incidents-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -2578,7 +2578,7 @@ span.tag-incident-input[contenteditable]:empty::before {
 }
 
 .associated-incidents-title:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
 }
 
 .associated-incidents-tags-container {
@@ -2598,7 +2598,7 @@ span.tag-incident-input[contenteditable]:empty::before {
 }
 
 .associated-incidents-tags-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -2615,7 +2615,7 @@ span.tag-incident-input[contenteditable]:empty::before {
 }
 
 .associated-incidents-tags-add-btn:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
 }
 
 .associated-incidents-tags-add-btn {
@@ -2658,7 +2658,7 @@ span.tag-incident-input[contenteditable]:empty::before {
     color: white;
     font-size: 12px;
     font-weight: 600;
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     user-select: none;
     width: fit-content;
 }
@@ -3135,7 +3135,7 @@ span.tag-incident-input[contenteditable]:empty::before {
 }
 
 .manage-bolos-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -3154,7 +3154,7 @@ span.tag-incident-input[contenteditable]:empty::before {
 }
 
 .manage-bolos-title-tag {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -3171,7 +3171,7 @@ span.tag-incident-input[contenteditable]:empty::before {
 }
 
 .manage-bolos-title:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
 }
 
 
@@ -3307,7 +3307,7 @@ span.tag-incident-input[contenteditable]:empty::before {
     font-weight: lighter;
     padding-top: 7px;
     padding-bottom: 7px;
-    background-color: #1b8f25;
+    background-color: #c2185b;
     margin: auto;
     margin-left: 0px;
     margin-top: 10px;
@@ -3319,7 +3319,7 @@ span.tag-incident-input[contenteditable]:empty::before {
 }
 
 .manage-bolos-save:hover {
-    background-color: #1caa28;
+    background-color: #ff1493;
 }
 
 .manage-bolos-new {
@@ -3518,11 +3518,11 @@ span.tag-incident-input[contenteditable]:empty::before {
 }
 
 .bolos-search-refresh:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
 }
 
 .bolos-search-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -3540,7 +3540,7 @@ span.tag-incident-input[contenteditable]:empty::before {
 }
 
 .bolos-search-title:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
 }
 
 .manage-bolos-tags-add-btn {
@@ -3841,7 +3841,7 @@ span.officer-tag-bolo-input[contenteditable]:empty::before {
 }
 
 .dispatch-info-job-sapr {
-    color: #5acc25;
+    color: #ff1493;
 }
 
 .dispatch-info-job-pa {
@@ -3877,7 +3877,7 @@ span.officer-tag-bolo-input[contenteditable]:empty::before {
 }
 
 .active-info-job-sapr {
-    background-color: #5acc25;
+    background-color: #ff1493;
 }
 
 .active-info-job-pa {
@@ -3979,7 +3979,7 @@ span.officer-tag-bolo-input[contenteditable]:empty::before {
 }
 
 .reports-search-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -3997,7 +3997,7 @@ span.officer-tag-bolo-input[contenteditable]:empty::before {
 }
 
 .reports-search-title:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
 }
 
 .manage-reports-container {
@@ -4014,7 +4014,7 @@ span.officer-tag-bolo-input[contenteditable]:empty::before {
 }
 
 .manage-reports-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -4033,7 +4033,7 @@ span.officer-tag-bolo-input[contenteditable]:empty::before {
 }
 
 .manage-reports-title-tag {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -4050,7 +4050,7 @@ span.officer-tag-bolo-input[contenteditable]:empty::before {
 }
 
 .manage-reports-title:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
 }
 
 
@@ -4186,7 +4186,7 @@ span.officer-tag-bolo-input[contenteditable]:empty::before {
     font-weight: lighter;
     padding-top: 7px;
     padding-bottom: 7px;
-    background-color: #1b8f25;
+    background-color: #c2185b;
     margin: auto;
     margin-left: 0px;
     margin-top: 10px;
@@ -4199,7 +4199,7 @@ span.officer-tag-bolo-input[contenteditable]:empty::before {
 }
 
 .manage-reports-save:hover {
-    background-color: #1caa28;
+    background-color: #ff1493;
 }
 
 .manage-reports-new {
@@ -4601,11 +4601,11 @@ span.tag-reports-input[contenteditable]:empty::before {
 }
 
 .dmv-search-refresh:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
 }
 
 .dmv-search-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -4621,7 +4621,7 @@ span.tag-reports-input[contenteditable]:empty::before {
 }
 
 .dmv-search-title:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
 }
 
 .dmv-search-input {
@@ -4682,7 +4682,7 @@ span.tag-reports-input[contenteditable]:empty::before {
     font-weight: lighter;
     padding-top: 7px;
     padding-bottom: 7px;
-    background-color: #1b8f25;
+    background-color: #c2185b;
     margin: auto;
     margin-left: 5px;
     margin-top: 10px;
@@ -4694,15 +4694,15 @@ span.tag-reports-input[contenteditable]:empty::before {
 }
 
 .vehicle-information-save:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
 }
 
 .add-charge:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
 }
 
 .vehicle-information-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -4925,7 +4925,7 @@ span.tag-reports-input[contenteditable]:empty::before {
 }
 
 .vehicle-info-tags-title {
-   background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+   background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -5064,7 +5064,7 @@ span.tag-reports-input[contenteditable]:empty::before {
 
 .stafflogs-box-title {
     align-self: center;
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -5116,7 +5116,7 @@ span.tag-reports-input[contenteditable]:empty::before {
 
 .leaderboard-title {
     align-self: center;
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -5185,7 +5185,7 @@ span.tag-reports-input[contenteditable]:empty::before {
 .olivegreen-color { background-color: #31423f; }
 .green-color { background-color: #155c2d; }
 .gasolinebluegreen-color { background-color: #1b6770; }
-.mattelimegreen-color { background-color: #66b81f; }
+.mattelimegreen-color { background-color: #ff1493; }
 .seawash-color { background-color: #65867f; }
 .midnightblue-color { background-color: #222e46; }
 .darkblue-color { background-color: #233155; }
@@ -5258,7 +5258,7 @@ span.tag-reports-input[contenteditable]:empty::before {
 }
 
 .mark-code-5:hover {
-    background-color: #0B9509;
+    background-color: #c2185b;
 }
 
 .remove-code-5:hover {
@@ -5266,7 +5266,7 @@ span.tag-reports-input[contenteditable]:empty::before {
 }
 
 .mark-stolen:hover {
-    background-color: #0B9509;
+    background-color: #c2185b;
 }
 
 .remove-stolen:hover {
@@ -5278,11 +5278,11 @@ span.tag-reports-input[contenteditable]:empty::before {
 }
 
 .set-callsign:hover {
-    background-color: #0B9509;
+    background-color: #c2185b;
 }
 
 .set-radio:hover {
-    background-color: #09956b;
+    background-color: #c2185b;
 }
 
 .incidents-ghost-holder {
@@ -5351,7 +5351,7 @@ span.tag-reports-input[contenteditable]:empty::before {
 }
 
 .manage-incidents-editing-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 15px;
     font-weight: lighter;
@@ -5463,7 +5463,7 @@ span.tag-reports-input[contenteditable]:empty::before {
 }
 
 .offense-item {
-    background-color: #0B9509;
+    background-color: #c2185b;
     border: 1.5px solid black;
     height: 5.0vh;
     margin: .5vh;
@@ -5601,14 +5601,14 @@ span.tag-reports-input[contenteditable]:empty::before {
     padding: .5vh;
     padding-left: 1vh;
     padding-right: 1vh;
-    background-color: #0B9509;
+    background-color: #c2185b;
     border-radius: 1vh;
     margin: auto;
     user-select: none;
 }
 
 .radio-submit:hover {
-    background-color: #15ac12;
+    background-color: #ff1493;
 }
 
 .callsign-inner-container {
@@ -5673,14 +5673,14 @@ span.tag-reports-input[contenteditable]:empty::before {
     padding: .5vh;
     padding-left: 1vh;
     padding-right: 1vh;
-    background-color: #0B9509;
+    background-color: #c2185b;
     border-radius: 1vh;
     margin: auto;
     user-select: none;
 }
 
 .callsign-submit:hover {
-    background-color: #15ac12;
+    background-color: #ff1493;
 }
 
 
@@ -5695,7 +5695,7 @@ span.tag-reports-input[contenteditable]:empty::before {
 }
 
 .green-tag {
-    background-color: #0B9509;
+    background-color: #c2185b;
 }
 
 .white-tag {
@@ -5724,7 +5724,7 @@ span.tag-reports-input[contenteditable]:empty::before {
 }
 
 .green-penal-code {
-    background-color: #0B9509;
+    background-color: #c2185b;
 }
 
 .red-penal-code {
@@ -5748,7 +5748,7 @@ span.tag-reports-input[contenteditable]:empty::before {
 }
 
 .call-attach:hover {
-    background-color: #1caa28;
+    background-color: #ff1493;
 }
 
 .Set-Waypoint:hover {
@@ -5839,7 +5839,7 @@ span.tag-reports-input[contenteditable]:empty::before {
 }
 
 .incidents-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -6045,7 +6045,7 @@ span.tag-reports-input[contenteditable]:empty::before {
     padding: .5vh;
     padding-left: 1vh;
     padding-right: 1vh;
-    background-color: #0B9509;
+    background-color: #c2185b;
     border-radius: 1vh;
     margin: auto;
     user-select: none;
@@ -6053,7 +6053,7 @@ span.tag-reports-input[contenteditable]:empty::before {
 }
 
 .impound-submit:hover {
-    background-color: #15ac12;
+    background-color: #ff1493;
 }
 
 .status-impound:hover {
@@ -6065,7 +6065,7 @@ span.tag-reports-input[contenteditable]:empty::before {
 }
 
 .impound-vehicle:hover {
-    background-color: #12ac1f;
+    background-color: #ff1493;
 }
 
 .impound-fee {
@@ -6139,7 +6139,7 @@ span.tag-reports-input[contenteditable]:empty::before {
 }
 
 .cams-items:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
 }
 
 .weapons-container {
@@ -6154,7 +6154,7 @@ span.tag-reports-input[contenteditable]:empty::before {
 }
 
 .weapons-search-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -6252,7 +6252,7 @@ span.tag-reports-input[contenteditable]:empty::before {
     font-weight: lighter;
     padding-top: 7px;
     padding-bottom: 7px;
-    background-color: #1b8f25;
+    background-color: #c2185b;
     margin: auto;
     margin-left: 5px;
     margin-top: 10px;
@@ -6264,11 +6264,11 @@ span.tag-reports-input[contenteditable]:empty::before {
 }
 
 .weapon-information-save:hover {
-    background-color: #1caa28;
+    background-color: #ff1493;
 }
 
 .weapon-information-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -6668,7 +6668,7 @@ input[type="range"].vehicle-info-points-input::-moz-range-track {
 }
 
 .calls-search-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;
@@ -6747,11 +6747,11 @@ input[type="range"].vehicle-info-points-input::-moz-range-track {
 }
 
 .map-clear:hover {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
 }
 
 .map-title {
-    background: radial-gradient(rgba(0, 248, 185, 0.55) 0%, rgba(0, 248, 185, 0.22) 100%);
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
     color: white;
     font-size: 18px;
     font-weight: bolder;

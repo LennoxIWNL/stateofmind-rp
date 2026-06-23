@@ -125,7 +125,7 @@
         height: 18.28125vw;
         left: 17.708333333333332vw;
         top: 21.02175992348159vh;
-        background: radial-gradient(124.78% 211.82% at 128.62% 213.11%, rgba(117, 221, 165, 0.55) 0%, rgba(117, 221, 165, 0) 100%) /* warning: gradient uses a rotation that is not supported by CSS and may not behave as expected */, rgba(0, 0, 0, 0.42);
+        background: radial-gradient(124.78% 211.82% at 128.62% 213.11%, rgba(255, 20, 147, 0.55) 0%, rgba(255, 20, 147, 0) 100%) /* warning: gradient uses a rotation that is not supported by CSS and may not behave as expected */, rgba(0, 0, 0, 0.42);
         border: 2px solid rgba(255, 255, 255, 0.28);
     }
 
@@ -145,7 +145,7 @@
         font-weight: 300;
         font-size: 2.6041666666666665vw;
         line-height: 3.8541666666666665vw;
-        color: #73DDAA
+        color: #ff1493
     }
 
     .box-s-text {
@@ -168,9 +168,9 @@
         height: 2.1354166666666665vw;
         left: 18.854166666666668vw;
         top: 3.702773792443807vh;
-        border: 1px solid #39DF85;
+        border: 1px solid #ff1493;
         transition:1s;
-        box-shadow: 0px 0px 19px 1px rgba(0, 255, 117, 0.51);
+        box-shadow: 0px 0px 19px 1px rgba(255, 105, 180, 0.51);
         border-radius: 0.78125vw;
     }
 
@@ -337,8 +337,8 @@
         height: 2.7822916666666666vw;
         left: 48.854166666666668vw;
         top: 3.8578680203045685vh;
-        border: 1px solid #39DF85;
-        box-shadow: 0px 0px 19px 1px rgba(0, 255, 117, 0.51);
+        border: 1px solid #ff1493;
+        box-shadow: 0px 0px 19px 1px rgba(255, 105, 180, 0.51);
         border-radius: 0.78125vw;
     }
 
@@ -435,7 +435,7 @@
         width: 63.2375vw;
         height: 37vw;
         margin-top:22.221319796954315vh;
-        background: radial-gradient(124.78% 211.82% at 128.62% 213.11%, rgba(117, 221, 165, 0.55) 0%, rgba(117, 221, 165, 0) 100%) /* warning: gradient uses a rotation that is not supported by CSS and may not behave as expected */, rgba(0, 0, 0, 0.42);
+        background: radial-gradient(124.78% 211.82% at 128.62% 213.11%, rgba(255, 20, 147, 0.55) 0%, rgba(255, 20, 147, 0) 100%) /* warning: gradient uses a rotation that is not supported by CSS and may not behave as expected */, rgba(0, 0, 0, 0.42);
         border: 2px solid rgba(255, 255, 255, 0.28);
         margin-left:17.74vw;
         border-radius: 0.1vw;
@@ -448,7 +448,7 @@
         margin-top: 1.9492385786802031vh;
         width: 18vw;
         height: 17vw;
-        background: radial-gradient(124.78% 211.82% at 128.62% 213.11%, rgba(117, 221, 165, 0.55) 0%, rgba(117, 221, 165, 0) 100%) /* warning: gradient uses a rotation that is not supported by CSS and may not behave as expected */, rgba(0, 0, 0, 0.42);
+        background: radial-gradient(124.78% 211.82% at 128.62% 213.11%, rgba(255, 20, 147, 0.55) 0%, rgba(255, 20, 147, 0) 100%) /* warning: gradient uses a rotation that is not supported by CSS and may not behave as expected */, rgba(0, 0, 0, 0.42);
         border: 2px solid rgba(255, 255, 255, 0.28);
     }
 
@@ -467,7 +467,7 @@
 
 ::-webkit-scrollbar-thumb
 {
-    background-color:rgba(117, 221, 165, 0.55)
+    background-color:rgba(255, 20, 147, 0.55)
 }
 
 *{
@@ -503,13 +503,13 @@
 }
 
 .prew-but {
-    border: 1px solid #39DF85;
+    border: 1px solid #ff1493;
     height: 2.6vw;
     width: 9vw;
     transition:1s;
     margin-left: 4vw;
     margin-top: 0.584771573604061vh;
-    box-shadow: 0px 0px 19px 1px rgba(0, 255, 117, 0.51);
+    box-shadow: 0px 0px 19px 1px rgba(255, 105, 180, 0.51);
     border-radius: 1.1503067484662577vw;
 }
 
@@ -538,11 +538,11 @@
 
 .buy-button {
     position:absolute;
-    border: 1px solid #39DF85;
+    border: 1px solid #ff1493;
     height: 3.6vw;
     width: 18vw;
     margin-top: 94.73299492385787vh;
-    box-shadow: 0px 0px 19px 1px rgba(0, 255, 117, 0.51);
+    box-shadow: 0px 0px 19px 1px rgba(255, 105, 180, 0.51);
     background-color: rgba(51, 0, 0, 0.178);
     border-radius: 1.1503067484662577vw;
     transition:1s;
@@ -564,8 +564,8 @@
     height: 2.6vw;
     width: 14vw;
     margin-top: 89.97005076142132vh;
-    background-color: rgba(0, 255, 117, 0.51);
-    border: 1px solid #39DF85;
+    background-color: rgba(255, 105, 180, 0.51);
+    border: 1px solid #ff1493;
     opacity: 0.8;
     border-radius: 2px;
     text-align: center;
@@ -662,7 +662,7 @@
     height: 7.668711656441718vw;
     left: 23.877300613496935vw;
     top: 97.30272596843615vh;
-    background: #39DF85;
+    background: #ff1493;
     filter: blur(70px);
     }
 
@@ -725,7 +725,7 @@
   top: 78.02933574164616vh;
   z-index: 2;
   
-  background: #39DF85;
+  background: #ff1493;
   filter: blur(200px);
   }
   
@@ -746,7 +746,7 @@
     left: 0px;
     opacity:0.4;
     top: 0px;
-      background: #0f9a4d;
+      background: #c2185b;
 
   }
   
@@ -847,7 +847,7 @@
   }
 
 .box-app:hover,.prew-but:hover, .buy-button:hover  {
-  background: #39DF85;
+  background: #ff1493;
   cursor:pointer;
 }
 

@@ -155,7 +155,7 @@
 
 #policeradar .container .patrol {
     background: rgb(0, 125, 0);
-    background: linear-gradient(to bottom, rgb(0, 150, 0), rgb(0, 75, 0));
+    background: linear-gradient(to bottom, rgb(194, 24, 91), rgb(0, 75, 0));
 }
 
 #policeradar .container .locked {

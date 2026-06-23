@@ -31,7 +31,7 @@ body{
     height: 0px;
     border-style: solid;
     border-width: 13px 13px 0 0;
-    border-color: #24a492 transparent transparent transparent;
+    border-color: #c2185b transparent transparent transparent;
     transform: rotate(0deg);
 }
 .vinyet{
@@ -94,7 +94,7 @@ body{
     text-align: center;
     justify-content: center;
     background: #27565a;
-    color: #35ac9b;
+    color: #ff1493;
     float: left;
     padding: 2px;
     font-size: 17px;
@@ -105,7 +105,7 @@ body{
 #npcmeslekamk{
     font-size: 13px;
     background-color: #27565a;
-    color: #24a492;
+    color: #c2185b;
     padding: 4px 11px;
     justify-items: center;
     justify-content: center;
@@ -114,7 +114,7 @@ body{
 #npcrep{
     font-size: 13px;
     background-color: #27565a;
-    color: #24a492;
+    color: #c2185b;
     padding: 4px 11px;
     justify-items: center;
     justify-content: center;

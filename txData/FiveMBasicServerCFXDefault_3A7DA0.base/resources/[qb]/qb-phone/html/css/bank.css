@@ -114,11 +114,11 @@
     font-size: 2vh;
 }
 .pay-invoice {
-    color: #4cd137;
+    color: #ff1493;
     transition: .1s;
 }
 .pay-invoice:hover {
-    color: #70f75b;
+    color: #ff69b4;
 }
 .decline-invoice {
     color: #e84118;
@@ -277,7 +277,7 @@
     border-bottom: 2px solid #fbc531;
 }
 #bank-transfer-iban:valid {
-    border-bottom: 2px solid #6ab04c;
+    border-bottom: 2px solid #ff1493;
 }
 #bank-transfer-amount {
     position: absolute;
@@ -306,7 +306,7 @@
 }
 
 #bank-transfer-amount:valid {
-    border-bottom: 2px solid #6ab04c;
+    border-bottom: 2px solid #ff1493;
 }
 .bank-transfer-iban-icon  {
     position: absolute;

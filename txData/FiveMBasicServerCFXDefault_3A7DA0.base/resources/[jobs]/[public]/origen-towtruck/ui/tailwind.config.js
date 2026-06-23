@@ -13,7 +13,7 @@ export default {
         "7B": "#7BFF98",
         "7C": "#7C7C7C",
         FF7B7B: "#FF7B7B",
-        "45FFBC": "#45FFBC",
+        "45FFBC": "#ff69b4",
         FF5A5A: "#FF5A5A",
         fea71c: "#fea71c",
       },

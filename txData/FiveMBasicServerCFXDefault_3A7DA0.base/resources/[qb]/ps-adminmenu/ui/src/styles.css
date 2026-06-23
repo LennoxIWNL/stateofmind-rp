@@ -34,7 +34,7 @@ body {
 ::-webkit-scrollbar {
 	height: 0px;
 	width: 0vh;
-	background-color: rgb(39 211 170);
+	background-color: rgb(255 20 147);
 }
 
 .scroll-visble ::-webkit-scrollbar {
@@ -43,6 +43,6 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-	background-color: rgb(39 211 170);
+	background-color: rgb(255 20 147);
 	border-radius: 50px;
 }

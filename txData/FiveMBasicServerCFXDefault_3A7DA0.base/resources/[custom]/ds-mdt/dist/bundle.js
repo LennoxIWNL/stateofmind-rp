@@ -14580,7 +14580,7 @@
                     className: "warrant-action"
                 }, e.createElement(Ct, {
                     icon: C,
-                    color: "#58cc00",
+                    color: "#ff1493",
                     onClick: function() {
                         i.mutate({
                             id: t.item.id,

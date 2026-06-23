@@ -202,7 +202,7 @@
         background-color: rgb(255, 255, 255);
     }
     .some-left .batang.done {
-        background-color: rgb(112, 226, 102);
+        background-color: rgb(255, 20, 147);
     }
     .some-left .batang {
         width: 5px;
@@ -342,6 +342,6 @@
         background-color: #6a94ff;
     }
     button.create {
-        background-color: #4f9d56;
+        background-color: #c2185b;
     }
 </style>

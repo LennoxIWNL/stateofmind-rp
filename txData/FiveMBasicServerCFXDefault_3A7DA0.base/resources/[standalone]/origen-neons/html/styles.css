@@ -16,7 +16,7 @@ div {
   width: 25%;
   height: 15%;
   transform: translate(-50%, -50%);
-  border: 0.5px solid rgb(39 211 170);
+  border: 0.5px solid rgb(255 20 147);
   background-color: rgba(0, 0, 0, 1.00);
 }
 
@@ -29,7 +29,7 @@ div {
   width: 30%;
   height: 30%;
   transform: translate(-50%, -50%);
-  border: 0.5px solid rgb(39 211 170);
+  border: 0.5px solid rgb(255 20 147);
   background-color: rgba(0, 0, 0, 1.00);
 }
 
@@ -42,7 +42,7 @@ div {
   width: 25%;
   height: 15%;
   transform: translate(-50%, -50%);
-  border: 0.5px solid rgb(39 211 170);
+  border: 0.5px solid rgb(255 20 147);
   background-color: rgba(0, 0, 0, 1.00);
 }
 
@@ -55,7 +55,7 @@ div {
   width: 25%;
   height: 17%;
   transform: translate(-50%, -50%);
-  border: 0.5px solid rgb(39 211 170);
+  border: 0.5px solid rgb(255 20 147);
   background-color: rgba(0, 0, 0, 1.00);
 }
 
@@ -91,7 +91,7 @@ body{
   text-align: left;
   padding-left: 1%;
   color: white;
-  background-color: rgba(39, 211, 170, 0.60);
+  background-color: rgba(255, 20, 147, 0.60);
 }
 
 .neon1 {
@@ -104,7 +104,7 @@ body{
   text-align: left;
   padding-left: 1%;
   color: white;
-  background-color: rgba(39, 211, 170, 0.60);
+  background-color: rgba(255, 20, 147, 0.60);
 }
 
 .neon2 {
@@ -117,7 +117,7 @@ body{
   text-align: left;
   padding-left: 1%;
   color: white;
-  background-color: rgba(39, 211, 170, 0.60);
+  background-color: rgba(255, 20, 147, 0.60);
 
 }
 .neon3 {
@@ -130,7 +130,7 @@ body{
   text-align: left;
   padding-left: 1%;
   color: white;
-  background-color: rgba(39, 211, 170, 0.60);
+  background-color: rgba(255, 20, 147, 0.60);
 }
 .neon4 {
   top: 45%;
@@ -142,7 +142,7 @@ body{
   text-align: left;
   padding-left: 1%;
   color: white;
-  background-color: rgba(39, 211, 170, 0.60);
+  background-color: rgba(255, 20, 147, 0.60);
 }
 .allneons {
   top: 60%;
@@ -154,7 +154,7 @@ body{
   text-align: left;
   padding-left: 1%;
   color: white;
-  background-color: rgba(39, 211, 170, 0.60);
+  background-color: rgba(255, 20, 147, 0.60);
 }
 
 .crisscross {
@@ -167,7 +167,7 @@ body{
   text-align: left;
   padding-left: 1%;
   color: white;
-  background-color: rgba(39, 211, 170, 0.60);
+  background-color: rgba(255, 20, 147, 0.60);
 }
 
 .lightning {
@@ -180,7 +180,7 @@ body{
   text-align: left;
   padding-left: 1%;
   color: white;
-  background-color: rgba(39, 211, 170, 0.60);
+  background-color: rgba(255, 20, 147, 0.60);
 }
 
 .fourways {
@@ -193,7 +193,7 @@ body{
   text-align: left;
   padding-left: 1%;
   color: white;
-  background-color: rgba(39, 211, 170, 0.60);
+  background-color: rgba(255, 20, 147, 0.60);
 }
 
 .blinking {
@@ -206,7 +206,7 @@ body{
   text-align: left;
   padding-left: 1%;
   color: white;
-  background-color: rgba(39, 211, 170, 0.60);
+  background-color: rgba(255, 20, 147, 0.60);
 }
 
 .snake {
@@ -219,7 +219,7 @@ body{
   text-align: left;
   padding-left: 1%;
   color: white;
-  background-color: rgba(39, 211, 170, 0.60);
+  background-color: rgba(255, 20, 147, 0.60);
 }
 
 .allinone {
@@ -232,7 +232,7 @@ body{
   text-align: left;
   padding-left: 1%;
   color: white;
-  background-color: rgba(39, 211, 170, 0.60);
+  background-color: rgba(255, 20, 147, 0.60);
 }
 
 .aspeed1 {
@@ -245,7 +245,7 @@ body{
   text-align: left;
   padding-left: 1%;
   color: white;
-  background-color: rgba(39, 211, 170, 0.60);
+  background-color: rgba(255, 20, 147, 0.60);
 }
 
 .aspeed2 {
@@ -258,7 +258,7 @@ body{
   text-align: left;
   padding-left: 1%;
   color: white;
-  background-color: rgba(39, 211, 170, 0.60);
+  background-color: rgba(255, 20, 147, 0.60);
 }
 
 .aspeed3 {
@@ -271,7 +271,7 @@ body{
   text-align: left;
   padding-left: 1%;
   color: white;
-  background-color: rgba(39, 211, 170, 0.60);
+  background-color: rgba(255, 20, 147, 0.60);
 }
 
 .rgbspeed1 {
@@ -284,7 +284,7 @@ body{
   text-align: left;
   padding-left: 1%;
   color: white;
-  background-color: rgba(39, 211, 170, 0.60);
+  background-color: rgba(255, 20, 147, 0.60);
 }
 
 .rgbspeed2 {
@@ -297,7 +297,7 @@ body{
   text-align: left;
   padding-left: 1%;
   color: white;
-  background-color: rgba(39, 211, 170, 0.60);
+  background-color: rgba(255, 20, 147, 0.60);
 }
 
 .rgbspeed3 {
@@ -310,7 +310,7 @@ body{
   text-align: left;
   padding-left: 1%;
   color: white;
-  background-color: rgba(39, 211, 170, 0.60);
+  background-color: rgba(255, 20, 147, 0.60);
 }
 
 .container {
@@ -368,7 +368,7 @@ body{
 }
 
 input:checked + .slider {
-  background-color: rgb(39 211 170);
+  background-color: rgb(255 20 147);
 }
 
 input:focus + .slider {
@@ -686,12 +686,12 @@ input.spectrum.with-add-on {
 }
 
 .sp-hue {
-  background: -moz-linear-gradient(top, red 0, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, red 100%);
-  background: -ms-linear-gradient(top, red 0, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, red 100%);
-  background: -o-linear-gradient(top, red 0, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, red 100%);
-  background: -webkit-gradient(linear, left top, left bottom, from(red), color-stop(.17, #ff0), color-stop(.33, #0f0), color-stop(.5, #0ff), color-stop(.67, #00f), color-stop(.83, #f0f), to(red));
-  background: -webkit-linear-gradient(top, red 0, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, red 100%);
-  background: linear-gradient(to bottom, red 0, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, red 100%)
+  background: -moz-linear-gradient(top, red 0, #ff0 17%, #ff69b4 33%, #ff69b4 50%, #00f 67%, #f0f 83%, red 100%);
+  background: -ms-linear-gradient(top, red 0, #ff0 17%, #ff69b4 33%, #ff69b4 50%, #00f 67%, #f0f 83%, red 100%);
+  background: -o-linear-gradient(top, red 0, #ff0 17%, #ff69b4 33%, #ff69b4 50%, #00f 67%, #f0f 83%, red 100%);
+  background: -webkit-gradient(linear, left top, left bottom, from(red), color-stop(.17, #ff0), color-stop(.33, #ff69b4), color-stop(.5, #ff69b4), color-stop(.67, #00f), color-stop(.83, #f0f), to(red));
+  background: -webkit-linear-gradient(top, red 0, #ff0 17%, #ff69b4 33%, #ff69b4 50%, #00f 67%, #f0f 83%, red 100%);
+  background: linear-gradient(to bottom, red 0, #ff0 17%, #ff69b4 33%, #ff69b4 50%, #00f 67%, #f0f 83%, red 100%)
 }
 
 .sp-1 {
@@ -1001,7 +1001,7 @@ input.spectrum.with-add-on {
 }
 
 .sp-container button.sp-choose {
-  background-color: #3cab3b;
+  background-color: #ff1493;
   color: #fff;
   margin-left: 5px
 }

@@ -112,7 +112,7 @@
 }
 
 .storeapp-download:hover {
-    color: #3cb623;
+    color: #ff1493;
     transition: .05s ease-in-out;
 }
 
@@ -196,7 +196,7 @@
 }
 
 .download-password-input:valid {
-    border-bottom: .2vh solid rgb(19, 179, 27);
+    border-bottom: .2vh solid rgb(255, 20, 147);
 }
 
 .download-progressbar {

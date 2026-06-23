@@ -68,8 +68,8 @@ body {
     top: 14%;
     left: 5%;
     border-radius: 0.833px;
-    background: #08C098;
-    box-shadow: 0px 0px 3.2px 1px rgba(8, 192, 152, 0.37);
+    background: #ff1493;
+    box-shadow: 0px 0px 3.2px 1px rgba(255, 20, 147, 0.37);
 }
 
 #TUKeyDiv {
@@ -81,7 +81,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #08c098;
+    color: #ff1493;
     background: #171A21;
     border-radius: 7px;
 }
@@ -91,9 +91,9 @@ body {
     height: 67%;
     position: relative;
     border-radius: 4px;
-    border: 1px solid #08C098;
-    background: rgba(8, 192, 152, 0.14);
-    box-shadow: 0px 0px 7.4px 1px rgba(8, 192, 152, 0.21);
+    border: 1px solid #ff1493;
+    background: rgba(255, 20, 147, 0.14);
+    box-shadow: 0px 0px 7.4px 1px rgba(255, 20, 147, 0.21);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -140,7 +140,7 @@ body {
     width: fit-content;
     height: 100%;
     position: relative;
-    /* background: radial-gradient(82.81% 82.81% at 50% 50%, rgba(90, 255, 217, 0.00) 35.8%, rgba(90, 255, 217, 0.28) 93.82%), #055C44;
+    /* background: radial-gradient(82.81% 82.81% at 50% 50%, rgba(255, 105, 180, 0.00) 35.8%, rgba(255, 105, 180, 0.28) 93.82%), #055C44;
     box-shadow: 0px 0px 16.8px 0px rgba(255, 255, 255, 0.22) inset; */
     color: #FFF;
     font-family: "Inter", sans-serif;
@@ -166,7 +166,7 @@ body {
     width: fit-content;
     height: 100%;
     position: relative;
-    /* background: radial-gradient(82.81% 82.81% at 50% 50%, rgba(90, 255, 217, 0.00) 35.8%, rgba(90, 255, 217, 0.28) 93.82%), #055C44;
+    /* background: radial-gradient(82.81% 82.81% at 50% 50%, rgba(255, 105, 180, 0.00) 35.8%, rgba(255, 105, 180, 0.28) 93.82%), #055C44;
     box-shadow: 0px 0px 16.8px 0px rgba(255, 255, 255, 0.22) inset; */
     color: #FFF;
     font-family: "Inter", sans-serif;
@@ -192,7 +192,7 @@ body {
     width: fit-content;
     height: 75%;
     position: relative;
-    background: radial-gradient(82.81% 82.81% at 50% 50%, rgba(90, 255, 217, 0.00) 35.8%, rgba(90, 255, 217, 0.28) 93.82%), #055C44;
+    background: radial-gradient(82.81% 82.81% at 50% 50%, rgba(255, 105, 180, 0.00) 35.8%, rgba(255, 105, 180, 0.28) 93.82%), #055C44;
     box-shadow: 0px 0px 16.8px 0px rgba(255, 255, 255, 0.22) inset;
     color: #FFF;
     font-family: "Inter", sans-serif;
@@ -244,7 +244,7 @@ body {
     width: fit-content;
     height: 80%;
     position: relative;
-    /* background: radial-gradient(82.81% 82.81% at 50% 50%, rgba(90, 255, 217, 0.00) 35.8%, rgba(90, 255, 217, 0.28) 93.82%), #055C44;
+    /* background: radial-gradient(82.81% 82.81% at 50% 50%, rgba(255, 105, 180, 0.00) 35.8%, rgba(255, 105, 180, 0.28) 93.82%), #055C44;
     box-shadow: 0px 0px 16.8px 0px rgba(255, 255, 255, 0.22) inset; */
     color: #FFF;
     font-family: "Inter", sans-serif;
@@ -271,7 +271,7 @@ body {
     width: fit-content;
     height: 80%;
     position: relative;
-    /* background: radial-gradient(82.81% 82.81% at 50% 50%, rgba(90, 255, 217, 0.00) 35.8%, rgba(90, 255, 217, 0.28) 93.82%), #055C44;
+    /* background: radial-gradient(82.81% 82.81% at 50% 50%, rgba(255, 105, 180, 0.00) 35.8%, rgba(255, 105, 180, 0.28) 93.82%), #055C44;
     box-shadow: 0px 0px 16.8px 0px rgba(255, 255, 255, 0.22) inset; */
     color: #FFF;
     font-family: "Inter", sans-serif;
@@ -298,7 +298,7 @@ body {
     width: fit-content;
     height: 70%;
     position: relative;
-    background: radial-gradient(82.81% 82.81% at 50% 50%, rgba(90, 255, 217, 0.00) 35.8%, rgba(90, 255, 217, 0.28) 93.82%), #055C44;
+    background: radial-gradient(82.81% 82.81% at 50% 50%, rgba(255, 105, 180, 0.00) 35.8%, rgba(255, 105, 180, 0.28) 93.82%), #055C44;
     box-shadow: 0px 0px 16.8px 0px rgba(255, 255, 255, 0.22) inset;
     color: #FFF;
     font-family: "Inter", sans-serif;

@@ -712,7 +712,7 @@ const cancelProgressBar = () => {
 
 const _tmpl$ = /*#__PURE__*/template(`<div class="center-column center"><div class="progress-cont">`),
   _tmpl$2 = /*#__PURE__*/template(`<div class="progress"><div class="top-line"><p class="gilroy600 p-white"></p><p class="gilroy400 p-white">%</p></div><div class="bottom-line"><ul class="center">`),
-  _tmpl$3 = /*#__PURE__*/template(`<li class="center"><svg width="11" height="8" viewBox="0 0 11 8" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 0H8L10.5 4L8 8H0L2.5 4L0 0Z" fill="url(#paint0_linear_192_180)"></path><defs><linearGradient id="paint0_linear_192_180" x1="8" y1="3.99996" x2="-4.38265e-10" y2="3.99996" gradientUnits="userSpaceOnUse"><stop stop-color="#ff1493"></stop><stop offset="1" stop-color="#129070">`);
+  _tmpl$3 = /*#__PURE__*/template(`<li class="center"><svg width="11" height="8" viewBox="0 0 11 8" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 0H8L10.5 4L8 8H0L2.5 4L0 0Z" fill="url(#paint0_linear_192_180)"></path><defs><linearGradient id="paint0_linear_192_180" x1="8" y1="3.99996" x2="-4.38265e-10" y2="3.99996" gradientUnits="userSpaceOnUse"><stop stop-color="#ff1493"></stop><stop offset="1" stop-color="#c2185b">`);
 const interfaceView = props => {
   return (() => {
     const _el$ = _tmpl$(),

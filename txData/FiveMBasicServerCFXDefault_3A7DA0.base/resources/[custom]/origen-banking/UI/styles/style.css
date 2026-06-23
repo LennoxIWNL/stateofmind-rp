@@ -140,7 +140,7 @@ body {
 }
 
 .text-glow {
-  color: #2de5eb;
+  color: #ff1493;
   text-shadow: 0 0 2vh #2dcfeb;
   font-weight: bold;
 }
@@ -150,7 +150,7 @@ body {
   text-shadow: 0 0 2vh #ff1493;
   font-weight: bold; */
 
-  color: #2de5eb;
+  color: #ff1493;
   text-shadow: 0 0 2vh #2dcfeb;
   font-weight: bold;
 }
@@ -408,7 +408,7 @@ body {
 .selected-account-account-details h4 {
   font-size: 2vh;
   width: fit-content;
-  color: #48e1c5;
+  color: #ff1493;
   margin: 0;
   position: relative;
 }
@@ -438,7 +438,7 @@ body {
   justify-content: center;
   background-color: #083543b2;
   font-weight: 700;
-  color: #2de5eb;
+  color: #ff1493;
   margin: 1vh 0vh;
   cursor: pointer;
   padding: 1vh 1vh;
@@ -468,7 +468,7 @@ body {
 }
 
 .account-details-selected {
-  background: linear-gradient(0deg, #02222c, #2de5eb, #02222c) !important;
+  background: linear-gradient(0deg, #02222c, #ff1493, #02222c) !important;
 }
 
 .account-details-user {
@@ -729,7 +729,7 @@ body {
   justify-content: center;
   background-color: #083543b2;
   font-weight: 700;
-  color: #4aedf3;
+  color: #ff69b4;
   font-size: 1.3vh;
   margin-top: 3vh;
 }

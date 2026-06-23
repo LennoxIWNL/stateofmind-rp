@@ -101,7 +101,7 @@ function SetupRaces(Races) {
             $(".racing-races").append(element);
             $("#raceid-"+i).data('RaceData', race);
             if (!race.RaceData.Started) {
-                $("#raceid-"+i).css({"border-bottom-color":"#34b121"});
+                $("#raceid-"+i).css({"border-bottom-color":"#ff1493"});
             } else {
                 $("#raceid-"+i).css({"border-bottom-color":"#b12121"});
             }

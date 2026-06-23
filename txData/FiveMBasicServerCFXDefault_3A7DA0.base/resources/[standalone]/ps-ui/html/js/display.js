@@ -14,7 +14,7 @@ window.addEventListener('message', function(event) {
                     $("#display-container").css("background", "#d9534f");
                     break;
                 case "success":
-                    $("#display-container").css("background", "#5cb85c");
+                    $("#display-container").css("background", "#ff1493");
                     break;
                 case "warning":
                     $("#display-container").css("background", "#f0ad4e");

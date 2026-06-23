@@ -1147,7 +1147,7 @@ div:focus {
 }
 
 .text-green {
-  color: #66bb6a;
+  color: #ff1493;
 }
 
 .text-gray {
@@ -1852,7 +1852,7 @@ p {
 .option:hover {
   border-radius: calc(0.092592592vh * 4);
   border: calc(0.092592592vh * 1) solid #ff1493;
-  background: radial-gradient(801.37% 145.73% at 50% 50%, #00b083 0%, #00251b 100%);
+  background: radial-gradient(801.37% 145.73% at 50% 50%, #ff1493 0%, #00251b 100%);
   box-shadow: 0px calc(0.092592592vh * 4) calc(0.092592592vh * 54) 0px rgba(255, 20, 147, 0.55);
 }
 .option-icon {
@@ -2275,7 +2275,7 @@ p {
 }
 
 .primary {
-  background: #41b06a;
+  background: #ff1493;
 }
 
 .secondary {
@@ -2767,9 +2767,9 @@ textarea {
 }
 
 .buttons .MuiButtonBase-root.MuiButton-root.MuiButton-contained.MuiButton-containedSizeSmall.MuiButton-sizeSmall.MuiButton-containedPrimary {
-  background-color: #41b06a;
+  background-color: #ff1493;
   color: #ebecff;
-  border-color: #41b06a;
+  border-color: #ff1493;
 }
 
 .buttons .MuiButtonBase-root.MuiButton-root.MuiButton-contained.MuiButton-containedSizeSmall.MuiButton-sizeSmall.MuiButton-containedSecondary {
@@ -2792,7 +2792,7 @@ textarea {
 }
 
 .button-green {
-  background-color: #41b06a;
+  background-color: #ff1493;
 }
 
 .button-blue {
@@ -2853,7 +2853,7 @@ textarea {
 }
 
 .app-content .component-paper .actions .action-call svg {
-  color: #41b06a;
+  color: #ff1493;
 }
 
 .app-content .component-paper .actions .action-delete svg {
@@ -3264,7 +3264,7 @@ textarea {
   background: linear-gradient(180deg, #ff9d8f 0%, #be4545 100%);
 }
 .notification-container .actions .action-accept {
-  background: linear-gradient(180deg, #c1ff8f 0%, #45be58 100%);
+  background: linear-gradient(180deg, #c1ff8f 0%, #ff1493 100%);
 }
 .notification-container .notification-info {
   flex: 1;
@@ -4102,7 +4102,7 @@ textarea {
   left: 50%;
   transform: translateX(-50%) translateY(-50%) rotateZ(90deg) translateY(-50%) translateY(1px);
   color: #c8c6ca;
-  background-image: linear-gradient(90deg, #aed581 0%, #4dd0e1 33.333%, #ff4081 66.666%, #ffa726 100%);
+  background-image: linear-gradient(90deg, #aed581 0%, #ff1493 33.333%, #ff4081 66.666%, #ffa726 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   padding: 0.2777777778vh 0.4166666667vh;
@@ -5778,7 +5778,7 @@ textarea {
   padding: 0;
   font-family: Nekst;
   --rdp-cell-size: 3vh;
-  --rdp-background-color: rgba(79, 255, 244, 1);
+  --rdp-background-color: rgba(255, 105, 180, 1);
 }
 .calendar-container .rdp .rdp-day:hover {
   color: #000000;
@@ -6094,7 +6094,7 @@ textarea {
   border: none;
   display: flex;
   align-items: center;
-  background: #4dc3a5;
+  background: #ff1493;
   height: calc(0.092592592vh * 30);
   width: calc(0.092592592vh * 30);
   justify-content: center;
@@ -6482,7 +6482,7 @@ textarea {
   text-transform: capitalize;
 }
 .vehicles-item .vehicle-state.impounded {
-  background-color: #4effca;
+  background-color: #ff69b4;
 }
 .vehicles-item .vehicle-state.out {
   background-color: #99393a;
@@ -6793,7 +6793,7 @@ textarea {
   align-items: center;
   width: calc(0.092592592vh * 22);
   height: calc(0.092592592vh * 22);
-  background: #4dc3a5;
+  background: #ff1493;
   justify-content: center;
   border-radius: calc(0.092592592vh * 3);
   transition: ease-in 150ms;
@@ -7110,13 +7110,13 @@ textarea {
   cursor: pointer;
   color: #266152;
   align-items: center;
-  background: #4dc3a5;
+  background: #ff1493;
   width: calc(0.092592592vh * 30);
   height: calc(0.092592592vh * 30);
   justify-content: center;
   border-radius: calc(0.092592592vh * 4);
   transition: ease-in all 150ms;
-  box-shadow: 0px 0 15px 0px #4dc3a5;
+  box-shadow: 0px 0 15px 0px #ff1493;
 }
 ._container_nfetb_1 ._reply_container_nfetb_1 ._btn_nfetb_46:hover {
   color: #ffffff;
@@ -7297,7 +7297,7 @@ textarea {
   font-size: calc(0.092592592vh * 12);
 }
 ._container_12vh5_1 ._right_12vh5_48 ._price_12vh5_48 span {
-  color: #39bd4d;
+  color: #ff1493;
   font-size: calc(0.092592592vh * 10);
 }
 ._container_12vh5_1 ._right_12vh5_48 ._price_12vh5_48 ._down_12vh5_63 {
@@ -7363,12 +7363,12 @@ textarea {
   cursor: pointer;
   font-weight: 500;
   color: #171717;
-  background: #48a376;
+  background: #c2185b;
 }
 ._container_qokjm_1 ._filter_options_qokjm_39 ._filter_item_qokjm_45._active_qokjm_64 {
   font-weight: 500;
   color: #171717;
-  background: #48a376;
+  background: #c2185b;
 }
 ._container_qokjm_1 ._list_qokjm_69 {
   width: 100%;
@@ -7446,7 +7446,7 @@ textarea {
 }
 ._container_1w5x2_1 ._numbers_1w5x2_43 ._number_1w5x2_43:hover {
   cursor: pointer;
-  border: 1px solid #48a376;
+  border: 1px solid #c2185b;
   background: rgba(255, 20, 147, 0.14);
 }
 ._container_1w5x2_1 ._btn_1w5x2_75 {
@@ -7457,7 +7457,7 @@ textarea {
   font-style: normal;
   font-family: "Inter";
   outline: none;
-  border: 1px solid #48a376;
+  border: 1px solid #c2185b;
   background: rgba(255, 20, 147, 0.14);
   height: calc(0.092592592vh * 50);
   font-size: calc(0.092592592vh * 14);
@@ -7500,14 +7500,14 @@ textarea {
   color: rgba(255, 255, 255, 0.3);
 }
 ._container_l5mk5_1 ._left_l5mk5_13 ._price_l5mk5_26 span {
-  color: #39bd4d;
+  color: #ff1493;
   margin-left: calc(0.092592592vh * 5);
 }
 ._container_l5mk5_1 ._left_l5mk5_13 ._price_l5mk5_26 ._down_l5mk5_37 {
   color: #c94242;
 }
 ._container_l5mk5_1 ._icon_l5mk5_40 {
-  color: #48a376;
+  color: #c2185b;
   padding: calc(0.092592592vh * 8);
   font-size: calc(0.092592592vh * 14);
   border-radius: calc(0.092592592vh * 6);
@@ -7597,11 +7597,11 @@ textarea {
 }
 ._container_sg931_1 ._trend_container_sg931_51 ._title_sg931_57 span {
   cursor: pointer;
-  color: #48a376;
+  color: #c2185b;
   font-size: calc(0.092592592vh * 13);
 }
 ._container_sg931_1 ._trend_container_sg931_51 ._title_sg931_57 span:hover {
-  color: #48a376;
+  color: #c2185b;
 }
 ._container_sg931_1 ._trend_container_sg931_51 ._list_sg931_74 {
   display: flex;
@@ -7678,7 +7678,7 @@ textarea {
 }
 ._container_1w5x2_1 ._numbers_1w5x2_43 ._number_1w5x2_43:hover {
   cursor: pointer;
-  border: 1px solid #48a376;
+  border: 1px solid #c2185b;
   background: rgba(255, 20, 147, 0.14);
 }
 ._container_1w5x2_1 ._btn_1w5x2_75 {
@@ -7689,7 +7689,7 @@ textarea {
   font-style: normal;
   font-family: "Inter";
   outline: none;
-  border: 1px solid #48a376;
+  border: 1px solid #c2185b;
   background: rgba(255, 20, 147, 0.14);
   height: calc(0.092592592vh * 50);
   font-size: calc(0.092592592vh * 14);
@@ -7738,7 +7738,7 @@ textarea {
   font-style: normal;
   font-family: "Inter";
   outline: none;
-  border: 1px solid #48a376;
+  border: 1px solid #c2185b;
   background: rgba(255, 20, 147, 0.14);
   height: calc(0.092592592vh * 50);
   font-size: calc(0.092592592vh * 14);
@@ -7834,7 +7834,7 @@ textarea {
   font-style: normal;
   font-family: "Inter";
   outline: none;
-  border: 1px solid #48a376;
+  border: 1px solid #c2185b;
   background: rgba(255, 20, 147, 0.14);
   height: calc(0.092592592vh * 40);
   font-size: calc(0.092592592vh * 12);
@@ -7869,11 +7869,11 @@ textarea {
 }
 ._container_mt4at_1 ._transactions_container_mt4at_65 ._title_mt4at_71 span {
   cursor: pointer;
-  color: #48a376;
+  color: #c2185b;
   font-size: calc(0.092592592vh * 13);
 }
 ._container_mt4at_1 ._transactions_container_mt4at_65 ._title_mt4at_71 span:hover {
-  color: #48a376;
+  color: #c2185b;
 }
 ._container_mt4at_1 ._transactions_container_mt4at_65 ._list_mt4at_88 {
   display: flex;
@@ -7918,7 +7918,7 @@ textarea {
 }
 ._container_1otez_1 ._icon_1otez_9:hover {
   cursor: pointer;
-  color: #48a376;
+  color: #c2185b;
 }
 ._container_1otez_1 ._title_1otez_18 {
   color: #ffffff;
@@ -7948,10 +7948,10 @@ textarea {
   color: rgba(255, 255, 255, 0.35);
 }
 ._container_9gl2j_1 ._btn_9gl2j_16:hover {
-  color: #48a376;
+  color: #c2185b;
 }
 ._container_9gl2j_1 ._active_9gl2j_25 {
-  color: #48a376;
+  color: #c2185b;
 }._container_12hme_1 {
   height: 100%;
   width: 100%;
@@ -8090,7 +8090,7 @@ textarea {
 ._document_actions_n8oq7_1 ._btn_n8oq7_15._active_n8oq7_32, ._document_actions_n8oq7_1 ._btn_n8oq7_15:hover {
   cursor: pointer;
   color: rgba(0, 0, 0, 0.61);
-  background-color: #4dc3a5;
+  background-color: #ff1493;
 }.document-view {
   display: flex;
   flex-direction: column;
@@ -8843,8 +8843,8 @@ svg.active .svg-elem-1 {
   background-color: #30d7aa1e;
 }
 ._container_1n3mp_1[data-ison=true] ._handle_1n3mp_11 {
-  background: #30d7aa;
-  box-shadow: 0px 4px 10px 0px rgba(48, 215, 170, 0.55);
+  background: #ff1493;
+  box-shadow: 0px 4px 10px 0px rgba(255, 20, 147, 0.55);
 }._container_4izor_1 {
   left: 0;
   right: 0;
@@ -9347,7 +9347,7 @@ svg.active .svg-elem-1 {
   border-radius: calc(0.092592592vh * 6);
   transition: ease-in 150ms;
   position: relative;
-  background: linear-gradient(145deg, rgba(24, 163, 172, 0.56) 0%, rgba(103, 138, 143, 0.65) 100%);
+  background: linear-gradient(145deg, rgba(194, 24, 91, 0.56) 0%, rgba(103, 138, 143, 0.65) 100%);
 }
 .activity-item .icon {
   height: auto;
@@ -9461,7 +9461,7 @@ svg.active .svg-elem-1 {
   justify-content: center;
   padding: calc(0.092592592vh * 25);
   border-radius: calc(0.092592592vh * 6);
-  background: linear-gradient(130deg, rgba(24, 163, 172, 0.5) 0%, rgba(255, 255, 255, 0) 100%);
+  background: linear-gradient(130deg, rgba(194, 24, 91, 0.5) 0%, rgba(255, 255, 255, 0) 100%);
 }
 .job-groups .group-options .group-action .info .icon {
   color: #ffffff;
@@ -9500,7 +9500,7 @@ svg.active .svg-elem-1 {
 }
 .job-groups .group-options .group-action .btn:hover {
   cursor: pointer;
-  background-color: rgba(24, 163, 172, 0.3);
+  background-color: rgba(194, 24, 91, 0.3);
 }
 .job-groups .group-options .bg-icon {
   opacity: 0.1;
@@ -9538,7 +9538,7 @@ svg.active .svg-elem-1 {
   border-radius: calc(0.092592592vh * 6);
   transition: ease-in 150ms;
   opacity: 0;
-  background: linear-gradient(130deg, rgba(24, 163, 172, 0.5) 0%, rgba(255, 255, 255, 0) 100%);
+  background: linear-gradient(130deg, rgba(194, 24, 91, 0.5) 0%, rgba(255, 255, 255, 0) 100%);
 }
 .job-groups .available-groups .group-item:hover {
   filter: brightness(120%);
@@ -9574,11 +9574,11 @@ svg.active .svg-elem-1 {
   padding: calc(0.092592592vh * 10);
   height: calc(0.092592592vh * 58);
   border-radius: calc(0.092592592vh * 6);
-  background: linear-gradient(130deg, rgba(24, 163, 172, 0.5018382353) 0%, rgba(255, 255, 255, 0) 100%);
+  background: linear-gradient(130deg, rgba(194, 24, 91, 0.5018382353) 0%, rgba(255, 255, 255, 0) 100%);
 }
 .jobs-item .hovering-header {
   cursor: pointer;
-  box-shadow: 0px 0px 14px 0px #2bc2d1 inset;
+  box-shadow: 0px 0px 14px 0px #ff1493 inset;
   background: #1b8893;
 }
 .jobs-item .hovering-header .hover-container {
@@ -9670,7 +9670,7 @@ svg.active .svg-elem-1 {
   padding: calc(0.092592592vh * 15);
   transition: ease-in 150ms;
   border-radius: calc(0.092592592vh * 6);
-  background: linear-gradient(130deg, rgba(24, 163, 172, 0.5) 0%, rgba(255, 255, 255, 0) 100%);
+  background: linear-gradient(130deg, rgba(194, 24, 91, 0.5) 0%, rgba(255, 255, 255, 0) 100%);
 }
 .member-item:hover {
   filter: brightness(120%);
@@ -9700,7 +9700,7 @@ svg.active .svg-elem-1 {
   transition: ease-in 150ms;
 }
 .member-item .info-container .group-value.action:hover {
-  color: rgba(24, 163, 172, 0.5);
+  color: rgba(194, 24, 91, 0.5);
 }.jobs-mygroup {
   display: flex;
   height: 100%;
@@ -9761,8 +9761,8 @@ svg.active .svg-elem-1 {
   background-color: #30d7aa1e;
 }
 .jobs-mygroup .switch[data-isOn=true] .handle {
-  background: #30d7aa;
-  box-shadow: 0px 4px 10px 0px rgba(48, 215, 170, 0.55);
+  background: #ff1493;
+  box-shadow: 0px 4px 10px 0px rgba(255, 20, 147, 0.55);
 }.jobs-center-app {
   background: #181824;
   position: relative;
@@ -10074,7 +10074,7 @@ svg.active .svg-elem-1 {
 }
 ._switch_1ff0d_1[data-isOn=true] ._handle_1ff0d_12 {
   background: #ff1493;
-  box-shadow: 0px 4px 10px 0px rgba(48, 215, 170, 0.55);
+  box-shadow: 0px 4px 10px 0px rgba(255, 20, 147, 0.55);
 }._container_1ocx1_1 {
   display: flex;
   width: 100%;
@@ -10307,10 +10307,10 @@ svg.active .svg-elem-1 {
   background: #ec9340;
 }
 .twatter-post .actions .btn:nth-child(2) {
-  background: #43ced7;
+  background: #ff1493;
 }
 .twatter-post .actions .btn:nth-child(3) {
-  background: #51ca81;
+  background: #ff1493;
 }
 .twatter-post .actions .btn:nth-child(4) {
   background: #ef5b5b;

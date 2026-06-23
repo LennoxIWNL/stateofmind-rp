@@ -193,7 +193,7 @@ body {
     margin: 1vh;
     width: 20vh;
     height: 5vh;
-    background: #28a745;
+    background: #c2185b;
     border-radius: 0.5vh;
 }
 
@@ -254,12 +254,12 @@ body {
     margin: 1vh;
     width: 20vh;
     height: 5vh;
-    background: #28a745;
+    background: #c2185b;
     border-radius: 0.5vh;
 }
 
 .apply-job-button:hover {
-    background: #28a745;
+    background: #c2185b;
 }
 
 .apply-job-button > p {

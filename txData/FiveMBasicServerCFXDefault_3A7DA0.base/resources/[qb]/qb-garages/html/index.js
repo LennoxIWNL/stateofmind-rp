@@ -126,7 +126,7 @@ window.addEventListener('message', function(event) {
 					${svg}
 					<div id="MDRSBDBCarDivTopPlate" style="background-image: url(${plateImg}); color: ${plateTextColor};"><h4>${vehData.plate}</h4></div>
 				</div>
-				<div id="MDRSBDBCarDivBottom"><h4 style="text-transform: capitalize;">${vehLabel}</h4><h4 style="color: #08c098; text-shadow: 0px 0px 20px #08c098; font-size: 0.6vw;">${status}</h4></div>
+				<div id="MDRSBDBCarDivBottom"><h4 style="text-transform: capitalize;">${vehLabel}</h4><h4 style="color: #ff1493; text-shadow: 0px 0px 20px #ff1493; font-size: 0.6vw;">${status}</h4></div>
 				<div class="MDRSBDBCarDivBottomBorder ${divStyleBorderBottom}" id="MDRSBDBCarDivBottomBorder-${vehData.vehicle}"></div>
 			</div>`;
 			appendHtml(document.getElementById("MDRSBottomDivBottom"), vehiclesHTML);
@@ -164,7 +164,7 @@ function clFunc(name1, name2, name3, name4, name5, name6, name7, name8, name9, n
 			vehicleLogs[choosedVehData.plate].forEach(function(logData, index) {
 				var logsHTML = `
 				<div id="MDLSBDPLBtn2">
-					<h4 style="text-shadow: 0px 0px 20px #08c098; font-size: 0.8vw;">Log Data</h4>
+					<h4 style="text-shadow: 0px 0px 20px #ff1493; font-size: 0.8vw;">Log Data</h4>
 					<h4 style="color: rgb(255, 254, 254, 0.4); font-size: 0.7vw; font-weight: 450;">${logData.type} | Garage: ${logData.garage} | Time: ${logData.time}</h4>
 				</div>`;
 				appendHtml(document.getElementById("MDLSBottomDivParkingLogs"), logsHTML);
@@ -176,7 +176,7 @@ function clFunc(name1, name2, name3, name4, name5, name6, name7, name8, name9, n
 		vehicleLogs[name3].forEach(function(logData, index) {
 			var logsHTML = `
 			<div id="MDLSBDPLBtn2">
-				<h4 style="text-shadow: 0px 0px 20px #08c098; font-size: 0.8vw;">Log Data</h4>
+				<h4 style="text-shadow: 0px 0px 20px #ff1493; font-size: 0.8vw;">Log Data</h4>
 				<h4 style="color: rgb(255, 254, 254, 0.4); font-size: 0.7vw; font-weight: 450;">${logData.type} | Garage: ${logData.garage} | Time: ${logData.time}</h4>
 			</div>`;
 			appendHtml(document.getElementById("MDLSBottomDivParkingLogs"), logsHTML);
@@ -356,7 +356,7 @@ function clFunc(name1, name2, name3, name4, name5, name6, name7, name8, name9, n
 						${svg}
 						<div id="MDRSBDBCarDivTopPlate" style="background-image: url(${plateImg}); color: ${plateTextColor};"><h4>${vehData.plate}</h4></div>
 					</div>
-					<div id="MDRSBDBCarDivBottom"><h4 style="text-transform: capitalize;">${vehLabel}</h4><h4 style="color: #08c098; text-shadow: 0px 0px 20px #08c098; font-size: 0.6vw;">${status}</h4></div>
+					<div id="MDRSBDBCarDivBottom"><h4 style="text-transform: capitalize;">${vehLabel}</h4><h4 style="color: #ff1493; text-shadow: 0px 0px 20px #ff1493; font-size: 0.6vw;">${status}</h4></div>
 					<div class="MDRSBDBCarDivBottomBorder ${divStyleBorderBottom}" id="MDRSBDBCarDivBottomBorder-${vehData.vehicle}"></div>
 				</div>`;
 				appendHtml(document.getElementById("MDRSBottomDivBottom"), vehiclesHTML);
@@ -453,7 +453,7 @@ function clFunc(name1, name2, name3, name4, name5, name6, name7, name8, name9, n
 							${svg}
 							<div id="MDRSBDBCarDivTopPlate" style="background-image: url(${plateImg}); color: ${plateTextColor};"><h4>${vehData.plate}</h4></div>
 						</div>
-						<div id="MDRSBDBCarDivBottom"><h4 style="text-transform: capitalize;">${vehLabel}</h4><h4 style="color: #08c098; text-shadow: 0px 0px 20px #08c098; font-size: 0.6vw;">${status}</h4></div>
+						<div id="MDRSBDBCarDivBottom"><h4 style="text-transform: capitalize;">${vehLabel}</h4><h4 style="color: #ff1493; text-shadow: 0px 0px 20px #ff1493; font-size: 0.6vw;">${status}</h4></div>
 						<div class="MDRSBDBCarDivBottomBorder ${divStyleBorderBottom}" id="MDRSBDBCarDivBottomBorder-${vehData.vehicle}"></div>
 					</div>`;
 					appendHtml(document.getElementById("MDRSBottomDivBottom"), vehiclesHTML);
@@ -551,7 +551,7 @@ function clFunc(name1, name2, name3, name4, name5, name6, name7, name8, name9, n
 							${svg}
 							<div id="MDRSBDBCarDivTopPlate" style="background-image: url(${plateImg}); color: ${plateTextColor};"><h4>${vehData.plate}</h4></div>
 						</div>
-						<div id="MDRSBDBCarDivBottom"><h4 style="text-transform: capitalize;">${vehLabel}</h4><h4 style="color: #08c098; text-shadow: 0px 0px 20px #08c098; font-size: 0.6vw;">${status}</h4></div>
+						<div id="MDRSBDBCarDivBottom"><h4 style="text-transform: capitalize;">${vehLabel}</h4><h4 style="color: #ff1493; text-shadow: 0px 0px 20px #ff1493; font-size: 0.6vw;">${status}</h4></div>
 						<div class="MDRSBDBCarDivBottomBorder ${divStyleBorderBottom}" id="MDRSBDBCarDivBottomBorder-${vehData.vehicle}"></div>
 					</div>`;
 					appendHtml(document.getElementById("MDRSBottomDivBottom"), vehiclesHTML);
@@ -699,7 +699,7 @@ function searchForCar(e) {
 					${svg}
 					<div id="MDRSBDBCarDivTopPlate" style="background-image: url(${plateImg}); color: ${plateTextColor};"><h4>${existingVehicle.plate}</h4></div>
 				</div>
-				<div id="MDRSBDBCarDivBottom"><h4 style="text-transform: capitalize;">${vehLabel}</h4><h4 style="color: #08c098; text-shadow: 0px 0px 20px #08c098; font-size: 0.6vw;">${status}</h4></div>
+				<div id="MDRSBDBCarDivBottom"><h4 style="text-transform: capitalize;">${vehLabel}</h4><h4 style="color: #ff1493; text-shadow: 0px 0px 20px #ff1493; font-size: 0.6vw;">${status}</h4></div>
 				<div class="MDRSBDBCarDivBottomBorder ${divStyleBorderBottom}" id="MDRSBDBCarDivBottomBorder-${existingVehicle.vehicle}"></div>
 			</div>`;
 			appendHtml(document.getElementById("MDRSBottomDivBottom"), vehiclesHTML);

@@ -47,7 +47,7 @@ body {
   width: 4.2%;
   font-size: 0.8vw;
   padding: 2px;
-  background:radial-gradient(83% 83% at 50% 50%,rgb(1, 104, 76),rgb(7, 197, 153));
+  background:radial-gradient(83% 83% at 50% 50%,rgb(1, 104, 76),rgb(255, 20, 147));
   color: white;
   box-shadow: 0px 0px 15px 2px rgb(47,113,100);
   position: absolute;
@@ -77,7 +77,7 @@ body {
   width: 3.5%;
   filter: blur(0.6px);
   font-size: 0.9rem;
-  background:radial-gradient(83% 83% at 50% 50%,rgb(1, 104, 76),rgb(7, 197, 153));
+  background:radial-gradient(83% 83% at 50% 50%,rgb(1, 104, 76),rgb(255, 20, 147));
   position: absolute;
   top: -13%;
   left: -19%;
@@ -146,7 +146,7 @@ body {
 }
 
 .main-box .right-box .item:hover .control-1 path{
-  fill: #19c29a;
+  fill: #ff1493;
 }
 
 .main-box .right-box .item:hover .alt-border{
@@ -154,10 +154,10 @@ body {
 }
 
 .main-box .right-box .item:hover .border{
-  background:radial-gradient(83% 83% at 50% 50%,rgb(1, 104, 76),rgb(7, 197, 153));
+  background:radial-gradient(83% 83% at 50% 50%,rgb(1, 104, 76),rgb(255, 20, 147));
 }
 .main-box .right-box .item:hover .itemhr{
-  background:radial-gradient(83% 83% at 50% 50%,rgb(1, 104, 76),rgb(7, 197, 153));
+  background:radial-gradient(83% 83% at 50% 50%,rgb(1, 104, 76),rgb(255, 20, 147));
 }
 
 
@@ -209,7 +209,7 @@ body {
   border-radius: 50%;
   font-size: 0.9rem;
   padding: 2px;
-  background-color: rgb(20, 195, 154);
+  background-color: rgb(255, 20, 147);
   display: none;
 }
 

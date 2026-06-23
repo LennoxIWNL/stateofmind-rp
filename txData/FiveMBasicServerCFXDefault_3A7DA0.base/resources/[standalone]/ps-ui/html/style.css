@@ -8,7 +8,7 @@
   border-image: linear-gradient(45deg, #ecc800, #564800) 1 !important;
 }
 .good {
-  background-color: #3cec54 !important;
+  background-color: #ff69b4 !important;
 }
 .bad {
   background-color: #F00F18 !important;
@@ -415,10 +415,10 @@ body::-webkit-scrollbar {
 }
 
 .var-group.bg1{
-  background-color: #00ffff;
+  background-color: #ff69b4;
 }
 .var-group.bg2{
-  background-color: #088f90;
+  background-color: #c2185b;
 }
 .var-group.bg3{
   background-color: #708fae;
@@ -503,18 +503,18 @@ body::-webkit-scrollbar {
 }
 .numbermaze-group:first-child {
   color: #008001 !important;
-  background-color: #6acf66;
+  background-color: #ff1493;
 }
 .numbermaze-group:last-child {
   color: #F00F18!important;
-  background-color: #6acf66;
+  background-color: #ff1493;
 }
 .numbermaze-group.breathing {
   animation: 0.5s infinite alternate ease-in-out breathing-bg;
 }
 @keyframes breathing-bg {
   from{background-color: #094e1c;}
-  to{background-color: #6acf66;}
+  to{background-color: #ff1493;}
 }
 .numbermaze-groups.transparent .numbermaze-group{
   color: transparent;
@@ -549,7 +549,7 @@ body::-webkit-scrollbar {
 
 
 .success {
-  background: rgba(54, 156, 80, 0.85);
+  background: rgba(194, 24, 91, 0.85);
   color: #fff;
 }
 
@@ -650,7 +650,7 @@ body::-webkit-scrollbar {
   transform: translate(-50%, -50%);
   -ms-transform: translate(-50%, -50%);
   background-color: #3C3C3C;
-  color: #00FFBF;
+  color: #ff69b4;
   font-family: "Roboto", sans-serif;
   font-size: 18px;
   font-weight: bold;

@@ -65,9 +65,9 @@ function resetStyles(index) {
 }
 
 function applyStyles(index) {
-    $('.item').eq(index).find('.item-right, .alt-border, .border').css('background', 'radial-gradient(83% 83% at 50% 50%,rgb(1, 104, 76),rgb(7, 197, 153))');
-    $('.item').eq(index).find('.itemhr, .control-1 path').css('background', 'radial-gradient(83% 83% at 50% 50%,rgb(1, 104, 76),rgb(7, 197, 153))');
-    $('.item').eq(index).find('.control-1 path').css('fill', '#19c29a');
+    $('.item').eq(index).find('.item-right, .alt-border, .border').css('background', 'radial-gradient(83% 83% at 50% 50%,rgb(1, 104, 76),rgb(255, 20, 147))');
+    $('.item').eq(index).find('.itemhr, .control-1 path').css('background', 'radial-gradient(83% 83% at 50% 50%,rgb(1, 104, 76),rgb(255, 20, 147))');
+    $('.item').eq(index).find('.control-1 path').css('fill', '#ff1493');
     $('.item').eq(index).find('.alt-border').css('display', 'block');
 
 }

@@ -56,11 +56,11 @@ SetupLawyers = function(data) {
             $(".lawyers-list").append(element);
         }
 
-        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(0, 204, 102);">Mechanic (' + mechanic.length + ')</h1>');
+        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(255, 20, 147);">Mechanic (' + mechanic.length + ')</h1>');
 
         if (mechanic.length > 0) {
             $.each(mechanic, function(i, lawyer2) {
-                var element = '<div class="lawyer-list" id="lawyerid2-' + i + '"> <div class="lawyer-list-firstletter" style="background-color: rgb(0, 204, 102);">' + (lawyer2.name).charAt(0).toUpperCase() + '</div> <div class="lawyer-list-fullname">' + lawyer2.name + '</div> <div class="lawyer-list-call"><i class="fas fa-phone"></i></div> </div>'
+                var element = '<div class="lawyer-list" id="lawyerid2-' + i + '"> <div class="lawyer-list-firstletter" style="background-color: rgb(255, 20, 147);">' + (lawyer2.name).charAt(0).toUpperCase() + '</div> <div class="lawyer-list-fullname">' + lawyer2.name + '</div> <div class="lawyer-list-call"><i class="fas fa-phone"></i></div> </div>'
                 $(".lawyers-list").append(element);
                 $("#lawyerid2-" + i).data('LawyerData', lawyer2);
             });
@@ -118,7 +118,7 @@ SetupLawyers = function(data) {
         var element = '<div class="lawyer-list"><div class="no-lawyers">There are no real estate agents available.</div></div>'
         $(".lawyers-list").append(element);
 
-        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(0, 204, 102);">Mechanic (' + mechanic.length + ')</h1>');
+        $(".lawyers-list").append('<br><h1 style="font-size:1.641025641025641vh; padding:1.0256410256410255vh; color:#fff; margin-top:0; width:100%; display:block; background-color: rgb(255, 20, 147);">Mechanic (' + mechanic.length + ')</h1>');
 
         var element = '<div class="lawyer-list"><div class="no-lawyers">There are no mechanics available.</div></div>'
         $(".lawyers-list").append(element);

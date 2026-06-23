@@ -235,12 +235,12 @@ function checkAndLogLevel(color) {
                 
                 for (const colorKey in levelOne) {
                     levelOne[colorKey].forEach(function (controlClass) {
-                        $(`.${controlClass} path`).css({'fill': 'rgb(39 ,211 ,170,0.5)'});
+                        $(`.${controlClass} path`).css({'fill': 'rgb(255 ,20 ,147,0.5)'});
                     });
                 }
 
                 $(level[levelCount].border).css({'border-color': 'white'});
-                $(level[levelCount].class).css({'background-color': 'rgb(39 ,211 ,170,0.5)'});
+                $(level[levelCount].class).css({'background-color': 'rgb(255 ,20 ,147,0.5)'});
                 levelCount++;
                 $(level[levelCount].border).css({'border-color': 'yellow'});
                 levelPassedColors.clear();

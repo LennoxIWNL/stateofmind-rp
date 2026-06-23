@@ -68,10 +68,10 @@ body {
 	color: #fff;
 }
 .enter:hover {
- 	box-shadow: #47cf73 0 0 1px 1px;
+ 	box-shadow: #ff1493 0 0 1px 1px;
 }
 .enter:active {
- 	background: #47cf73;
+ 	background: #ff1493;
 	color: #fff;
 }
 .shadow{

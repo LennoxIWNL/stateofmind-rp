@@ -88,7 +88,7 @@ body {
 }
 
 .color-1{
-  background-color: rgb(37, 188, 173);
+  background-color: rgb(255, 20, 147);
 }
 
 .color-2{
@@ -108,7 +108,7 @@ body {
 }
 
 .color-7{
-  background-color: rgb(37, 188, 173);
+  background-color: rgb(255, 20, 147);
 }
 
 .color-8{
@@ -128,11 +128,11 @@ body {
 }
 
 .color-12{
-  background-color: rgb(37, 188, 173);
+  background-color: rgb(255, 20, 147);
 }
 
 .color-13{
-  background-color: rgb(37, 188, 173);
+  background-color: rgb(255, 20, 147);
 }
 
 .color-14{
@@ -144,7 +144,7 @@ body {
 }
 
 .color-16{
-  background-color: rgb(37, 188, 173);
+  background-color: rgb(255, 20, 147);
 }
 
 .color-17{
@@ -160,7 +160,7 @@ body {
 }
 
 .color-20{
-  background-color: rgb(37, 188, 173);
+  background-color: rgb(255, 20, 147);
 }
 
 .color-21{
@@ -168,7 +168,7 @@ body {
 }
 
 .color-22{
-  background-color: rgb(37, 188, 173);
+  background-color: rgb(255, 20, 147);
 }
 
 .color-23{
@@ -176,7 +176,7 @@ body {
 }
 
 .color-24{
-  background-color: rgb(37, 188, 173);
+  background-color: rgb(255, 20, 147);
 }
 
 .color-25{
@@ -391,7 +391,7 @@ body {
 
 .unlock-button{
   padding: 0.5rem 17.5rem;
-  color: rgb(39 ,211 ,170);
+  color: rgb(255 ,20 ,147);
   background-color: rgb(0 37 43);
   position: absolute;
   top: 40.7rem;
@@ -414,8 +414,8 @@ body {
   border-radius: 0.2rem;
   width: 38rem;
   height: 1.5rem;
-  color: rgb(39 ,211 ,170);
-  background-color: rgb(39 ,211 ,170);
+  color: rgb(255 ,20 ,147);
+  background-color: rgb(255 ,20 ,147);
   z-index: 2;
 }
 
@@ -441,7 +441,7 @@ body {
 }
 
 .path{
-  fill: rgb(37, 188, 173);
+  fill: rgb(255, 20, 147);
 }
 
 .line{

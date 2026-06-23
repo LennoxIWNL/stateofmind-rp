@@ -12,7 +12,7 @@ const FavoriteEmotes: React.FC = () => {
                 width: "100%",
                 height: "37%",
 
-                /* backgroundColor: "rgb(0, 255, 255, 0.5)", */
+                /* backgroundColor: "rgb(255, 105, 180, 0.5)", */
 
                 display: "flex",
                 flexDirection: "row",

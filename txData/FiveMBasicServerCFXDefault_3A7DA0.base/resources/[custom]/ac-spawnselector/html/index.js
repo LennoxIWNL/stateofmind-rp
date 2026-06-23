@@ -62,20 +62,20 @@ window.addEventListener('message', function(event) {
 			body.style.display = "none";
             document.getElementById("body").innerHTML = `
             <div id="MDTop">
-                <div style="width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center; position: absolute; left: 42%; bottom: 37%; font-size: 30px; color: #00dfbd;">
-                    <i style="text-shadow: 0px 0px 20px #00dfbd;" class="fas fa-map-marker-alt"></i>
+                <div style="width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center; position: absolute; left: 42%; bottom: 37%; font-size: 30px; color: #ff1493;">
+                    <i style="text-shadow: 0px 0px 20px #ff1493;" class="fas fa-map-marker-alt"></i>
                 </div>
-                <!-- <div style="width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center; position: relative; font-size: 30px; color: #00dfbd;">
-                    <i style="text-shadow: 0px 0px 10px #00dfbd;" class="fas fa-map-marker-alt"></i>
+                <!-- <div style="width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center; position: relative; font-size: 30px; color: #ff1493;">
+                    <i style="text-shadow: 0px 0px 10px #ff1493;" class="fas fa-map-marker-alt"></i>
                 </div> -->
                 <div style="width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 5px;">
-                    <h4 style="color: #00dfbd; font-size: 20px; font-weight: 600;">Spawn Selector</h4>
+                    <h4 style="color: #ff1493; font-size: 20px; font-weight: 600;">Spawn Selector</h4>
                     <h4 style="color: #a7b1b9; font-size: 14px;">Click on a location to wake up there</h4>
                 </div>
             </div>
             <div id="MDBottomCenter">
                 <div id="MDBCRadial" onclick="clFunc('spawn', 'lastLocation')"><i style="position: absolute; font-size: 40px;" class="far fa-long-arrow-right"></i></div>
-                <h4 id="MDBottomCenterH4">OR <span style="color: #00dfbd; border-bottom: 2px solid #00dfbd; padding-bottom: 3px;">SPAWN</span> AT LAST LOCATION</h4>
+                <h4 id="MDBottomCenterH4">OR <span style="color: #ff1493; border-bottom: 2px solid #ff1493; padding-bottom: 3px;">SPAWN</span> AT LAST LOCATION</h4>
             </div>
             <div id="MDBottomLeft">
                 <div style="width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center;">
@@ -214,20 +214,20 @@ function clFunc(name1, name2, name3, name4, name5, name6) {
             xhr.send(JSON.stringify({type: name2, name: name3}));
             document.getElementById("body").innerHTML = `
             <div id="MDTop">
-                <div style="width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center; position: absolute; left: 42%; bottom: 37%; font-size: 30px; color: #00dfbd;">
-                    <i style="text-shadow: 0px 0px 20px #00dfbd;" class="fas fa-map-marker-alt"></i>
+                <div style="width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center; position: absolute; left: 42%; bottom: 37%; font-size: 30px; color: #ff1493;">
+                    <i style="text-shadow: 0px 0px 20px #ff1493;" class="fas fa-map-marker-alt"></i>
                 </div>
-                <!-- <div style="width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center; position: relative; font-size: 30px; color: #00dfbd;">
-                    <i style="text-shadow: 0px 0px 10px #00dfbd;" class="fas fa-map-marker-alt"></i>
+                <!-- <div style="width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center; position: relative; font-size: 30px; color: #ff1493;">
+                    <i style="text-shadow: 0px 0px 10px #ff1493;" class="fas fa-map-marker-alt"></i>
                 </div> -->
                 <div style="width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 5px;">
-                    <h4 style="color: #00dfbd; font-size: 20px; font-weight: 600;">Spawn Selector</h4>
+                    <h4 style="color: #ff1493; font-size: 20px; font-weight: 600;">Spawn Selector</h4>
                     <h4 style="color: #a7b1b9; font-size: 14px;">Click on a location to wake up there</h4>
                 </div>
             </div>
             <div id="MDBottomCenter">
                 <div id="MDBCRadial" onclick="clFunc('spawn', 'lastLocation')"><i style="position: absolute; font-size: 40px;" class="far fa-long-arrow-right"></i></div>
-                <h4 id="MDBottomCenterH4">OR <span style="color: #00dfbd; border-bottom: 2px solid #00dfbd; padding-bottom: 3px;">SPAWN</span> AT LAST LOCATION</h4>
+                <h4 id="MDBottomCenterH4">OR <span style="color: #ff1493; border-bottom: 2px solid #ff1493; padding-bottom: 3px;">SPAWN</span> AT LAST LOCATION</h4>
             </div>
             <div id="MDBottomLeft">
                 <div style="width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center;">
@@ -290,20 +290,20 @@ function clFunc(name1, name2, name3, name4, name5, name6) {
             xhr.send(JSON.stringify({type: name2, x: Number(name3), y: Number(name4), z: Number(name5), w: Number(name6)}));
             document.getElementById("body").innerHTML = `
             <div id="MDTop">
-                <div style="width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center; position: absolute; left: 42%; bottom: 37%; font-size: 30px; color: #00dfbd;">
-                    <i style="text-shadow: 0px 0px 20px #00dfbd;" class="fas fa-map-marker-alt"></i>
+                <div style="width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center; position: absolute; left: 42%; bottom: 37%; font-size: 30px; color: #ff1493;">
+                    <i style="text-shadow: 0px 0px 20px #ff1493;" class="fas fa-map-marker-alt"></i>
                 </div>
-                <!-- <div style="width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center; position: relative; font-size: 30px; color: #00dfbd;">
-                    <i style="text-shadow: 0px 0px 10px #00dfbd;" class="fas fa-map-marker-alt"></i>
+                <!-- <div style="width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center; position: relative; font-size: 30px; color: #ff1493;">
+                    <i style="text-shadow: 0px 0px 10px #ff1493;" class="fas fa-map-marker-alt"></i>
                 </div> -->
                 <div style="width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 5px;">
-                    <h4 style="color: #00dfbd; font-size: 20px; font-weight: 600;">Spawn Selector</h4>
+                    <h4 style="color: #ff1493; font-size: 20px; font-weight: 600;">Spawn Selector</h4>
                     <h4 style="color: #a7b1b9; font-size: 14px;">Click on a location to wake up there</h4>
                 </div>
             </div>
             <div id="MDBottomCenter">
                 <div id="MDBCRadial" onclick="clFunc('spawn', 'lastLocation')"><i style="position: absolute; font-size: 40px;" class="far fa-long-arrow-right"></i></div>
-                <h4 id="MDBottomCenterH4">OR <span style="color: #00dfbd; border-bottom: 2px solid #00dfbd; padding-bottom: 3px;">SPAWN</span> AT LAST LOCATION</h4>
+                <h4 id="MDBottomCenterH4">OR <span style="color: #ff1493; border-bottom: 2px solid #ff1493; padding-bottom: 3px;">SPAWN</span> AT LAST LOCATION</h4>
             </div>
             <div id="MDBottomLeft">
                 <div style="width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center;">

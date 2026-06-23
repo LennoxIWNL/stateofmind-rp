@@ -44,7 +44,7 @@ class Transaction {
           else if (this.type == "transfer_recieved")
             return `&nbsp;(${this.targetId} → You)`;
           else if (this.type == "deposit")
-            return `&nbsp;(<span style="color: #73f5e4">+${this.PrettyPrintAmount()}</span>)`;
+            return `&nbsp;(<span style="color: #ff69b4">+${this.PrettyPrintAmount()}</span>)`;
           else if (this.type == "withdraw")
             return `&nbsp;(<span style="color: #ed5365">-${this.PrettyPrintAmount()}</span>)`;
           else return ``;

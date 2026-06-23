@@ -52,7 +52,7 @@ $(document).ready(function () {
           background: "rgba(1, 4, 6, 0.5)",
           width: 400,
           iconColor: "white",
-          confirmButtonColor: "rgba(108, 255, 176, 0.52)",
+          confirmButtonColor: "rgba(255, 105, 180, 0.52)",
           confirmButtonText: "Okey, I got it!",
           color: "white",
         });
@@ -64,7 +64,7 @@ $(document).ready(function () {
           background: "rgba(1, 4, 6, 0.5)",
           width: 400,
           iconColor: "white",
-          confirmButtonColor: "rgba(108, 255, 176, 0.52)",
+          confirmButtonColor: "rgba(255, 105, 180, 0.52)",
           confirmButtonText: "Okey, I got it!",
           color: "white",
         });

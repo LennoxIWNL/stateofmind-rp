@@ -185,12 +185,12 @@ body {
   line-height: var(--size-100);
   text-transform: uppercase;
   margin-bottom: var(--size-7);
-  background: linear-gradient(180deg, #00ff75 0%, #096c36 96.87%);
+  background: linear-gradient(180deg, #ff69b4 0%, #096c36 96.87%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  -webkit-text-stroke: var(--size-0-8) #6cffb0;
-  text-shadow: 0 var(--size-4) var(--size-72) rgba(108, 255, 176, 0.52);
+  -webkit-text-stroke: var(--size-0-8) #ff69b4;
+  text-shadow: 0 var(--size-4) var(--size-72) rgba(255, 105, 180, 0.52);
   position: relative;
   display: inline-block;
 }
@@ -250,9 +250,9 @@ body {
 .item.active,
 .item:hover {
   background: linear-gradient(0deg, #0c7b3f 0%, rgba(5, 75, 38, 0) 100%);
-  border: var(--size-1) solid #19a85b;
+  border: var(--size-1) solid #c2185b;
   box-shadow: 0 var(--size-4) var(--size-56) rgba(5, 75, 38, 0.25),
-    inset 0 0 var(--size-37) #19a85b;
+    inset 0 0 var(--size-37) #c2185b;
 }
 .item .top {
   display: flex;
@@ -266,7 +266,7 @@ body {
 }
 
 .item-title t {
-  color: #00ff75;
+  color: #ff69b4;
   margin-left: 0.3vw;
   font-size: 0.8vw;
 }
@@ -385,7 +385,7 @@ body {
 }
 
 .char {
-  color: #6cffb0;
+  color: #ff69b4;
   animation: typing 1s linear;
 }
 
@@ -407,7 +407,7 @@ body {
 .progress-bar .bar {
   width: 0%;
   height: inherit;
-  background-color: rgba(2, 225, 145, 0.71);
+  background-color: rgba(255, 20, 147, 0.71);
   -webkit-animation: animate-stripes 3s linear infinite;
   transition: width 0.85s;
   transition-timing-function: ease-out;
@@ -433,7 +433,7 @@ body {
   }
   100% {
     background: transparent;
-    color: #6cffb0;
+    color: #ff69b4;
   }
 }
 .search-userlist {
@@ -492,7 +492,7 @@ body {
 }
 
 .form-input y {
-  color: rgb(108, 255, 176);
+  color: rgb(255, 105, 180);
   animation: rbcolor 3s linear infinite;
 }
 
@@ -501,13 +501,13 @@ body {
     color: rgba(255, 255, 255, 0.54);
   }
   50% {
-    color: rgb(108, 255, 176);
+    color: rgb(255, 105, 180);
   }
   75% {
     color: rgba(255, 255, 255, 0.54);
   }
   100% {
-    color: rgb(108, 255, 176);
+    color: rgb(255, 105, 180);
   }
 }
 

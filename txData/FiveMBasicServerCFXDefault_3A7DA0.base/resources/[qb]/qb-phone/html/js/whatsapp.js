@@ -198,7 +198,7 @@ $(document).on('click', '#whatsapp-openedchat-send', function(e){
         $("#whatsapp-openedchat-message").val("");
         $("div.emojionearea-editor").data("emojioneArea").setText('');
     } else {
-        QB.Phone.Notifications.Add("fab fa-whatsapp", "Whatsapp", "You can't send a empty message!", "#25D366", 1750);
+        QB.Phone.Notifications.Add("fab fa-whatsapp", "Whatsapp", "You can't send a empty message!", "#ff1493", 1750);
     }
 });
 
@@ -222,7 +222,7 @@ $(document).on('keypress', function (e) {
                 }));
                 $("#whatsapp-openedchat-message").val("");
             } else {
-                QB.Phone.Notifications.Add("fab fa-whatsapp", "Whatsapp", "You can't send a empty message!", "#25D366", 1750);
+                QB.Phone.Notifications.Add("fab fa-whatsapp", "Whatsapp", "You can't send a empty message!", "#ff1493", 1750);
             }
         }
     }

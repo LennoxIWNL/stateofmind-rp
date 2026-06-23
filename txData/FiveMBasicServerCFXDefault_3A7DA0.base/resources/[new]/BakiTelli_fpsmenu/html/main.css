@@ -148,8 +148,8 @@ body {
   background: linear-gradient(0deg, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)),
     radial-gradient(
         138.37% 165.81% at 117.74% 201.72%,
-        rgba(117, 221, 165, 0.55) 0%,
-        rgba(117, 221, 165, 0) 100%
+        rgba(255, 20, 147, 0.55) 0%,
+        rgba(255, 20, 147, 0) 100%
       )
       /* warning: gradient uses a rotation that is not supported by CSS and may not behave as expected */,
     rgba(0, 0, 0, 0.42);
@@ -214,11 +214,11 @@ body {
   height: 4.1vw;
   background: linear-gradient(
     180deg,
-    #59d893 -27.42%,
-    rgba(89, 216, 147, 0) 140.32%
+    #ff1493 -27.42%,
+    rgba(255, 20, 147, 0) 140.32%
   );
   border: 0.062083333333333336 solid rgba(0, 0, 0, 0.4);
-  filter: drop-shadow(0px 0px 0.46875vw rgba(83, 182, 128, 0.3));
+  filter: drop-shadow(0px 0px 0.46875vw rgba(255, 20, 147, 0.3));
   border-radius: 0.35vw;
 }
 
@@ -236,11 +236,11 @@ body {
   height: 3.1vw;
   background: linear-gradient(
     180deg,
-    #59d893 -27.42%,
-    rgba(89, 216, 147, 0) 140.32%
+    #ff1493 -27.42%,
+    rgba(255, 20, 147, 0) 140.32%
   );
   border: 0.05729166666666667vw solid rgba(0, 0, 0, 0.4);
-  filter: drop-shadow(0px 0px 0.46875vw rgba(83, 182, 128, 0.3));
+  filter: drop-shadow(0px 0px 0.46875vw rgba(255, 20, 147, 0.3));
   border-radius: 0.3541666666666667vw;
 }
 
@@ -342,8 +342,8 @@ body {
   height: 100%;
   background: linear-gradient(
     180deg,
-    #59d893 -27.42%,
-    rgba(89, 216, 147, 0) 140.32%
+    #ff1493 -27.42%,
+    rgba(255, 20, 147, 0) 140.32%
   );
   border: 0.057vw solid rgba(0, 0, 0, 0.4);
   filter: drop-shadow(0px 0px 1.2vw rgba(182, 83, 83, 0.57));

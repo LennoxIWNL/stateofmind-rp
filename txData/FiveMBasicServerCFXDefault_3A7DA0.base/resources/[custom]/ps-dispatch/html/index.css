@@ -555,9 +555,9 @@ video {
     background-color: rgb(0 76 165 / var(--tw-bg-opacity))
 }
 
-.bg-\[\#0098A3\] {
+.bg-\[\#c2185b\] {
     --tw-bg-opacity: 1;
-    background-color: rgb(0 152 163 / var(--tw-bg-opacity))
+    background-color: rgb(194 24 91 / var(--tw-bg-opacity))
 }
 
 .bg-\[\#232B33\] {
@@ -582,7 +582,7 @@ video {
 
 .bg-accent_cyan {
     --tw-bg-opacity: 1;
-    background-color: rgb(0 152 163 / var(--tw-bg-opacity))
+    background-color: rgb(194 24 91 / var(--tw-bg-opacity))
 }
 
 .bg-accent_dark_green {
@@ -597,7 +597,7 @@ video {
 
 .bg-accent_green {
     --tw-bg-opacity: 1;
-    background-color: rgb(0 163 121 / var(--tw-bg-opacity))
+    background-color: rgb(194 24 91 / var(--tw-bg-opacity))
 }
 
 .bg-accent_red {
@@ -716,7 +716,7 @@ video {
 
 .text-accent_cyan {
     --tw-text-opacity: 1;
-    color: rgb(0 152 163 / var(--tw-text-opacity))
+    color: rgb(194 24 91 / var(--tw-text-opacity))
 }
 
 .text-accent_red {

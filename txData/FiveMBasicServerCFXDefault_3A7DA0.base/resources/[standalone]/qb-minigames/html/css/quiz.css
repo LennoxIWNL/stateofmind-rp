@@ -248,8 +248,8 @@ section .option_list .option .icon {
     line-height: 24px;
 }
 .option_list .option .icon.tick {
-    color: #23903c;
-    border-color: #23903c;
+    color: #c2185b;
+    border-color: #c2185b;
     background: #d4edda;
 }
 

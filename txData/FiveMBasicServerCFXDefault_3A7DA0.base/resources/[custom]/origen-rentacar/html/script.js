@@ -117,9 +117,9 @@ $(document).on('click', '.category-box .item', function (e) {
   $('.category-box .item').children('.name').css('color','#88888e')
 
   $(this).css('background-color','rgb(9, 66, 57,0.5)')
-  $(this).css('border','1px solid #15c7a3')
-  $(this).children('i').css('color','#15c7a3')
-  $(this).children('.name').css('color','#15c7a3')
+  $(this).css('border','1px solid #ff1493')
+  $(this).children('i').css('color','#ff1493')
+  $(this).children('.name').css('color','#ff1493')
 
 })
 
@@ -132,9 +132,9 @@ $(document).on('click', '.car-box .car-item', function (e) {
   $('.car-box .car-item').children('.name').css('color','#88888e')
 
   $(this).css('background-color','rgb(9, 66, 57,0.5)')
-  $(this).css('border','1px solid #15c7a3')
-  $(this).children('i').css('color','#15c7a3')
-  $(this).children('.name').css('color','#15c7a3')
+  $(this).css('border','1px solid #ff1493')
+  $(this).children('i').css('color','#ff1493')
+  $(this).children('.name').css('color','#ff1493')
 
 
 })

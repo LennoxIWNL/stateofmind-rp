@@ -74,7 +74,7 @@ body {
 
 
 .header{
-  color: rgb(10 242 184);
+  color: rgb(255 105 180);
   font-size: 1.5rem;
   text-transform: uppercase;
   font-weight: 500;
@@ -82,7 +82,7 @@ body {
   margin-left: 1.5rem;
   margin-top: 1rem;
   display: flex;
-  text-shadow: 0px 0px 10px rgba(10 ,242 ,184,0.6);
+  text-shadow: 0px 0px 10px rgba(255 ,105 ,180,0.6);
 }
 
 .alt{
@@ -152,15 +152,15 @@ body {
 
 .online{
   padding: 0.4rem 4.5rem;
-  background-color: rgba(10,242,184,0.1);
+  background-color: rgba(255,105,180,0.1);
   position: absolute;
   top: 5rem;
   left: 1.5rem;
   border: 1px solid rgb(42 117 108);
   border-radius: 0.1rem;
-  color: rgb(66, 201, 176);
+  color: rgb(255, 20, 147);
   font-family: AkrobatBold;
-  text-shadow: 0px 0px 10px rgba(66, 201, 176);
+  text-shadow: 0px 0px 10px rgba(255, 20, 147);
   font-size: 0.6rem;
 }
 
@@ -204,15 +204,15 @@ body {
   width: 2rem;
   height: 2rem;
   border-radius: 0.1rem;
-  background-color: rgba(10,242,184,0.1);
+  background-color: rgba(255,105,180,0.1);
   border: 1.5px solid rgb(42 117 108);
 }
 
 .fa-user{
-  color: rgb(66, 201, 176);
+  color: rgb(255, 20, 147);
   font-size: 1rem;
   margin-left: 0.65rem;
-  text-shadow: 0px 0px 10px rgba(66, 201, 176);
+  text-shadow: 0px 0px 10px rgba(255, 20, 147);
 }
 
 .online-box .right-box{
@@ -228,7 +228,7 @@ body {
 }
 
 .online-box .right-box .name{
-  color: rgb(28 213 167);
+  color: rgb(255 20 147);
   font-size: 0.6rem;
   text-transform: uppercase;
   font-weight: bold;
@@ -239,8 +239,8 @@ body {
 }
 
 .online-box .right-box .steam{
-  color: rgb(28 213 167);
-  background-color: rgba(28 ,213, 167,0.1);
+  color: rgb(255 20 147);
+  background-color: rgba(255 ,20, 147,0.1);
   position: absolute;
   font-size: 0.5rem;
   text-transform: uppercase;

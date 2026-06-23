@@ -203,7 +203,7 @@
 }
 
 #myhouse-option-transfer-confirm {
-    background-color: #27ae60;
+    background-color: #ff1493;
 }
 
 #myhouse-option-transfer-confirm:hover {
@@ -285,7 +285,7 @@
 }
 
 .myhouse-option-transfer-container-citizenid:valid {
-    border-bottom: .3vh solid #27ae60;
+    border-bottom: .3vh solid #ff1493;
 }
 
 

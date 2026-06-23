@@ -73,8 +73,8 @@
 }
 
 .listcard:hover {
-    background-color: rgba(11, 197, 151, 0.8); /* Main color for hovering */
-    border-color: rgba(11, 197, 151, 0.8); /* Main color for hovering */
+    background-color: rgba(255, 20, 147, 0.8); /* Main color for hovering */
+    border-color: rgba(255, 20, 147, 0.8); /* Main color for hovering */
 }
 
 div > .playerid-txt {
