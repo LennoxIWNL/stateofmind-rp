@@ -93,13 +93,13 @@ local CreateTargets = function()
                         }
                         _G.CurrentData = data
                         -- DrawText(locale(k))
-                        exports['origen-textui']:drawText('E', locale(k))
+                        exports['som-textui']:drawText('E', locale(k))
                     end,
                     onExit = function()
                         _G.InZone = false
                         table.wipe(_G.CurrentZone)
                         -- HideText()
-                        exports['origen-textui']:drawTextClose()
+                        exports['som-textui']:drawTextClose()
                     end
                 })
             end

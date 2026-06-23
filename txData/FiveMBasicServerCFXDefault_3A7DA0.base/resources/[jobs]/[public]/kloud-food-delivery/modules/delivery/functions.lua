@@ -68,13 +68,13 @@ CreateInteraction = function(dropoff, data)
                 _G.CurrentDropOff = dropoff
 
                 -- DrawText(locale("deliver"))
-                exports['origen-textui']:drawText('E', 'Deliver')
+                exports['som-textui']:drawText('E', 'Deliver')
             end,
             onExit = function()
                 _G.InZone = false
                 _G.CurrentZone = nil
                 -- HideText()
-                exports['origen-textui']:drawTextClose()
+                exports['som-textui']:drawTextClose()
             end
         })
     end

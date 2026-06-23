@@ -68,7 +68,7 @@ function SetLaststand(bool)
         end
         InLaststand = true
         -- TriggerServerEvent('hospital:server:ambulanceAlert', Lang:t('info.civ_down'))
-        TriggerEvent('origen-deathscreen:die', Config.ReviveInterval)
+        TriggerEvent('som-deathscreen:die', Config.ReviveInterval)
         CreateThread(function()
             while InLaststand do
                 ped = PlayerPedId()

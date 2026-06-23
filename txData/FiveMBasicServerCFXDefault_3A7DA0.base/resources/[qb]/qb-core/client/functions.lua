@@ -95,7 +95,7 @@ function QBCore.Functions.Notify(text, texttype, length)
         -- })
         -- TriggerEvent('hud:client:notify', texttype or "info", "Notification", text)
         local textcolor = (texttype == "error" and 2 or 1)
-        TriggerEvent('origen-notify:sendNotify', textcolor, text, length or 3000)
+        TriggerEvent('som-notify:sendNotify', textcolor, text, length or 3000)
     else
         -- texttype = texttype or 'primary'
         -- length = length or 5000
@@ -107,7 +107,7 @@ function QBCore.Functions.Notify(text, texttype, length)
         -- })
         -- TriggerEvent('hud:client:notify', texttype or "info", "Notification", text)
         local textcolor = (texttype == "error" and 2 or 1)
-        TriggerEvent('origen-notify:sendNotify', textcolor, text, length or 3000)
+        TriggerEvent('som-notify:sendNotify', textcolor, text, length or 3000)
     end
 end
 

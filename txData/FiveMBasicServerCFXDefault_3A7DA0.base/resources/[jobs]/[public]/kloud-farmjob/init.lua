@@ -196,12 +196,12 @@ CreateTargets = function()
             radius = 4.5,
             debug = KloudDev.Debug,
             onEnter = function()
-                exports['origen-textui']:drawText('E', locale("press_wash_crops"))
+                exports['som-textui']:drawText('E', locale("press_wash_crops"))
                 -- DrawText(locale("press_wash_crops", "[E]"))
             end,
             onExit = function()
                 -- HideText()
-                exports['origen-textui']:drawTextClose()
+                exports['som-textui']:drawTextClose()
             end,
             inside = function ()
                 if not _G.IsBusy and IsControlJustPressed(0, 38) then
@@ -210,7 +210,7 @@ CreateTargets = function()
 
                 if _G.IsBusy then
                     -- HideText()
-                    exports['origen-textui']:drawTextClose()
+                    exports['som-textui']:drawTextClose()
                 end
             end
         })

@@ -61,7 +61,7 @@ function DeathTimer()
         Wait(1000)
         deathTime = deathTime - 1
         if deathTime <= 0 then
-            TriggerEvent('origen-deathscreen:res')
+            TriggerEvent('som-deathscreen:res')
             if IsControlPressed(0, 38) and hold <= 0 and not isInHospitalBed then
                 TriggerEvent("hospital:client:RespawnAtHospital")
                 hold = 5
@@ -69,15 +69,15 @@ function DeathTimer()
             if IsControlPressed(0, 38) then
                 if hold - 1 >= 0 then
                     hold = hold - 1
-                    TriggerEvent('origen-deathscreen:updateRes', hold)
+                    TriggerEvent('som-deathscreen:updateRes', hold)
                 else
                     hold = 0
-                    TriggerEvent('origen-deathscreen:updateRes', hold)
+                    TriggerEvent('som-deathscreen:updateRes', hold)
                 end
             end
             if IsControlReleased(0, 38) then
                 hold = 5
-                TriggerEvent('origen-deathscreen:updateRes', hold)
+                TriggerEvent('som-deathscreen:updateRes', hold)
             end
         end
     end

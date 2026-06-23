@@ -88,7 +88,7 @@ end)
 
 RegisterNetEvent("kloud-farm:client:wash", function()
     -- HideText()
-    exports['origen-textui']:drawTextClose()
+    exports['som-textui']:drawTextClose()
     local optionsTbl = {}
     for _, v in pairs(KloudDev.WashLocations.items) do
         if GetItemCount(v[1], nil, false) > 0 then
