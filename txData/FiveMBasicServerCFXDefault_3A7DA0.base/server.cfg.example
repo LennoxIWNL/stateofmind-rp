@@ -1,0 +1,83 @@
+## State of Mind RP — server.cfg EXAMPLE
+## Copy this file to `server.cfg` and fill in the real secrets.
+## `server.cfg` itself is gitignored so secrets never get committed.
+
+## You CAN edit the following:
+endpoint_add_tcp "0.0.0.0:30120"
+endpoint_add_udp "0.0.0.0:30120"
+sv_maxclients 6
+# Get a Steam Web API key from https://steamcommunity.com/dev/apikey
+set steam_webApiKey "YOUR_STEAM_WEB_API_KEY"
+sets tags "default, deployer, qbcore, qb-core"
+
+## You MAY edit the following:
+# Get a license key from https://keymaster.fivem.net
+sv_licenseKey "YOUR_CFX_LICENSE_KEY"
+sv_hostname "State of MindRP By Lennox!"
+sets sv_projectName "[QBCore Framework] State of MindRP"
+sets sv_projectDesc "An advanced FiveM RP framework including jobs, gangs, housing & more!"
+sets locale "en-US"
+load_server_icon server-icon.png
+set sv_enforceGameBuild 2944
+set mysql_connection_string "mysql://root:YOUR_DB_PASSWORD@localhost/stateofmindrp?charset=utf8mb4"
+
+# Voice config
+setr voice_useNativeAudio true
+setr voice_useSendingRangeOnly true
+setr voice_defaultCycle "GRAVE"
+setr voice_defaultVolume 0.3
+setr voice_enableRadioAnim 1
+setr voice_syncData 1
+setr voice_enableUi 0
+
+# QBCore locale config
+setr qb_locale "en"
+setr UseTarget true
+
+setr inventory:framework "qb"
+
+# These resources will start by default.
+ensure mapmanager
+ensure chat
+ensure spawnmanager
+ensure sessionmanager
+ensure basic-gamemode
+ensure hardcap
+ensure baseevents
+
+# QBCore & Extra stuff
+ensure qb-core
+ensure ox_lib
+ensure jim_bridge
+ensure pa-textui-2
+ensure [qb]
+ensure [standalone]
+ensure [custom]
+ensure [new]
+ensure [voice]
+ensure [jobs]
+ensure [robberies]
+
+# Heavy streaming assets load LAST so the framework is up and the server is
+# responsive (heartbeat OK) before the ~5GB of ped/vehicle streams mount.
+ensure [assets-streams]
+
+## Permissions ##
+add_ace group.admin command allow # allow all commands
+# Owner (Lennox) — license identifier is reliable (works without Steam)
+add_principal identifier.license:YOUR_LICENSE_IDENTIFIER group.admin
+add_principal identifier.license:YOUR_LICENSE_IDENTIFIER qbcore.god
+# Steam identifier (requires steam_webApiKey to resolve)
+add_principal identifier.steam:YOUR_STEAM_IDENTIFIER group.admin
+add_principal identifier.steam:YOUR_STEAM_IDENTIFIER qbcore.god
+
+# Resources
+add_ace resource.qb-core command allow # Allow qb-core to execute commands
+
+# Gods
+add_ace qbcore.god command allow # Allow all commands
+
+# Inheritance
+add_principal qbcore.god group.admin # Allow gods access to the main admin group used to get all default permissions
+add_principal qbcore.god qbcore.admin # Allow gods access to admin commands
+add_principal qbcore.admin qbcore.mod # Allow admins access to mod commands

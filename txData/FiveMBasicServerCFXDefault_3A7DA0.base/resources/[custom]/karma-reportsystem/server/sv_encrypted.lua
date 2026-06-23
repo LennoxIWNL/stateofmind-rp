@@ -1,0 +1,19 @@
+-- RegisterServerEvent('submit:bug:report')
+-- AddEventHandler('submit:bug:report', function(data)
+--     local src = source
+--     local pName = GetPlayerName(source)
+--     local connect = {
+--         {
+--             ["color"] = "8388736",
+--             ["title"] = "New Report - ".. pName,
+--             ["description"] = "Title: \n\n `"..data.title.."` \n\n━━━━━━━━━━━━━━━━━━\n\n Description: \n\n `"..data.description.."` \n\n━━━━━━━━━━━━━━━━━━\n\n VOD / Clip / Screenshot URLs: \n\n `"..data.url.."` \n\n━━━━━━━━━━━━━━━━━━\n\n",
+-- 	        ["footer"] = {
+--                 ["text"] = "by Karma Developments 4.0",
+--             },
+--             ["image"] = {
+--                 ["url"] = "https://cdn.discordapp.com/attachments/640330555119894548/1214343561336852601/logo_background.png?ex=65f8c492&is=65e64f92&hm=1d9fb86af29115ab1645dffa2ec78d4e6387b7daf46752bbeb6c854cd51096a4&"
+--             }
+--         }
+--     }
+--     PerformHttpRequest("PUT_YOU_WEBHOOK_HERE", function(err, text, headers) end, 'POST', json.encode({username = "Karma Developments - Reports",  avatar_url = "https://cdn.discordapp.com/attachments/640330555119894548/1214343561336852601/logo_background.png?ex=65f8c492&is=65e64f92&hm=1d9fb86af29115ab1645dffa2ec78d4e6387b7daf46752bbeb6c854cd51096a4&",embeds = connect}), { ['Content-Type'] = 'application/json' })
+-- end)

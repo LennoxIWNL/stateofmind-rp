@@ -1,0 +1,102 @@
+# =============================================================
+#  State of Mind RP — .gitignore
+#  Goal: track ONLY the resources + the config the server needs
+#  to run. Everything that is a build artifact, runtime-generated,
+#  machine-specific, or secret is ignored so that a `git pull` on
+#  the VM never overwrites the live server binaries or data.
+# =============================================================
+
+# -------------------------------------------------------------
+#  FXServer build artifacts (the "Server" / artifact folder)
+#  These are the FXServer binaries themselves (build 25770 etc).
+#  They are downloaded per-build on the VM and must never be in git
+#  or a pull will clobber the running server's executables.
+# -------------------------------------------------------------
+/Server/
+# In case the artifact folder is ever named differently:
+**/FXServer.exe
+**/citizen/
+**/alpine/
+
+# -------------------------------------------------------------
+#  txAdmin / runtime caches (regenerated on every boot)
+# -------------------------------------------------------------
+txData/**/cache/
+txData/**/.replxx_history
+**/cache/files/
+
+# -------------------------------------------------------------
+#  txAdmin runtime data, player database & logs (machine-specific,
+#  changes constantly, and contains player PII)
+# -------------------------------------------------------------
+txData/default/data/
+txData/default/logs/
+txData/**/logs/
+crashes/
+**/crashes/
+*.log
+
+# -------------------------------------------------------------
+#  Secrets / credentials (NEVER commit these)
+#  - admins.json holds txAdmin password hashes + identifiers
+#  - config.json holds the DB password / txAdmin secrets
+#  - TLS keys + server tokens
+#  server.cfg is now IGNORED because it holds sv_licenseKey +
+#  steam_webApiKey + mysql_connection_string. A redacted
+#  server.cfg.example is tracked instead — copy it to server.cfg
+#  and fill in real secrets on the VM.
+# -------------------------------------------------------------
+txData/admins.json
+txData/default/config.json
+**/server.cfg
+!**/server.cfg.example
+# Backups of server.cfg also hold the live secrets — never commit them
+**/server.cfg.bkp
+*.bkp
+*.bak
+**/server-tls.key
+**/server-tls.crt
+**/server-monitor-token.key
+*.pem
+
+# -------------------------------------------------------------
+#  Streamed / heavy binary game assets that bloat the repo.
+#  These are what pushed the repo past 13GB and made GitHub pushes
+#  time out, so they are ignored. Keep them on disk / host elsewhere.
+# -------------------------------------------------------------
+# The whole streamed-asset resource tree (brackets are literal dir
+# names, so they must be escaped or git treats them as a char class):
+**/\[assets-streams\]/
+# Any stream folder under any resource:
+**/stream/
+# Heavy binary asset formats wherever they appear:
+*.ytd
+*.yft
+*.ydr
+*.ybn
+*.ydd
+*.rpf
+*.ymt
+*.ymap
+*.ytyp
+*.awc
+*.ypt
+*.ynv
+
+# -------------------------------------------------------------
+#  Node / build dependency trees (regenerated via npm install)
+# -------------------------------------------------------------
+**/node_modules/
+
+# -------------------------------------------------------------
+#  OS / editor junk
+# -------------------------------------------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.tmp
+*~
+.vscode/
+.idea/
+*.code-workspace
