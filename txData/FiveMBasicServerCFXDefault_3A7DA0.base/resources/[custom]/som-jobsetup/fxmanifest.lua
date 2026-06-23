@@ -13,7 +13,10 @@ shared_scripts {
 }
 
 client_script 'client/main.lua'
-server_script 'server/main.lua'
+server_scripts {
+    'server/main.lua',
+    'server/jobpatch.lua'
+}
 
 -- points database (created/updated at runtime via SaveResourceFile)
 files {

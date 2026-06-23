@@ -89,3 +89,46 @@ Config.Jobs = {
     'realestate',
     'cardealer',
 }
+
+-- ===========================================================================
+--  JOB-CONFIG INJECTION
+--  These describe job scripts whose Config.Locations som-jobsetup can write
+--  coordinates INTO directly (so the REAL interaction relocates, not a copy).
+--  Each location type lists its vector arity (3 = vector3, 4 = vector4) and,
+--  for entries shaped like {coords = vector4(...), ...}, the `nested` key.
+--  Restarting the resource after a write makes it take effect live.
+-- ===========================================================================
+Config.JobConfigs = {
+    ['qb-policejob'] = {
+        label = 'Police — qb-policejob',
+        file  = 'config.lua',
+        restart = true,                 -- offer to restart after writing
+        locations = {
+            duty        = { arity = 3, label = 'Duty toggle' },
+            vehicle     = { arity = 4, label = 'Garage / vehicle spawn' },
+            stash       = { arity = 3, label = 'Stash' },
+            impound     = { arity = 4, label = 'Impound' },
+            helicopter  = { arity = 4, label = 'Helicopter spawn' },
+            armory      = { arity = 3, label = 'Armory' },
+            trash       = { arity = 3, label = 'Trash' },
+            fingerprint = { arity = 3, label = 'Fingerprint scanner' },
+            evidence    = { arity = 3, label = 'Evidence locker' },
+        },
+    },
+    ['qb-ambulancejob'] = {
+        label = 'Ambulance — qb-ambulancejob',
+        file  = 'config.lua',
+        restart = true,
+        locations = {
+            checking = { arity = 4, label = 'Hospital check-in (front desk)' },
+            duty     = { arity = 4, label = 'Duty toggle' },
+            armory   = { arity = 4, label = 'Armory' },
+            roof     = { arity = 4, label = 'Roof (heli)' },
+            main     = { arity = 3, label = 'Main entrance point' },
+            basement = { arity = 3, label = 'Basement point' },
+            stash    = { arity = 3, label = 'Stash' },
+            beds     = { arity = 4, nested = 'coords', label = 'Patient beds' },
+            jailbeds = { arity = 4, nested = 'coords', label = 'Jail/prison beds' },
+        },
+    },
+}

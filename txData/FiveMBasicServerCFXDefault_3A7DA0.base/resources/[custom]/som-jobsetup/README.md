@@ -23,6 +23,21 @@ So moving a garage = open the menu, stand on the new spot, click *Move point to
 me*. Nothing in qb-policejob / qb-ambulancejob / qb-garages has to be touched —
 the point just triggers their existing event/export.
 
+## Two modes
+
+1. **Job-config injection (PD / EMS)** — writes coordinates **straight into**
+   `qb-policejob` / `qb-ambulancejob` `Config.Locations`, so the *real*
+   interaction relocates (no duplicate). This is the menu's first option:
+   **Set up Job interactions**. It backs up the config every time and can
+   restart the resource so the change is live. Supported slots:
+   - **Police:** duty, garage (`vehicle`), stash, impound, helicopter, armory,
+     trash, **fingerprint**, evidence
+   - **Ambulance:** **hospital check-in** (`checking`), duty, armory, roof,
+     main, basement, stash, **beds** (patient beds), jailbeds
+2. **Managed custom points** — som-jobsetup renders its own blip / ped / marker
+   / qb-target zone and fires a configurable event. Use for anything that
+   exposes an event/command/export (stashes, shops, 3rd-eye, custom jobs).
+
 ## Usage
 
 1. As an admin, run **`/jobsetup`** (ace `command.jobsetup`; `group.admin` already

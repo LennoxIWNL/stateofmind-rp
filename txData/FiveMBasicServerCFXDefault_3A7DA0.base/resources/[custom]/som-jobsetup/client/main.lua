@@ -273,14 +273,109 @@ local function listMenu()
     lib.showContext('som_js_list')
 end
 
+-- ===========================================================================
+--  Job-config injection (writes coords straight into qb-policejob /
+--  qb-ambulancejob configs so the REAL interaction relocates).
+-- ===========================================================================
+local jobLocCache = {}   -- resource -> parsed list
+
+RegisterNetEvent('som-jobsetup:client:jobLocations', function(resource, list)
+    jobLocCache[resource] = list
+end)
+
+local function existingFor(resource, locType)
+    local out = {}
+    for _, e in ipairs(jobLocCache[resource] or {}) do
+        if e.type == locType then out[e.index] = e.coords end
+    end
+    return out
+end
+
+local function patchDialog(resource, locType, locDef, jc)
+    local existing = existingFor(resource, locType)
+    -- build index options from what exists, plus a "new index" choice
+    local idxOpts, maxIdx = {}, 0
+    for i, coords in pairs(existing) do
+        idxOpts[#idxOpts + 1] = { value = tostring(i), label = ('#%d  (%s)'):format(i, coords) }
+        if i > maxIdx then maxIdx = i end
+    end
+    table.sort(idxOpts, function(a, b) return a.label < b.label end)
+    if not locDef.nested then
+        idxOpts[#idxOpts + 1] = { value = 'new', label = ('+ new (#%d)'):format(maxIdx + 1) }
+    end
+    if #idxOpts == 0 then idxOpts[1] = { value = '1', label = '#1' } end
+
+    local c, h = captureHere()
+    local input = lib.inputDialog(('%s · %s'):format(jc.label, locDef.label or locType), {
+        { type = 'select', label = 'Which slot to set', required = true, options = idxOpts, default = idxOpts[1].value,
+          description = 'Pick an existing slot to MOVE it, or "+ new" to add one' },
+        { type = 'number', label = 'Index (if "+ new")', default = maxIdx + 1, min = 1, step = 1 },
+        { type = 'checkbox', label = 'Restart the job now (apply live)', checked = jc.restart and true or false,
+          description = 'Restarts ' .. resource .. ' so the change takes effect immediately' },
+    })
+    if not input then return end
+    local index = input[1] == 'new' and math.floor(input[2]) or tonumber(input[1])
+    local ok = lib.alertDialog({
+        header = 'Confirm write',
+        content = ('Write **%s** `[%s][%d]` =\n`%s`\n\nat your feet (%.2f, %.2f, %.2f, %.1f)?\n\nA backup of the config is saved first.')
+            :format(resource, locType, index, locDef.label or locType, c.x, c.y, c.z, h),
+        centered = true, cancel = true,
+    })
+    if ok ~= 'confirm' then return end
+    TriggerServerEvent('som-jobsetup:server:patchJobLocation', {
+        resource = resource, locType = locType, index = index,
+        x = c.x, y = c.y, z = c.z, h = h, restart = input[3] and true or false,
+    })
+end
+
+local function jobLocTypeMenu(resource, jc)
+    TriggerServerEvent('som-jobsetup:server:getJobLocations', resource) -- refresh cache
+    local options = {}
+    -- stable sorted list of location types
+    local keys = {}
+    for k in pairs(jc.locations) do keys[#keys + 1] = k end
+    table.sort(keys)
+    for _, k in ipairs(keys) do
+        local def = jc.locations[k]
+        local existing = existingFor(resource, k)
+        local count = 0 for _ in pairs(existing) do count = count + 1 end
+        options[#options + 1] = {
+            title = def.label or k,
+            description = ('%s · %d slot(s) · arity %d%s'):format(k, count, def.arity, def.nested and ' · nested' or ''),
+            icon = 'location-crosshairs',
+            onSelect = function() patchDialog(resource, k, def, jc) end,
+        }
+    end
+    lib.registerContext({ id = 'som_js_jobloc', title = jc.label, menu = 'som_js_jobs', options = options })
+    lib.showContext('som_js_jobloc')
+end
+
+local function jobConfigMenu()
+    local options = {}
+    for resource, jc in pairs(Config.JobConfigs) do
+        TriggerServerEvent('som-jobsetup:server:getJobLocations', resource)
+        options[#options + 1] = {
+            title = jc.label, icon = 'screwdriver-wrench', arrow = true,
+            description = 'Write coords into ' .. resource .. '/' .. jc.file,
+            onSelect = function() jobLocTypeMenu(resource, jc) end,
+        }
+    end
+    if #options == 0 then options[1] = { title = 'No job configs defined', disabled = true } end
+    lib.registerContext({ id = 'som_js_jobs', title = 'Set up Job Interactions', menu = 'som_js_main', options = options })
+    lib.showContext('som_js_jobs')
+end
+
 local function mainMenu()
     lib.registerContext({
         id = 'som_js_main',
         title = 'State of Mind · Job Setup',
         options = {
-            { title = 'Add interaction point (here)', icon = 'plus',
-              description = 'Capture your current position as a new point', onSelect = addPointDialog },
-            { title = 'Manage points', icon = 'list', description = ('%d point(s)'):format((function()
+            { title = 'Set up Job interactions (PD / EMS configs)', icon = 'screwdriver-wrench', arrow = true,
+              description = 'Move garage, duty, armory, fingerprint, check-in, beds… straight into the job config',
+              onSelect = jobConfigMenu },
+            { title = 'Add custom interaction point (here)', icon = 'plus',
+              description = 'Capture your current position as a new managed point', onSelect = addPointDialog },
+            { title = 'Manage custom points', icon = 'list', description = ('%d point(s)'):format((function()
                 local n = 0 for _ in pairs(points) do n = n + 1 end return n end)()), onSelect = listMenu },
             { title = (showCoords and 'Hide live coords' or 'Show live coords'), icon = 'crosshairs', onSelect = function()
                 showCoords = not showCoords; mainMenu() end },
