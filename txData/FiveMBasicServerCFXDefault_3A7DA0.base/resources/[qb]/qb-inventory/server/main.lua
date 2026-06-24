@@ -7,6 +7,38 @@ local Gloveboxes = {}
 local Stashes = {}
 local ShopItems = {}
 
+-- NUI blocker: server-side inventory state + rate limiting
+local OpenInventories = {}
+local ActionLog = {}
+local RATE_LIMIT_MAX = 20
+local RATE_LIMIT_WINDOW = 2000
+
+local function NuiBlocker_IsOpen(src)
+    return OpenInventories[src] == true
+end
+
+local function NuiBlocker_SetOpen(src, state)
+    OpenInventories[src] = state or nil
+end
+
+local function NuiBlocker_IsRateLimited(src)
+    local now = GetGameTimer()
+    if not ActionLog[src] then ActionLog[src] = {} end
+    local log = ActionLog[src]
+    while #log > 0 and (now - log[1]) > RATE_LIMIT_WINDOW do
+        table.remove(log, 1)
+    end
+    if #log >= RATE_LIMIT_MAX then return true end
+    log[#log + 1] = now
+    return false
+end
+
+AddEventHandler('playerDropped', function()
+    local src = source
+    OpenInventories[src] = nil
+    ActionLog[src] = nil
+end)
+
 function QBInventoryNotify(source, msg, type, length)
     if Framework == "QBCore" then
     	FWork.Functions.Notify(source, msg, type, length)
@@ -1174,8 +1206,10 @@ local function OpenInventory(name, id, other, origin)
 			end
 		end
 		TriggerClientEvent("qb-inventory:client:closeinv", id)
+		NuiBlocker_SetOpen(src, true)
 		TriggerClientEvent("inventory:client:OpenInventory", src, {}, Player.PlayerData.items, secondInv)
 	else
+		NuiBlocker_SetOpen(src, true)
 		TriggerClientEvent("inventory:client:OpenInventory", src, {}, Player.PlayerData.items)
 	end
 end
@@ -1474,13 +1508,16 @@ RegisterNetEvent('inventory:server:OpenInventory', function(name, id, other)
 				end
 			end
 			TriggerClientEvent("qb-inventory:client:closeinv", id)
+			NuiBlocker_SetOpen(src, true)
 			TriggerClientEvent("inventory:client:OpenInventory", src, {}, Player.PlayerData.items, secondInv)
 		else
+			NuiBlocker_SetOpen(src, true)
 			TriggerClientEvent("inventory:client:OpenInventory", src, {}, Player.PlayerData.items)
 	end
 end)
 
 RegisterNetEvent('inventory:server:SaveInventory', function(type, id)
+	NuiBlocker_SetOpen(source, false)
 	if type == "trunk" then
 		if IsVehicleOwned(id) then
 			SaveOwnedVehicleItems(id, Trunks[id].items)
@@ -1509,6 +1546,8 @@ end)
 RegisterNetEvent('inventory:server:UseItemSlot', function(slot)
 	local src = source
 	local Player = QBCore.Functions.GetPlayer(src)
+	if not Player then return end
+	if NuiBlocker_IsRateLimited(src) then return end
 	local itemData = Player.Functions.GetItemBySlot(slot)
 	if itemData then
 	local itemInfo = QBCore.Shared.Items[itemData.name]
@@ -1547,6 +1586,17 @@ end)
 RegisterNetEvent('inventory:server:UseItem', function(inventory, item)
 	local src = source
 	local Player = QBCore.Functions.GetPlayer(src)
+	if not Player then return end
+
+	if not NuiBlocker_IsOpen(src) then
+		TriggerEvent('qb-log:server:CreateLog', 'anticheat', 'NUI Exploit Blocked', 'red',
+			'**' .. GetPlayerName(src) .. '** (citizenid: *' .. Player.PlayerData.citizenid .. '* | *' .. src ..
+			'*) UseItem without open inventory')
+		return
+	end
+
+	if NuiBlocker_IsRateLimited(src) then return end
+
 	if inventory == "player" or inventory == "hotbar" then
 		local itemData = Player.Functions.GetItemBySlot(item.slot)
 		if itemData then
@@ -1575,6 +1625,20 @@ RegisterNetEvent('inventory:server:SetInventoryData', function(fromInventory, to
 	local src = source
 	local Player = QBCore.Functions.GetPlayer(src)
 	if not Player then return end
+
+	if not NuiBlocker_IsOpen(src) then
+		TriggerEvent('qb-log:server:CreateLog', 'anticheat', 'NUI Exploit Blocked', 'red',
+			'**' .. GetPlayerName(src) .. '** (citizenid: *' .. Player.PlayerData.citizenid .. '* | *' .. src ..
+			'*) SetInventoryData without open inventory — from: ' .. tostring(fromInventory) .. ' to: ' .. tostring(toInventory))
+		return
+	end
+
+	if NuiBlocker_IsRateLimited(src) then
+		TriggerEvent('qb-log:server:CreateLog', 'anticheat', 'NUI Rate Limited', 'orange',
+			'**' .. GetPlayerName(src) .. '** (id: *' .. src .. '*) rate-limited on SetInventoryData')
+		return
+	end
+
 	fromSlot = tonumber(fromSlot)
 	toSlot = tonumber(toSlot)
 
@@ -2158,6 +2222,17 @@ end)
 RegisterServerEvent("inventory:server:GiveItem", function(target, name, amount, slot)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
+    if not Player then return end
+
+    if not NuiBlocker_IsOpen(src) then
+        TriggerEvent('qb-log:server:CreateLog', 'anticheat', 'NUI Exploit Blocked', 'red',
+            '**' .. GetPlayerName(src) .. '** (citizenid: *' .. Player.PlayerData.citizenid .. '* | *' .. src ..
+            '*) GiveItem without open inventory — item: ' .. tostring(name) .. ' x' .. tostring(amount))
+        return
+    end
+
+    if NuiBlocker_IsRateLimited(src) then return end
+
 	target = tonumber(target)
     local OtherPlayer = QBCore.Functions.GetPlayer(target)
     local dist = #(GetEntityCoords(GetPlayerPed(src))-GetEntityCoords(GetPlayerPed(target)))

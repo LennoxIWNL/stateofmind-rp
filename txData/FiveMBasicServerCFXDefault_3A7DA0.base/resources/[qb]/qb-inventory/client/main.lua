@@ -973,6 +973,7 @@ end)
 -- NUI
 
 RegisterNUICallback('RobMoney', function(data, cb)
+    if not inInventory then return cb('ok') end
     TriggerServerEvent("police:server:RobPlayer", data.TargetId)
     cb('ok')
 end)
@@ -991,6 +992,7 @@ RegisterNUICallback('GetWeaponData', function(cData, cb)
 end)
 
 RegisterNUICallback('RemoveAttachment', function(data, cb)
+    if not inInventory then return cb({}) end
     local ped = PlayerPedId()
     local WeaponData = QBCore.Shared.Items[data.WeaponData.name]
     print(data.AttachmentData.attachment:gsub("(.*).*_",''))
@@ -1051,11 +1053,13 @@ RegisterNUICallback("CloseInventory", function()
 end)
 
 RegisterNUICallback("UseItem", function(data, cb)
+    if not inInventory then return cb('ok') end
     TriggerServerEvent("inventory:server:UseItem", data.inventory, data.item)
     cb('ok')
 end)
 
 RegisterNUICallback("SetInventoryData", function(data, cb)
+    if not inInventory then return cb('ok') end
     TriggerServerEvent("inventory:server:SetInventoryData", data.fromInventory, data.toInventory, data.fromSlot, data.toSlot, data.fromAmount, data.toAmount)
     cb('ok')
 end)
@@ -1071,6 +1075,7 @@ RegisterNUICallback("PlayDropFail", function(_, cb)
 end)
 
 RegisterNUICallback('GiveItem', function(data, cb)
+    if not inInventory then return cb('ok') end
     local player, distance = QBCore.Functions.GetClosestPlayer(GetEntityCoords(PlayerPedId()))
     if player ~= -1 and distance < 3 then
         if data.inventory == 'player' then
