@@ -26,3 +26,4 @@ server_scripts {
 
 -- ElixirFW
 server_scripts { '@oxmysql/lib/MySQL.lua' }
+lua54 'yes'

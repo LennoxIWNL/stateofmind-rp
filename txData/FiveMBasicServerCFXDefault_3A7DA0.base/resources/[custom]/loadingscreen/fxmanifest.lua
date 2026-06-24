@@ -18,3 +18,5 @@ files {
 
 server_scripts { "build/sv_*.js" }
 client_scripts { "build/cl_*.js" }
+
+lua54 'yes'

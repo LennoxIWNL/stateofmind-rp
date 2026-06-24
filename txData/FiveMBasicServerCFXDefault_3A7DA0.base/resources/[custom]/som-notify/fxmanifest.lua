@@ -11,3 +11,5 @@ files {
 client_script {
   "client.lua",
 }
+
+lua54 'yes'

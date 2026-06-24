@@ -60,7 +60,6 @@ exports("closeTextUi", closeTextUi)
 
 Citizen.CreateThread(function()
     while true do
-        Citizen.Wait(0)
         if isNuiOpen then
             local playerCoords = GetEntityCoords(PlayerPedId())
             local itemCoords = myCoords
@@ -69,6 +68,9 @@ Citizen.CreateThread(function()
             if dist > myDistance then
                 closeNui()
             end
+            Citizen.Wait(200)
+        else
+            Citizen.Wait(1000)
         end
     end
 end)

@@ -26,3 +26,4 @@ server_scripts {
 	'server/server.lua',
 	'server/remove.lua',
 }
+lua54 'yes'

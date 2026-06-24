@@ -60,16 +60,14 @@ Citizen.CreateThread(function()
     WarMenu.SetMenuX('spray', 0.75)
     WarMenu.SetMenuY('spray', 0.35)
     while true do
-        Wait(0)
-
         if IsSpraying then
             if WarMenu.IsMenuOpened('spray') then
                 if WarMenu.ComboBox(Config.Text.MENU.FONTS, Fonts, SprayFont, SprayFont, function(currentIndex, selectedIndex)
                     SprayFont = currentIndex
                     ResetFormattedText()
 				end) then
-                elseif WarMenu.ColorSelector(Config.Text.MENU.COLOR, SIMPLE_COLORS, SprayColor, function(i) 
-                    SprayColor = i 
+                elseif WarMenu.ColorSelector(Config.Text.MENU.COLOR, SIMPLE_COLORS, SprayColor, function(i)
+                    SprayColor = i
                 end) then
                 elseif WarMenu.ComboBox(Config.Text.MENU.SIZE, SprayScaleSelect, SprayScale, SprayScale, function(currentIndex, selectedIndex)
 					SprayScale = currentIndex
@@ -86,6 +84,9 @@ Citizen.CreateThread(function()
                 IsSpraying = false
                 SprayText = ''
             end
+            Wait(0)
+        else
+            Wait(500)
         end
     end
 end)

@@ -30,3 +30,4 @@ client_scripts {
 	'config.lua',
 	'client.lua',
 }
+lua54 'yes'

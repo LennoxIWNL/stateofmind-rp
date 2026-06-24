@@ -30,3 +30,5 @@ server_scripts {
 }
 
 -- ElixirFW
+
+lua54 'yes'

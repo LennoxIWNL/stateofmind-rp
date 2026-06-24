@@ -45,20 +45,27 @@ ensure basic-gamemode
 ensure hardcap
 ensure baseevents
 
-# QBCore & Extra stuff
+# QBCore & Extra stuff — load order matters!
+# Core framework + libraries first
 ensure qb-core
 ensure ox_lib
 ensure jim_bridge
 ensure pa-textui-2
+
+# Voice before phone (npwd depends on pma-voice)
+ensure [voice]
+
+# Phone stack: screenshot-basic → qb-npwd → npwd → compat bridge
 ensure screenshot-basic
 ensure qb-npwd
 ensure npwd
 ensure qb-phone-compat
+
+# Resource folders (resources already ensured above are skipped by FiveM)
 ensure [qb]
 ensure [standalone]
 ensure [custom]
 ensure [new]
-ensure [voice]
 ensure [jobs]
 ensure [robberies]
 

@@ -18,3 +18,5 @@ files {
     "html/*.js",
     "colors.json"
 }
+
+lua54 'yes'

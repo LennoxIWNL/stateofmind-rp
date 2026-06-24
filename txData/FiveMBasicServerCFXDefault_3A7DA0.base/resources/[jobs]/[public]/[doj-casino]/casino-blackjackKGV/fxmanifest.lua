@@ -18,3 +18,5 @@ server_scripts{
 	'server/*.lua'
 } 
 
+
+lua54 'yes'

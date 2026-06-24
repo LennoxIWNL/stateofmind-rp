@@ -18,3 +18,4 @@ client_scripts {
 }
 
 server_script 'server/server.lua' 
+lua54 'yes'

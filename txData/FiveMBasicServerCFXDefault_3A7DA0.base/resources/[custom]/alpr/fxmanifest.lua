@@ -24,3 +24,4 @@ files {
     "html/sounds/*.mp3",
 }
 server_scripts { '@oxmysql/lib/MySQL.lua' }
+lua54 'yes'

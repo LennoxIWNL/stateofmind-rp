@@ -15,3 +15,5 @@ client_scripts {
 
 export "taskBar"
 export "closeGuiFail"
+
+lua54 'yes'

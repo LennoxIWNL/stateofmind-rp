@@ -21,3 +21,5 @@ files {
   'html/style.css',
   'html/app.js'
 }
+
+lua54 'yes'

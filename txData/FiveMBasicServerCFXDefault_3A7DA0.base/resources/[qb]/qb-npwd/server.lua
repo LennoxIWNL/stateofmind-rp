@@ -6,7 +6,7 @@ AddEventHandler('QBCore:Server:PlayerLoaded', function(qbPlayer)
   local charInfo = qbPlayer.PlayerData.charinfo
   local playerSrc = qbPlayer.PlayerData.source
 
-  MySQL.Sync.fetchAll('UPDATE players SET phone_number = ? WHERE citizenid = ?', { phoneNumber, playerIdent })
+  MySQL.update.await('UPDATE players SET phone_number = ? WHERE citizenid = ?', { phoneNumber, playerIdent })
 
   exports.npwd:newPlayer({
     source = playerSrc,

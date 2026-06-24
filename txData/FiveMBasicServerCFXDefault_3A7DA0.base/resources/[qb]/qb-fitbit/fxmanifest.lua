@@ -18,3 +18,5 @@ client_script 'client/main.lua'
 files {
     'html/*'
 }
+
+lua54 'yes'

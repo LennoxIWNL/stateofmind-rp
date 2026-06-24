@@ -17,3 +17,5 @@ server_scripts {
 
 game 'gta5'
 fx_version 'adamant'
+
+lua54 'yes'

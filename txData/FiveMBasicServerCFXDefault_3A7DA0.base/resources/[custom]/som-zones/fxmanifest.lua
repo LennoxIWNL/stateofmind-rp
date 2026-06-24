@@ -9,3 +9,5 @@ client_scripts {
     '@PolyZone/ComboZone.lua',
     'client/cl_zones.lua',
 }
+
+lua54 'yes'

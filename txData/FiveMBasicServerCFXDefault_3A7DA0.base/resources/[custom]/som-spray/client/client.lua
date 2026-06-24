@@ -66,8 +66,7 @@ end)
 
 Citizen.CreateThread(function()
     while true do
-        Citizen.Wait(0)
-
+        local drawnAny = false
         scaleformHandleIdx = SCALEFORM_ID_MIN
         local ped = PlayerPedId()
         local coords = GetEntityCoords(ped)
@@ -75,6 +74,7 @@ Citizen.CreateThread(function()
         for _, spray in pairs(SPRAYS) do
             if spray.color and #(coords - spray.location) < 100.0 then
                 DrawSpray(PLAYER_NAME_HEAP[scaleformHandleIdx], spray)
+                drawnAny = true
 
                 scaleformHandleIdx = scaleformHandleIdx + 1
 
@@ -85,6 +85,7 @@ Citizen.CreateThread(function()
         end
 
         if IsSpraying then
+            drawnAny = true
             local rayEndCoords, rayNormal, fwdVector = FindRaycastedSprayCoords()
             if rayEndCoords and rayNormal then
                 local cIndex = 'color'
@@ -98,8 +99,8 @@ Citizen.CreateThread(function()
 
                 DrawSpray(PLAYER_NAME_HEAP[SCALEFORM_ID_MAX], {
                     location = sprayCoords,
-                    rotation = rayNormal, 
-                    
+                    rotation = rayNormal,
+
                     scale = (SprayScaleSelect[SprayScale] / 10.0) * FONTS[SprayFont].sizeMult,
                     text = FormattedSprayText,
                     font = FONTS[SprayFont].font,
@@ -107,6 +108,8 @@ Citizen.CreateThread(function()
                 })
             end
         end
+
+        Citizen.Wait(drawnAny and 0 or 500)
     end
 end)
 
@@ -121,8 +124,6 @@ Citizen.CreateThread(function()
     local ttl = 30
 
     while true do
-        Wait(0)
-
         if wantedSprayLocation and wantedSprayRotation and IsSpraying then
             if ttl >= 0 then
                 ttl = ttl - 1
@@ -131,8 +132,8 @@ Citizen.CreateThread(function()
             if currentSprayRotation ~= wantedSprayRotation or not currentSprayRotation or ttl < 0 then
                 ttl = 30
                 local wantedSprayRotationFixed = vector3(
-                    wantedSprayRotation.x, 
-                    wantedSprayRotation.y, 
+                    wantedSprayRotation.x,
+                    wantedSprayRotation.y,
                     wantedSprayRotation.z + 0.03
                 )
 
@@ -141,6 +142,9 @@ Citizen.CreateThread(function()
                 currentSprayRotation = wantedSprayRotation
                 currentComputedRotation = camRot
             end
+            Wait(0)
+        else
+            Wait(500)
         end
     end
 end)

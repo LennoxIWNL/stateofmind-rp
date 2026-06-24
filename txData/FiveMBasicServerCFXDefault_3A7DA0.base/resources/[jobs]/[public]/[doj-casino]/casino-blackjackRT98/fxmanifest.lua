@@ -11,3 +11,5 @@ client_scripts {
 server_script "sv_blackjack.lua"
 
 
+
+lua54 'yes'
