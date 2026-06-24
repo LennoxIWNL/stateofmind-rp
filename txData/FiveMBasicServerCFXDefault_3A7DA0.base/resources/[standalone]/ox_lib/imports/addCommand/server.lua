@@ -1,7 +1,15 @@
+--[[
+    https://github.com/overextended/ox_lib
+
+    This file is licensed under LGPL-3.0 or higher <https://www.gnu.org/licenses/lgpl-3.0.en.html>
+
+    Copyright © 2025 Linden <https://github.com/thelindat>
+]]
+
 ---@class OxCommandParams
 ---@field name string
 ---@field help? string
----@field type? 'number' | 'playerId' | 'string'
+---@field type? 'number' | 'playerId' | 'string' | 'longString'
 ---@field optional? boolean
 
 ---@class OxCommandProperties
@@ -18,7 +26,7 @@ SetTimeout(1000, function()
     TriggerClientEvent('chat:addSuggestions', -1, registeredCommands)
 end)
 
-AddEventHandler('playerJoining', function(source)
+AddEventHandler('playerJoining', function()
     TriggerClientEvent('chat:addSuggestions', source, registeredCommands)
 end)
 
@@ -30,7 +38,8 @@ end)
 local function parseArguments(source, args, raw, params)
     if not params then return args end
 
-    for i = 1, #params do
+    local paramsNum = #params
+    for i = 1, paramsNum do
         local arg, param = args[i], params[i]
         local value
 
@@ -41,8 +50,15 @@ local function parseArguments(source, args, raw, params)
         elseif param.type == 'playerId' then
             value = arg == 'me' and source or tonumber(arg)
 
-            if not value or not GetPlayerGuid(value--[[@as string]]) then
+            if not value or not DoesPlayerExist(value--[[@as string]]) then
                 value = false
+            end
+        elseif param.type == 'longString' and i == paramsNum then
+            if arg then
+                local start = raw:find(arg, 1, true)
+                value = start and raw:sub(start)
+            else
+                value = nil
             end
         else
             value = arg
@@ -59,6 +75,33 @@ local function parseArguments(source, args, raw, params)
     end
 
     return args
+end
+
+---@param commandName string
+---@param properties OxCommandProperties
+---@return OxCommandProperties
+local function buildSuggestion(commandName, properties)
+    local hints
+
+    if properties.params then
+        hints = {}
+
+        for i = 1, #properties.params do
+            local param = properties.params[i]
+            hints[i] = {
+                name = param.name,
+                help = param.type
+                    and (param.help and ('%s (type: %s)'):format(param.help, param.type) or ('(type: %s)'):format(param.type))
+                    or param.help,
+            }
+        end
+    end
+
+    return {
+        name = ('/%s'):format(commandName),
+        help = properties.help,
+        params = hints,
+    }
 end
 
 ---@param commandName string | string[]
@@ -83,16 +126,6 @@ function lib.addCommand(commandName, properties, cb, ...)
         params = properties.params
     end
 
-    if params then
-        for i = 1, #params do
-            local param = params[i]
-
-            if param.type then
-                param.help = param.help and ('%s (type: %s)'):format(param.help, param.type) or ('(type: %s)'):format(param.type)
-            end
-        end
-    end
-
     local commands = type(commandName) ~= 'table' and { commandName } or commandName
     local numCommands = #commands
     local totalCommands = #registeredCommands
@@ -102,7 +135,11 @@ function lib.addCommand(commandName, properties, cb, ...)
 
         if not args then return end
 
-        cb(source, args, raw)
+        local success, resp = pcall(cb, source, args, raw)
+
+        if not success then
+            Citizen.Trace(("^1command '%s' failed to execute!\n%s"):format(string.strsplit(' ', raw) or raw, resp))
+        end
     end
 
     for i = 1, numCommands do
@@ -127,15 +164,10 @@ function lib.addCommand(commandName, properties, cb, ...)
         end
 
         if properties then
-            properties.name = ('/%s'):format(commandName)
-            properties.restricted = nil
-            registeredCommands[totalCommands] = properties
+            local suggestion = buildSuggestion(commandName, properties)
+            registeredCommands[totalCommands] = suggestion
 
-            if i ~= numCommands and numCommands ~= 1 then
-                properties = table.clone(properties)
-            end
-
-            if shouldSendCommands then TriggerClientEvent('chat:addSuggestions', -1, properties) end
+            if shouldSendCommands then TriggerClientEvent('chat:addSuggestions', -1, suggestion) end
         end
     end
 end

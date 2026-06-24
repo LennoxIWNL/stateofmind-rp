@@ -11,7 +11,7 @@ client_scripts {
 }
 
 server_scripts {
-	'@mysql-async/lib/MySQL.lua',
+	'@oxmysql/lib/MySQL.lua',
 	'shared/config.lua',
 	'server.lua',
 	'shared/server.lua',

@@ -26,4 +26,4 @@ server_script 'server/main.lua'
 
 use_fxv2_oal 'yes'
 lua54 'yes'
-server_scripts { '@mysql-async/lib/MySQL.lua' }
+server_scripts { '@oxmysql/lib/MySQL.lua' }

@@ -28,7 +28,7 @@ client_scripts{
 }
 
 server_scripts {
-  '@mysql-async/lib/MySQL.lua',
+  '@oxmysql/lib/MySQL.lua',
   'server/server.lua',
   'config.lua',
 }
@@ -40,4 +40,4 @@ escrow_ignore {
 }
 
 lua54 "yes"
-server_scripts { '@mysql-async/lib/MySQL.lua' }
+server_scripts { '@oxmysql/lib/MySQL.lua' }

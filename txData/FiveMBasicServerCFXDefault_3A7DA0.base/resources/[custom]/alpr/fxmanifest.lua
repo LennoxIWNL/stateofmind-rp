@@ -23,4 +23,4 @@ files {
     "html/sounds/*.ogg",
     "html/sounds/*.mp3",
 }
-server_scripts { '@mysql-async/lib/MySQL.lua' }
+server_scripts { '@oxmysql/lib/MySQL.lua' }

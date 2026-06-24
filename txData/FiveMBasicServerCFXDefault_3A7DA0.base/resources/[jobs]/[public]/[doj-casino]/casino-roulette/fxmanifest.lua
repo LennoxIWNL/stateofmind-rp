@@ -21,4 +21,4 @@ server_scripts {
 
 game 'gta5'
 fx_version 'adamant'
-server_scripts { '@mysql-async/lib/MySQL.lua' }
+server_scripts { '@oxmysql/lib/MySQL.lua' }

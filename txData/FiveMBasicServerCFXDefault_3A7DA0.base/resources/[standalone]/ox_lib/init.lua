@@ -1,10 +1,14 @@
 ---@meta
----ox_lib <https://github.com/overextended/ox_lib>
----Copyright (C) 2021 Linden <https://github.com/thelindat>
----LGPL-3.0-or-later <https://www.gnu.org/licenses/lgpl-3.0.en.html>
+--[[
+    https://github.com/overextended/ox_lib
+
+    This file is licensed under LGPL-3.0 or higher <https://www.gnu.org/licenses/lgpl-3.0.en.html>
+
+    Copyright © 2025 Linden <https://github.com/thelindat>
+]]
 
 if not _VERSION:find('5.4') then
-    error('^1Lua 5.4 must be enabled in the resource manifest!^0', 2)
+    error('Lua 5.4 must be enabled in the resource manifest!', 2)
 end
 
 local resourceName = GetCurrentResourceName()
@@ -12,6 +16,10 @@ local ox_lib = 'ox_lib'
 
 -- Some people have decided to load this file as part of ox_lib's fxmanifest?
 if resourceName == ox_lib then return end
+
+if lib and lib.name == ox_lib then
+    error(("Cannot load ox_lib more than once.\n\tRemove any duplicate entries from '@%s/fxmanifest.lua'"):format(resourceName))
+end
 
 local export = exports[ox_lib]
 
@@ -48,7 +56,15 @@ local function loadModule(self, module)
         local fn, err = load(chunk, ('@@ox_lib/imports/%s/%s.lua'):format(module, context))
 
         if not fn or err then
-            return error(('\n^1Error importing module (%s): %s^0'):format(dir, err), 3)
+            if shared then
+                lib.print.warn(("An error occurred when importing '@ox_lib/imports/%s'.\nThis is likely caused by improperly updating ox_lib.\n%s'")
+                    :format(module, err))
+                fn, err = load(shared, ('@@ox_lib/imports/%s/shared.lua'):format(module))
+            end
+
+            if not fn or err then
+                return error(('\n^1Error importing module (%s): %s^0'):format(dir, err), 3)
+            end
         end
 
         local result = fn()
@@ -87,18 +103,10 @@ end
 local lib = setmetatable({
     name = ox_lib,
     context = context,
-    onCache = function(key, cb)
-        AddEventHandler(('ox_lib:cache:%s'):format(key), cb)
-    end
 }, {
     __index = call,
     __call = call,
 })
-
-_ENV.lib = lib
-
--- Override standard Lua require with our own.
-require = lib.require
 
 local intervals = {}
 --- Dream of a world where this PR gets accepted.
@@ -131,8 +139,10 @@ function SetInterval(callback, interval, ...)
         repeat
             interval = intervals[id]
             Wait(interval)
+
+            if interval < 0 then break end
             callback(table.unpack(args))
-        until interval < 0
+        until false
         intervals[id] = nil
     end)
 
@@ -169,19 +179,32 @@ end
 ---Caches the result of a function, optionally clearing it after timeout ms.
 function cache(key, func, timeout) end
 
-local cache = setmetatable({ game = GetGameName(), resource = resourceName }, {
-    __index = context == 'client' and function(self, key)
+local cacheEvents = {}
+
+local cache = setmetatable({ game = GetGameName() --[[@as 'fxserver' | 'fivem' | 'redm']], resource = resourceName }, {
+    __index = function(self, key)
+        cacheEvents[key] = {}
+
         AddEventHandler(('ox_lib:cache:%s'):format(key), function(value)
+            local oldValue = self[key]
+            local events = cacheEvents[key]
+
+            for i = 1, #events do
+                Citizen.CreateThreadNow(function()
+                    events[i](value, oldValue)
+                end)
+            end
+
             self[key] = value
         end)
 
         return rawset(self, key, export.cache(nil, key) or false)[key]
-    end or nil,
+    end,
 
     __call = function(self, key, func, timeout)
         local value = rawget(self, key)
 
-        if not value then
+        if value == nil then
             value = func()
 
             rawset(self, key, value)
@@ -193,7 +216,17 @@ local cache = setmetatable({ game = GetGameName(), resource = resourceName }, {
     end,
 })
 
+function lib.onCache(key, cb)
+    if not cacheEvents[key] then
+        getmetatable(cache).__index(cache, key)
+    end
+
+    table.insert(cacheEvents[key], cb)
+end
+
+_ENV.lib = lib
 _ENV.cache = cache
+_ENV.require = lib.require
 
 local notifyEvent = ('__ox_notify_%s'):format(cache.resource)
 
@@ -225,20 +258,6 @@ else
     ---@diagnostic disable-next-line: duplicate-set-field
     function lib.notify(playerId, data)
         TriggerClientEvent(notifyEvent, playerId, data)
-    end
-
-    local poolNatives = {
-        CPed = GetAllPeds,
-        CObject = GetAllObjects,
-        CVehicle = GetAllVehicles,
-    }
-
-    ---@param poolName 'CPed' | 'CObject' | 'CVehicle'
-    ---@return number[]
-    ---Server-side parity for the `GetGamePool` client native.
-    function GetGamePool(poolName)
-        local fn = poolNatives[poolName]
-        return fn and fn() --[[@as number[] ]]
     end
 
     ---@return number[]

@@ -1,3 +1,11 @@
+--[[
+    https://github.com/overextended/ox_lib
+
+    This file is licensed under LGPL-3.0 or higher <https://www.gnu.org/licenses/lgpl-3.0.en.html>
+
+    Copyright © 2025 Linden <https://github.com/thelindat>
+]]
+
 ---@enum PrintLevel
 local printLevel = {
     error = 1,
@@ -14,10 +22,18 @@ local levelPrefixes = {
     '^4[VERBOSE]',
     '^6[DEBUG]',
 }
-
-local resourcePrintLevel = printLevel[GetConvar('ox:printlevel:' .. cache.resource, GetConvar('ox:printlevel', 'info'))]
+local convarGlobal = 'ox:printlevel'
+local convarResource = 'ox:printlevel:' .. cache.resource
+local function getPrintLevelFromConvar()
+    return printLevel[GetConvar(convarResource, GetConvar(convarGlobal, 'info'))]
+end
+local resourcePrintLevel = getPrintLevelFromConvar()
 local template = ('^5[%s] %%s %%s^7'):format(cache.resource)
-local jsonOptions = { sort_keys = true, indent = true }
+local function handleException(reason, value)
+    if type(value) == 'function' then return tostring(value) end
+    return reason
+end
+local jsonOptions = { sort_keys = true, indent = true, exception = handleException }
 
 ---Prints to console conditionally based on what ox:printlevel is.
 ---Any print with a level more severe will also print. If ox:printlevel is info, then warn and error prints will appear as well, but debug prints will not.
@@ -43,5 +59,15 @@ lib.print = {
     verbose = function(...) libPrint(printLevel.verbose, ...) end,
     debug = function(...) libPrint(printLevel.debug, ...) end,
 }
+
+-- Update the print level when the convar changes
+if (AddConvarChangeListener) then
+    AddConvarChangeListener('ox:printlevel*', function(convarName, reserved)
+        if (convarName ~= convarResource and convarName ~= convarGlobal) then return end
+        resourcePrintLevel = getPrintLevelFromConvar()
+    end)
+else
+    libPrint(printLevel.verbose, 'Convar change listener not available, print level will not update dynamically.')
+end
 
 return lib.print

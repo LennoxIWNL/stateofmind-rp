@@ -1,3 +1,11 @@
+--[[
+    https://github.com/overextended/ox_lib
+
+    This file is licensed under LGPL-3.0 or higher <https://www.gnu.org/licenses/lgpl-3.0.en.html>
+
+    Copyright © 2025 Linden <https://github.com/thelindat>
+]]
+
 ---@type { [string]: MenuProps }
 local registeredMenus = {}
 ---@type MenuProps | nil
@@ -5,6 +13,7 @@ local openMenu
 
 ---@alias MenuPosition 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 ---@alias MenuChangeFunction fun(selected: number, scrollIndex?: number, args?: any, checked?: boolean)
+---@alias MenuScrollSelectChangeFunction fun(selected: number, scrollIndex?: number, args?: any)
 
 ---@class MenuOptions
 ---@field label string
@@ -27,9 +36,9 @@ local openMenu
 ---@field disableInput? boolean
 ---@field canClose? boolean
 ---@field onClose? fun(keyPressed?: 'Escape' | 'Backspace')
----@field onSelected? MenuChangeFunction
----@field onSideScroll? MenuChangeFunction
----@field onCheck? MenuChangeFunction
+---@field onSelected? MenuScrollSelectChangeFunction
+---@field onSideScroll? MenuScrollSelectChangeFunction
+---@field onCheck? fun(selected: number, checked: boolean, args?: any)
 ---@field cb? MenuChangeFunction
 
 ---@param data MenuProps
@@ -49,6 +58,11 @@ function lib.showMenu(id, startIndex)
     if not menu then
         error(('No menu with id %s was found'):format(id))
     end
+
+    if table.type(menu.options) == 'empty' then
+        error(('Can\'t open empty menu with id %s'):format(id))
+    end
+    
     if not openMenu then
         local control = cache.game == 'fivem' and 140 or 0xE30CD707
 

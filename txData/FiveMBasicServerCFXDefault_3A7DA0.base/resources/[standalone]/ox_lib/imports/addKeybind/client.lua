@@ -1,3 +1,11 @@
+--[[
+    https://github.com/overextended/ox_lib
+
+    This file is licensed under LGPL-3.0 or higher <https://www.gnu.org/licenses/lgpl-3.0.en.html>
+
+    Copyright © 2025 Linden <https://github.com/thelindat>
+]]
+
 if cache.game == 'redm' then return end
 
 ---@class KeybindProps
@@ -14,8 +22,10 @@ if cache.game == 'redm' then return end
 ---@class CKeybind : KeybindProps
 ---@field currentKey string
 ---@field disabled boolean
+---@field isPressed boolean
 ---@field hash number
 ---@field getCurrentKey fun(): string
+---@field isControlPressed fun(): boolean
 
 local keybinds = {}
 
@@ -24,6 +34,7 @@ local GetControlInstructionalButton = GetControlInstructionalButton
 
 local keybind_mt = {
     disabled = false,
+    isPressed = false,
     defaultKey = '',
     defaultMapper = 'keyboard',
 }
@@ -36,8 +47,13 @@ function keybind_mt:getCurrentKey()
     return GetControlInstructionalButton(0, self.hash, true):sub(3)
 end
 
+function keybind_mt:isControlPressed()
+    return self.isPressed
+end
+
 function keybind_mt:disable(toggle)
     self.disabled = toggle
+    self.isPressed = false
 end
 
 ---@param data KeybindProps
@@ -48,13 +64,15 @@ function lib.addKeybind(data)
     keybinds[data.name] = setmetatable(data, keybind_mt)
 
     RegisterCommand('+' .. data.name, function()
-        if not data.onPressed or data.disabled or IsPauseMenuActive() then return end
-        data:onPressed()
+        if data.disabled or (IsPauseMenuActive() and not data.allowInPauseMenu) then return end
+        data.isPressed = true
+        if data.onPressed then data:onPressed() end
     end)
 
     RegisterCommand('-' .. data.name, function()
-        if not data.onReleased or data.disabled or IsPauseMenuActive() then return end
-        data:onReleased()
+        if data.disabled or (IsPauseMenuActive() and not data.allowInPauseMenu) then return end
+        data.isPressed = false
+        if data.onReleased then data:onReleased() end
     end)
 
     RegisterKeyMapping('+' .. data.name, data.description, data.defaultMapper, data.defaultKey)

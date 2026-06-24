@@ -36,4 +36,4 @@ escrow_ignore {
 
 
 lua54 'yes'
-dependency '/assetpacks'server_scripts { '@mysql-async/lib/MySQL.lua' }
+dependency '/assetpacks'server_scripts { '@oxmysql/lib/MySQL.lua' }

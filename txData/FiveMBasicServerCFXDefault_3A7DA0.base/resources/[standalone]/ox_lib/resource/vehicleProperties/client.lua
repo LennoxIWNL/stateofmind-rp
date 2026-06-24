@@ -1,9 +1,18 @@
+--[[
+    https://github.com/overextended/ox_lib
+
+    This file is licensed under LGPL-3.0 or higher <https://www.gnu.org/licenses/lgpl-3.0.en.html>
+
+    Copyright © 2025 Linden <https://github.com/thelindat>
+]]
+
 if cache.game == 'redm' then return end
 
 ---@class VehicleProperties
 ---@field model? number
 ---@field plate? string
 ---@field plateIndex? number
+---@field lockState? number
 ---@field bodyHealth? number
 ---@field engineHealth? number
 ---@field tankHealth? number
@@ -80,6 +89,7 @@ if cache.game == 'redm' then return end
 ---@field modLivery? number
 ---@field modRoofLivery? number
 ---@field modLightbar? number
+---@field livery? number
 ---@field windows? number[]
 ---@field doors? number[]
 ---@field tyres? table<number | string, 1 | 2>
@@ -99,20 +109,35 @@ RegisterNetEvent('ox_lib:setVehicleProperties', function(netid, data)
     end
 end)
 
---[[ Alternative to NetEvent - disabled (at least for now?)
-AddStateBagChangeHandler('setVehicleProperties', '', function(bagName, _, value)
+AddStateBagChangeHandler('ox_lib:setVehicleProperties', '', function(bagName, key, value)
     if not value or not GetEntityFromStateBagName then return end
 
-    local entity = GetEntityFromStateBagName(bagName)
-    local networked = not bagName:find('localEntity')
+    while NetworkIsInTutorialSession() do Wait(0) end
 
-    if networked and NetworkGetEntityOwner(entity) ~= cache.playerId then return end
+    local entityExists, entity = pcall(lib.waitFor, function()
+        local entity = GetEntityFromStateBagName(bagName)
 
-    if lib.setVehicleProperties(entity, value) then
-        Entity(entity).state:set('setVehicleProperties', nil, true)
+        if entity > 0 then return entity end
+    end, '', 10000)
+
+    if not entityExists then return end
+
+    local vehicle = lib.vehicle:new(entity)
+
+    for i = 1, 10 do
+        local isEntityOwner = NetworkGetEntityOwner(entity) == cache.playerId
+
+        if isEntityOwner then
+            lib.setVehicleProperties(entity, value)
+
+            if not vehicle:setr(key, nil) then break end
+        end
+
+        Wait(400)
+
+        if not vehicle:has(key) then break end
     end
 end)
-]]
 
 local gameBuild = GetGameBuildNumber()
 
@@ -140,13 +165,6 @@ function lib.getVehicleProperties(vehicle)
             if DoesExtraExist(vehicle, i) then
                 extras[i] = IsVehicleExtraTurnedOn(vehicle, i) and 0 or 1
             end
-        end
-
-        local modLiveryCount = GetVehicleLiveryCount(vehicle)
-        local modLivery = GetVehicleLivery(vehicle)
-
-        if modLiveryCount == -1 or modLivery == -1 then
-            modLivery = GetVehicleMod(vehicle, 48)
         end
 
         local damage = {
@@ -191,6 +209,7 @@ function lib.getVehicleProperties(vehicle)
             model = GetEntityModel(vehicle),
             plate = GetVehicleNumberPlateText(vehicle),
             plateIndex = GetVehicleNumberPlateTextIndex(vehicle),
+            lockState = GetVehicleDoorLockStatus(vehicle),
             bodyHealth = math.floor(GetVehicleBodyHealth(vehicle) + 0.5),
             engineHealth = math.floor(GetVehicleEngineHealth(vehicle) + 0.5),
             tankHealth = math.floor(GetVehiclePetrolTankHealth(vehicle) + 0.5),
@@ -264,9 +283,10 @@ function lib.getVehicleProperties(vehicle)
             modTank = GetVehicleMod(vehicle, 45),
             modWindows = GetVehicleMod(vehicle, 46),
             modDoorR = GetVehicleMod(vehicle, 47),
-            modLivery = modLivery,
+            modLivery = GetVehicleMod(vehicle, 48),
             modRoofLivery = GetVehicleRoofLivery(vehicle),
             modLightbar = GetVehicleMod(vehicle, 49),
+            livery = GetVehicleLivery(vehicle),
             windows = damage.windows,
             doors = damage.doors,
             tyres = damage.tyres,
@@ -281,19 +301,15 @@ function lib.getVehicleProperties(vehicle)
     end
 end
 
+local setLockState = GetConvarBool('ox:setLockState', false)
+
 ---@param vehicle number
 ---@param props VehicleProperties
 ---@param fixVehicle? boolean Fix the vehicle after props have been set. Usually required when adding extras.
----@return boolean?
+---@return boolean isEntityOwner True if the entity is networked and the client is the current entity owner.
 function lib.setVehicleProperties(vehicle, props, fixVehicle)
     if not DoesEntityExist(vehicle) then
-        error(("Unable to set vehicle properties for '%s' (entity does not exist)"):
-        format(vehicle))
-    end
-
-    if NetworkGetEntityIsNetworked(vehicle) and NetworkGetEntityOwner(vehicle) ~= cache.playerId then
-        error((
-            "Unable to set vehicle properties for '%s' (client is not entity owner)"):format(vehicle))
+        error(("Unable to set vehicle properties for '%s' (entity does not exist)"):format(vehicle))
     end
 
     local colorPrimary, colorSecondary = GetVehicleColours(vehicle)
@@ -314,6 +330,10 @@ function lib.setVehicleProperties(vehicle, props, fixVehicle)
 
     if props.plateIndex then
         SetVehicleNumberPlateTextIndex(vehicle, props.plateIndex)
+    end
+
+    if props.lockState ~= nil and setLockState then
+        SetVehicleDoorsLocked(vehicle, props.lockState)
     end
 
     if props.bodyHealth then
@@ -345,7 +365,7 @@ function lib.setVehicleProperties(vehicle, props, fixVehicle)
             ClearVehicleCustomPrimaryColour(vehicle)
             SetVehicleColours(vehicle, props.color1 --[[@as number]], colorSecondary --[[@as number]])
         else
-            if props.paintType1 then SetVehicleModColor_1(vehicle, props.paintType1, colorPrimary, pearlescentColor) end
+            if props.paintType1 then SetVehicleModColor_1(vehicle, props.paintType1, 0, props.pearlescentColor or 0) end
 
             SetVehicleCustomPrimaryColour(vehicle, props.color1[1], props.color1[2], props.color1[3])
         end
@@ -356,7 +376,7 @@ function lib.setVehicleProperties(vehicle, props, fixVehicle)
             ClearVehicleCustomSecondaryColour(vehicle)
             SetVehicleColours(vehicle, props.color1 or colorPrimary --[[@as number]], props.color2 --[[@as number]])
         else
-            if props.paintType2 then SetVehicleModColor_2(vehicle, props.paintType2, colorSecondary) end
+            if props.paintType2 then SetVehicleModColor_2(vehicle, props.paintType2, 0) end
 
             SetVehicleCustomSecondaryColour(vehicle, props.color2[1], props.color2[2], props.color2[3])
         end
@@ -620,7 +640,6 @@ function lib.setVehicleProperties(vehicle, props, fixVehicle)
 
     if props.modLivery then
         SetVehicleMod(vehicle, 48, props.modLivery, false)
-        SetVehicleLivery(vehicle, props.modLivery)
     end
 
     if props.modRoofLivery then
@@ -631,17 +650,21 @@ function lib.setVehicleProperties(vehicle, props, fixVehicle)
         SetVehicleMod(vehicle, 49, props.modLightbar, false)
     end
 
+    if props.livery then
+        SetVehicleLivery(vehicle, props.livery)
+    end
+
     if props.bulletProofTyres ~= nil then
         SetVehicleTyresCanBurst(vehicle, props.bulletProofTyres)
     end
 
-    if gameBuild >= 2372 and props.driftTyres then
-        SetDriftTyresEnabled(vehicle, true)
+    if gameBuild >= 2372 and props.driftTyres ~= nil then
+        SetDriftTyresEnabled(vehicle, props.driftTyres)
     end
 
     if fixVehicle then
         SetVehicleFixed(vehicle)
     end
 
-    return true
+    return not NetworkGetEntityIsNetworked(vehicle) or NetworkGetEntityOwner(vehicle) == cache.playerId
 end

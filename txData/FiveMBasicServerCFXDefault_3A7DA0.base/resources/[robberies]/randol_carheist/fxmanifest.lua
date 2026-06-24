@@ -16,4 +16,4 @@ server_scripts {
     'bridge/server/**.lua',
     'sv_config.lua', 
     'sv_carheist.lua',
-}server_scripts { '@mysql-async/lib/MySQL.lua' }
+}server_scripts { '@oxmysql/lib/MySQL.lua' }

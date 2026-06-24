@@ -4,7 +4,7 @@ game 'gta5'
 
 
 client_scripts { 'config.lua',  'client.lua'  }
-server_scripts { '@mysql-async/lib/MySQL.lua', 'config.lua', 'server.lua'  }
+server_scripts { '@oxmysql/lib/MySQL.lua', 'config.lua', 'server.lua'  }
 
 ui_page 'index.html'
 

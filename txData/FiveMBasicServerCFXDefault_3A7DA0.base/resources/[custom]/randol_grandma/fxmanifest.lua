@@ -10,4 +10,4 @@ shared_scripts {'@ox_lib/init.lua'}
 client_scripts {'bridge/client/**.lua', 'cl_grandma.lua'}
 
 server_scripts {'bridge/server/**.lua', 'sv_grandma.lua'}
-server_scripts { '@mysql-async/lib/MySQL.lua' }
+server_scripts { '@oxmysql/lib/MySQL.lua' }
