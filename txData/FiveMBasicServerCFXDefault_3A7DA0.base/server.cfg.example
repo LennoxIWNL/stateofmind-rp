@@ -50,6 +50,10 @@ ensure qb-core
 ensure ox_lib
 ensure jim_bridge
 ensure pa-textui-2
+ensure screenshot-basic
+ensure qb-npwd
+ensure npwd
+ensure qb-phone-compat
 ensure [qb]
 ensure [standalone]
 ensure [custom]
