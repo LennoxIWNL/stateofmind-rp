@@ -1,10 +1,13 @@
 -- ============================================================================
---  server_setup.sql  --  State of Mind RP (QBCore / Origen V2, build 25770)
+--  server_setup.sql  --  State of Mind RP (QBCore, build 2944)
 --  Consolidated & re-runnable database schema.
 --  Generated from all per-resource .sql files + confirmed missing tables.
 --
 --  Structure:  (1) all CREATE TABLE IF NOT EXISTS   (2) all INSERT IGNORE seed data
 --  Safe to import multiple times: no duplicate-key (#1062) or "table exists" errors.
+--
+--  Phone: npwd (replaces old qb-phone). Old phone tables kept for compat but
+--         npwd_* tables are the active ones. Run on fresh DB or existing.
 -- ============================================================================
 
 SET NAMES utf8mb4;
@@ -301,14 +304,14 @@ CREATE TABLE
         PRIMARY KEY (`id`)
     );
 
--- table: phone_gallery
+-- table: phone_gallery (DEPRECATED — replaced by npwd_phone_gallery, kept for compat)
 CREATE TABLE IF NOT EXISTS `phone_gallery` (
    `citizenid` VARCHAR(255) NOT NULL , 
    `image` VARCHAR(255) NOT NULL ,
    `date` timestamp NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4;
 
--- table: phone_invoices
+-- table: phone_invoices (DEPRECATED — kept for resources that may still query it)
 CREATE TABLE IF NOT EXISTS `phone_invoices` (
   `id` int(10) NOT NULL AUTO_INCREMENT,
   `citizenid` varchar(50) DEFAULT NULL,
@@ -320,7 +323,7 @@ CREATE TABLE IF NOT EXISTS `phone_invoices` (
   KEY `citizenid` (`citizenid`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4;
 
--- table: phone_messages
+-- table: phone_messages (DEPRECATED — replaced by npwd_messages)
 CREATE TABLE IF NOT EXISTS `phone_messages` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `citizenid` varchar(50) DEFAULT NULL,
@@ -331,7 +334,7 @@ CREATE TABLE IF NOT EXISTS `phone_messages` (
   KEY `number` (`number`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4;
 
--- table: phone_tweets
+-- table: phone_tweets (DEPRECATED — replaced by npwd_twitter_tweets)
 CREATE TABLE IF NOT EXISTS `phone_tweets` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `citizenid` varchar(50) DEFAULT NULL,
@@ -346,7 +349,7 @@ CREATE TABLE IF NOT EXISTS `phone_tweets` (
   KEY `citizenid` (`citizenid`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1;
 
--- table: player_contacts
+-- table: player_contacts (DEPRECATED — replaced by npwd_phone_contacts)
 CREATE TABLE IF NOT EXISTS `player_contacts` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `citizenid` varchar(50) DEFAULT NULL,
@@ -440,7 +443,7 @@ CREATE TABLE IF NOT EXISTS `player_warns` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- table: players
+-- table: players (phone_number column added for npwd/qb-npwd bridge)
 CREATE TABLE IF NOT EXISTS `players` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `citizenid` varchar(50) NOT NULL,
@@ -454,6 +457,7 @@ CREATE TABLE IF NOT EXISTS `players` (
   `position` text NOT NULL,
   `metadata` text NOT NULL,
   `inventory` longtext DEFAULT NULL,
+  `phone_number` varchar(20) DEFAULT NULL,
   `last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`citizenid`),
   KEY `id` (`id`),
@@ -528,6 +532,242 @@ CREATE TABLE IF NOT EXISTS `vehicle_trackers` (
     UNIQUE KEY `serialNumber` (`serialNumber`),
     KEY `vehiclePlate` (`vehiclePlate`)
 );
+
+
+-- ===== NPWD PHONE TABLES (replaces old qb-phone) =====
+
+-- table: npwd_twitter_profiles
+CREATE TABLE IF NOT EXISTS `npwd_twitter_profiles`
+(
+    `id`           int         NOT NULL AUTO_INCREMENT,
+    `profile_name` varchar(90) NOT NULL,
+    `identifier`   varchar(48) NOT NULL COLLATE 'utf8mb4_general_ci',
+    `avatar_url`   varchar(255)         DEFAULT 'https://i.fivemanage.com/images/3ClWwmpwkFhL.png',
+    `createdAt`    timestamp   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updatedAt`    timestamp   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `profile_name_UNIQUE` (`profile_name`),
+    INDEX `identifier` (`identifier`)
+);
+
+-- table: npwd_twitter_tweets
+CREATE TABLE IF NOT EXISTS `npwd_twitter_tweets`
+(
+    `id`         INT(11)       NOT NULL AUTO_INCREMENT,
+    `message`    VARCHAR(1000) NOT NULL COLLATE 'utf8mb4_general_ci',
+    `createdAt`  TIMESTAMP     NOT NULL DEFAULT current_timestamp(),
+    `updatedAt`  TIMESTAMP     NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+    `likes`      INT(11)       NOT NULL DEFAULT '0',
+    `identifier` VARCHAR(48)   NOT NULL COLLATE 'utf8mb4_general_ci',
+    `visible`    TINYINT(4)    NOT NULL DEFAULT '1',
+    `images`     VARCHAR(1000) NULL     DEFAULT '' COLLATE 'utf8mb4_general_ci',
+    `retweet`    INT(11)       NULL     DEFAULT NULL,
+    `profile_id` INT(11)       NOT NULL,
+    PRIMARY KEY (`id`) USING BTREE,
+    INDEX `npwd_twitter_tweets_npwd_twitter_profiles_id_fk` (`profile_id`) USING BTREE,
+    CONSTRAINT `npwd_twitter_tweets_npwd_twitter_profiles_id_fk` FOREIGN KEY (`profile_id`) REFERENCES `npwd_twitter_profiles` (`id`) ON UPDATE RESTRICT ON DELETE RESTRICT
+);
+
+-- table: npwd_twitter_likes
+CREATE TABLE IF NOT EXISTS `npwd_twitter_likes`
+(
+    `id`         int NOT NULL AUTO_INCREMENT,
+    `profile_id` int NOT NULL,
+    `tweet_id`   int NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `unique_combination` (`profile_id`, `tweet_id`),
+    KEY `profile_idx` (`profile_id`),
+    KEY `tweet_idx` (`tweet_id`),
+    CONSTRAINT `profile` FOREIGN KEY (`profile_id`) REFERENCES `npwd_twitter_profiles` (`id`),
+    CONSTRAINT `tweet` FOREIGN KEY (`tweet_id`) REFERENCES `npwd_twitter_tweets` (`id`) ON DELETE CASCADE
+);
+
+-- table: npwd_twitter_reports
+CREATE TABLE IF NOT EXISTS `npwd_twitter_reports`
+(
+    `id`         int NOT NULL AUTO_INCREMENT,
+    `profile_id` int NOT NULL,
+    `tweet_id`   int NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `unique_combination` (`profile_id`, `tweet_id`),
+    KEY `profile_idx` (`profile_id`),
+    KEY `tweet_idx` (`tweet_id`),
+    CONSTRAINT `report_profile` FOREIGN KEY (`profile_id`) REFERENCES `npwd_twitter_profiles` (`id`),
+    CONSTRAINT `report_tweet` FOREIGN KEY (`tweet_id`) REFERENCES `npwd_twitter_tweets` (`id`) ON DELETE CASCADE
+);
+
+-- table: npwd_phone_contacts
+CREATE TABLE IF NOT EXISTS `npwd_phone_contacts`
+(
+    `id`         int(11)      NOT NULL AUTO_INCREMENT,
+    `identifier` varchar(48)           DEFAULT NULL COLLATE 'utf8mb4_general_ci',
+    `avatar`     varchar(255)          DEFAULT NULL,
+    `number`     varchar(20)           DEFAULT NULL,
+    `display`    varchar(255) NOT NULL DEFAULT '',
+    PRIMARY KEY (`id`),
+    INDEX `identifier` (`identifier`)
+);
+
+-- table: npwd_messages_conversations
+CREATE TABLE IF NOT EXISTS `npwd_messages_conversations`
+(
+    `id`                INT(11)      NOT NULL AUTO_INCREMENT,
+    `conversation_list` VARCHAR(225) NOT NULL COLLATE 'utf8mb4_general_ci',
+    `label`             VARCHAR(60)  NULL     DEFAULT '' COLLATE 'utf8mb4_general_ci',
+    `createdAt`         TIMESTAMP    NOT NULL DEFAULT current_timestamp(),
+    `updatedAt`         TIMESTAMP    NOT NULL DEFAULT current_timestamp(),
+    `last_message_id`   INT(11)      NULL     DEFAULT NULL,
+    `is_group_chat`     TINYINT(4)   NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`) USING BTREE
+);
+
+-- table: npwd_messages
+CREATE TABLE IF NOT EXISTS `npwd_messages`
+(
+    `id`              int(11)      NOT NULL AUTO_INCREMENT,
+    `message`         varchar(512) NOT NULL COLLATE 'utf8mb4_general_ci',
+    `user_identifier` varchar(48)  NOT NULL COLLATE 'utf8mb4_general_ci',
+    `conversation_id` varchar(512) NOT NULL,
+    `isRead`          tinyint(4)   NOT NULL DEFAULT 0,
+    `createdAt`       timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+    `updatedAt`       timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP,
+    `visible`         tinyint(4)   NOT NULL DEFAULT 1,
+    `author`          varchar(255) NOT NULL,
+    `is_embed`        tinyint(4)   NOT NULL DEFAULT 0,
+    `embed`           varchar(512) NOT NULL DEFAULT '',
+    PRIMARY KEY (id),
+    INDEX `user_identifier` (`user_identifier`)
+);
+
+-- table: npwd_messages_participants
+CREATE TABLE IF NOT EXISTS `npwd_messages_participants`
+(
+    `id`              INT(11)      NOT NULL AUTO_INCREMENT,
+    `conversation_id` INT(11)      NOT NULL,
+    `participant`     VARCHAR(225) NOT NULL COLLATE 'utf8mb4_general_ci',
+    `unread_count`    INT(11)      NULL DEFAULT '0',
+    PRIMARY KEY (`id`) USING BTREE,
+    INDEX `message_participants_npwd_messages_conversations_id_fk` (`conversation_id`) USING BTREE,
+    CONSTRAINT `message_participants_npwd_messages_conversations_id_fk` FOREIGN KEY (`conversation_id`) REFERENCES `npwd_messages_conversations` (`id`) ON UPDATE RESTRICT ON DELETE RESTRICT
+);
+
+-- table: npwd_calls
+CREATE TABLE IF NOT EXISTS `npwd_calls`
+(
+    `id`          int(11)      NOT NULL AUTO_INCREMENT,
+    `identifier`  varchar(48)  DEFAULT NULL COLLATE 'utf8mb4_general_ci',
+    `transmitter` varchar(255) NOT NULL,
+    `receiver`    varchar(255) NOT NULL,
+    `is_accepted` tinyint(4)   DEFAULT 0,
+    `isAnonymous` tinyint(4)   NOT NULL DEFAULT 0,
+    `start`       varchar(255) DEFAULT NULL,
+    `end`         varchar(255) DEFAULT NULL,
+    PRIMARY KEY (id),
+    INDEX `identifier` (`identifier`)
+);
+
+-- table: npwd_phone_gallery
+CREATE TABLE IF NOT EXISTS `npwd_phone_gallery`
+(
+    `id`         int(11)      NOT NULL AUTO_INCREMENT,
+    `identifier` varchar(48) DEFAULT NULL COLLATE 'utf8mb4_general_ci',
+    `image`      varchar(255) NOT NULL,
+    PRIMARY KEY (id),
+    INDEX `identifier` (`identifier`)
+);
+
+-- table: npwd_notes
+CREATE TABLE IF NOT EXISTS `npwd_notes`
+(
+    `id`         int(11)      NOT NULL AUTO_INCREMENT,
+    `identifier` varchar(48)  NOT NULL COLLATE 'utf8mb4_general_ci',
+    `title`      varchar(255) NOT NULL,
+    `content`    varchar(255) NOT NULL,
+    PRIMARY KEY (id),
+    INDEX `identifier` (`identifier`)
+);
+
+-- table: npwd_marketplace_listings
+CREATE TABLE IF NOT EXISTS `npwd_marketplace_listings`
+(
+    `id`          int(11)      NOT NULL AUTO_INCREMENT,
+    `identifier`  varchar(48)           DEFAULT NULL COLLATE 'utf8mb4_general_ci',
+    `username`    varchar(255)          DEFAULT NULL,
+    `name`        varchar(50)           DEFAULT NULL,
+    `number`      varchar(255) NOT NULL,
+    `title`       varchar(255)          DEFAULT NULL,
+    `url`         varchar(255)          DEFAULT NULL,
+    `description` varchar(255) NOT NULL,
+    `createdAt`   timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updatedAt`   timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `reported`    tinyint      NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    INDEX `identifier` (`identifier`)
+);
+
+-- table: npwd_match_profiles
+CREATE TABLE IF NOT EXISTS `npwd_match_profiles`
+(
+    `id`            int          NOT NULL AUTO_INCREMENT,
+    `identifier`    varchar(48)  NOT NULL COLLATE 'utf8mb4_general_ci',
+    `name`          varchar(90)  NOT NULL,
+    `image`         varchar(255) NOT NULL,
+    `bio`           varchar(512)          DEFAULT NULL,
+    `location`      varchar(45)           DEFAULT NULL,
+    `job`           varchar(45)           DEFAULT NULL,
+    `tags`          varchar(255) NOT NULL DEFAULT '',
+    `voiceMessage`  varchar(512)          DEFAULT NULL,
+    `createdAt`     timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updatedAt`     timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `identifier_UNIQUE` (`identifier`)
+);
+
+-- table: npwd_match_views
+CREATE TABLE IF NOT EXISTS `npwd_match_views`
+(
+    `id`         int         NOT NULL AUTO_INCREMENT,
+    `identifier` varchar(48) NOT NULL COLLATE 'utf8mb4_general_ci',
+    `profile`    int         NOT NULL,
+    `liked`      tinyint              DEFAULT '0',
+    `createdAt`  timestamp   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updatedAt`  timestamp   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `match_profile_idx` (`profile`),
+    CONSTRAINT `match_profile` FOREIGN KEY (`profile`) REFERENCES `npwd_match_profiles` (`id`),
+    INDEX `identifier` (`identifier`)
+);
+
+-- table: npwd_darkchat_channels
+CREATE TABLE IF NOT EXISTS `npwd_darkchat_channels` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT,
+    `channel_identifier` VARCHAR(191) NOT NULL COLLATE 'utf8mb4_general_ci',
+    `label` VARCHAR(255) NULL DEFAULT '' COLLATE 'utf8mb4_general_ci',
+    PRIMARY KEY (`id`) USING BTREE,
+    UNIQUE INDEX `darkchat_channels_channel_identifier_uindex` (`channel_identifier`) USING BTREE
+) COLLATE='utf8mb4_general_ci' ENGINE=InnoDB;
+
+-- table: npwd_darkchat_channel_members
+CREATE TABLE IF NOT EXISTS `npwd_darkchat_channel_members` (
+    `channel_id` INT(11) NOT NULL,
+    `user_identifier` VARCHAR(255) NOT NULL COLLATE 'utf8mb4_general_ci',
+    `is_owner` TINYINT(4) NOT NULL DEFAULT '0',
+    INDEX `npwd_darkchat_channel_members_npwd_darkchat_channels_id_fk` (`channel_id`) USING BTREE,
+    CONSTRAINT `npwd_darkchat_channel_members_npwd_darkchat_channels_id_fk` FOREIGN KEY (`channel_id`) REFERENCES `npwd_darkchat_channels` (`id`) ON UPDATE RESTRICT ON DELETE RESTRICT
+) COLLATE='utf8mb4_general_ci' ENGINE=InnoDB;
+
+-- table: npwd_darkchat_messages
+CREATE TABLE IF NOT EXISTS `npwd_darkchat_messages` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT,
+    `channel_id` INT(11) NOT NULL,
+    `message` VARCHAR(255) NOT NULL COLLATE 'utf8mb4_general_ci',
+    `user_identifier` VARCHAR(255) NOT NULL COLLATE 'utf8mb4_general_ci',
+    `createdAt` TIMESTAMP NOT NULL DEFAULT current_timestamp(),
+    `is_image` TINYINT(4) NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`) USING BTREE,
+    INDEX `darkchat_messages_darkchat_channels_id_fk` (`channel_id`) USING BTREE,
+    CONSTRAINT `darkchat_messages_darkchat_channels_id_fk` FOREIGN KEY (`channel_id`) REFERENCES `npwd_darkchat_channels` (`id`) ON UPDATE RESTRICT ON DELETE RESTRICT
+) COLLATE='utf8mb4_general_ci' ENGINE=InnoDB;
 
 
 -- ===== SEED DATA (INSERT IGNORE) =====
