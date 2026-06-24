@@ -75,9 +75,10 @@ end
 
 RegisterNetEvent('qb-spawn:client:openUI', function()
     SetEntityVisible(PlayerPedId(), false)
-    DoScreenFadeOut(250)
-    Citizen.Wait(1000)
-    DoScreenFadeIn(250)
+    if not IsScreenFadedOut() then
+        DoScreenFadeOut(0)
+        Citizen.Wait(0)
+    end
     local current = GetPlayers()
     local cv = GetConvarInt('sv_maxclients', 64)
     for i = 1, #current do
@@ -99,6 +100,8 @@ RegisterNetEvent('qb-spawn:client:openUI', function()
     end
     SetNuiFocus(true, true)
     SendNUIMessage({action = "spawnSelector", open = true, resourceName = GetCurrentResourceName(), lastLocation = Config.EnableLastLocation, infos = Config.Infos, weatherData = {icon = Config.WeatherIcons[weather], weather = string.lower(weather), tempType = Config.TemperatureType, temp = degreeC, windSpeed = GetWindSpeed(), playerCount = current .. "/" .. cv, time = {hour = hour, minute = minute}}})
+    Citizen.Wait(100)
+    DoScreenFadeIn(500)
 end)
 
 RegisterNetEvent('qb-spawn:client:setupSpawns', function(cData, new, apps)

@@ -39,7 +39,7 @@ Config = {
     FirstButton = {
         Enabled = true,
         Text = 'Discord', -- First button link
-        Link = 'https://discord.gg/xGajyNamxe' -- Second button link
+        Link = '' -- Replace with your own Discord link
     },
 
     SecondButton = {

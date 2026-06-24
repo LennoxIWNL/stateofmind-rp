@@ -101,7 +101,7 @@ function sendToDiscord(DiscordLog, source, title, des, color)
                 author = {
                     name = "ELIXIR WeaponShop",
                     icon_url = "https://media.discordapp.net/attachments/1246580007351095356/1246580301715607602/hacker-profile22.png?ex=665d90a0&is=665c3f20&hm=79795d6fa25d523198e86fc20ef395ec44894264dd89569f5dea21ce40b46397&=&format=webp&quality=lossless&width=576&height=576",
-                    url = "https://discord.gg/YPYXBU2n6w"
+                    url = ""
                 },
                 ["fields"] = {
                     {
@@ -126,7 +126,7 @@ function sendToDiscord(DiscordLog, source, title, des, color)
                     },
                     {
                         ["name"] = "> Support:",
-                        ["value"] = 'https://discord.gg/YPYXBU2n6w',
+                        ["value"] = '',
                         ["inline"] = true
                     },
                 },

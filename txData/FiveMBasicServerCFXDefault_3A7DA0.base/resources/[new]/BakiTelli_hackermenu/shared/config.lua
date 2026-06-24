@@ -8,7 +8,7 @@ Config = {}
 
 Config.Mysql = "oxmysql" -- mysql-async, ghmattimysql, oxmysql
 Config.Money = "bank" -- cash or bank
-Config.Webhook = "https://discord.com/api/webhooks/1246766874541428777/bCaRDSfTwIYJfVHfGakxpeuJ_3Xbnrcf-4gkIkGWf8gAkOGwC66YZhAlBQdptvWq5KMp" -- insert log channel webhook
+Config.Webhook = "" -- insert your own log channel webhook
 Config.ItemName = "tablet" -- hacker tablet item name
 
 Config.HackerMenu = {

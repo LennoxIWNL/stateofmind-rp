@@ -5,7 +5,7 @@ lua54 'yes'
 
 author 'Kloud Development'
 description 'Advanced Fast Food Delivery by Kloud Development'
-discord 'https://discord.gg/DbqC2SWzJk'
+discord ''
 
 version '1.0.1'
 

@@ -9,8 +9,8 @@ local removeInProgress = false -- for future functionality
 -----------------------------------------------------------------------------------------------------------
 
 local Webhooks = { -- these webhooks keys MUST MATCH your config keys
-    [1] = 'https://discord.com/api/webhooks/1058428023336083466/jzMPmUEndV_cJvSdX_20X-snTn-ej3S6KSkZzzNvhltWU26QjJfuSxOG0cWmWIwbp_IE',--LSPD Discord
-    [2] = 'https://discord.com/api/webhooks/1060559253187858442/US_WtUFEvfZTflNHXI6RGEQiozS9DbhFFUT5mtkK7JIRw6sfOH6bapO4qPppKqB4-eaZ',-- Staff Logs
+    [1] = '',-- LSPD Discord - insert your own webhook
+    [2] = '',-- Staff Logs - insert your own webhook
     --[[[3] = '',
     [4] = '',
     [5] = '',
