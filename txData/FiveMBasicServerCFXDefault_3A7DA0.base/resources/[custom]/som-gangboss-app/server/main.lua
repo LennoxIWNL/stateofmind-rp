@@ -1,26 +1,56 @@
 local QBCore = exports['qb-core']:GetCoreObject()
 
+-- =========================================================================
+--  Custom Ranks Cache
+-- =========================================================================
+local CustomRanks = {}
+
+local function loadCustomRanks()
+    MySQL.query('SELECT type, name, grade, custom_label FROM som_custom_ranks', {}, function(results)
+        CustomRanks = {}
+        if not results then return end
+        for _, row in ipairs(results) do
+            local key = ('%s:%s:%d'):format(row.type, row.name, row.grade)
+            CustomRanks[key] = row.custom_label
+        end
+    end)
+end
+
+local function getCustomLabel(type, name, grade)
+    local key = ('%s:%s:%d'):format(type, name, grade)
+    return CustomRanks[key]
+end
+
+local function resolveGradeName(type, name, grade)
+    local custom = getCustomLabel(type, name, grade)
+    if custom then return custom end
+    local def = type == 'gang' and QBCore.Shared.Gangs[name] or QBCore.Shared.Jobs[name]
+    if def and def.grades and def.grades[tostring(grade)] then
+        return def.grades[tostring(grade)].name or ('Grade ' .. grade)
+    end
+    return 'Grade ' .. grade
+end
+
+-- =========================================================================
+--  Grade List (with custom labels overlaid)
+-- =========================================================================
 local function getGrades(type, name)
     local grades = {}
-    if type == 'gang' then
-        local gang = QBCore.Shared.Gangs[name]
-        if gang and gang.grades then
-            for k, v in pairs(gang.grades) do
-                grades[#grades + 1] = { level = tonumber(k), name = v.name or ('Grade ' .. k) }
-            end
-        end
-    else
-        local job = QBCore.Shared.Jobs[name]
-        if job and job.grades then
-            for k, v in pairs(job.grades) do
-                grades[#grades + 1] = { level = tonumber(k), name = v.name or ('Grade ' .. k) }
-            end
+    local def = type == 'gang' and QBCore.Shared.Gangs[name] or QBCore.Shared.Jobs[name]
+    if def and def.grades then
+        for k, v in pairs(def.grades) do
+            local level = tonumber(k)
+            local label = getCustomLabel(type, name, level) or v.name or ('Grade ' .. k)
+            grades[#grades + 1] = { level = level, name = label, defaultName = v.name or ('Grade ' .. k) }
         end
     end
     table.sort(grades, function(a, b) return a.level < b.level end)
     return grades
 end
 
+-- =========================================================================
+--  Roster Helpers
+-- =========================================================================
 local function getOnlineMembers(type, name)
     local members = {}
     for _, pid in ipairs(QBCore.Functions.GetPlayers()) do
@@ -29,12 +59,13 @@ local function getOnlineMembers(type, name)
             local data = type == 'gang' and player.PlayerData.gang or player.PlayerData.job
             if data and data.name == name then
                 local charinfo = player.PlayerData.charinfo or {}
+                local grade = data.grade and data.grade.level or 0
                 members[#members + 1] = {
                     src = player.PlayerData.source,
                     citizenid = player.PlayerData.citizenid,
                     name = (charinfo.firstname or '') .. ' ' .. (charinfo.lastname or ''),
-                    grade = data.grade and data.grade.level or 0,
-                    gradeName = data.grade and data.grade.name or 'Unknown',
+                    grade = grade,
+                    gradeName = resolveGradeName(type, name, grade),
                     online = true,
                 }
             end
@@ -53,13 +84,13 @@ local function getOfflineMembers(type, name, onlineCids, cb)
                 local ok1, charinfo = pcall(json.decode, row.charinfo)
                 local ok2, fieldData = pcall(json.decode, row[field])
                 if ok1 and ok2 then
-                    local grade = fieldData.grade or {}
+                    local grade = fieldData.grade and fieldData.grade.level or 0
                     members[#members + 1] = {
                         src = nil,
                         citizenid = row.citizenid,
                         name = (charinfo.firstname or '') .. ' ' .. (charinfo.lastname or ''),
-                        grade = grade.level or 0,
-                        gradeName = grade.name or 'Unknown',
+                        grade = grade,
+                        gradeName = resolveGradeName(type, name, grade),
                         online = false,
                     }
                 end
@@ -69,6 +100,22 @@ local function getOfflineMembers(type, name, onlineCids, cb)
     end)
 end
 
+-- =========================================================================
+--  Permission Check
+-- =========================================================================
+local function hasPermission(player, type, name)
+    local pData = type == 'gang' and player.PlayerData.gang or player.PlayerData.job
+    if not pData or pData.name ~= name then return false end
+    if type == 'job' then
+        local gradeInfo = QBCore.Shared.Jobs[name] and QBCore.Shared.Jobs[name].grades[tostring(pData.grade.level)]
+        if not gradeInfo or not gradeInfo.isboss then return false end
+    end
+    return true
+end
+
+-- =========================================================================
+--  Events
+-- =========================================================================
 RegisterNetEvent('som-gangboss:server:getRoster', function(type, name)
     local src = source
     local player = QBCore.Functions.GetPlayer(src)
@@ -79,13 +126,7 @@ RegisterNetEvent('som-gangboss:server:getRoster', function(type, name)
 
     if type == 'job' then
         if not pData.grade or not pData.grade.level then return end
-        local jobDef = QBCore.Shared.Jobs[name]
-        if not jobDef then return end
-        local maxGrade = -1
-        for k in pairs(jobDef.grades or {}) do
-            if tonumber(k) > maxGrade then maxGrade = tonumber(k) end
-        end
-        local gradeInfo = jobDef.grades and jobDef.grades[tostring(pData.grade.level)]
+        local gradeInfo = QBCore.Shared.Jobs[name] and QBCore.Shared.Jobs[name].grades[tostring(pData.grade.level)]
         if not gradeInfo or not gradeInfo.isboss then return end
     end
 
@@ -161,33 +202,25 @@ RegisterNetEvent('som-gangboss:server:hire', function(type, name, targetSrc, gra
     local player = QBCore.Functions.GetPlayer(src)
     if not player then return end
     grade = tonumber(grade) or 0
-
-    local pData = type == 'gang' and player.PlayerData.gang or player.PlayerData.job
-    if not pData or pData.name ~= name then return end
-
-    if type == 'job' then
-        local gradeInfo = QBCore.Shared.Jobs[name] and QBCore.Shared.Jobs[name].grades[tostring(pData.grade.level)]
-        if not gradeInfo or not gradeInfo.isboss then return end
-    end
+    if not hasPermission(player, type, name) then return end
 
     local target = QBCore.Functions.GetPlayer(tonumber(targetSrc))
     if not target then
         TriggerClientEvent('som-gangboss:client:notify', src, 'Player not found or offline', 'error')
+        TriggerClientEvent('som-gangboss:client:actionResult', src, { ok = false })
         return
     end
 
     local label = ''
-    local gradeName = ''
+    local gradeName = resolveGradeName(type, name, grade)
     if type == 'gang' then
         target.Functions.SetGang(name, grade)
         local g = QBCore.Shared.Gangs[name]
         label = g and g.label or name
-        gradeName = g and g.grades and g.grades[tostring(grade)] and g.grades[tostring(grade)].name or ('Grade ' .. grade)
     else
         target.Functions.SetJob(name, grade)
         local j = QBCore.Shared.Jobs[name]
         label = j and j.label or name
-        gradeName = j and j.grades and j.grades[tostring(grade)] and j.grades[tostring(grade)].name or ('Grade ' .. grade)
     end
 
     TriggerClientEvent('som-gangboss:client:notify', src, ('Hired %s as %s'):format(
@@ -204,17 +237,11 @@ RegisterNetEvent('som-gangboss:server:fire', function(type, name, targetCid)
     local src = source
     local player = QBCore.Functions.GetPlayer(src)
     if not player then return end
-
-    local pData = type == 'gang' and player.PlayerData.gang or player.PlayerData.job
-    if not pData or pData.name ~= name then return end
-
-    if type == 'job' then
-        local gradeInfo = QBCore.Shared.Jobs[name] and QBCore.Shared.Jobs[name].grades[tostring(pData.grade.level)]
-        if not gradeInfo or not gradeInfo.isboss then return end
-    end
+    if not hasPermission(player, type, name) then return end
 
     if targetCid == player.PlayerData.citizenid then
         TriggerClientEvent('som-gangboss:client:notify', src, 'You cannot fire yourself', 'error')
+        TriggerClientEvent('som-gangboss:client:actionResult', src, { ok = false })
         return
     end
 
@@ -253,25 +280,16 @@ RegisterNetEvent('som-gangboss:server:setGrade', function(type, name, targetCid,
     local player = QBCore.Functions.GetPlayer(src)
     if not player then return end
     newGrade = tonumber(newGrade) or 0
+    if not hasPermission(player, type, name) then return end
 
-    local pData = type == 'gang' and player.PlayerData.gang or player.PlayerData.job
-    if not pData or pData.name ~= name then return end
-
-    if type == 'job' then
-        local gradeInfo = QBCore.Shared.Jobs[name] and QBCore.Shared.Jobs[name].grades[tostring(pData.grade.level)]
-        if not gradeInfo or not gradeInfo.isboss then return end
-    end
-
+    local gradeName = resolveGradeName(type, name, newGrade)
     local label = ''
-    local gradeName = ''
     if type == 'gang' then
         local g = QBCore.Shared.Gangs[name]
         label = g and g.label or name
-        gradeName = g and g.grades and g.grades[tostring(newGrade)] and g.grades[tostring(newGrade)].name or ('Grade ' .. newGrade)
     else
         local j = QBCore.Shared.Jobs[name]
         label = j and j.label or name
-        gradeName = j and j.grades and j.grades[tostring(newGrade)] and j.grades[tostring(newGrade)].name or ('Grade ' .. newGrade)
     end
 
     local targetPlayer = QBCore.Functions.GetPlayerByCitizenId(targetCid)
@@ -299,4 +317,70 @@ RegisterNetEvent('som-gangboss:server:setGrade', function(type, name, targetCid,
 
     TriggerClientEvent('som-gangboss:client:notify', src, ('Set rank to %s'):format(gradeName), 'success')
     TriggerClientEvent('som-gangboss:client:actionResult', src, { ok = true })
+end)
+
+-- =========================================================================
+--  Custom Rank Management
+-- =========================================================================
+RegisterNetEvent('som-gangboss:server:getCustomRanks', function(type, name)
+    local src = source
+    local player = QBCore.Functions.GetPlayer(src)
+    if not player then return end
+    if not hasPermission(player, type, name) then return end
+
+    local grades = getGrades(type, name)
+    TriggerClientEvent('som-gangboss:client:customRanksData', src, grades)
+end)
+
+RegisterNetEvent('som-gangboss:server:setCustomRank', function(orgType, name, grade, customLabel)
+    local src = source
+    local player = QBCore.Functions.GetPlayer(src)
+    if not player then return end
+    if not hasPermission(player, orgType, name) then return end
+
+    grade = tonumber(grade)
+    if not grade then return end
+    if type(customLabel) ~= 'string' then return end
+    customLabel = customLabel:sub(1, 50):gsub('[<>]', '')
+
+    if customLabel == '' then
+        MySQL.query('DELETE FROM som_custom_ranks WHERE type = ? AND name = ? AND grade = ?', { orgType, name, grade })
+        local key = ('%s:%s:%d'):format(orgType, name, grade)
+        CustomRanks[key] = nil
+    else
+        MySQL.query([[
+            INSERT INTO som_custom_ranks (type, name, grade, custom_label, created_by)
+            VALUES (?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE custom_label = VALUES(custom_label), created_by = VALUES(created_by)
+        ]], { orgType, name, grade, customLabel, player.PlayerData.citizenid })
+        local key = ('%s:%s:%d'):format(orgType, name, grade)
+        CustomRanks[key] = customLabel
+    end
+
+    TriggerClientEvent('som-gangboss:client:notify', src,
+        customLabel == '' and 'Rank label reset to default' or ('Rank renamed to "%s"'):format(customLabel), 'success')
+    TriggerClientEvent('som-gangboss:client:actionResult', src, { ok = true })
+end)
+
+-- =========================================================================
+--  Init
+-- =========================================================================
+AddEventHandler('onResourceStart', function(res)
+    if res ~= GetCurrentResourceName() then return end
+
+    MySQL.query([[
+        CREATE TABLE IF NOT EXISTS `som_custom_ranks` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `type` ENUM('gang', 'job') NOT NULL,
+            `name` VARCHAR(50) NOT NULL,
+            `grade` INT NOT NULL,
+            `custom_label` VARCHAR(50) NOT NULL,
+            `created_by` VARCHAR(50) NOT NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY `unique_rank` (`type`, `name`, `grade`)
+        )
+    ]], {}, function()
+        loadCustomRanks()
+        print('^5[som-gangboss-app]^7 Custom ranks table ready')
+    end)
 end)

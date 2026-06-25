@@ -3,7 +3,7 @@ games { 'gta5' }
 
 name 'Lennox-Anticheat'
 author 'Lennox'
-description 'Server-authoritative anti-cheat — weapon/explosion/entity filtering, heartbeat tamper detection, teleport/speed monitoring, honeypot traps, ban evasion blocking.'
+description 'Lennox Anti-Cheat v1.0 Full Release — 50+ detection modules, hardware fingerprinting, behavioral analysis, economy protection, framework auto-detection.'
 version '1.0.0'
 lua54 'yes'
 
@@ -12,6 +12,12 @@ shared_script 'config.lua'
 server_scripts {
     'server/main.lua',
     'server/detections.lua',
+    'server/protection.lua',
+    'server/hwid.lua',
+    'server/behavioral.lua',
+    'server/damage_model.lua',
+    'server/economy.lua',
+    'server/validation.lua',
     'server/connect.lua',
     'server/commands.lua',
 }

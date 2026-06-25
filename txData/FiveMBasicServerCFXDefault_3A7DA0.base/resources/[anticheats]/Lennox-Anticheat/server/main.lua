@@ -125,6 +125,8 @@ local function saveBans()
         json.encode(bans, { indent = true }), -1)
 end
 
+function LAC._getBans() return bans end
+
 function LAC.checkBan(identifiers, tokens)
     for _, ban in ipairs(bans) do
         for _, bi in ipairs(ban.identifiers or {}) do
@@ -393,6 +395,19 @@ CreateThread(function()
     end
 end)
 
+-- Session token rotation (every 10 minutes, re-issue tokens to all players)
+CreateThread(function()
+    while true do
+        Wait(600000)
+        for _, pid in ipairs(GetPlayers()) do
+            local src = tonumber(pid)
+            if SessionTokens[src] then
+                LAC.issueSessionToken(src)
+            end
+        end
+    end
+end)
+
 -- =========================================================================
 --  Exports
 -- =========================================================================
@@ -430,12 +445,47 @@ AddEventHandler('playerDropped', function()
     SeenNonces[src] = nil
 end)
 
--- Issue session tokens to players once they've fully loaded
+-- Anti-resource-stop: alert staff if someone tries to stop the anticheat
+AddEventHandler('onResourceStop', function(res)
+    if res == GetCurrentResourceName() then
+        sendDiscord('bans', 'CRITICAL — ANTICHEAT STOPPED',
+            '**The Lennox Anti-Cheat resource was stopped.** This should never happen during normal operation. Check your server console and txAdmin logs immediately.',
+            16711680, true)
+    end
+end)
+
+-- =========================================================================
+--  Framework Auto-Detection & Session Init
+-- =========================================================================
+LAC.Framework = 'standalone'
+
+AddEventHandler('onResourceStart', function(res)
+    if res ~= GetCurrentResourceName() then return end
+
+    if GetResourceState('qb-core') == 'started' then
+        LAC.Framework = 'qbcore'
+        print('^5[Lennox-Anticheat]^7 Framework: ^2QBCore^7')
+    elseif GetResourceState('es_extended') == 'started' then
+        LAC.Framework = 'esx'
+        print('^5[Lennox-Anticheat]^7 Framework: ^2ESX^7')
+    else
+        print('^5[Lennox-Anticheat]^7 Framework: ^3Standalone^7')
+    end
+end)
+
+-- QBCore session init
 RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
     LAC.issueSessionToken(source)
 end)
 
--- Fallback: issue token after a delay for non-QB frameworks
+-- ESX session init
+RegisterNetEvent('esx:playerLoaded', function()
+    if LAC.Framework == 'esx' then
+        LAC.issueSessionToken(source)
+    end
+end)
+
+-- Fallback: issue token after a delay for any framework
 AddEventHandler('playerJoining', function()
     local src = source
     SetTimeout(5000, function()

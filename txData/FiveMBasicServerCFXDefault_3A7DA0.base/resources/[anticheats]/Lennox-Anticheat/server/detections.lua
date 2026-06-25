@@ -6,6 +6,31 @@
 local cfg = LACConfig
 
 -- =========================================================================
+--  Shared: Token Validation Helper
+-- =========================================================================
+local function validateClientEvent(src, token, nonce)
+    if not token then return true end
+    return LAC.validateToken(src, token, nonce)
+end
+
+-- =========================================================================
+--  Helper: Register Client Event (shorthand for standard detection receiver)
+-- =========================================================================
+function _rce(eventName, displayName, severity, hard, webhookChannel, color)
+    RegisterNetEvent(eventName, function(token, nonce, detail)
+        local src = source
+        if LAC.isAdmin(src) then return end
+        if not validateClientEvent(src, token, nonce) then return end
+        if type(detail) ~= 'string' then return end
+        LAC.flagPlayer(src, displayName, detail:sub(1, 100), severity, hard)
+        LAC.sendDiscord(webhookChannel or 'events', displayName,
+            ('**Player:** %s (id: %s)\n**Detail:** %s')
+                :format(GetPlayerName(src) or '?', src, detail:sub(1, 100)),
+            color or 16711680)
+    end)
+end
+
+-- =========================================================================
 --  1. Heartbeat (tamper / resource-kill detection)
 -- =========================================================================
 local HB_CHALLENGE = LAC.deriveKey('hb:challenge')
@@ -313,11 +338,6 @@ local DETECT_HEALTH    = LAC.deriveKey('det:health')
 local DETECT_WEAPON    = LAC.deriveKey('det:weapon')
 local DETECT_ANTITAMP  = LAC.deriveKey('det:antitamper')
 
-local function validateClientEvent(src, token, nonce)
-    if not token then return true end
-    return LAC.validateToken(src, token, nonce)
-end
-
 RegisterNetEvent(DETECT_GODMODE, function(token, nonce, detail)
     local src = source
     if LAC.isAdmin(src) then return end
@@ -400,6 +420,522 @@ RegisterNetEvent(DETECT_ANTITAMP, function(token, nonce, detail)
         ('**Player:** %s (id: %s)\n**Detail:** %s\n**Verdict:** Cheat tool signature or tampered client.')
             :format(GetPlayerName(src) or '?', src, detail:sub(1, 100)),
         16711680, true)
+end)
+
+-- =========================================================================
+--  9. Server-Side Ped Model Validation
+-- =========================================================================
+local ALLOWED_PED_MODELS = {
+    [GetHashKey('mp_m_freemode_01')] = true,
+    [GetHashKey('mp_f_freemode_01')] = true,
+}
+
+CreateThread(function()
+    Wait(30000)
+    while true do
+        Wait(15000)
+        for _, pid in ipairs(GetPlayers()) do
+            local src = tonumber(pid)
+            if not LAC.isAdmin(src) then
+                local ped = GetPlayerPed(src)
+                if ped and ped > 0 then
+                    local model = GetEntityModel(ped)
+                    if model and model ~= 0 and not ALLOWED_PED_MODELS[model] then
+                        LAC.flagPlayer(src, 'Invalid Ped Model',
+                            ('Model: 0x%X'):format(model), 10, true)
+                        LAC.sendDiscord('events', 'Invalid Ped Model',
+                            ('**Player:** %s (id: %s)\n**Model:** `0x%X`\n**Verdict:** Player is using a non-freemode ped model.')
+                                :format(GetPlayerName(src) or '?', src, model),
+                            16711680)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- =========================================================================
+--  10. Server-Side Health/Armor Monitoring
+-- =========================================================================
+local PlayerHealthCache = {}
+
+CreateThread(function()
+    Wait(20000)
+    while true do
+        Wait(5000)
+        for _, pid in ipairs(GetPlayers()) do
+            local src = tonumber(pid)
+            if not LAC.isAdmin(src) then
+                local ped = GetPlayerPed(src)
+                if ped and ped > 0 then
+                    local health = GetEntityHealth(ped)
+                    local armor = GetPedArmour(ped)
+                    local cache = PlayerHealthCache[src]
+
+                    if cache then
+                        -- Max health is 200, max armor is 100
+                        if health > 200 then
+                            LAC.flagPlayer(src, 'Impossible Health',
+                                ('Health: %d (max 200)'):format(health), 10, true)
+                        end
+                        if armor > 100 then
+                            LAC.flagPlayer(src, 'Impossible Armor',
+                                ('Armor: %d (max 100)'):format(armor), 10, true)
+                        end
+                        -- Detect large health gain without medical item (>50 HP in 5s while not dead)
+                        if cache.health > 100 and health > cache.health + 50 then
+                            LAC.flagPlayer(src, 'Suspicious Heal (server)',
+                                ('Health: %d -> %d in 5s'):format(cache.health, health), 3, false)
+                        end
+                    end
+
+                    PlayerHealthCache[src] = { health = health, armor = armor }
+                end
+            end
+        end
+    end
+end)
+
+AddEventHandler('playerDropped', function()
+    PlayerHealthCache[source] = nil
+end)
+
+-- =========================================================================
+--  11. New Client Detection Receivers
+-- =========================================================================
+local DETECT_SUPERJUMP  = LAC.deriveKey('det:superjump')
+local DETECT_VEHSPEED   = LAC.deriveKey('det:vehspeed')
+local DETECT_AMMO       = LAC.deriveKey('det:ammo')
+local DETECT_VISION     = LAC.deriveKey('det:vision')
+local DETECT_PEDFLAG    = LAC.deriveKey('det:pedflag')
+local DETECT_RESPAWN    = LAC.deriveKey('det:rapidrespawn')
+
+RegisterNetEvent(DETECT_SUPERJUMP, function(token, nonce, detail)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    if type(detail) ~= 'string' then return end
+    LAC.flagPlayer(src, 'Super Jump', detail:sub(1, 100), 8, false)
+    LAC.sendDiscord('events', 'Super Jump Detected',
+        ('**Player:** %s (id: %s)\n**Detail:** %s'):format(GetPlayerName(src) or '?', src, detail:sub(1, 100)), 16744192)
+end)
+
+RegisterNetEvent(DETECT_VEHSPEED, function(token, nonce, detail)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    if type(detail) ~= 'string' then return end
+    LAC.flagPlayer(src, 'Vehicle Speed Hack', detail:sub(1, 100), 5, false)
+    LAC.sendDiscord('events', 'Vehicle Speed Exceeded',
+        ('**Player:** %s (id: %s)\n**Detail:** %s'):format(GetPlayerName(src) or '?', src, detail:sub(1, 100)), 16744192)
+end)
+
+RegisterNetEvent(DETECT_AMMO, function(token, nonce, detail)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    if type(detail) ~= 'string' then return end
+    LAC.flagPlayer(src, 'Infinite Ammo', detail:sub(1, 100), 8, true)
+    LAC.sendDiscord('events', 'Infinite Ammo Detected',
+        ('**Player:** %s (id: %s)\n**Detail:** %s'):format(GetPlayerName(src) or '?', src, detail:sub(1, 100)), 16711680)
+end)
+
+RegisterNetEvent(DETECT_VISION, function(token, nonce, detail)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    if type(detail) ~= 'string' then return end
+    LAC.flagPlayer(src, 'Unauthorized Vision Mode', detail:sub(1, 100), 5, false)
+    LAC.sendDiscord('events', 'Vision Mode Exploit',
+        ('**Player:** %s (id: %s)\n**Detail:** %s'):format(GetPlayerName(src) or '?', src, detail:sub(1, 100)), 16776960)
+end)
+
+RegisterNetEvent(DETECT_PEDFLAG, function(token, nonce, detail)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    if type(detail) ~= 'string' then return end
+    LAC.flagPlayer(src, 'Suspicious Ped Flags', detail:sub(1, 100), 8, false)
+    LAC.sendDiscord('events', 'Ped Flag Manipulation',
+        ('**Player:** %s (id: %s)\n**Detail:** %s'):format(GetPlayerName(src) or '?', src, detail:sub(1, 100)), 16744192)
+end)
+
+RegisterNetEvent(DETECT_RESPAWN, function(token, nonce, detail)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    if type(detail) ~= 'string' then return end
+    LAC.flagPlayer(src, 'Rapid Respawn', detail:sub(1, 100), 10, true)
+    LAC.sendDiscord('events', 'Rapid Respawn Detected',
+        ('**Player:** %s (id: %s)\n**Detail:** %s'):format(GetPlayerName(src) or '?', src, detail:sub(1, 100)), 16711680)
+end)
+
+-- =========================================================================
+--  v4.0 — New Detection Receivers
+-- =========================================================================
+local DETECT_ENVTAMPER   = LAC.deriveKey('det:envtamper')
+local DETECT_CANARY      = LAC.deriveKey('det:canary')
+local DETECT_COMBAT      = LAC.deriveKey('det:combat')
+local DETECT_VEHFLY      = LAC.deriveKey('det:vehfly')
+local DETECT_SWIMSPEED   = LAC.deriveKey('det:swimspeed')
+local DETECT_PTFXSPAM    = LAC.deriveKey('det:particlespam')
+local DETECT_SHOOTDEAD   = LAC.deriveKey('det:shootdead')
+
+RegisterNetEvent(DETECT_ENVTAMPER, function(token, nonce, detail)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    if type(detail) ~= 'string' then return end
+    LAC.flagPlayer(src, 'Environment Tampering', detail:sub(1, 100), 20, true)
+    LAC.sendDiscord('bans', 'ENVIRONMENT TAMPERING — EXECUTOR DETECTED',
+        ('**Player:** %s (id: %s)\n**Detail:** %s\n**Verdict:** Core Lua functions or FiveM natives have been hooked/replaced. This is definitive proof of an executor.')
+            :format(GetPlayerName(src) or '?', src, detail:sub(1, 100)), 16711680, true)
+end)
+
+RegisterNetEvent(DETECT_CANARY, function(token, nonce, detail)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    if type(detail) ~= 'string' then return end
+    LAC.flagPlayer(src, 'Canary Tripped', detail:sub(1, 100), 15, true)
+    LAC.sendDiscord('bans', 'MEMORY TAMPERING DETECTED',
+        ('**Player:** %s (id: %s)\n**Detail:** %s\n**Verdict:** Planted canary values were modified — indicates memory editor or cheat tool scanning globals.')
+            :format(GetPlayerName(src) or '?', src, detail:sub(1, 100)), 16711680, true)
+end)
+
+RegisterNetEvent(DETECT_COMBAT, function(token, nonce, detail)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    if type(detail) ~= 'string' then return end
+    LAC.flagPlayer(src, 'Combat Exploit', detail:sub(1, 100), 8, false)
+    LAC.sendDiscord('events', 'Combat Exploit Detected',
+        ('**Player:** %s (id: %s)\n**Detail:** %s'):format(GetPlayerName(src) or '?', src, detail:sub(1, 100)), 16711680)
+end)
+
+RegisterNetEvent(DETECT_VEHFLY, function(token, nonce, detail)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    if type(detail) ~= 'string' then return end
+    LAC.flagPlayer(src, 'Vehicle Fly Hack', detail:sub(1, 100), 8, true)
+    LAC.sendDiscord('events', 'Vehicle Fly Hack',
+        ('**Player:** %s (id: %s)\n**Detail:** %s\n**Verdict:** Non-aircraft vehicle gaining sustained altitude.')
+            :format(GetPlayerName(src) or '?', src, detail:sub(1, 100)), 16711680)
+end)
+
+RegisterNetEvent(DETECT_SWIMSPEED, function(token, nonce, detail)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    if type(detail) ~= 'string' then return end
+    LAC.flagPlayer(src, 'Swim Speed Hack', detail:sub(1, 100), 5, false)
+    LAC.sendDiscord('events', 'Swim Speed Exceeded',
+        ('**Player:** %s (id: %s)\n**Detail:** %s'):format(GetPlayerName(src) or '?', src, detail:sub(1, 100)), 16744192)
+end)
+
+RegisterNetEvent(DETECT_PTFXSPAM, function(token, nonce, detail)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    if type(detail) ~= 'string' then return end
+    LAC.flagPlayer(src, 'Particle Effect Spam', detail:sub(1, 100), 8, true)
+    LAC.sendDiscord('events', 'Particle Spam Detected',
+        ('**Player:** %s (id: %s)\n**Detail:** %s'):format(GetPlayerName(src) or '?', src, detail:sub(1, 100)), 16711680)
+end)
+
+RegisterNetEvent(DETECT_SHOOTDEAD, function(token, nonce, detail)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    if type(detail) ~= 'string' then return end
+    LAC.flagPlayer(src, 'Shooting While Dead', detail:sub(1, 100), 10, true)
+    LAC.sendDiscord('events', 'Shooting While Dead',
+        ('**Player:** %s (id: %s)\n**Detail:** %s'):format(GetPlayerName(src) or '?', src, detail:sub(1, 100)), 16711680)
+end)
+
+-- =========================================================================
+--  v1.0 Full Release — New Detection Receivers
+-- =========================================================================
+local DETECT_HWSPOOF     = LAC.deriveKey('det:hwfingerprint')
+local DETECT_FREECAM     = LAC.deriveKey('det:freecam')
+local DETECT_PROGTELE    = LAC.deriveKey('det:progteleport')
+local DETECT_WORLDMANIP  = LAC.deriveKey('det:worldmanip')
+local DETECT_OBJSPAM     = LAC.deriveKey('det:objectspam')
+
+_rce(DETECT_HWSPOOF, 'HWID Spoof (mid-session)', 15, true, 'bans', 16711680)
+_rce(DETECT_FREECAM, 'Freecam Detected', 10, true, 'events', 16711680)
+_rce(DETECT_PROGTELE, 'Progressive Teleport', 8, false, 'events', 16744192)
+_rce(DETECT_WORLDMANIP, 'World Manipulation', 5, false, 'events', 16776960)
+_rce(DETECT_OBJSPAM, 'Object Spam', 8, false, 'events', 16744192)
+
+-- =========================================================================
+--  Pass 2 — New Detection Receivers
+-- =========================================================================
+local DETECT_GODTEST    = LAC.deriveKey('det:godtest')
+local DETECT_VEHHANDLE  = LAC.deriveKey('det:vehhandle')
+local DETECT_NOCLIPWALL = LAC.deriveKey('det:noclipwall')
+local DETECT_SPECTADV   = LAC.deriveKey('det:spectadv')
+local DETECT_OBJMANIP   = LAC.deriveKey('det:objmanip')
+local DETECT_PEDMANIP   = LAC.deriveKey('det:pedmanip')
+local DETECT_NETMANIP   = LAC.deriveKey('det:netmanip')
+local DETECT_VEHADV     = LAC.deriveKey('det:vehadv')
+local DETECT_PERF       = LAC.deriveKey('det:perf')
+local DETECT_RESINTEG   = LAC.deriveKey('det:resinteg')
+
+_rce(DETECT_GODTEST, 'God Mode (server test)', 10, true, 'bans', 16711680)
+_rce(DETECT_VEHHANDLE, 'Vehicle Handling Exploit', 8, false, 'events', 16744192)
+_rce(DETECT_NOCLIPWALL, 'Advanced Noclip', 8, false, 'events', 16744192)
+_rce(DETECT_SPECTADV, 'Advanced Spectate', 5, false, 'events', 16776960)
+_rce(DETECT_OBJMANIP, 'Object/Prop Manipulation', 8, false, 'events', 16744192)
+_rce(DETECT_PEDMANIP, 'Ped Manipulation', 8, false, 'events', 16711680)
+_rce(DETECT_NETMANIP, 'Network Manipulation', 8, false, 'events', 16711680)
+_rce(DETECT_VEHADV, 'Advanced Vehicle Exploit', 8, true, 'events', 16711680)
+_rce(DETECT_PERF, 'Performance Attack', 5, false, 'events', 16776960)
+_rce(DETECT_RESINTEG, 'Resource Integrity Failure', 15, true, 'bans', 16711680)
+
+-- =========================================================================
+--  Pass 2 — Advanced God Mode: Server-Instrumented Health Test
+-- =========================================================================
+local GOD_TEST_REQ  = LAC.deriveKey('lac:godtest:req')
+local GOD_TEST_RESP = LAC.deriveKey('lac:godtest:resp')
+local RAG_TEST_REQ  = LAC.deriveKey('lac:ragtest:req')
+local RAG_TEST_RESP = LAC.deriveKey('lac:ragtest:resp')
+
+local PendingGodTests = {}
+local PendingRagTests = {}
+
+RegisterNetEvent(GOD_TEST_RESP, function(token, nonce, healthBefore, healthAfter)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    local pending = PendingGodTests[src]
+    if not pending then return end
+    PendingGodTests[src] = nil
+
+    healthBefore = tonumber(healthBefore) or 0
+    healthAfter = tonumber(healthAfter) or 0
+
+    if healthAfter >= healthBefore and healthBefore > 100 then
+        LAC.flagPlayer(src, 'God Mode (server test)',
+            ('Health did not decrease: before=%d after=%d'):format(healthBefore, healthAfter), 10, true)
+        LAC.sendDiscord('bans', 'GOD MODE CONFIRMED — SERVER TEST',
+            ('**Player:** %s (id: %s)\n**Health:** %d → %d (expected decrease)\n**Verdict:** Server-instrumented damage test failed.')
+                :format(GetPlayerName(src) or '?', src, healthBefore, healthAfter), 16711680, true)
+    end
+end)
+
+RegisterNetEvent(RAG_TEST_RESP, function(token, nonce, didRagdoll)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    local pending = PendingRagTests[src]
+    if not pending then return end
+    PendingRagTests[src] = nil
+
+    if not didRagdoll then
+        LAC.flagPlayer(src, 'Ragdoll Resistance',
+            'Server-initiated ragdoll test failed — ped did not ragdoll', 8, false)
+    end
+end)
+
+CreateThread(function()
+    Wait(60000)
+    while true do
+        Wait(cfg.GodModeTestInterval or 120000)
+        for _, pid in ipairs(GetPlayers()) do
+            local src = tonumber(pid)
+            if not LAC.isAdmin(src) then
+                local ped = GetPlayerPed(src)
+                if ped and ped > 0 and GetEntityHealth(ped) > 100 then
+                    PendingGodTests[src] = { sentAt = GetGameTimer(), expectedHealth = GetEntityHealth(ped) }
+                    TriggerClientEvent(GOD_TEST_REQ, src, cfg.GodModeTestDamage or 1)
+                end
+            end
+        end
+    end
+end)
+
+CreateThread(function()
+    Wait(90000)
+    while true do
+        Wait(cfg.RagdollTestInterval or 180000)
+        for _, pid in ipairs(GetPlayers()) do
+            local src = tonumber(pid)
+            if not LAC.isAdmin(src) then
+                local ped = GetPlayerPed(src)
+                if ped and ped > 0 and GetEntityHealth(ped) > 100 then
+                    PendingRagTests[src] = { sentAt = GetGameTimer() }
+                    TriggerClientEvent(RAG_TEST_REQ, src)
+                end
+            end
+        end
+    end
+end)
+
+-- Timeout pending tests
+CreateThread(function()
+    while true do
+        Wait(30000)
+        local now = GetGameTimer()
+        for src, test in pairs(PendingGodTests) do
+            if now - test.sentAt > 15000 then PendingGodTests[src] = nil end
+        end
+        for src, test in pairs(PendingRagTests) do
+            if now - test.sentAt > 15000 then PendingRagTests[src] = nil end
+        end
+    end
+end)
+
+-- Server-side health authoritativeness
+local ServerHealthTrack = {}
+
+CreateThread(function()
+    Wait(30000)
+    while true do
+        Wait(5000)
+        for _, pid in ipairs(GetPlayers()) do
+            local src = tonumber(pid)
+            if not LAC.isAdmin(src) then
+                local ped = GetPlayerPed(src)
+                if ped and ped > 0 then
+                    local health = GetEntityHealth(ped)
+                    local prev = ServerHealthTrack[src]
+                    if prev then
+                        if health > prev.health + 100 and prev.health > 100 then
+                            local veh = GetVehiclePedIsIn(ped, false)
+                            if veh == 0 then
+                                LAC.flagPlayer(src, 'Server Health Authority',
+                                    ('Health jumped %d→%d without known heal'):format(prev.health, health), 5, false)
+                            end
+                        end
+                    end
+                    ServerHealthTrack[src] = { health = health, time = GetGameTimer() }
+                end
+            end
+        end
+    end
+end)
+
+AddEventHandler('playerDropped', function()
+    local src = source
+    PendingGodTests[src] = nil
+    PendingRagTests[src] = nil
+    ServerHealthTrack[src] = nil
+end)
+
+-- =========================================================================
+--  Pass 2 — Vehicle God Mode Detection
+-- =========================================================================
+local VehicleHealthTrack = {}
+
+CreateThread(function()
+    Wait(30000)
+    while true do
+        Wait(5000)
+        for _, pid in ipairs(GetPlayers()) do
+            local src = tonumber(pid)
+            if not LAC.isAdmin(src) then
+                local ped = GetPlayerPed(src)
+                if ped and ped > 0 then
+                    local veh = GetVehiclePedIsIn(ped, false)
+                    if veh ~= 0 and GetPedInVehicleSeat(veh, -1) == ped then
+                        local vehHealth = GetEntityHealth(veh)
+                        local vehId = NetworkGetNetworkIdFromEntity(veh)
+                        local prev = VehicleHealthTrack[src]
+                        if prev and prev.vehId == vehId then
+                            if vehHealth > prev.health + 500 and prev.health > 0 then
+                                LAC.flagPlayer(src, 'Vehicle God Mode',
+                                    ('Vehicle health jumped %d→%d'):format(prev.health, vehHealth), 8, false)
+                            end
+                        end
+                        VehicleHealthTrack[src] = { health = vehHealth, time = GetGameTimer(), vehId = vehId }
+                    else
+                        VehicleHealthTrack[src] = nil
+                    end
+                end
+            end
+        end
+    end
+end)
+
+AddEventHandler('playerDropped', function()
+    VehicleHealthTrack[source] = nil
+end)
+
+-- =========================================================================
+--  12. Global Event Rate Limiter
+-- =========================================================================
+local EventRates = {}
+
+AddEventHandler('__cfx_internal:commandFallback', function(name)
+    local src = source
+    if not src or src <= 0 then return end
+    if LAC.isAdmin(src) then return end
+
+    local now = GetGameTimer()
+    if not EventRates[src] then EventRates[src] = { count = 0, reset = now } end
+    local er = EventRates[src]
+
+    if now - er.reset > (cfg.GlobalEventRateWindow or 1000) then
+        er.count = 0; er.reset = now
+    end
+    er.count = er.count + 1
+
+    if er.count > (cfg.GlobalEventRateLimit or 100) then
+        LAC.flagPlayer(src, 'Event Rate Limit',
+            ('%d events/sec'):format(er.count), 5, false)
+    end
+end)
+
+AddEventHandler('playerDropped', function()
+    EventRates[source] = nil
+end)
+
+-- =========================================================================
+--  13. Server-Side Vehicle Teleport Detection
+-- =========================================================================
+local VehiclePositions = {}
+
+CreateThread(function()
+    Wait(20000)
+    while true do
+        Wait(3000)
+        for _, pid in ipairs(GetPlayers()) do
+            local src = tonumber(pid)
+            if not LAC.isAdmin(src) then
+                local ped = GetPlayerPed(src)
+                if ped and ped > 0 then
+                    local veh = GetVehiclePedIsIn(ped, false)
+                    if veh ~= 0 then
+                        local pos = GetEntityCoords(veh)
+                        local vehId = NetworkGetNetworkIdFromEntity(veh)
+                        local prev = VehiclePositions[src]
+
+                        if prev and prev.vehId == vehId then
+                            local dist = #(pos - prev.pos)
+                            local elapsed = (GetGameTimer() - prev.time) / 1000.0
+                            if elapsed > 0.5 and dist > 500.0 and elapsed < 3.0 then
+                                local pd = LAC.getPlayerData(src)
+                                if (GetGameTimer() - (pd.joinedAt or 0)) > 30000 then
+                                    LAC.flagPlayer(src, 'Vehicle Teleport',
+                                        ('%.0fm in %.1fs'):format(dist, elapsed), 5, false)
+                                end
+                            end
+                        end
+
+                        VehiclePositions[src] = { pos = pos, time = GetGameTimer(), vehId = vehId }
+                    else
+                        VehiclePositions[src] = nil
+                    end
+                end
+            end
+        end
+    end
+end)
+
+AddEventHandler('playerDropped', function()
+    VehiclePositions[source] = nil
 end)
 
 -- Periodic silent integrity re-check

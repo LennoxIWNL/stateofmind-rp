@@ -102,6 +102,34 @@ RegisterNetEvent('som-gangboss:client:actionResult', function(result)
     actionResponse = result
 end)
 
+local customRanksResponse = nil
+
+RegisterNUICallback('getCustomRanks', function(data, cb)
+    customRanksResponse = nil
+    TriggerServerEvent('som-gangboss:server:getCustomRanks', data.type, data.name)
+    local waited = 0
+    while customRanksResponse == nil and waited < 3000 do
+        Wait(50)
+        waited = waited + 50
+    end
+    cb({ grades = customRanksResponse or {} })
+end)
+
+RegisterNUICallback('setCustomRank', function(data, cb)
+    actionResponse = nil
+    TriggerServerEvent('som-gangboss:server:setCustomRank', data.type, data.name, tonumber(data.grade), data.label or '')
+    local waited = 0
+    while actionResponse == nil and waited < 3000 do
+        Wait(50)
+        waited = waited + 50
+    end
+    cb(actionResponse or { ok = true })
+end)
+
+RegisterNetEvent('som-gangboss:client:customRanksData', function(grades)
+    customRanksResponse = grades
+end)
+
 RegisterNetEvent('som-gangboss:client:notify', function(msg, nType)
     lib.notify({ title = 'Management', description = msg, type = nType or 'inform', duration = 5000 })
 end)

@@ -77,6 +77,7 @@ body{font-family:-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:
 <div class="tabs" id="tabs" style="display:none">
   <div class="tab active" data-tab="roster" onclick="switchTab('roster')">Roster</div>
   <div class="tab" data-tab="hire" onclick="switchTab('hire')">Hire</div>
+  <div class="tab" data-tab="ranks" onclick="switchTab('ranks')">Ranks</div>
 </div>
 <div class="content" id="content">
   <div class="loading">Loading...</div>
@@ -127,7 +128,8 @@ function switchTab(tab) {
   S.tab = tab;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   if (tab === 'roster') loadRoster();
-  else renderHire();
+  else if (tab === 'hire') renderHire();
+  else if (tab === 'ranks') loadRanks();
 }
 
 async function init() {
@@ -273,6 +275,47 @@ async function scanNearby() {
     return;
   }
   list.innerHTML = S.nearby.map(n => `<div class="nearby" onclick="document.getElementById('h-id').value=${n.src}"><div><div class="nearby-name">${esc(n.name)}</div><div class="nearby-meta">ID: ${n.src} &bull; ${n.dist}m</div></div></div>`).join('');
+}
+
+async function loadRanks() {
+  content.innerHTML = '<div class="loading">Loading ranks...</div>';
+  const data = await post('getCustomRanks', { type: S.type, name: S.name });
+  S.rankGrades = data.grades || [];
+  renderRanks();
+}
+
+function renderRanks() {
+  let h = `<div class="section">Custom Rank Labels</div><p style="font-size:10px;color:var(--dim);margin-bottom:12px">Rename ranks to customize your organization. Leave blank to use the default name.</p>`;
+
+  if (!S.rankGrades || !S.rankGrades.length) {
+    h += '<div class="empty">No ranks available</div>';
+    content.innerHTML = h;
+    return;
+  }
+
+  S.rankGrades.forEach(g => {
+    const isCustom = g.name !== g.defaultName;
+    h += `<div class="member" style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div><span style="font-size:12px;font-weight:700">Grade ${g.level}</span><span style="font-size:10px;color:var(--dim);margin-left:6px">${esc(g.defaultName)}</span></div>
+        ${isCustom ? '<span class="member-rank" style="font-size:9px">Custom</span>' : ''}
+      </div>
+      <div style="display:flex;gap:6px">
+        <input class="search" style="margin:0;flex:1" id="rk-${g.level}" value="${esc(g.name)}" placeholder="${esc(g.defaultName)}">
+        <button class="btn-pink" style="width:auto;padding:6px 12px;border-radius:6px;font-size:10px;border:none;cursor:pointer;font-weight:700;background:var(--pink);color:#fff" onclick="saveRank(${g.level})">Save</button>
+      </div>
+    </div>`;
+  });
+
+  content.innerHTML = h;
+}
+
+async function saveRank(grade) {
+  const input = document.getElementById('rk-' + grade);
+  if (!input) return;
+  const label = input.value.trim();
+  await post('setCustomRank', { type: S.type, name: S.name, grade: grade, label: label });
+  loadRanks();
 }
 
 init();
