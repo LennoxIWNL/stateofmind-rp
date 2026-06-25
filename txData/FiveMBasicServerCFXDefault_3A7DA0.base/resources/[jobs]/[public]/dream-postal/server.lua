@@ -168,6 +168,7 @@ function getPlayerIdentification(src)
 
     if (Config.FRAMEWORK == 'qb') then
         local Player = FRAMEWORK.Functions.GetPlayer(src)
+        if not Player then return { fullName = 'Unknown', identifier = 'unknown' } end
         fullName = Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname
         identifier = Player.PlayerData.citizenid
     elseif (Config.FRAMEWORK == 'esx' or Config.FRAMEWORK == 'esx-old') then

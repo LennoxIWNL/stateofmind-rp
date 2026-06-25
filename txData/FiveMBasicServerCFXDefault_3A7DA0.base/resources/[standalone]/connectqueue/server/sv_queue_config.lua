@@ -44,7 +44,7 @@ Config.PleaseWait = "Please wait %f seconds. The connection will start automatic
 
 -- on resource start, players can join the queue but will not let them join for __ milliseconds
 -- this will let the queue settle and lets other resources finish initializing
-Config.JoinDelay = 30000
+Config.JoinDelay = 120000
 
 -- will show how many people have temporary priority in the connection message
 Config.ShowTemp = true

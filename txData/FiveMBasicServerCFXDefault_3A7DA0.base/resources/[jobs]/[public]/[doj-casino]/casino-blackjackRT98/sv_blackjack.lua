@@ -186,7 +186,7 @@ end)
 
 for i=0,31,1 do
     CreateThread(function()
-        math.randomseed(os.clock()*100000000000)
+        math.randomseed(math.floor(os.clock()*100000000000))
         while true do  --blackjack game management thread
             math.random() 
             math.random()
