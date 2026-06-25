@@ -3,7 +3,7 @@
 Config = {}
 
 Config.UseLanguage = "en"                                                           -- Select the language you want to use in the script (the translation is at the end of the file)
-Config.UseSoundEffect = true                                                        -- Only use this if you use InteractSound
+Config.UseSoundEffect = false                                                        -- Only use this if you use InteractSound
 Config.UseTarget = GetConvar('UseTarget', 'true') == 'true'
 Config.Elevators = {
     -- The following tags are not required! You can add them if you want

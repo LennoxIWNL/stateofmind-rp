@@ -91,7 +91,7 @@ Citizen.CreateThread(function()
 				SetVehicleTurboPressure(pedVehicle, 25)
 			end
 		end
-	  Wait(0)
+	  Wait(IsPedInAnyVehicle(PlayerPedId(), false) and 0 or 500)
 	end
 end)
 
@@ -99,11 +99,13 @@ Citizen.CreateThread(function()
 	while true do
 		if activated == true then
 			DrawHudText("2Step", {0, 255, 85,255},0.92,0.88,0.7,0.7,6)
-		end
-		if AntilagDisplay == true then
+			Wait(0)
+		elseif AntilagDisplay == true then
 			DrawHudText("Anti-Lag", {0, 255, 85,255},0.92,0.88,0.7,0.7,6)
+			Wait(0)
+		else
+			Wait(500)
 		end
-	  Wait(0)
 	end
 end)
 

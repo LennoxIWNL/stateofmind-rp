@@ -1639,7 +1639,7 @@ p {
 }
 .menuItem:hover {
   border: calc(0.092592592vh * 1) solid #ff1493;
-  background: url(./itembg-08ba48fa.svg), radial-gradient(62.19% 62.19% at 50% 50%, rgba(255, 20, 147, 0.25) 0%, rgba(0, 102, 76, 0.25) 100%);
+  background: url(./itembg-08ba48fa.svg), radial-gradient(62.19% 62.19% at 50% 50%, rgba(255, 20, 147, 0.25) 0%, rgba(102, 0, 76, 0.25) 100%);
   background-repeat: no-repeat;
   background-position: center;
   background-size: 100% 100%;
@@ -1852,7 +1852,7 @@ p {
 .option:hover {
   border-radius: calc(0.092592592vh * 4);
   border: calc(0.092592592vh * 1) solid #ff1493;
-  background: radial-gradient(801.37% 145.73% at 50% 50%, #ff1493 0%, #00251b 100%);
+  background: radial-gradient(801.37% 145.73% at 50% 50%, #ff1493 0%, #25001b 100%);
   box-shadow: 0px calc(0.092592592vh * 4) calc(0.092592592vh * 54) 0px rgba(255, 20, 147, 0.55);
 }
 .option-icon {
@@ -1931,7 +1931,7 @@ p {
   justify-content: center;
   border: calc(0.092592592vh * 1) solid #ff1493;
   position: relative;
-  background: radial-gradient(62.19% 62.19% at 50% 50%, rgba(255, 20, 147, 0.25) 0%, rgba(0, 102, 76, 0.25) 100%);
+  background: radial-gradient(62.19% 62.19% at 50% 50%, rgba(255, 20, 147, 0.25) 0%, rgba(102, 0, 76, 0.25) 100%);
 }
 .interation-wrapper .interaction-alert .interaction-text {
   width: 100%;
@@ -9995,7 +9995,7 @@ svg.active .svg-elem-1 {
 }
 ._setting_item_1j2j1_1:hover {
   cursor: pointer;
-  background: radial-gradient(62.19% 62.19% at 50% 50%, rgba(255, 20, 147, 0.25) 0%, rgba(0, 102, 76, 0.25) 100%);
+  background: radial-gradient(62.19% 62.19% at 50% 50%, rgba(255, 20, 147, 0.25) 0%, rgba(102, 0, 76, 0.25) 100%);
 }
 ._setting_item_1j2j1_1 ._info_1j2j1_14 {
   display: flex;
@@ -10017,7 +10017,7 @@ svg.active .svg-elem-1 {
   height: calc(0.092592592vh * 28);
   justify-content: center;
   border-radius: calc(0.092592592vh * 6);
-  background: radial-gradient(62.19% 62.19% at 50% 50%, rgba(255, 20, 147, 0.25) 0%, rgba(0, 102, 76, 0.25) 100%);
+  background: radial-gradient(62.19% 62.19% at 50% 50%, rgba(255, 20, 147, 0.25) 0%, rgba(102, 0, 76, 0.25) 100%);
 }
 ._setting_item_1j2j1_1 ._info_1j2j1_14 ._icon_container_1j2j1_27 ._icon_1j2j1_27 {
   color: #ff1493;

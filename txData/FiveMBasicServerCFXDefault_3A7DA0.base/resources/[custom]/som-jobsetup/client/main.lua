@@ -12,6 +12,79 @@ local uiOpen = false
 local function vec(p) return vector3(p.coords.x + 0.0, p.coords.y + 0.0, p.coords.z + 0.0) end
 local function zoneName(id) return ('som_js_%s'):format(id) end
 
+local function getRaycastCoords()
+    local camRot = GetGameplayCamRot(2)
+    local camPos = GetGameplayCamCoord()
+    local radX = camRot.x * math.pi / 180.0
+    local radZ = camRot.z * math.pi / 180.0
+    local dir = vector3(
+        -math.sin(radZ) * math.abs(math.cos(radX)),
+        math.cos(radZ) * math.abs(math.cos(radX)),
+        math.sin(radX)
+    )
+    local dest = camPos + dir * 25.0
+    local handle = StartShapeTestRay(camPos.x, camPos.y, camPos.z, dest.x, dest.y, dest.z, -1, PlayerPedId(), 7)
+    local _, hit, endCoords, surfaceNormal = GetShapeTestResult(handle)
+    if hit == 1 then return endCoords, surfaceNormal end
+    return nil
+end
+
+local function snapToGround(x, y, z)
+    local found, gz = GetGroundZFor_3dCoord(x, y, z + 2.0, false)
+    if found then return gz end
+    found, gz = GetGroundZFor_3dCoord(x, y, z - 0.5, false)
+    if found then return gz end
+    return z
+end
+
+local aimingMode = false
+local aimCallback = nil
+
+local function startAimMode(cb)
+    aimingMode = true
+    aimCallback = cb
+    lib.notify({ title = 'Job Setup', description = 'Aim at the FLOOR where you want the point. LEFT CLICK to confirm, RIGHT CLICK to cancel.', type = 'inform', duration = 5000 })
+end
+
+CreateThread(function()
+    while true do
+        if aimingMode then
+            local coords, normal = getRaycastCoords()
+            if coords then
+                local gz = snapToGround(coords.x, coords.y, coords.z)
+                DrawMarker(28, coords.x, coords.y, gz, 0, 0, 0, 0, 0, 0,
+                    0.15, 0.15, 0.15,
+                    255, 20, 147, 200,
+                    false, true, 2, false, nil, nil, false)
+                DrawMarker(1, coords.x, coords.y, gz, 0, 0, 0, 0, 0, 0,
+                    1.0, 1.0, 0.05,
+                    255, 20, 147, 80,
+                    false, true, 2, false, nil, nil, false)
+            end
+
+            if IsControlJustPressed(0, 24) then
+                aimingMode = false
+                if coords and aimCallback then
+                    local gz = snapToGround(coords.x, coords.y, coords.z)
+                    local heading = GetEntityHeading(PlayerPedId())
+                    aimCallback(
+                        { x = math.floor(coords.x * 100) / 100, y = math.floor(coords.y * 100) / 100, z = math.floor(gz * 100) / 100 },
+                        math.floor(heading * 100) / 100
+                    )
+                    aimCallback = nil
+                end
+            elseif IsControlJustPressed(0, 25) then
+                aimingMode = false
+                aimCallback = nil
+                lib.notify({ title = 'Job Setup', description = 'Cancelled', type = 'error' })
+            end
+            Wait(0)
+        else
+            Wait(500)
+        end
+    end
+end)
+
 local function captureHere()
     local ped = PlayerPedId()
     local c = GetEntityCoords(ped)
@@ -75,7 +148,8 @@ local function renderPoint(point)
         local t = 0
         while not HasModelLoaded(hash) and t < 100 do Wait(10); t = t + 1 end
         if HasModelLoaded(hash) then
-            local ped = CreatePed(4, hash, coords.x, coords.y, coords.z - 1.0, point.heading or 0.0, false, true)
+            local pedZ = snapToGround(coords.x, coords.y, coords.z)
+            local ped = CreatePed(4, hash, coords.x, coords.y, pedZ, point.heading or 0.0, false, true)
             FreezeEntityPosition(ped, true)
             SetEntityInvincible(ped, true)
             SetBlockingOfNonTemporaryEvents(ped, true)
@@ -202,17 +276,20 @@ end)
 --  NUI Callbacks — Points
 -- ===========================================================================
 RegisterNUICallback('addPoint', function(data, cb)
-    local coords, heading = captureHere()
-    TriggerServerEvent('som-jobsetup:server:save', {
-        label = data.label or 'New Point',
-        job = data.job or 'unknown',
-        type = data.pointType or 'target',
-        radius = (tonumber(data.radius) or 1.5) + 0.0,
-        restrictJob = data.restrictJob and true or false,
-        coords = coords,
-        heading = heading,
-    })
     cb('ok')
+    closeUI()
+    startAimMode(function(coords, heading)
+        TriggerServerEvent('som-jobsetup:server:save', {
+            label = data.label or 'New Point',
+            job = data.job or 'unknown',
+            type = data.pointType or 'target',
+            radius = (tonumber(data.radius) or 1.5) + 0.0,
+            restrictJob = data.restrictJob and true or false,
+            coords = coords,
+            heading = heading,
+        })
+        lib.notify({ title = 'Job Setup', description = 'Point created!', type = 'success' })
+    end)
 end)
 
 RegisterNUICallback('teleportToPoint', function(data, cb)
@@ -225,13 +302,15 @@ RegisterNUICallback('teleportToPoint', function(data, cb)
 end)
 
 RegisterNUICallback('movePoint', function(data, cb)
-    local point = points[tonumber(data.id)]
-    if point then
-        local c, h = captureHere()
-        point.coords, point.heading = c, h
-        TriggerServerEvent('som-jobsetup:server:save', point)
-    end
     cb('ok')
+    local point = points[tonumber(data.id)]
+    if not point then return end
+    closeUI()
+    startAimMode(function(coords, heading)
+        point.coords, point.heading = coords, heading
+        TriggerServerEvent('som-jobsetup:server:save', point)
+        lib.notify({ title = 'Job Setup', description = 'Point moved!', type = 'success' })
+    end)
 end)
 
 RegisterNUICallback('deletePoint', function(data, cb)
@@ -274,8 +353,13 @@ RegisterNUICallback('exportPoints', function(_, cb)
 end)
 
 RegisterNUICallback('getCoords', function(_, cb)
-    local c, h = captureHere()
-    cb({ x = c.x, y = c.y, z = c.z, heading = h })
+    local rc = getRaycastCoords()
+    if rc then
+        cb({ x = math.floor(rc.x * 100) / 100, y = math.floor(rc.y * 100) / 100, z = math.floor(rc.z * 100) / 100, heading = math.floor(GetEntityHeading(PlayerPedId()) * 100) / 100 })
+    else
+        local c, h = captureHere()
+        cb({ x = c.x, y = c.y, z = c.z, heading = h })
+    end
 end)
 
 -- ===========================================================================
@@ -299,15 +383,18 @@ RegisterNUICallback('getJobLocations', function(data, cb)
 end)
 
 RegisterNUICallback('patchLocation', function(data, cb)
-    local c, h = captureHere()
-    TriggerServerEvent('som-jobsetup:server:patchJobLocation', {
-        resource = data.resource,
-        locType = data.locType,
-        index = tonumber(data.index),
-        x = c.x, y = c.y, z = c.z, h = h,
-        restart = data.restart and true or false,
-    })
     cb('ok')
+    closeUI()
+    startAimMode(function(coords, heading)
+        TriggerServerEvent('som-jobsetup:server:patchJobLocation', {
+            resource = data.resource,
+            locType = data.locType,
+            index = tonumber(data.index),
+            x = coords.x, y = coords.y, z = coords.z, h = heading,
+            restart = data.restart and true or false,
+        })
+        lib.notify({ title = 'Job Setup', description = 'Location written!', type = 'success' })
+    end)
 end)
 
 -- ===========================================================================

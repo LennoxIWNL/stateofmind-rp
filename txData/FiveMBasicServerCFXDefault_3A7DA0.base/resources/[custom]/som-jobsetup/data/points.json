@@ -1,16 +1,16 @@
 [
     {
+        "heading": 112.95,
         "job": "police",
-        "heading": 308.31,
-        "id": 1,
-        "label": "Sign On VPD",
+        "label": "New Point",
+        "id": 8,
         "restrictJob": true,
-        "radius": 1.5,
         "type": "duty",
         "coords": {
-            "x": -1101.66,
-            "y": -830.87,
-            "z": 20.14
-        }
+            "z": 19.14,
+            "x": -1101.54,
+            "y": -830.82
+        },
+        "radius": 1.5
     }
 ]

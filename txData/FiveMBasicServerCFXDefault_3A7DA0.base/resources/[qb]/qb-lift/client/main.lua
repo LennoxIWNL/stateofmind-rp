@@ -4,6 +4,65 @@ local QBCore = exports['qb-core']:GetCoreObject()
 local PlayerData = {}
 local PlayerJob, PlayerGang = {}
 local floorsMenu = {}
+local spawnedDoors = {}
+
+local ElevatorDoors = {
+    {
+        model = 'prop_facgate_04_l',
+        coords = vector3(-1097.37, -849.39, 5.06),
+        heading = 222.0,
+    },
+    {
+        model = 'prop_facgate_04_l',
+        coords = vector3(-1097.30, -849.20, 19.31),
+        heading = 222.0,
+    },
+    {
+        model = 'prop_facgate_04_l',
+        coords = vector3(-1097.26, -849.29, 26.83),
+        heading = 222.0,
+    },
+    {
+        model = 'prop_facgate_04_l',
+        coords = vector3(-1097.29, -849.29, 30.95),
+        heading = 222.0,
+    },
+    {
+        model = 'prop_facgate_04_l',
+        coords = vector3(-1097.31, -849.23, 34.28),
+        heading = 222.0,
+    },
+}
+
+local function spawnElevatorDoors()
+    for _, door in ipairs(ElevatorDoors) do
+        local hash = GetHashKey(door.model)
+        RequestModel(hash)
+        while not HasModelLoaded(hash) do Wait(10) end
+        local obj = CreateObject(hash, door.coords.x, door.coords.y, door.coords.z, false, false, false)
+        SetEntityHeading(obj, door.heading)
+        FreezeEntityPosition(obj, true)
+        SetEntityCollisionState(obj, true, true)
+        spawnedDoors[#spawnedDoors + 1] = obj
+        SetModelAsNoLongerNeeded(hash)
+    end
+end
+
+local function deleteElevatorDoors()
+    for _, obj in ipairs(spawnedDoors) do
+        if DoesEntityExist(obj) then DeleteEntity(obj) end
+    end
+    spawnedDoors = {}
+end
+
+CreateThread(function()
+    Wait(3000)
+    spawnElevatorDoors()
+end)
+
+AddEventHandler('onResourceStop', function(res)
+    if res == GetCurrentResourceName() then deleteElevatorDoors() end
+end)
 
 AddEventHandler('onResourceStart', function(resource)
     PlayerData = QBCore.Functions.GetPlayerData()
@@ -69,28 +128,13 @@ end
 local function changeFloor(data)
     local ped = PlayerPedId()
 
-    QBCore.Functions.Progressbar("callLift", Config.Language[Config.UseLanguage].Waiting, 5000, false, false, {
-        disableMovement = true,
-        disableCarMovement = true,
-        disableMouse = false,
-        disableCombat = true,
-    }, {
-        animDict = "anim@apt_trans@elevator",
-        anim = "elev_1",
-        flags = 16,
-    }, {}, {}, function() -- Done
-        StopAnimTask(ped, "anim@apt_trans@elevator", "elev_1", 1.0)
-        DoScreenFadeOut(500)
-        Citizen.Wait(1000)
-        if Config.UseSoundEffect then
-            TriggerServerEvent("InteractSound_SV:PlayOnSource", Config.Elevators[data.lift].Sound, 0.05)
-        end
-        SetEntityCoords(ped, data.floor.Coords.x, data.floor.Coords.y, data.floor.Coords.z, 0, 0, 0, false)
-        SetEntityHeading(ped, data.floor.ExitHeading)
-        Citizen.Wait(1000)
-        DoScreenFadeIn(600)
-        
-    end)
+    DoScreenFadeOut(500)
+    Wait(600)
+    StopAnimTask(ped, "anim@apt_trans@elevator", "elev_1", 1.0)
+    SetEntityCoords(ped, data.floor.Coords.x, data.floor.Coords.y, data.floor.Coords.z, 0, 0, 0, false)
+    SetEntityHeading(ped, tonumber(data.floor.ExitHeading) or 0.0)
+    Wait(500)
+    DoScreenFadeIn(600)
 end
 
 CreateThread(function()
@@ -107,13 +151,18 @@ CreateThread(function()
                 SetDrawOrigin( b.Coords.x, b.Coords.y, b.Coords.z + 0.2, 0)
                 if liftDist <= 7 then
                     inLiftRange = true
-                    DrawSprite("ozzi_ui", "point", 0, 0, 0.015, 0.025, 0, 255, 255, 255, 200)
-                    -- DrawMarker(2, b.Coords, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.2, 0.15, 200, 0, 0, 222, false, false, false, true, false, false, false)
+                    DrawMarker(2, b.Coords.x, b.Coords.y, b.Coords.z + 0.3, 0, 0, 0, 0, 0, 0,
+                        0.15, 0.15, 0.15, 255, 20, 147, 180, false, true, 2, false, nil, nil, false)
                     if liftDist <= 1.5 then
                         if not IsPedInAnyVehicle(ped) then
-                            -- DrawText3Ds(b.Coords.x, b.Coords.y, b.Coords.z + 0.2, Config.Language[Config.UseLanguage].Call)
-                            DrawSprite("ozzi_ui", "key", 0, 0, 0.018, 0.030, 0, 255, 255, 255, 255)
-                            DrawSprite("ozzi_ui", "use", 0.044, 0, 0.06, 0.028, 0, 255, 255, 255, 255)
+                            SetTextFont(4)
+                            SetTextScale(0.35, 0.35)
+                            SetTextColour(255, 20, 147, 255)
+                            SetTextOutline()
+                            SetTextCentre(true)
+                            SetTextEntry('STRING')
+                            AddTextComponentString('~w~[~q~E~w~] Elevator')
+                            DrawText(0.5, 0.9)
                             if IsControlJustPressed(0, 38) then
                                 openFloorsMenu(k, i)
                             end

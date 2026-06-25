@@ -106,6 +106,11 @@ end)
 
 RegisterNetEvent('QBCore:Client:SetDuty', function(newDuty)
     PlayerJob.onduty = newDuty
+    if newDuty then
+        QBCore.Functions.Notify('You are now on duty', 'success')
+    else
+        QBCore.Functions.Notify('You are now off duty', 'primary')
+    end
 end)
 
 RegisterNetEvent('QBCore:Client:OnJobUpdate', function(JobInfo)
