@@ -1,1 +1,16 @@
-[]
+[
+    {
+        "job": "police",
+        "heading": 308.31,
+        "id": 1,
+        "label": "Sign On VPD",
+        "restrictJob": true,
+        "radius": 1.5,
+        "type": "duty",
+        "coords": {
+            "x": -1101.66,
+            "y": -830.87,
+            "z": 20.14
+        }
+    }
+]

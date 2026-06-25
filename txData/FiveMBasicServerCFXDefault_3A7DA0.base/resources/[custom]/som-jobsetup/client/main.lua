@@ -168,10 +168,12 @@ end)
 -- ===========================================================================
 --  NUI — open / close
 -- ===========================================================================
+local setFocus = SetNuiFocus or SetNUIFocus
+
 local function openUI()
     if uiOpen then return end
     uiOpen = true
-    SetNUIFocus(true, true)
+    setFocus(true, true)
     SendNUIMessage({
         type = 'open',
         page = 'home',
@@ -187,7 +189,7 @@ end
 local function closeUI()
     if not uiOpen then return end
     uiOpen = false
-    SetNUIFocus(false, false)
+    setFocus(false, false)
     SendNUIMessage({ type = 'close' })
 end
 

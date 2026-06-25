@@ -113,10 +113,10 @@ function showModal(title, body, onConfirm, btnLabel){
   const btn=document.getElementById('modal-confirm');
   btn.textContent=btnLabel||'Confirm';
   modalCallback=onConfirm;
-  btn.onclick=()=>{closeModal();if(modalCallback)modalCallback();};
+  btn.onclick=()=>{const cb=modalCallback;closeModal();if(cb)cb();};
   modal.classList.remove('hidden');
 }
-function closeModal(){modal.classList.add('hidden');modalCallback=null;}
+function closeModal(){modalCallback=null;modal.classList.add('hidden');}
 
 // ── Pages ─────────────────────────────────────────
 

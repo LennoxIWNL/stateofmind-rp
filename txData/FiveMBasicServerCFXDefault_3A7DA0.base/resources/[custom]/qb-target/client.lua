@@ -1157,7 +1157,7 @@ CreateThread(function()
 						end
 					else
 						SetDrawOrigin(Zones[_].center, 0)
-						DrawSprite("draw", "selected", 0, 0, 0.016, 0.026, 0, 255,255,255, 255)
+						DrawSprite("draw", "selected", 0, 0, 0.016, 0.026, 0, 255, 20, 147, 255)
 						ClearDrawOrigin()
 					end
 				end
