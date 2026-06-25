@@ -89,8 +89,10 @@ local recoils = {
 CreateThread(function()
     while true do
         local ped = PlayerPedId()
-        if IsPedShooting(ped) and not IsPedDoingDriveby(ped) then
-            local _, weap = GetCurrentPedWeapon(ped)
+        local _, weap = GetCurrentPedWeapon(ped)
+        if weap == `WEAPON_UNARMED` then
+            Wait(500) -- Not armed, no need to check shooting
+        elseif IsPedShooting(ped) and not IsPedDoingDriveby(ped) then
             if recoils[weap] and recoils[weap] ~= 0 then
                 local tv = 0
                 if GetFollowPedCamViewMode() ~= 4 then
@@ -114,7 +116,9 @@ CreateThread(function()
                     until tv >= recoils[weap]
                 end
             end
+            Wait(0)
+        else
+            Wait(0) -- Armed but not shooting, still need per-frame check
         end
-        Wait(0)
     end
 end)

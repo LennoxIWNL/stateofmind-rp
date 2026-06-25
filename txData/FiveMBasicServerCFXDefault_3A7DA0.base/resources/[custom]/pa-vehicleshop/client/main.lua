@@ -7,7 +7,7 @@ Citizen.CreateThread(function()
 		if v.Ped.Enable then
             local pedHash2 = type(v.Ped.Model) == "number" and v.Ped.Model or joaat(v.Ped.Model)
 			RequestModel(pedHash2)
-			while not HasModelLoaded(pedHash2) do Citizen.Wait(0) end
+			while not HasModelLoaded(pedHash2) do Citizen.Wait(50) end
 			v.Ped.ped = CreatePed(0, pedHash2, v.Ped.Coords.x, v.Ped.Coords.y, v.Ped.Coords.z - 1, v.Ped.Coords.w, false, true)
 			FreezeEntityPosition(v.Ped.ped, true)
             SetEntityInvincible(v.Ped.ped, true)
@@ -17,7 +17,7 @@ Citizen.CreateThread(function()
         	SetPedCanPlayAmbientAnims(v.Ped.ped, false) 
             SetModelAsNoLongerNeeded(pedHash2)
             RequestAnimDict(v.Ped.animDict)
-            while not HasAnimDictLoaded(v.Ped.animDict) do Citizen.Wait(0) end
+            while not HasAnimDictLoaded(v.Ped.animDict) do Citizen.Wait(50) end
 			TaskPlayAnim(v.Ped.ped, v.Ped.animDict, v.Ped.animName, 5.0, 5.0, -1, 1, 0, false, false, false)
             if v.Interaction.Target.Enable then
 				if GetResourceState('ox_target') == 'started' or GetResourceState('pa-target') == 'started' then
@@ -190,7 +190,7 @@ end)
 --                 if v.vehicleModel then
 --                     local model = GetHashKey(v.vehicleModel)
 --                     RequestModel(model)
---                     while not HasModelLoaded(model) do Citizen.Wait(0) end
+--                     while not HasModelLoaded(model) do Citizen.Wait(50) end
 --                     Config.VehicleShops[v.dealershipId].ShowroomVehicles[v.spotId].vehicleModel = v.vehicleModel
 --                     Config.VehicleShops[v.dealershipId].ShowroomVehicles[v.spotId].vehicle = CreateVehicle(model, v.coords.x, v.coords.y, v.coords.z, false, false)
 --                     local vehicle = Config.VehicleShops[v.dealershipId].ShowroomVehicles[v.spotId].vehicle
@@ -251,7 +251,7 @@ Citizen.CreateThread(function()
                             if v.vehicleModel then
                                 local model = GetHashKey(v.vehicleModel)
                                 RequestModel(model)
-                                while not HasModelLoaded(model) do Citizen.Wait(0) end
+                                while not HasModelLoaded(model) do Citizen.Wait(50) end
                                 Config.VehicleShops[v.dealershipId].ShowroomVehicles[v.spotId].vehicleModel = v.vehicleModel
                                 Config.VehicleShops[v.dealershipId].ShowroomVehicles[v.spotId].vehicle = CreateVehicle(model, v.coords.x, v.coords.y, v.coords.z, false, false)
                                 local vehicle = Config.VehicleShops[v.dealershipId].ShowroomVehicles[v.spotId].vehicle
@@ -284,7 +284,7 @@ Citizen.CreateThread(function()
 				else
 					break
 				end
-				Citizen.Wait(0)
+				Citizen.Wait(500)
 			end
 			closestVehShop = {}
 			sleep = 0
@@ -421,7 +421,7 @@ RegisterNUICallback('callback', function(data)
         DeleteVehiclesInsideShop()
         RequestModel(GetHashKey(data.veh))
         while not HasModelLoaded(GetHashKey(data.veh)) do
-            Citizen.Wait(0)
+            Citizen.Wait(50)
         end
         currentCar = CreateVehicle(GetHashKey(data.veh), currentCoords.showroomVehCoords, false, false)
         local brake = GetVehicleMaxBraking(currentCar)
@@ -481,7 +481,7 @@ RegisterNUICallback('callback', function(data)
                 end
                 RequestModel(model)
                 while not HasModelLoaded(model) do
-                    Wait(0)
+                    Wait(50)
                 end
                 currentTestVehicle = CreateVehicle(model, currentCoords.testVehCoords.x, currentCoords.testVehCoords.y, currentCoords.testVehCoords.z, currentCoords.testVehCoords.w, true, false)
                 currentTestVehicleNetId = NetworkGetNetworkIdFromEntity(currentTestVehicle)
@@ -583,7 +583,7 @@ RegisterNUICallback('callback', function(data)
         end
         local model = GetHashKey(data.model)
         RequestModel(model)
-        while not HasModelLoaded(model) do Citizen.Wait(0) end
+        while not HasModelLoaded(model) do Citizen.Wait(50) end
         Config.VehicleShops[data.dealershipId].ShowroomVehicles[data.spotId].vehicleModel = data.model
         local spot = Config.VehicleShops[data.dealershipId].ShowroomVehicles[data.spotId]
         Config.VehicleShops[data.dealershipId].ShowroomVehicles[data.spotId].vehicle = CreateVehicle(model, spot.coords.x, spot.coords.y, spot.coords.z, false, false)
@@ -598,7 +598,7 @@ RegisterNUICallback('callback', function(data)
         SetVehicleNumberPlateText(vehicle, 'BUY ME')
         PlaceObjectOnGroundProperly(vehicle)
         SetVehicleColourCombination(vehicle, 0)
-        while not DoesEntityExist(vehicle) do Citizen.Wait(0) end
+        while not DoesEntityExist(vehicle) do Citizen.Wait(50) end
         --local props = GetVehicleProperties(vehicle)
         --TriggerServerEvent('pa-vehicleshop:deleteVehicleShowroom:server', data.dealershipId, data.spotId, data.model, props)
         TriggerServerEvent('pa-vehicleshop:deleteVehicleShowroom:server', data.dealershipId, data.spotId, data.model)
@@ -618,7 +618,7 @@ RegisterNUICallback('callback', function(data)
             local coords = Config.VehicleShops[tonumber(data.dealershipId)].ShowroomVehicles[tonumber(data.spotId)].coords
             local model = GetHashKey("dubsta2")
             RequestModel("dubsta2")
-            while not HasModelLoaded("dubsta2") do Citizen.Wait(0) end
+            while not HasModelLoaded("dubsta2") do Citizen.Wait(50) end
             local vehicle = CreateVehicle(model, coords.x, coords.y, coords.z, false, false)
             table.insert(lastVehicles, vehicle)
             SetEntityVisible(vehicle, false, 0)
@@ -926,7 +926,7 @@ RegisterNetEvent('pa-vehicleshop:buyVehicle:client', function(model, plate, deal
     local model = type(model) == 'string' and GetHashKey(model) or model
     if not IsModelInCdimage(model) then return end
     RequestModel(model)
-    while not HasModelLoaded(model) do Citizen.Wait(0) end
+    while not HasModelLoaded(model) do Citizen.Wait(50) end
     local boughtVehCoords = Config.VehicleShops[tonumber(dealershipId)].Coords.BoughtVehicles
     local currentBoughtVehicle = CreateVehicle(model, boughtVehCoords.x, boughtVehCoords.y, boughtVehCoords.z, boughtVehCoords.w, true, false)
     local currentBoughtVehicleNetId = NetworkGetNetworkIdFromEntity(currentBoughtVehicle)
@@ -1085,7 +1085,7 @@ RegisterNetEvent('pa-vehicleshop:deleteVehicleShowroom:client', function(dealers
     if createNew then
         local model = GetHashKey(newModel)
         RequestModel(model)
-        while not HasModelLoaded(model) do Citizen.Wait(0) end
+        while not HasModelLoaded(model) do Citizen.Wait(50) end
         local spot = Config.VehicleShops[dealershipId].ShowroomVehicles[spotId]
         Config.VehicleShops[dealershipId].ShowroomVehicles[spotId].vehicle = CreateVehicle(model, spot.coords.x, spot.coords.y, spot.coords.z, false, false)
         local vehicle = Config.VehicleShops[dealershipId].ShowroomVehicles[spotId].vehicle
@@ -1138,7 +1138,7 @@ Citizen.CreateThread(function()
                     currentHide()
                     break
 				end
-				Citizen.Wait(0)
+				Citizen.Wait(500)
 			end
             showTextUI2 = false
 			closestVehShopPed = {}

@@ -14,7 +14,7 @@ end)
 
 AddEventHandler('onResourceStart', function(res)
     if res ~= GetCurrentResourceName() then return end
-    while CoreReady == false do Citizen.Wait(0) end
+    while CoreReady == false do Citizen.Wait(100) end
     CreateBlipsZones()
 end)
 
@@ -183,7 +183,7 @@ function CreateZone(index, garage, zoneType, job)
 end
 
 function CreateBlipsZones()
-    while CoreReady == false do Citizen.Wait(0) end
+    while CoreReady == false do Citizen.Wait(100) end
     PlayerData = GetPlayerData()
     PlayerGang = PlayerData.gang
     PlayerJob = PlayerData.job
@@ -232,7 +232,7 @@ function CreateBlipsZones()
                 shouldClose = true
             }, VehicleMenu)
                 while listenForKey do
-                    Citizen.Wait(0)
+                    Citizen.Wait(500)
                     RegisterCommand("++xl34rnm0r3", function()
                         if GetVehiclePedIsUsing(PlayerPedId()) ~= 0 then
                             if zone.data.type == 'depot' then return end

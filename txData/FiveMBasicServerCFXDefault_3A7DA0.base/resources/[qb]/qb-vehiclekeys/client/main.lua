@@ -89,7 +89,7 @@ local function robKeyLoop()
                     local plate = QBCore.Functions.GetPlate(vehicle)
 
                     if GetPedInVehicleSeat(vehicle, -1) == PlayerPedId() and not HasKeys(plate) and not isBlacklistedVehicle(vehicle) and not AreKeysJobShared(vehicle) then
-                        sleep = 0
+                        sleep = 100
 
                         local vehiclePos = GetOffsetFromEntityInWorldCoords(vehicle, 0.0, 1.0, 0.5)
                         -- DrawText3D(vehiclePos.x, vehiclePos.y, vehiclePos.z, Lang:t("info.skeys"))
@@ -356,7 +356,7 @@ exports('HasKeys', HasKeys)
 function loadAnimDict(dict)
     while not HasAnimDictLoaded(dict) do
         RequestAnimDict(dict)
-        Wait(0)
+        Wait(50)
     end
 end
 -- If in vehicle returns that, otherwise tries 3 different raycasts to get the vehicle they are facing.
@@ -410,9 +410,11 @@ function ToggleVehicleLocks(veh)
                 TaskPlayAnim(ped, 'anim@mp_player_intmenu@key_fob@', 'fob_click', 3.0, 3.0, -1, 49, 0, false, false, false)
                 TriggerServerEvent("InteractSound_SV:PlayWithinDistance", 5, "lock", 0.3)
                 NetworkRequestControlOfEntity(veh)
-                while NetworkGetEntityOwner(veh) ~= 128 do
+                local netAttempts = 0
+                while NetworkGetEntityOwner(veh) ~= 128 and netAttempts < 50 do
                     NetworkRequestControlOfEntity(veh)
-                    Wait(0)
+                    netAttempts = netAttempts + 1
+                    Wait(50)
                 end
                 if vehLockStatus == 1 then
                     TriggerServerEvent('qb-vehiclekeys:server:setVehLockState', NetworkGetNetworkIdFromEntity(veh), 2)

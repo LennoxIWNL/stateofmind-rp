@@ -104,7 +104,7 @@ local function GetDeliveryLocation()
             exports["qb-core"]:DrawText(Lang:t('info.busstop_text'), 'rgb(220, 20, 60)')
             CreateThread(function()
                 repeat
-                    Wait(0)
+                    Wait(5)
                     if IsControlJustPressed(0, 38) then
                         local ped = PlayerPedId()
                         local veh = GetVehiclePedIsIn(ped, 0)

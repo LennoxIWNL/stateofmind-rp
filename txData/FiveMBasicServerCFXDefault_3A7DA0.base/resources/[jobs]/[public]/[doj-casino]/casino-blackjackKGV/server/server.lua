@@ -202,7 +202,7 @@ function StartTableThread(i)
 	Citizen.CreateThread(function()
 		local index = i
 		-- DebugPrint(index)
-		while true do Wait(0)
+		while true do Wait(500)
 			if players[index] and #players[index] ~= 0 then
 				DebugPrint("WAITING FOR ALL PLAYERS AT TABLE "..index.." TO PLACE THEIR BETS.")				
 				PlayDealerAnim(index, "anim_casino_b@amb@casino@games@blackjack@dealer", "female_place_bet_request")
@@ -330,7 +330,7 @@ function StartTableThread(i)
 										PlayDealerSpeech(index, "MINIGAME_BJACK_DEALER_ANOTHER_CARD")
 										while v.player_in == true and #v.hand < 5 do
 											timeTracker[index] = 0
-											Wait(0)
+											Wait(100)
 											PlayDealerAnim(index, "anim_casino_b@amb@casino@games@blackjack@dealer", "female_dealer_focus_player_0".. 5-v.seat .."_idle")
 											DebugPrint("TABLE "..index..": AWAITING MOVE FROM "..GetPlayerName(v.player):upper())
 											TriggerClientEvent("BLACKJACK:RequestMove", v.player, moveTime - timeTracker[index])
@@ -502,7 +502,7 @@ function StartTableThread(i)
 													-- PlayDealerAnim(index, "anim_casino_b@amb@casino@games@blackjack@dealer", "female_dealer_focus_player_0".. 5-v.seat .."_idle_intro")
 													-- Wait(1500)
 													PlayDealerSpeech(index, "MINIGAME_BJACK_DEALER_ANOTHER_CARD")
-													repeat Wait(0)
+													repeat Wait(100)
 														timeTracker[index] = 0
 														PlayDealerAnim(index, "anim_casino_b@amb@casino@games@blackjack@dealer", "female_dealer_focus_player_0".. 5-v.seat .."_idle")
 														DebugPrint("TABLE "..index..": AWAITING MOVE FROM "..GetPlayerName(v.player):upper())
@@ -576,8 +576,8 @@ function StartTableThread(i)
 														PlayDealerAnim(index, "anim_casino_b@amb@casino@games@blackjack@dealer", "female_dealer_focus_player_0".. 5-v.seat .."_idle_intro_split")
 														Wait(1500)
 														PlayDealerSpeech(index, "MINIGAME_BJACK_DEALER_ANOTHER_CARD")
-														
-														repeat Wait(0)
+
+														repeat Wait(100)
 															timeTracker[index] = 0
 															PlayDealerAnim(index, "anim_casino_b@amb@casino@games@blackjack@dealer", "female_dealer_focus_player_0".. 5-v.seat .."_idle_split")
 															print(""..v.player)

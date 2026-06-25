@@ -283,7 +283,7 @@ function AwaitingInput()
                     waitingKeyPress = false
                 end
             end
-            Wait(0)
+            Wait(5)
         end
     end)
 end
@@ -460,7 +460,7 @@ RegisterNetEvent('qb-drugs:client:setLocation', function(locationData)
                             waitingDelivery = nil
                             break
                         end
-                        Wait(0)
+                        Wait(5)
                     end
                 end)
             else

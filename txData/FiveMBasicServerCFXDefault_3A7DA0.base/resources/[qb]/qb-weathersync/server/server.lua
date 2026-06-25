@@ -283,7 +283,7 @@ CreateThread(function()
     local failedCount = 0
 
     while true do
-        Wait(0)
+        Wait(1000)
         local newBaseTime = os.time(os.date("!*t")) / 2 + 360 --Set the server time depending of OS time
         if Config.RealTimeSync then
             newBaseTime = os.time(os.date("!*t")) --Set the server time depending of OS time

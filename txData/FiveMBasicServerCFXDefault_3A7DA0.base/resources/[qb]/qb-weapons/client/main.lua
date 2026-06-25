@@ -119,8 +119,10 @@ CreateThread(function()
                 TriggerServerEvent('weapons:server:UpdateWeaponQuality', CurrentWeaponData, MultiplierAmount)
                 MultiplierAmount = 0
             end
+            Wait(5)
+        else
+            Wait(500)
         end
-        Wait(0)
     end
 end)
 
@@ -149,7 +151,11 @@ CreateThread(function()
                 end
             end
         end
-        Wait(0)
+        if IsPedArmed(PlayerPedId(), 7) == 1 then
+            Wait(5)
+        else
+            Wait(500)
+        end
     end
 end)
 

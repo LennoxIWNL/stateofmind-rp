@@ -47,9 +47,9 @@ RegisterNetEvent('dc-casino:slots:server:enter', function(netID, ReelLocation1, 
         local ReelEntity1 = CreateObject(SlotReferences[SlotModel].reela, ReelLocation1, true, false, false)
         local ReelEntity2 = CreateObject(SlotReferences[SlotModel].reela, ReelLocation2, true, false, false)
         local ReelEntity3 = CreateObject(SlotReferences[SlotModel].reela, ReelLocation3, true, false, false)
-        while not DoesEntityExist(ReelEntity1) do Wait(0) end
-        while not DoesEntityExist(ReelEntity2) do Wait(0) end
-        while not DoesEntityExist(ReelEntity3) do Wait(0) end
+        while not DoesEntityExist(ReelEntity1) do Wait(100) end
+        while not DoesEntityExist(ReelEntity2) do Wait(100) end
+        while not DoesEntityExist(ReelEntity3) do Wait(100) end
         Slots[src] = {
             Slot = NetworkGetEntityFromNetworkId(netID),
             SlotNetID = netID,
@@ -95,9 +95,9 @@ RegisterNetEvent('dc-casino:slots:server:spin', function(ChosenBetAmount)
     local BlurryReel1 = CreateObject(SlotReferences[SlotModel].reelb, Slots[src].ReelLoc1, true, false, false)
     local BlurryReel2 = CreateObject(SlotReferences[SlotModel].reelb, Slots[src].ReelLoc2, true, false, false)
     local BlurryReel3 = CreateObject(SlotReferences[SlotModel].reelb, Slots[src].ReelLoc3, true, false, false)
-    while not DoesEntityExist(BlurryReel1) do Wait(0) end
-    while not DoesEntityExist(BlurryReel2) do Wait(0) end
-    while not DoesEntityExist(BlurryReel3) do Wait(0) end
+    while not DoesEntityExist(BlurryReel1) do Wait(100) end
+    while not DoesEntityExist(BlurryReel2) do Wait(100) end
+    while not DoesEntityExist(BlurryReel3) do Wait(100) end
     FreezeEntityPosition(BlurryReel1, true)
     FreezeEntityPosition(BlurryReel2, true)
     FreezeEntityPosition(BlurryReel3, true)

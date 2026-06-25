@@ -157,7 +157,7 @@ local function ProcessRunStuff(ped)
     if IsInjuryCausingLimp() then
         RequestAnimSet('move_m@injured')
         while not HasAnimSetLoaded('move_m@injured') do
-            Wait(0)
+            Wait(10)
         end
         SetPedMovementClipset(ped, 'move_m@injured', 1)
         SetPlayerSprint(PlayerId(), false)
@@ -298,7 +298,7 @@ local function LeaveBed()
 
     RequestAnimDict(getOutDict)
     while not HasAnimDictLoaded(getOutDict) do
-        Wait(0)
+        Wait(10)
     end
 
     FreezeEntityPosition(player, false)
@@ -507,7 +507,7 @@ local function ProcessDamage(ped)
 
                         DoScreenFadeOut(100)
                         while not IsScreenFadedOut() do
-                            Wait(0)
+                            Wait(50)
                         end
 
                         if not IsPedRagdoll(ped) and IsPedOnFoot(ped) and not IsPedSwimming(ped) then
@@ -737,7 +737,7 @@ CreateThread(function()
     while true do
         local sleep = 1000
         if isInHospitalBed and canLeaveBed then
-            sleep = 0
+            sleep = 5
             exports['qb-core']:DrawText(Lang:t('text.bed_out'))
             if IsControlJustReleased(0, 38) then
                 exports['qb-core']:KeyPressed(38)
@@ -849,7 +849,7 @@ local function CheckInControls(variable)
                     listen = false
                 end
             end
-            Wait(1)
+            Wait(5)
         end
     end)
 end

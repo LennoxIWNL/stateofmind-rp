@@ -163,10 +163,14 @@ function ManageReticle()
 end 
 
 Citizen.CreateThread( function()
-    while true do 
-	
-		HideHudComponentThisFrame( 14 )		
-		Citizen.Wait( 0 )
-
-    end 
+    while true do
+        local ped = PlayerPedId()
+        local _, weaponHash = GetCurrentPedWeapon(ped, true)
+        if weaponHash ~= GetHashKey('WEAPON_UNARMED') then
+            HideHudComponentThisFrame( 14 )
+            Citizen.Wait( 0 )
+        else
+            Citizen.Wait( 500 )
+        end
+    end
 end )

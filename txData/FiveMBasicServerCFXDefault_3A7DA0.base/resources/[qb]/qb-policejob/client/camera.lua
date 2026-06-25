@@ -52,7 +52,7 @@ end
 local function CreateInstuctionScaleform(scaleform)
     scaleform = RequestScaleformMovie(scaleform)
     while not HasScaleformMovieLoaded(scaleform) do
-        Wait(0)
+        Wait(10)
     end
     PushScaleformMovieFunction(scaleform, 'CLEAR_ALL')
     PopScaleformMovieFunctionVoid()
@@ -85,7 +85,7 @@ RegisterNetEvent('police:client:ActiveCamera', function(cameraId)
     if Config.SecurityCameras.cameras[cameraId] then
         DoScreenFadeOut(250)
         while not IsScreenFadedOut() do
-            Wait(0)
+            Wait(50)
         end
         SendNUIMessage({
             type = 'enablecam',
@@ -105,7 +105,7 @@ RegisterNetEvent('police:client:ActiveCamera', function(cameraId)
     elseif cameraId == 0 then
         DoScreenFadeOut(250)
         while not IsScreenFadedOut() do
-            Wait(0)
+            Wait(50)
         end
         CloseSecurityCamera()
         SendNUIMessage({
@@ -160,7 +160,7 @@ CreateThread(function()
             if IsControlJustPressed(1, 177) then
                 DoScreenFadeOut(250)
                 while not IsScreenFadedOut() do
-                    Wait(0)
+                    Wait(50)
                 end
                 CloseSecurityCamera()
                 SendNUIMessage({

@@ -152,7 +152,7 @@ function spinMeRightRoundBaby()
 		  SetEntityHeading(spinningObject, curHeading + 0.075)
 		  SetEntityHeading(spinningCar, curHeadingCar + 0.075)
 		end
-		Wait(0)
+		Wait(1)
 	  end
 	  spinningObject = nil
 	end)
@@ -164,7 +164,7 @@ function drawCarForWins()
 	end
 	RequestModel(Config.VehicleOnDisplay)
 	while not HasModelLoaded(Config.VehicleOnDisplay) do
-		Wait(0)
+		Wait(10)
 	end
 	SetModelAsNoLongerNeeded(Config.VehicleOnDisplay)
 	spinningCar = CreateVehicle(Config.VehicleOnDisplay, 935.432, 42.5611, 72.34, 0.0, 0, 0)
@@ -179,16 +179,16 @@ function playSomeBackgroundAudioBaby()
 	CreateThread(function()
 	  local function audioBanks()
 		while not RequestScriptAudioBank("DLC_VINEWOOD/CASINO_GENERAL", false, -1) do
-		  Wait(0)
+		  Wait(10)
 		end
 		while not RequestScriptAudioBank("DLC_VINEWOOD/CASINO_SLOT_MACHINES_01", false, -1) do
-		  Wait(0)
+		  Wait(10)
 		end
 		while not RequestScriptAudioBank("DLC_VINEWOOD/CASINO_SLOT_MACHINES_02", false, -1) do
-		  Wait(0)
+		  Wait(10)
 		end
 		while not RequestScriptAudioBank("DLC_VINEWOOD/CASINO_SLOT_MACHINES_03", false, -1) do
-		  Wait(0)
+		  Wait(10)
 		end
 	  end
 	  audioBanks()

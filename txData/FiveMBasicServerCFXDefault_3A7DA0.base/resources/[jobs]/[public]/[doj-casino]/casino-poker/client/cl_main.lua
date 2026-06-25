@@ -1820,7 +1820,7 @@ function setupSecondButtons(scaleform)
     ---
     local scaleform = RequestScaleformMovie(scaleform)
     while not HasScaleformMovieLoaded(scaleform) do
-        Citizen.Wait(0)
+        Citizen.Wait(10)
     end
     PushScaleformMovieFunction(scaleform, 'CLEAR_ALL')
     PopScaleformMovieFunctionVoid()
@@ -1875,7 +1875,7 @@ end
 function setupFirstButtons(scaleform)
     local scaleform = RequestScaleformMovie(scaleform)
     while not HasScaleformMovieLoaded(scaleform) do
-        Citizen.Wait(0)
+        Citizen.Wait(10)
     end
     PushScaleformMovieFunction(scaleform, 'CLEAR_ALL')
     PopScaleformMovieFunctionVoid()

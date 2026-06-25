@@ -222,17 +222,17 @@ handObjs = {}
 function CreatePeds()
 	if not HasAnimDictLoaded("anim_casino_b@amb@casino@games@blackjack@dealer") then
 		RequestAnimDict("anim_casino_b@amb@casino@games@blackjack@dealer")
-		repeat Wait(0) until HasAnimDictLoaded("anim_casino_b@amb@casino@games@blackjack@dealer")
+		repeat Wait(10) until HasAnimDictLoaded("anim_casino_b@amb@casino@games@blackjack@dealer")
 	end
 
 	if not HasAnimDictLoaded("anim_casino_b@amb@casino@games@shared@dealer@") then
 		RequestAnimDict("anim_casino_b@amb@casino@games@shared@dealer@")
-		repeat Wait(0) until HasAnimDictLoaded("anim_casino_b@amb@casino@games@shared@dealer@")
+		repeat Wait(10) until HasAnimDictLoaded("anim_casino_b@amb@casino@games@shared@dealer@")
 	end
 
 	if not HasAnimDictLoaded("anim_casino_b@amb@casino@games@blackjack@player") then
 		RequestAnimDict("anim_casino_b@amb@casino@games@blackjack@player")
-		repeat Wait(0) until HasAnimDictLoaded("anim_casino_b@amb@casino@games@blackjack@player")
+		repeat Wait(10) until HasAnimDictLoaded("anim_casino_b@amb@casino@games@blackjack@player")
 	end
 	
 	for i,v in pairs(customTables) do
@@ -248,7 +248,7 @@ function CreatePeds()
 		end
 		if not HasModelLoaded(model) then
 			RequestModel(model)
-			repeat Wait(0) until HasModelLoaded(model)
+			repeat Wait(10) until HasModelLoaded(model)
 		end
 		local tableObj = CreateObjectNoOffset(model, v.coords.x, v.coords.y, v.coords.z, false, false, false)
 		SetEntityRotation(tableObj, 0.0, 0.0, v.coords.w, 2, 1)
@@ -285,9 +285,9 @@ function CreatePeds()
 		
 		if not HasModelLoaded(model) then
 			RequestModel(model)
-			repeat Wait(0) until HasModelLoaded(model)
+			repeat Wait(10) until HasModelLoaded(model)
 		end
-		
+
 		local dealer = CreatePed(4, model, v.coords.x, v.coords.y, v.coords.z, v.coords.w, false, true)
 		SetEntityCanBeDamaged(dealer, false)
 		SetBlockingOfNonTemporaryEvents(dealer, true)
@@ -318,7 +318,7 @@ RegisterNetEvent("BLACKJACK:PlayDealerAnim", function(i, animDict, anim)
 		
 		if not HasAnimDictLoaded(animDict) then
 			RequestAnimDict(animDict)
-			repeat Wait(0) until HasAnimDictLoaded(animDict)
+			repeat Wait(10) until HasAnimDictLoaded(animDict)
 		end
 		DebugPrint("PLAYING "..anim:upper().." ON DEALER "..i)
 		local scene = CreateSynchronizedScene(v.coords.x, v.coords.y, v.coords.z, 0.0, 0.0, v.coords.w, 2)
@@ -339,7 +339,7 @@ RegisterNetEvent("BLACKJACK:DealerTurnOverCard", function(i)
 	local cardX,cardY,cardZ = GetEntityCoords(dealerHandObjs[i][1])
 	AttachEntityToEntity(dealerHandObjs[i][1], spawnedPeds[i], GetPedBoneIndex(spawnedPeds[i],28422), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0, 1, 2, 1)
     while not HasAnimEventFired(spawnedPeds[i],585557868) do
-        Wait(0)
+        Wait(1)
     end
     DetachEntity(dealerHandObjs[i][1],false,true)
     SetEntityCoordsNoOffset(dealerHandObjs[i][1], cardX,cardY,cardZ)
@@ -350,7 +350,7 @@ RegisterNetEvent("BLACKJACK:DealerCheckCard", function(i)
     local cardX,cardY,cardZ = GetEntityCoords(dealerHandObjs[i][1])
     AttachEntityToEntity(dealerHandObjs[i][1], spawnedPeds[i], GetPedBoneIndex(spawnedPeds[i],28422), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0, 1, 2, 1)
 	while not HasAnimEventFired(spawnedPeds[i],585557868) do
-        Wait(0)
+        Wait(1)
     end
     Wait(100)
     DetachEntity(dealerHandObjs[i][1],false,true)
@@ -381,7 +381,7 @@ RegisterNetEvent("BLACKJACK:PlaceBetChip", function(index, seat, bet, double, sp
 			DebugPrint(tostring(props))
 			DebugPrint(tostring(pileOffsets[seat]))		
 			RequestModel(model)
-			repeat Wait(0) until HasModelLoaded(model)
+			repeat Wait(10) until HasModelLoaded(model)
 			local location = 1
 			if double == true then location = 2 end			
 			local chip = CreateObjectNoOffset(model, tables[index].coords.x, tables[index].coords.y, tables[index].coords.z, false, false, false)
@@ -421,9 +421,9 @@ RegisterNetEvent("BLACKJACK:PlaceBetChip", function(index, seat, bet, double, sp
 					DebugPrint(tostring(props[i][j]))
 					DebugPrint(tostring(chipOffsets[seat]))		
 					RequestModel(model)
-					repeat Wait(0) until HasModelLoaded(model)		
+					repeat Wait(10) until HasModelLoaded(model)
 					local location = i
-					local chip = CreateObjectNoOffset(model, tables[index].coords.x, tables[index].coords.y, tables[index].coords.z, false, false, false)		
+					local chip = CreateObjectNoOffset(model, tables[index].coords.x, tables[index].coords.y, tables[index].coords.z, false, false, false)
 					table.insert(spawnedObjects, chip)
 					table.insert(chips[index][seat], chip)
 						SetEntityCoordsNoOffset(chip, GetObjectOffsetFromCoords(tables[index].coords.x, tables[index].coords.y, tables[index].coords.z, tables[index].coords.w, chipOffsets[seat][location].x + chipXOffset, chipOffsets[seat][location].y + chipYOffset, chipHeights[1] + chipGap))
@@ -517,7 +517,7 @@ RegisterNetEvent("BLACKJACK:RequestBets", function(index)
 						betCheckRecieved = true
 						canBet = _canBet
 					end)
-					repeat Wait(0) until betCheckRecieved == true
+					repeat Wait(50) until betCheckRecieved == true
 					RemoveEventHandler(eventHandler)
 					if canBet then
 						hideUi()
@@ -620,7 +620,7 @@ RegisterNetEvent("doj:client:blackjackMenu", function(args)
 			betCheckRecieved = true
 			canBet = _canBet
 		end)	
-		repeat Wait(0) until betCheckRecieved == true
+		repeat Wait(50) until betCheckRecieved == true
 		RemoveEventHandler(eventHandler)
 		if canBet then
 			if leavingBlackjack == true then leaveBlackjack() return end
@@ -657,7 +657,7 @@ RegisterNetEvent("doj:client:blackjackMenu", function(args)
 			betCheckRecieved = true
 			canBet = _canBet
 		end)	
-		repeat Wait(0) until betCheckRecieved == true
+		repeat Wait(50) until betCheckRecieved == true
 		RemoveEventHandler(eventHandler)
 		if canBet then
 			if leavingBlackjack == true then leaveBlackjack() return end
@@ -767,7 +767,7 @@ RegisterNetEvent("BLACKJACK:RetrieveCardsWithAnim", function(i, seat)
 			AttachEntityToEntity(v, spawnedPeds[i], GetPedBoneIndex(spawnedPeds[i],28422), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0, 1, 2, 1)
 		end
 		while not HasAnimEventFired(spawnedPeds[i],585557868) do
-			Wait(0)
+			Wait(1)
 		end
 		for x,v in pairs(dealerHandObjs[i]) do
 			DeleteEntity(v)
@@ -778,7 +778,7 @@ RegisterNetEvent("BLACKJACK:RetrieveCardsWithAnim", function(i, seat)
 			AttachEntityToEntity(v, spawnedPeds[i], GetPedBoneIndex(spawnedPeds[i],28422), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0, 1, 2, 1)
 		end
 		while not HasAnimEventFired(spawnedPeds[i],585557868) do
-			Wait(0)
+			Wait(1)
 		end
 		for x,v in pairs(handObjs[i][seat]) do
 			DeleteEntity(v)
@@ -805,7 +805,7 @@ RegisterNetEvent("BLACKJACK:GiveCard", function(i, seat, handSize, card, flipped
 	end	
 	local model = GetHashKey("vw_prop_cas_card_"..card)	
 	RequestModel(model)
-	repeat Wait(0) until HasModelLoaded(model)
+	repeat Wait(10) until HasModelLoaded(model)
 	local card = CreateObjectNoOffset(model, tables[i].coords.x, tables[i].coords.y, tables[i].coords.z, false, false, false)
 	table.insert(spawnedObjects, card)
 	if seat > 0 then
@@ -915,7 +915,7 @@ function ProcessTables()
 										local initPos = GetAnimInitialOffsetPosition("anim_casino_b@amb@casino@games@shared@player@", seatAnim, coords, rot, 0.01, 2)
 										local initRot = GetAnimInitialOffsetRotation("anim_casino_b@amb@casino@games@shared@player@", seatAnim, coords, rot, 0.01, 2)										
 										TaskGoStraightToCoord(ped, initPos, 1.0, 5000, initRot.z, 0.01)
-										repeat Wait(0) until GetScriptTaskStatus(ped, 2106541073) == 7
+										repeat Wait(10) until GetScriptTaskStatus(ped, 2106541073) == 7
 										Wait(50)									
 										SetPedCurrentWeaponVisible(ped, 0, true, 0, 0)									
 										local scene = NetworkCreateSynchronisedScene(coords, rot, 2, true, true, 1065353216, 0, 1065353216)

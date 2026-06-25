@@ -6,7 +6,7 @@ CreateThread(function()
         for _, scgrp in next, Config.BlacklistedScenarios.groups do
             SetScenarioGroupEnabled(scgrp, false)
         end
-        Wait(10000)
+        Wait(60000) -- Scenarios don't re-enable themselves, check once per minute is plenty
     end
 end)
 
@@ -76,28 +76,26 @@ if Config.Disable.idleCamera then
 end
 
 RegisterNetEvent('QBCore:Client:DrawWeapon', function()
-    local sleep
     while true do
-        sleep = 500
         local ped = PlayerPedId()
         local weapon = GetSelectedPedWeapon(ped)
         if weapon ~= `WEAPON_UNARMED` then
             if IsPedArmed(ped, 6) then
-                sleep = 0
                 DisableControlAction(1, 140, true)
                 DisableControlAction(1, 141, true)
                 DisableControlAction(1, 142, true)
-            end
-
-            if weapon == `WEAPON_FIREEXTINGUISHER` or weapon == `WEAPON_PETROLCAN` then
-                if IsPedShooting(ped) then
-                    SetPedInfiniteAmmo(ped, true, weapon)
+                Wait(0)
+            else
+                if weapon == `WEAPON_FIREEXTINGUISHER` or weapon == `WEAPON_PETROLCAN` then
+                    if IsPedShooting(ped) then
+                        SetPedInfiniteAmmo(ped, true, weapon)
+                    end
                 end
+                Wait(200)
             end
         else
             break
         end
-        Wait(sleep)
     end
 end)
 
@@ -110,7 +108,7 @@ end)
 
 CreateThread(function()
     while true do
-        Wait(2500)
+        Wait(5000) -- Blacklisted weapon check doesn't need to be super frequent
         local ped = PlayerPedId()
         local weapon = GetSelectedPedWeapon(ped)
         if Config.BlacklistedWeapons[weapon] then
@@ -125,7 +123,9 @@ CreateThread(function()
             DisableControlAction(1, 140, true)
             DisableControlAction(1, 141, true)
             DisableControlAction(1, 142, true)
+            Wait(0)
+        else
+            Wait(500) -- Not armed, check less frequently
         end
-        Wait(5)
     end
 end)

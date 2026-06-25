@@ -827,7 +827,7 @@ CreateThread(
 CreateThread(
     function()
         while not closetoRulett do
-            Wait(0)
+            Wait(500)
         end
 
         for rulettIndex, data in pairs(Config.RulettTables) do

@@ -110,8 +110,8 @@ AddEventHandler("Blackjack:sendBlackjackTableData", function(newBlackjackTableDa
 end)
 
 CreateThread(function()
-    while not closeToCasino do 
-        Wait(0)
+    while not closeToCasino do
+        Wait(500)
     end
     maleCasinoDealer = GetHashKey("S_M_Y_Casino_01")
     femaleCasinoDealer = GetHashKey("S_F_Y_Casino_01")
@@ -120,7 +120,7 @@ CreateThread(function()
     dealerAnimDict = "anim_casino_b@amb@casino@games@shared@dealer@"
     RequestAnimDict(dealerAnimDict)
     while not HasAnimDictLoaded(dealerAnimDict) do
-        Wait(0)
+        Wait(10)
     end
     for i=0,#cfg.blackjackTables,1 do
         math.random() math.random() math.random()
@@ -133,7 +133,7 @@ CreateThread(function()
         RequestModel(dealerModel)
         while not HasModelLoaded(dealerModel) do
             RequestModel(dealerModel)
-            Wait(0)
+            Wait(10)
         end
         dealerEntity = CreatePed(26,dealerModel,cfg.blackjackTables[i].dealerPos.x,cfg.blackjackTables[i].dealerPos.y,cfg.blackjackTables[i].dealerPos.z,cfg.blackjackTables[i].dealerHeading,false,true)
         table.insert(dealerPeds,dealerEntity)
@@ -190,7 +190,7 @@ function resetDealerIdle(dealerPed)
         dealerAnimDict = "anim_casino_b@amb@casino@games@shared@dealer@"
         RequestAnimDict(dealerAnimDict)
         while not HasAnimDictLoaded(dealerAnimDict) do
-            Wait(0)
+            Wait(10)
         end
         -- -- print("playing idle animation: " .. tostring(genderAnimString .. "idle"))
         TaskPlayAnim(dealerPed, dealerAnimDict, genderAnimString .. "idle", 1000.0, -2.0, -1, 2, 1148846080, 0) --anim_name is idle or female_idle depending on gender
@@ -200,11 +200,13 @@ function resetDealerIdle(dealerPed)
 end
 
 CreateThread(function()
-    while true do 
+    while true do
         if shouldForceIdleCardGames and sittingAtBlackjackTable then
             TaskPlayAnim(PlayerPedId(),"anim_casino_b@amb@casino@games@shared@player@", "idle_cardgames", 1.0, 1.0, -1, 0)
+            Wait(0)
+        else
+            Wait(1000)
         end
-        Wait(0)
     end
 end)
 
@@ -304,8 +306,8 @@ RegisterNetEvent("doj:client:startingBets", function(args)
             shouldForceIdleCardGames = false
             blackjackAnimDictToLoad = "anim_casino_b@amb@casino@games@shared@player@"
             RequestAnimDict(blackjackAnimDictToLoad)
-            while not HasAnimDictLoaded(blackjackAnimDictToLoad) do 
-                Wait(0)
+            while not HasAnimDictLoaded(blackjackAnimDictToLoad) do
+                Wait(10)
             end
             NetworkStopSynchronisedScene(Local_198f_255)
             TaskPlayAnim(PlayerPedId(), blackjackAnimDictToLoad, "sit_exit_left", 1.0, 1.0, 2500, 0)              
@@ -518,10 +520,10 @@ AddEventHandler("Blackjack:beginCardGiveOut",function(gameId,cardData,chairId,ca
             "anim_casino_b@amb@casino@games@blackjack@player",  
             "anim_casino_b@amb@casino@games@shared@player@",
         }
-        for k,v in pairs(blackjackAnimsToLoad) do 
+        for k,v in pairs(blackjackAnimsToLoad) do
             RequestAnimDict(v)
-            while not HasAnimDictLoaded(v) do 
-                Wait(0)
+            while not HasAnimDictLoaded(v) do
+                Wait(10)
             end
         end
         if sittingAtBlackjackTable and bettedThisRound then  
@@ -898,8 +900,8 @@ function startStandOrHit(gameId,dealerPed,chairId,actuallyPlaying)
     -- -- print("chairAnimId: " .. tostring(chairAnimId))
     -- -- print("genderAnimString: " .. tostring(genderAnimString))
     RequestAnimDict("anim_casino_b@amb@casino@games@blackjack@dealer")
-    while not HasAnimDictLoaded("anim_casino_b@amb@casino@games@blackjack@dealer") do 
-        Wait(0)
+    while not HasAnimDictLoaded("anim_casino_b@amb@casino@games@blackjack@dealer") do
+        Wait(10)
     end
     TaskPlayAnim(dealerPed, "anim_casino_b@amb@casino@games@blackjack@dealer", genderAnimString .. "dealer_focus_player_0" .. chairAnimId .. "_idle_intro", 3.0, 1.0, -1, 2, 0, 0, 0, 0 )
     PlayFacialAnim(dealerPed, genderAnimString .. "dealer_focus_player_0" .. chairAnimId .. "_idle_facial", "anim_casino_b@amb@casino@games@blackjack@dealer")
@@ -928,11 +930,11 @@ function flipDealerCard(dealerPed,gotCurrentHand,tableId,gameId)
     --PlayFacialAnim(dealerPed, genderAnimString .. "check_and_turn_card_facial", "anim_casino_b@amb@casino@games@blackjack@dealer")
     while not HasAnimEventFired(dealerPed,-1345695206) do
         -- print("waiting for -1345695206 to fire")
-        Wait(0)
+        Wait(1)
     end
     AttachEntityToEntity(cardObj, dealerPed, GetPedBoneIndex(dealerPed,28422), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0, 1, 2, 1)
     while not HasAnimEventFired(dealerPed,585557868) do
-        Wait(0)
+        Wait(1)
     end
     DetachEntity(cardObj,false,true)
     if blackjack_func_368(closestChair) == tableId then
@@ -956,7 +958,7 @@ function checkCard(dealerPed,cardObj)
     TaskPlayAnim(dealerPed, "anim_casino_b@amb@casino@games@blackjack@dealer", genderAnimString .. "check_card", 3.0, 1.0, -1, 2, 0, 0, 0, 0 )
     PlayFacialAnim(dealerPed, genderAnimString .. "check_card_facial", "anim_casino_b@amb@casino@games@blackjack@dealer")
     while not HasAnimEventFired(dealerPed,585557868) do
-        Wait(0)
+        Wait(1)
     end
     Wait(100)
     DetachEntity(cardObj,false,true)
@@ -1085,7 +1087,7 @@ AddEventHandler("Blackjack:chipsCleanup",function(chairId,tableId)
             end
             while not HasAnimEventFired(dealerPed,-1345695206) do
                 -- print("waiting for -1345695206 to fire")
-                Wait(0)
+                Wait(1)
             end
             for k,v in pairs(cardObjects) do
                 if k == chairId then
@@ -1097,7 +1099,7 @@ AddEventHandler("Blackjack:chipsCleanup",function(chairId,tableId)
             end
             while not HasAnimEventFired(dealerPed,585557868) do
                 -- print("waiting for 585557868 to fire")
-                Wait(0)
+                Wait(1)
             end
             for k,v in pairs(cardObjects) do
                 if k == chairId then
@@ -1143,8 +1145,8 @@ function betChipsForNextHand(chipsAmount,chipsProp,something,chairID,someBool,zO
     -- print("betChipsForNextHand",chairID)
     -- print("betChipsForNextHand_local",getLocalChairIndexFromGlobalChairId(chairID))
     RequestModel(chipsProp)
-    while not HasModelLoaded(chipsProp) do  
-        Wait(0)
+    while not HasModelLoaded(chipsProp) do
+        Wait(10)
         -- print("[CMG Casino] Stuck requesting model: " .. tostring(chipsProp))
         RequestModel(chipsProp)
     end
@@ -1190,8 +1192,8 @@ end
 function getNewCardFromMachine(nextCard,chairId,gameId)
     -- print("getNewCardFromMachine:",chairId)
     RequestModel(nextCard)
-    while not HasModelLoaded(nextCard) do  
-        Wait(0)
+    while not HasModelLoaded(nextCard) do
+        Wait(10)
         RequestModel(nextCard)
     end
     nextCardHash = GetHashKey(nextCard)
@@ -1243,10 +1245,10 @@ function dealerGiveCards(chairId,gender,dealerPed,cardObj) --func_36
     --func_15(func_21(iParam0, Local_188.f_899[iVar2 /*9*/].f_8, 0, 0), Local_188.f_1[iParam0 /*211*/][Local_188.f_1[iParam0 /*211*/].f_209], 0, 0);
     Wait(300)
     SetEntityVisible(cardObj,true)
-    while not HasAnimEventFired(dealerPed, 585557868) do 
-        Wait(0)
+    while not HasAnimEventFired(dealerPed, 585557868) do
+        Wait(1)
         -- print("waiting for anim event to fire.. for dealergivecards")
-    end 
+    end
 end
 
 function dealerGiveSelfCard(gender,dealerPed,cardIndex,cardObj) --func_36
@@ -1261,8 +1263,8 @@ function dealerGiveSelfCard(gender,dealerPed,cardIndex,cardObj) --func_36
     PlayFacialAnim(dealerPed, gender .. cardAnim.."_facial", "anim_casino_b@amb@casino@games@blackjack@dealer")
     Wait(300)
     SetEntityVisible(cardObj,true)
-    while not HasAnimEventFired(dealerPed, 585557868) do 
-        Wait(0)
+    while not HasAnimEventFired(dealerPed, 585557868) do
+        Wait(1)
         -- print("waiting for anim event to fire.. for dealerGiveSelfCard")
     end
     Wait(100)
@@ -1397,8 +1399,8 @@ function ensureCardModelsLoaded()
 		iVar2 = getCardFromNumber(iVar1, Local_198f_236)
         if not HasModelLoaded(iVar2) then
             RequestModel(iVar2)
-            while not HasModelLoaded(iVar2) do  
-                Wait(0)
+            while not HasModelLoaded(iVar2) do
+                Wait(10)
             end
         end
         cardNum = cardNum + 1
@@ -2627,7 +2629,7 @@ end
 function setupBlackjackInstructionalScaleform(scaleform)
     local scaleform = RequestScaleformMovie(scaleform)
     while not HasScaleformMovieLoaded(scaleform) do
-        Wait(0)
+        Wait(10)
     end
     PushScaleformMovieFunction(scaleform, "CLEAR_ALL")
     PopScaleformMovieFunctionVoid()
@@ -2684,7 +2686,7 @@ end
 function setupBlackjackMidBetScaleform(scaleform)
     local scaleform = RequestScaleformMovie(scaleform)
     while not HasScaleformMovieLoaded(scaleform) do
-        Wait(0)
+        Wait(10)
     end
     PushScaleformMovieFunction(scaleform, "CLEAR_ALL")
     PopScaleformMovieFunctionVoid()

@@ -81,12 +81,12 @@ local function OpenInsideTrack()
     -- Scaleform
     Utils.Scaleform = RequestScaleformMovie('HORSE_RACING_CONSOLE')
     while not HasScaleformMovieLoaded(Utils.Scaleform) do
-        Wait(0)
+        Wait(10)
     end
     DisplayHud(false)
     SetPlayerControl(PlayerId(), false, 0)
     while not RequestScriptAudioBank('DLC_VINEWOOD/CASINO_GENERAL') do
-        Wait(0)
+        Wait(10)
     end
     Utils:ShowMainScreen()
     Utils:SetMainScreenCooldown(cooldown)
@@ -248,7 +248,7 @@ function Utils:HandleControls()
 
                 -- Check race
                 while checkRaceStatus do
-                    Wait(0)
+                    Wait(100)
                     local raceFinished = Utils:IsRaceFinished()
                     if (raceFinished) then
                         StopSound(0)

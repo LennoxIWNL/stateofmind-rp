@@ -56,7 +56,6 @@ end
 function SeatBeltLoop()
     CreateThread(function()
         while true do
-            sleep = 0
             if seatbeltOn or harnessOn then
                 DisableControlAction(0, 75, true)
                 DisableControlAction(27, 75, true)
@@ -68,7 +67,7 @@ function SeatBeltLoop()
                 break
             end
             if not seatbeltOn and not harnessOn then break end
-            Wait(sleep)
+            Wait(0) -- DisableControlAction requires per-frame
         end
     end)
 end
@@ -88,7 +87,6 @@ exports("HasHarness", hasHarness)
 RegisterNetEvent('QBCore:Client:EnteredVehicle', function()
     local ped = PlayerPedId()
     while IsPedInAnyVehicle(ped, false) do
-        Wait(0)
         local currVehicle = GetVehiclePedIsIn(ped, false)
         if currVehicle and currVehicle ~= false and currVehicle ~= 0 then
             SetPedHelmet(ped, false)
@@ -199,6 +197,9 @@ RegisterNetEvent('QBCore:Client:EnteredVehicle', function()
                 modifierDensity = true
             end
             veloc = GetEntityVelocity(currVehicle)
+            if lastFrameVehSpeed >= 100 then
+                Wait(0) -- Per-frame at high speed for crash detection
+            end
         else
             if lastVeh then
                 SetPedHelmet(ped, true)

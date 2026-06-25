@@ -465,16 +465,16 @@ RegisterNetEvent('cdn-fuel:client:grabnozzle', function()
 			-- Load Rope Textures
 			RopeLoadTextures()
 			while not RopeAreTexturesLoaded() do
-				Wait(0)
+				Wait(50)
 				RopeLoadTextures()
 			end
 			-- Wait for Pump to exist.
 			while not pump do
-				Wait(0)
+				Wait(50)
 			end
 			Rope = AddRope(pumpCoords.x, pumpCoords.y, pumpCoords.z, 0.0, 0.0, 0.0, 3.0, Config.RopeType['fuel'], 8.0 --[[ DO NOT SET THIS TO 0.0!!! GAME WILL CRASH!]], 0.0, 1.0, false, false, false, 1.0, true)
 			while not Rope do
-				Wait(0)
+				Wait(50)
 			end
 			ActivatePhysics(Rope)
 			Wait(100)
@@ -2158,16 +2158,16 @@ RegisterNetEvent('cdn-fuel:client:grabnozzle:special', function()
 		-- Load Rope Textures
 		RopeLoadTextures()
 		while not RopeAreTexturesLoaded() do
-			Wait(0)
+			Wait(50)
 			RopeLoadTextures()
 		end
 		-- Wait for Pump to exist.
 		while not pump do
-			Wait(0)
+			Wait(50)
 		end
 		Rope = AddRope(pumpCoords.x, pumpCoords.y, pumpCoords.z + 2.0, 0.0, 0.0, 0.0, 3.0, Config.RopeType['fuel'], 8.0 --[[ DO NOT SET THIS TO 0.0!!! GAME WILL CRASH!]], 0.0, 1.0, false, false, false, 1.0, true)
 		while not Rope do
-			Wait(0)
+			Wait(50)
 		end
 		ActivatePhysics(Rope)
 		Wait(100)
@@ -2853,35 +2853,39 @@ if Config.VehicleShutoffOnLowFuel['shutOffLevel'] == 0 then
 	Config.VehicleShutoffOnLowFuel['shutOffLevel'] = 0.55
 end
 
--- This loop does use quite a bit of performance, but,
--- is needed due to electric vehicles running without fuel & normal vehicles driving backwards!
--- You can remove if you need the performance, but we believe it is very important.
+-- This loop handles disabling the "W" key when fuel is critically low or engine is off.
+-- Optimized: only runs per-frame (Wait(0)) when fuel is near shutoff threshold.
+-- When fuel is healthy or player is not in a vehicle, sleeps longer to save performance.
 CreateThread(function()
 	while true do
-		Wait(0)
 		local ped = PlayerPedId()
 		local veh = GetVehiclePedIsIn(ped, false)
 		if veh ~= 0 and veh ~= nil then
 			if not IsVehicleBlacklisted(veh) then
-				-- Check if we are below the threshold for the Fuel Shutoff Level, if so, disable the "W" key, if not, enable it again.
-				if IsPedInVehicle(ped, veh, false) and (GetIsVehicleEngineRunning(veh) == false) or GetFuel(veh) < (Config.VehicleShutoffOnLowFuel['shutOffLevel'] or 1) then
-					DisableControlAction(0, 71, true)
-				elseif IsPedInVehicle(ped, veh, false) and (GetIsVehicleEngineRunning(veh) == true) and GetFuel(veh) > (Config.VehicleShutoffOnLowFuel['shutOffLevel'] or 1) then
-					EnableControlAction(0, 71, true)
-				end
-				-- Now, we check if the fuel level is currently 5 above the level it should shut off,
-				-- if this is true, we will then enable the "W" key if currently disabled, and then,
-				-- we will add a 5 second wait, in order to reduce system impact.
-				if GetFuel(veh) > (Config.VehicleShutoffOnLowFuel['shutOffLevel'] + 5) then
+				local fuelLevel = GetFuel(veh)
+				local shutOffLevel = Config.VehicleShutoffOnLowFuel['shutOffLevel'] or 1
+				-- If fuel is well above shutoff, no need to run per-frame
+				if fuelLevel > (shutOffLevel + 5) then
 					if not IsControlEnabled(0, 71) then
-						-- Enable "W" Key if it is currently disabled.
 						EnableControlAction(0, 71, true)
 					end
 					Wait(5000)
+				elseif fuelLevel > shutOffLevel and GetIsVehicleEngineRunning(veh) then
+					-- Fuel is low-ish but not critical, check less frequently
+					EnableControlAction(0, 71, true)
+					Wait(1000)
+				else
+					-- Fuel is critically low or engine is off -- need per-frame disable
+					if IsPedInVehicle(ped, veh, false) and ((GetIsVehicleEngineRunning(veh) == false) or fuelLevel < shutOffLevel) then
+						DisableControlAction(0, 71, true)
+					end
+					Wait(0)
 				end
+			else
+				Wait(1000)
 			end
 		else
-			-- 1.75 Second Cooldown if the player is not inside of a vehicle.
+			-- Player is not inside a vehicle.
 			Wait(1750)
 		end
 	end

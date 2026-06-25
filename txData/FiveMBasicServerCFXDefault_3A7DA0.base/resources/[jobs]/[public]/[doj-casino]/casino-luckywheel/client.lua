@@ -19,12 +19,12 @@ CreateThread(function()
 	local model2 = GetHashKey('vw_prop_vw_luckywheel_01a')
 	local podiumModel = GetHashKey('vw_prop_vw_casino_podium_01a')
 	CreateThread(function()
-		RequestModel(model1) while not HasModelLoaded(model1) do Wait(0) end
-		RequestModel(model2) while not HasModelLoaded(model2) do Wait(0) end
-		RequestModel(m1a) while not HasModelLoaded(m1a) do Wait(0) end
-		RequestModel(m1b) while not HasModelLoaded(m1b) do Wait(0) end
-		RequestModel(m2a) while not HasModelLoaded(m2a) do Wait(0) end
-		RequestModel(m2b) while not HasModelLoaded(m2b) do Wait(0) end
+		RequestModel(model1) while not HasModelLoaded(model1) do Wait(10) end
+		RequestModel(model2) while not HasModelLoaded(model2) do Wait(10) end
+		RequestModel(m1a) while not HasModelLoaded(m1a) do Wait(10) end
+		RequestModel(m1b) while not HasModelLoaded(m1b) do Wait(10) end
+		RequestModel(m2a) while not HasModelLoaded(m2a) do Wait(10) end
+		RequestModel(m2b) while not HasModelLoaded(m2b) do Wait(10) end
 		ClearArea(Config.WheelPos.x, Config.WheelPos.y, Config.WheelPos.z, 5.0, true, false, false, false)
 		_wheel = CreateObject(model1, Config.WheelPos.x, Config.WheelPos.y, Config.WheelPos.z, false, false, true)
 		SetEntityHeading(_wheel, Config.WheelPos.h)
@@ -256,7 +256,7 @@ function doRoll(index)
                 if coords.x >= (_movePos.x - 0.01) and coords.x <= (_movePos.x + 0.01) and coords.y >= (_movePos.y - 0.01) and coords.y <= (_movePos.y + 0.01) then
                     _isMoved = true
                 end
-                Wait(0)
+                Wait(10)
             end
 			SetEntityHeading(playerPed, GetEntityHeading(_base))
             TaskPlayAnim(playerPed, lib, anim, 8.0, -8.0, -1, 0, 0, false, false, false)

@@ -528,7 +528,7 @@ local function dutylistener()
             else
                 break
             end
-            Wait(0)
+            Wait(5)
         end
     end)
 end
@@ -537,7 +537,7 @@ end
 local function stash()
     CreateThread(function()
         while true do
-            Wait(0)
+            Wait(5)
             if inStash and PlayerJob.type == 'leo' then
                 if PlayerJob.onduty then sleep = 5 end
                 if IsControlJustReleased(0, 38) then
@@ -556,7 +556,7 @@ end
 local function trash()
     CreateThread(function()
         while true do
-            Wait(0)
+            Wait(5)
             if inTrash and PlayerJob.type == 'leo' then
                 if PlayerJob.onduty then sleep = 5 end
                 if IsControlJustReleased(0, 38) then
@@ -578,7 +578,7 @@ end
 local function fingerprint()
     CreateThread(function()
         while true do
-            Wait(0)
+            Wait(5)
             if inFingerprint and PlayerJob.type == 'leo' then
                 if PlayerJob.onduty then sleep = 5 end
                 if IsControlJustReleased(0, 38) then
@@ -596,7 +596,7 @@ end
 local function armoury()
     CreateThread(function()
         while true do
-            Wait(0)
+            Wait(5)
             if inArmoury and PlayerJob.type == 'leo' then
                 if PlayerJob.onduty then sleep = 5 end
                 if IsControlJustReleased(0, 38) then
@@ -614,7 +614,7 @@ end
 local function evidence()
     CreateThread(function()
         while true do
-            Wait(0)
+            Wait(5)
             if inEvidence and PlayerJob.type == 'leo' then
                 if PlayerJob.onduty then sleep = 5 end
                 if IsControlJustReleased(0, 38) then
@@ -632,7 +632,7 @@ end
 local function heli()
     CreateThread(function()
         while true do
-            Wait(0)
+            Wait(5)
             if inHelicopter and PlayerJob.type == 'leo' then
                 if PlayerJob.onduty then sleep = 5 end
                 if IsControlJustReleased(0, 38) then
@@ -650,7 +650,7 @@ end
 local function impound()
     CreateThread(function()
         while true do
-            Wait(0)
+            Wait(5)
             if inImpound and PlayerJob.type == 'leo' then
                 if PlayerJob.onduty then sleep = 5 end
                 if IsPedInAnyVehicle(PlayerPedId(), false) then
@@ -670,7 +670,7 @@ end
 local function garage()
     CreateThread(function()
         while true do
-            Wait(0)
+            Wait(5)
             if inGarage and PlayerJob.type == 'leo' then
                 if PlayerJob.onduty then sleep = 5 end
                 if IsPedInAnyVehicle(PlayerPedId(), false) then

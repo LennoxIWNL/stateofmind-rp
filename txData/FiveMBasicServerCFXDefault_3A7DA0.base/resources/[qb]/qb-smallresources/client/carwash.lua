@@ -5,12 +5,12 @@ local washPoly = {}
 local function washLoop()
     CreateThread(function()
         while listen do
-            local ped = PlayerPedId()
-            local veh = GetVehiclePedIsIn(ped, false)
-            local driver = GetPedInVehicleSeat(veh, -1)
-            local dirtLevel = GetVehicleDirtLevel(veh)
-            if driver == ped and not washingVeh then
-                if IsControlPressed(0, 38) then
+            if IsControlJustPressed(0, 38) then
+                local ped = PlayerPedId()
+                local veh = GetVehiclePedIsIn(ped, false)
+                local driver = GetPedInVehicleSeat(veh, -1)
+                local dirtLevel = GetVehicleDirtLevel(veh)
+                if driver == ped and not washingVeh then
                     if dirtLevel > Config.CarWash.dirtLevel then
                         TriggerServerEvent('qb-carwash:server:washCar')
                     else

@@ -81,7 +81,7 @@ local function RobberyPed()
                     exports['qb-target']:RemoveZone('stealingPed')
                     break
                 end
-                Wait(0)
+                Wait(1000)
             end
         end)
     else
@@ -122,7 +122,7 @@ local function RobberyPed()
                         break
                     end
                 end
-                Wait(0)
+                Wait(500)
             end
         end)
     end
@@ -368,7 +368,7 @@ local function ToggleSelling()
                 if startDist > 10 then
                     TooFarAway()
                 end
-                Wait(0)
+                Wait(500)
             end
         end)
     else

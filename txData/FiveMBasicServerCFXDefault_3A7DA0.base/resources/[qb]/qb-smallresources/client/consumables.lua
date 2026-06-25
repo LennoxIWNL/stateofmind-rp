@@ -514,16 +514,11 @@ function AlcoholLoop()
     if not looped then
         looped = true
         CreateThread(function()
-            while true do
-                Wait(10)
-                if alcoholCount > 0 then
-                    Wait(1000 * 60 * 15)
-                    alcoholCount -= 1
-                else
-                    looped = false
-                    break
-                end
+            while alcoholCount > 0 do
+                Wait(1000 * 60 * 15) -- 15 minute decay timer
+                alcoholCount -= 1
             end
+            looped = false
         end)
     end
 end

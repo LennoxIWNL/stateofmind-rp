@@ -2693,67 +2693,65 @@ end)
 
 CreateThread(function() -- optimized flashlight thread, enables police to use flashlight to reveal and pickup evidence
     while true do
-        Wait(0)
-        if LocalPlayer.state.isLoggedIn then
-            if ActiveLEO then
-                if usingflashlight then
-                    pos = GetEntityCoords(ped)
-                    if next(AreaEvidence) then
-                        local CurEv = nil
-                        local CurEvId = nil
-                        for k, v in pairs(AreaEvidence) do
-                            local dist = #(pos - vector3(v.coords.x, v.coords.y, v.coords.z))
+        if not LocalPlayer.state.isLoggedIn then
+            Wait(5000)
+        elseif not ActiveLEO then
+            Wait(5000)
+        elseif not usingflashlight then
+            Wait(1000)
+        else
+            pos = GetEntityCoords(ped)
+            if next(AreaEvidence) then
+                local CurEv = nil
+                local CurEvId = nil
+                for k, v in pairs(AreaEvidence) do
+                    local dist = #(pos - vector3(v.coords.x, v.coords.y, v.coords.z))
 
-                            if (dist < pudist and v.pickup) then
-                                if not CurEv or (CurEv and dist < CurEv) then
-                                    CurEv = dist
-                                    CurEvId = k
-                                end
-                            end
+                    if (dist < pudist and v.pickup) then
+                        if not CurEv or (CurEv and dist < CurEv) then
+                            CurEv = dist
+                            CurEvId = k
                         end
-
-                        if CurEv then
-                            if not CurEvLoopRunning then CurEvLoop() end
-                            CurrentEvidence = table.clone(AreaEvidence[CurEvId])
-                            CurrentEvidence.evidenceId = CurEvId
-                        else
-                            CurrentEvidence = nil
-                        end
-
-                        for k, v in pairs(AreaEvidence) do
-                            local dist = #(pos - vector3(v.coords.x, v.coords.y, v.coords.z))
-                            if (not v.bucket or (v.bucket and curbucket == v.bucket)) and dist < flashdist and (not CurrentEvidence or k ~= CurrentEvidence.evidenceId) then
-                                DrawMarker(28, v.coords.x, v.coords.y, v.coords.z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, v.size, v.size, v.size, v.color.r, v.color.g, v.color.b, camopac, false, false, 2, nil, nil, false)
-                                if v.norm then
-                                    DrawLine(v.coords.x, v.coords.y, v.coords.z, v.norm.x, v.norm.y, v.norm.z, v.color.r, v.color.g, v.color.b, camopac)
-                                end
-                            end
-                        end 
-                        for k, v in pairs(AreaNetEvidence) do
-                            local drawcoords = v.coords
-
-                            if v.boneindex then drawcoords = GetWorldPositionOfEntityBone(v.entity, v.boneindex) elseif v.netev then drawcoords = GetOffsetFromEntityInWorldCoords(v.entity, drawcoords.x, drawcoords.y, drawcoords.z) end
-
-                            local dist = #(pos - vector3(drawcoords.x, drawcoords.y, drawcoords.z))
-                            if (not v.bucket or (v.bucket and curbucket == v.bucket)) and dist < flashdist and (not CurrentEvidence or k ~= CurrentEvidence.evidenceId) then
-                                if not v.boneindex then DrawMarker(28, drawcoords.x, drawcoords.y, drawcoords.z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, v.size, v.size, v.size, v.color.r, v.color.g, v.color.b, camopac, false, false, 2, nil, nil, false) end
-                                if v.norm then
-                                    if not v.netev then
-                                        DrawLine(drawcoords.x, drawcoords.y, drawcoords.z, v.norm.x, v.norm.y, v.norm.z, v.color.r, v.color.g, v.color.b, camopac)
-                                    else
-                                        local normoffset = GetOffsetFromEntityInWorldCoords(v.entity, v.norm.x, v.norm.y, v.norm.z)
-                                        DrawLine(drawcoords.x, drawcoords.y, drawcoords.z, normoffset.x, normoffset.y, normoffset.z, v.color.r, v.color.g, v.color.b, camopac)
-                                    end
-                                end
-                            end
-                        end  
                     end
-                else
-                    Wait(1000) -- checks once per second if ped is aiming flashlight 
                 end
-            else
-                Wait(5000) -- checks every five seconds if ped has police job
+
+                if CurEv then
+                    if not CurEvLoopRunning then CurEvLoop() end
+                    CurrentEvidence = table.clone(AreaEvidence[CurEvId])
+                    CurrentEvidence.evidenceId = CurEvId
+                else
+                    CurrentEvidence = nil
+                end
+
+                for k, v in pairs(AreaEvidence) do
+                    local dist = #(pos - vector3(v.coords.x, v.coords.y, v.coords.z))
+                    if (not v.bucket or (v.bucket and curbucket == v.bucket)) and dist < flashdist and (not CurrentEvidence or k ~= CurrentEvidence.evidenceId) then
+                        DrawMarker(28, v.coords.x, v.coords.y, v.coords.z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, v.size, v.size, v.size, v.color.r, v.color.g, v.color.b, camopac, false, false, 2, nil, nil, false)
+                        if v.norm then
+                            DrawLine(v.coords.x, v.coords.y, v.coords.z, v.norm.x, v.norm.y, v.norm.z, v.color.r, v.color.g, v.color.b, camopac)
+                        end
+                    end
+                end
+                for k, v in pairs(AreaNetEvidence) do
+                    local drawcoords = v.coords
+
+                    if v.boneindex then drawcoords = GetWorldPositionOfEntityBone(v.entity, v.boneindex) elseif v.netev then drawcoords = GetOffsetFromEntityInWorldCoords(v.entity, drawcoords.x, drawcoords.y, drawcoords.z) end
+
+                    local dist = #(pos - vector3(drawcoords.x, drawcoords.y, drawcoords.z))
+                    if (not v.bucket or (v.bucket and curbucket == v.bucket)) and dist < flashdist and (not CurrentEvidence or k ~= CurrentEvidence.evidenceId) then
+                        if not v.boneindex then DrawMarker(28, drawcoords.x, drawcoords.y, drawcoords.z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, v.size, v.size, v.size, v.color.r, v.color.g, v.color.b, camopac, false, false, 2, nil, nil, false) end
+                        if v.norm then
+                            if not v.netev then
+                                DrawLine(drawcoords.x, drawcoords.y, drawcoords.z, v.norm.x, v.norm.y, v.norm.z, v.color.r, v.color.g, v.color.b, camopac)
+                            else
+                                local normoffset = GetOffsetFromEntityInWorldCoords(v.entity, v.norm.x, v.norm.y, v.norm.z)
+                                DrawLine(drawcoords.x, drawcoords.y, drawcoords.z, normoffset.x, normoffset.y, normoffset.z, v.color.r, v.color.g, v.color.b, camopac)
+                            end
+                        end
+                    end
+                end
             end
+            Wait(0)
         end
     end
 end)

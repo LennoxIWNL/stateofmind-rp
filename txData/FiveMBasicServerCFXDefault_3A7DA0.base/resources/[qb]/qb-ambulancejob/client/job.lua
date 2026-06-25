@@ -309,7 +309,7 @@ local function EMSControls(variable)
                     TriggerEvent('qb-ambulancejob:elevator_roof')
                 end
             end
-            Wait(1)
+            Wait(5)
         end
     end)
 end
@@ -365,7 +365,7 @@ local function EMSVehicle(k)
                     currentGarage = currentVehicle
                 end
             end
-            Wait(1)
+            Wait(5)
         end
     end)
 end
@@ -396,7 +396,7 @@ local function EMSHelicopter(k)
                     end, Config.Helicopter, coords, true)
                 end
             end
-            Wait(1)
+            Wait(5)
         end
     end)
 end

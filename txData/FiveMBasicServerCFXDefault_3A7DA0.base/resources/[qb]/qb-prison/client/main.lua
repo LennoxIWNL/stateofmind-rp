@@ -383,7 +383,7 @@ CreateThread(function()
 							TriggerEvent("prison:client:Leave")
 							break
 						end
-						Wait(0)
+						Wait(5)
 					end
 				end)
 				exports['qb-core']:DrawText('[E] Check Time', 'left')
@@ -406,7 +406,7 @@ CreateThread(function()
 							TriggerEvent("prison:client:canteen")
 							break
 						end
-						Wait(0)
+						Wait(5)
 					end
 				end)
 				exports['qb-core']:DrawText('[E] Open Canteen', 'left')

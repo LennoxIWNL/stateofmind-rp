@@ -66,15 +66,15 @@ end)
 
 Citizen.CreateThread(function()
     while true do
-        local drawnAny = false
         scaleformHandleIdx = SCALEFORM_ID_MIN
         local ped = PlayerPedId()
         local coords = GetEntityCoords(ped)
+        local hasNearbySpray = false
 
         for _, spray in pairs(SPRAYS) do
             if spray.color and #(coords - spray.location) < 100.0 then
+                hasNearbySpray = true
                 DrawSpray(PLAYER_NAME_HEAP[scaleformHandleIdx], spray)
-                drawnAny = true
 
                 scaleformHandleIdx = scaleformHandleIdx + 1
 
@@ -85,7 +85,6 @@ Citizen.CreateThread(function()
         end
 
         if IsSpraying then
-            drawnAny = true
             local rayEndCoords, rayNormal, fwdVector = FindRaycastedSprayCoords()
             if rayEndCoords and rayNormal then
                 local cIndex = 'color'
@@ -107,9 +106,12 @@ Citizen.CreateThread(function()
                     color = COLORS[SprayColor][cIndex].hex,
                 })
             end
+            Citizen.Wait(0)
+        elseif hasNearbySpray then
+            Citizen.Wait(0)
+        else
+            Citizen.Wait(2000)
         end
-
-        Citizen.Wait(drawnAny and 0 or 500)
     end
 end)
 

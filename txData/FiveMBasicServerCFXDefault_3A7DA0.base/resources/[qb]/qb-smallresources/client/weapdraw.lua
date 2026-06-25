@@ -141,7 +141,7 @@ RegisterNetEvent('weapons:client:DrawWeapon', function()
         local ped = PlayerPedId()
         sleep = 250
         if DoesEntityExist(ped) and not IsEntityDead(ped) and not IsPedInParachuteFreeFall(ped) and not IsPedFalling(ped) and (GetPedParachuteState(ped) == -1 or GetPedParachuteState(ped) == 0) then
-            sleep = 0
+            sleep = 100 -- Weapon switch detection doesn't need per-frame, 100ms is responsive enough
             if currWeap ~= GetSelectedPedWeapon(ped) then
                 local pos = GetEntityCoords(ped, true)
                 local rot = GetEntityHeading(ped)

@@ -359,10 +359,12 @@ local function HotdogLoop()
 
     CreateThread(function()
         while true do
-            Wait(0)
             if IsPushing then
                 DisableControlAction(0, 244) -- m
                 DisableControlAction(0, 23) -- f
+                Wait(0)
+            else
+                Wait(500)
             end
         end
     end)
@@ -895,7 +897,7 @@ CreateThread(function()
                         exports['qb-core']:DrawText(Lang:t("info.start_working"), 'left')
                         CreateThread(function()
                             while inZone do
-                                Wait(0)
+                                Wait(5)
                                 if IsControlJustPressed(0, 38) then
                                     StartWorking()
                                 end
@@ -905,7 +907,7 @@ CreateThread(function()
                         exports['qb-core']:DrawText(Lang:t("info.stop_working"), 'left')
                         CreateThread(function()
                             while inZone do
-                                Wait(0)
+                                Wait(5)
                                 if IsControlJustPressed(0, 38) then
                                     StopWorking()
                                 end

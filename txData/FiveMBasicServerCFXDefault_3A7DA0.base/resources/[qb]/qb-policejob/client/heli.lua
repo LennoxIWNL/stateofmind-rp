@@ -136,7 +136,7 @@ end)
 -- Threads
 CreateThread(function()
 	while true do
-		Wait(0)
+		Wait(5)
 		if LocalPlayer.state.isLoggedIn then
 			if PlayerJob.type == 'leo' and PlayerJob.onduty then
 				if IsPlayerInPolmav() then
@@ -171,7 +171,7 @@ CreateThread(function()
 						SetTimecycleModifierStrength(0.3)
 						local scaleform = RequestScaleformMovie('HELI_CAM')
 						while not HasScaleformMovieLoaded(scaleform) do
-							Wait(0)
+							Wait(10)
 						end
 						local cam = CreateCam('DEFAULT_SCRIPTED_FLY_CAMERA', true)
 						AttachCamToEntity(cam, heli, 0.0, 0.0, -1.5, true)

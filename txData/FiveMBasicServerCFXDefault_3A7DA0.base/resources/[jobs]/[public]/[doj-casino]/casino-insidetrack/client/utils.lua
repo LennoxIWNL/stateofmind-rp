@@ -125,7 +125,7 @@ function Utils:GetMouseClickedButton()
     returnValue = EndScaleformMovieMethodReturnValue()
 
     while not IsScaleformMovieMethodReturnValueReady(returnValue) do
-        Wait(0)
+        Wait(10)
     end
 
     return GetScaleformMovieMethodReturnValueInt(returnValue)
@@ -194,7 +194,7 @@ end
 
 local function GenerateHorsesOrder()
     while (#Utils.HorsesPositions < 6) do
-        Wait(0)
+        Wait(1)
 
         for i = 1, 6 do
             local randomPos = math.random(6)
@@ -234,7 +234,7 @@ function Utils:IsRaceFinished()
     local raceReturnValue = EndScaleformMovieMethodReturnValue()
 
     while not IsScaleformMovieMethodReturnValueReady(raceReturnValue) do
-        Wait(0)
+        Wait(10)
     end
 
     return GetScaleformMovieMethodReturnValueBool(raceReturnValue)
@@ -294,7 +294,7 @@ end
 
 local function GenerateHorsesOrder()
     while (#Utils.HorsesPositions < 6) do
-        Wait(0)
+        Wait(1)
 
         for i = 1, 6 do
             local randomPos = math.random(6)
@@ -334,7 +334,7 @@ function Utils:IsRaceFinished()
     local raceReturnValue = EndScaleformMovieMethodReturnValue()
 
     while not IsScaleformMovieMethodReturnValueReady(raceReturnValue) do
-        Wait(0)
+        Wait(10)
     end
 
     return GetScaleformMovieMethodReturnValueBool(raceReturnValue)

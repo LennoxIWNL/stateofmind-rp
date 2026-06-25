@@ -120,7 +120,7 @@ local function DrawText3D(x, y, z, text)
     ClearDrawOrigin()
 end
 
-local function LoadAnimDict(dict) while not HasAnimDictLoaded(dict) do RequestAnimDict(dict) Wait(0) end end
+local function LoadAnimDict(dict) while not HasAnimDictLoaded(dict) do RequestAnimDict(dict) Wait(10) end end
 
 local function StartIdleScene(CurrentAnimation)
     Wait(GetAnimDuration(AnimDict, CurrentAnimation) * 800)
@@ -169,7 +169,7 @@ end
 local function SetupScaleform()
     CreateThread(function()
         Scaleform = RequestScaleformMovie('SLOT_MACHINE')
-        while not HasScaleformMovieLoaded(Scaleform) do Wait(0) end
+        while not HasScaleformMovieLoaded(Scaleform) do Wait(10) end
         if SlotReferences[ClosestSlotModel].theme then CallScaleformMethod('SET_THEME', SlotReferences[ClosestSlotModel].theme) else CallScaleformMethod('SET_THEME') end
         local model = ClosestSlotModel
         local handle = CreateNamedRenderTargetForModel("machine_"..SlotReferences[ClosestSlotModel].scriptrt, model)
@@ -280,9 +280,9 @@ local function SlotMachineHandler()
 end
 
 CreateThread(function()
-    while not RequestScriptAudioBank("dlc_vinewood/casino_slot_machines_01", 0) do Wait(0) end
-    while not RequestScriptAudioBank("dlc_vinewood/casino_slot_machines_02", 0) do Wait(0) end
-    while not RequestScriptAudioBank("dlc_vinewood/casino_slot_machines_03", 0) do Wait(0) end
+    while not RequestScriptAudioBank("dlc_vinewood/casino_slot_machines_01", 0) do Wait(10) end
+    while not RequestScriptAudioBank("dlc_vinewood/casino_slot_machines_02", 0) do Wait(10) end
+    while not RequestScriptAudioBank("dlc_vinewood/casino_slot_machines_03", 0) do Wait(10) end
 	while true do
         local PlayerCoords = GetEntityCoords(PlayerPedId())
         for i = 1, #Slots do
@@ -419,12 +419,12 @@ RegisterNetEvent('dc-casino:slots:client:spinreels', function(SpinTime, ReelRewa
     local Reel1 = NetworkGetEntityFromNetworkId(ReelID1)
     local Reel2 = NetworkGetEntityFromNetworkId(ReelID2)
     local Reel3 = NetworkGetEntityFromNetworkId(ReelID3)
-    while not NetworkRequestControlOfEntity(BlurryReel1) do Wait(0) end
-    while not NetworkRequestControlOfEntity(BlurryReel2) do Wait(0) end
-    while not NetworkRequestControlOfEntity(BlurryReel3) do Wait(0) end
-    while not NetworkRequestControlOfEntity(Reel1) do Wait(0) end
-    while not NetworkRequestControlOfEntity(Reel2) do Wait(0) end
-    while not NetworkRequestControlOfEntity(Reel3) do Wait(0) end
+    while not NetworkRequestControlOfEntity(BlurryReel1) do Wait(10) end
+    while not NetworkRequestControlOfEntity(BlurryReel2) do Wait(10) end
+    while not NetworkRequestControlOfEntity(BlurryReel3) do Wait(10) end
+    while not NetworkRequestControlOfEntity(Reel1) do Wait(10) end
+    while not NetworkRequestControlOfEntity(Reel2) do Wait(10) end
+    while not NetworkRequestControlOfEntity(Reel3) do Wait(10) end
 
     IsSpinning = true
     SetEntityVisible(Reel1, false)

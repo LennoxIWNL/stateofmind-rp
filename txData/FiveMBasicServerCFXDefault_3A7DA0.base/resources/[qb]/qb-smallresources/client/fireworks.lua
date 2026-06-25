@@ -52,12 +52,9 @@ end
 
 local function fireworkText()
     CreateThread(function()
-        while true do
-            Wait(0)
-            if fireworkTime > 0 and fireworkLoc then
-                DrawText3D(fireworkLoc.x, fireworkLoc.y, fireworkLoc.z, Lang:t('firework.time_left')..fireworkTime)
-            end
-            if fireworkTime <= 0 then break end
+        while fireworkTime > 0 and fireworkLoc do
+            DrawText3D(fireworkLoc.x, fireworkLoc.y, fireworkLoc.z, Lang:t('firework.time_left')..fireworkTime)
+            Wait(0) -- DrawText3D needs per-frame
         end
     end)
 end

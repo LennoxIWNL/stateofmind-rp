@@ -174,7 +174,7 @@ CreateThread(function()
 
                                 DoScreenFadeOut(500)
                                 while not IsScreenFadedOut() do
-                                    Wait(0)
+                                    Wait(50)
                                 end
 
                                 if not IsPedRagdoll(player) and IsPedOnFoot(player) and not IsPedSwimming(player) then
@@ -188,7 +188,7 @@ CreateThread(function()
                             else
                                 DoScreenFadeOut(500)
                                 while not IsScreenFadedOut() do
-                                    Wait(0)
+                                    Wait(50)
                                 end
                                 DoScreenFadeIn(500)
 
