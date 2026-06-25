@@ -62,7 +62,10 @@ end)
 RegisterNetEvent('som-jobsetup:server:save', function(point)
     local src = source
     if not isAllowed(src) then return end
-    if type(point) ~= 'table' or type(point.coords) ~= 'table' then return end
+    if type(point) ~= 'table' then return end
+    if type(point.coords) ~= 'table' or not tonumber(point.coords.x) or not tonumber(point.coords.y) or not tonumber(point.coords.z) then return end
+    if point.label and type(point.label) ~= 'string' then return end
+    if point.type and not Config.Types[point.type] then return end
 
     if not point.id or not points[point.id] then
         point.id = nextId
@@ -98,11 +101,3 @@ RegisterNetEvent('som-jobsetup:server:export', function()
     TriggerClientEvent('som-jobsetup:client:export', src, raw)
 end)
 
--- Server-side dispatch for points whose action must run on the server
-RegisterNetEvent('som-jobsetup:server:dispatch', function(action)
-    local src = source
-    if type(action) ~= 'table' then return end
-    if action.kind == 'server_event' and action.name then
-        TriggerEvent(action.name, src, action.args)
-    end
-end)

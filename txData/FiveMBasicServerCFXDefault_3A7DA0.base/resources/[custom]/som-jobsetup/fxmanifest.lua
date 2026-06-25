@@ -18,9 +18,11 @@ server_scripts {
     'server/jobpatch.lua'
 }
 
--- points database (created/updated at runtime via SaveResourceFile)
+ui_page 'html/index.html'
+
 files {
-    'data/points.json'
+    'data/points.json',
+    'html/index.html',
 }
 
 dependencies {

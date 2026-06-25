@@ -1,16 +1,23 @@
 local QBCore = exports['qb-core']:GetCoreObject()
 
-local points = {}          -- id -> point (synced from server)
-local spawned = {}         -- id -> { blip, ped, zoneName }
-local markerOn = {}        -- id -> bool (draw marker)
+local points = {}
+local spawned = {}
+local markerOn = {}
 local showCoords = false
+local uiOpen = false
 
 -- ===========================================================================
 --  Helpers
 -- ===========================================================================
 local function vec(p) return vector3(p.coords.x + 0.0, p.coords.y + 0.0, p.coords.z + 0.0) end
-
 local function zoneName(id) return ('som_js_%s'):format(id) end
+
+local function captureHere()
+    local ped = PlayerPedId()
+    local c = GetEntityCoords(ped)
+    return { x = math.floor(c.x * 100) / 100, y = math.floor(c.y * 100) / 100, z = math.floor(c.z * 100) / 100 },
+           math.floor(GetEntityHeading(ped) * 100) / 100
+end
 
 local function runAction(point)
     local a = point.action
@@ -22,8 +29,7 @@ local function runAction(point)
     elseif a.kind == 'command' then
         ExecuteCommand(a.name)
     elseif a.kind == 'export' and a.resource then
-        local ok = pcall(function() exports[a.resource][a.name](exports[a.resource], a.args) end)
-        if not ok then pcall(function() exports[a.resource][a.name](a.args) end) end
+        pcall(function() exports[a.resource][a.name](a.args) end)
     end
 end
 
@@ -49,7 +55,6 @@ local function renderPoint(point)
     local coords = vec(point)
     local typeDef = Config.Types[point.type] or {}
 
-    -- Blip
     local blipCfg = point.blip or typeDef.blip
     if blipCfg then
         local blip = AddBlipForCoord(coords.x, coords.y, coords.z)
@@ -63,7 +68,6 @@ local function renderPoint(point)
         s.blip = blip
     end
 
-    -- Ped (the relocatable "garage entity" etc.)
     local pedModel = point.ped or typeDef.ped
     if pedModel then
         local hash = type(pedModel) == 'number' and pedModel or GetHashKey(pedModel)
@@ -80,7 +84,6 @@ local function renderPoint(point)
         end
     end
 
-    -- qb-target interaction zone (covers the spot / ped)
     local hasAction = (point.action and point.action.kind) and true or false
     if hasAction or point.type ~= 'blip' then
         local zn = zoneName(point.id)
@@ -107,13 +110,28 @@ local function renderAll()
     for _, p in pairs(points) do renderPoint(p) end
 end
 
+-- ===========================================================================
+--  Sync
+-- ===========================================================================
+local function sortedPointsList()
+    local list = {}
+    for _, p in pairs(points) do list[#list + 1] = p end
+    table.sort(list, function(a, b) return (a.job or '') .. (a.label or '') < (b.job or '') .. (b.label or '') end)
+    return list
+end
+
 RegisterNetEvent('som-jobsetup:client:sync', function(list)
     points = {}
     for _, p in ipairs(list) do points[p.id] = p end
     renderAll()
+    if uiOpen then
+        SendNUIMessage({ type = 'updatePoints', points = sortedPointsList() })
+    end
 end)
 
--- Marker draw loop
+-- ===========================================================================
+--  Marker / coords draw loop
+-- ===========================================================================
 CreateThread(function()
     while true do
         local sleep = 500
@@ -148,246 +166,152 @@ CreateThread(function()
 end)
 
 -- ===========================================================================
---  Menu (ox_lib)
+--  NUI — open / close
 -- ===========================================================================
-local function captureHere()
-    local ped = PlayerPedId()
-    local c = GetEntityCoords(ped)
-    return { x = math.floor(c.x * 100) / 100, y = math.floor(c.y * 100) / 100, z = math.floor(c.z * 100) / 100 },
-           math.floor(GetEntityHeading(ped) * 100) / 100
-end
-
-local function typeOptions()
-    local opts = {}
-    for k, v in pairs(Config.Types) do opts[#opts + 1] = { value = k, label = v.label } end
-    table.sort(opts, function(a, b) return a.label < b.label end)
-    return opts
-end
-
-local function jobOptions()
-    local opts = {}
-    for _, j in ipairs(Config.Jobs) do opts[#opts + 1] = j end
-    return opts
-end
-
-local function addPointDialog()
-    local coords, heading = captureHere()
-    local input = lib.inputDialog('New Interaction Point', {
-        { type = 'input',  label = 'Label', required = true, default = 'New Point' },
-        { type = 'select', label = 'Job', options = (function()
-            local o = {} for _, j in ipairs(jobOptions()) do o[#o + 1] = { value = j, label = j } end
-            o[#o + 1] = { value = '__custom', label = '(type a custom job below)' } return o end)(),
-            default = jobOptions()[1] },
-        { type = 'input',  label = 'Custom job (optional)', description = 'Used only if you picked "custom job"' },
-        { type = 'select', label = 'Type', options = typeOptions(), required = true },
-        { type = 'number', label = 'Radius (m)', default = 1.5, min = 0.5, max = 10, step = 0.5 },
-        { type = 'checkbox', label = 'Restrict interaction to this job' },
+local function openUI()
+    if uiOpen then return end
+    uiOpen = true
+    SetNUIFocus(true, true)
+    SendNUIMessage({
+        type = 'open',
+        page = 'home',
+        data = {
+            points = sortedPointsList(),
+            types = Config.Types,
+            jobs = Config.Jobs,
+            jobConfigs = Config.JobConfigs,
+        }
     })
-    if not input then return end
-    local job = input[2]
-    if job == '__custom' then job = (input[3] ~= '' and input[3]) or 'unknown' end
-    local point = {
-        label = input[1],
-        job = job,
-        type = input[4],
-        radius = input[5] + 0.0,
-        restrictJob = input[6] and true or false,
+end
+
+local function closeUI()
+    if not uiOpen then return end
+    uiOpen = false
+    SetNUIFocus(false, false)
+    SendNUIMessage({ type = 'close' })
+end
+
+RegisterNUICallback('close', function(_, cb)
+    closeUI()
+    cb('ok')
+end)
+
+-- ===========================================================================
+--  NUI Callbacks — Points
+-- ===========================================================================
+RegisterNUICallback('addPoint', function(data, cb)
+    local coords, heading = captureHere()
+    TriggerServerEvent('som-jobsetup:server:save', {
+        label = data.label or 'New Point',
+        job = data.job or 'unknown',
+        type = data.pointType or 'target',
+        radius = (tonumber(data.radius) or 1.5) + 0.0,
+        restrictJob = data.restrictJob and true or false,
         coords = coords,
         heading = heading,
-    }
-    TriggerServerEvent('som-jobsetup:server:save', point)
-end
-
-local function actionDialog(point)
-    local input = lib.inputDialog(('Action for "%s"'):format(point.label), {
-        { type = 'select', label = 'Trigger kind', required = true, default = (point.action and point.action.kind) or 'event',
-          options = {
-            { value = 'event', label = 'Client event (TriggerEvent)' },
-            { value = 'server_event', label = 'Server event (TriggerServerEvent)' },
-            { value = 'command', label = 'Console command (ExecuteCommand)' },
-            { value = 'export', label = 'Export call' },
-            { value = 'none', label = 'No action (blip/ped only)' },
-          } },
-        { type = 'input', label = 'Event / command / export name', default = (point.action and point.action.name) or '',
-          description = 'e.g. qb-garages:client:OpenMenu  OR  police:toggleduty' },
-        { type = 'input', label = 'Export resource (export kind only)', default = (point.action and point.action.resource) or '' },
-        { type = 'input', label = 'Args (string, optional)', default = (point.action and tostring(point.action.args or '')) or '' },
     })
-    if not input then return end
-    if input[1] == 'none' then
-        point.action = nil
-    else
-        point.action = { kind = input[1], name = input[2], resource = (input[3] ~= '' and input[3] or nil),
-                         args = (input[4] ~= '' and input[4] or nil) }
-    end
-    TriggerServerEvent('som-jobsetup:server:save', point)
-end
+    cb('ok')
+end)
 
-local function managePointMenu(point)
-    lib.registerContext({
-        id = 'som_js_point',
-        title = ('%s  [%s]'):format(point.label or point.type, point.job or '-'),
-        menu = 'som_js_list',
-        options = {
-            { title = 'Teleport to point', icon = 'location-arrow', onSelect = function()
-                SetEntityCoords(PlayerPedId(), vec(point).x, vec(point).y, vec(point).z, false, false, false, false)
-                SetEntityHeading(PlayerPedId(), point.heading or 0.0)
-            end },
-            { title = 'Move point to me (update coords)', icon = 'person-walking-arrow-right', onSelect = function()
-                local c, h = captureHere()
-                point.coords, point.heading = c, h
-                TriggerServerEvent('som-jobsetup:server:save', point)
-            end },
-            { title = 'Set / edit action', icon = 'bolt',
-              description = point.action and ('%s: %s'):format(point.action.kind, point.action.name) or 'none',
-              onSelect = function() actionDialog(point) end },
-            { title = (markerOn[point.id] and 'Hide marker' or 'Show marker'), icon = 'location-dot', onSelect = function()
-                markerOn[point.id] = not markerOn[point.id]
-                managePointMenu(point)
-            end },
-            { title = 'Delete point', icon = 'trash', onSelect = function()
-                local ok = lib.alertDialog({ header = 'Delete?', content = ('Delete "%s"?'):format(point.label or point.type),
-                    centered = true, cancel = true })
-                if ok == 'confirm' then TriggerServerEvent('som-jobsetup:server:delete', point.id) end
-            end },
-        }
-    })
-    lib.showContext('som_js_point')
-end
-
-local function listMenu()
-    local options = {}
-    local sorted = {}
-    for _, p in pairs(points) do sorted[#sorted + 1] = p end
-    table.sort(sorted, function(a, b) return (a.job or '') .. (a.label or '') < (b.job or '') .. (b.label or '') end)
-    for _, p in ipairs(sorted) do
-        options[#options + 1] = {
-            title = p.label or p.type,
-            description = ('%s · %s · %.1f,%.1f,%.1f'):format(p.job or '-', p.type, p.coords.x, p.coords.y, p.coords.z),
-            icon = 'map-pin',
-            onSelect = function() managePointMenu(p) end,
-        }
+RegisterNUICallback('teleportToPoint', function(data, cb)
+    local point = points[tonumber(data.id)]
+    if point then
+        SetEntityCoords(PlayerPedId(), vec(point).x, vec(point).y, vec(point).z, false, false, false, false)
+        SetEntityHeading(PlayerPedId(), point.heading or 0.0)
     end
-    if #options == 0 then options[1] = { title = 'No points yet', disabled = true } end
-    lib.registerContext({ id = 'som_js_list', title = 'Manage Points', menu = 'som_js_main', options = options })
-    lib.showContext('som_js_list')
-end
+    cb('ok')
+end)
+
+RegisterNUICallback('movePoint', function(data, cb)
+    local point = points[tonumber(data.id)]
+    if point then
+        local c, h = captureHere()
+        point.coords, point.heading = c, h
+        TriggerServerEvent('som-jobsetup:server:save', point)
+    end
+    cb('ok')
+end)
+
+RegisterNUICallback('deletePoint', function(data, cb)
+    TriggerServerEvent('som-jobsetup:server:delete', tonumber(data.id))
+    cb('ok')
+end)
+
+RegisterNUICallback('saveAction', function(data, cb)
+    local point = points[tonumber(data.id)]
+    if point then
+        if data.kind == 'none' then
+            point.action = nil
+        else
+            point.action = {
+                kind = data.kind,
+                name = data.name or '',
+                resource = (data.resource ~= '' and data.resource) or nil,
+                args = (data.args ~= '' and data.args) or nil,
+            }
+        end
+        TriggerServerEvent('som-jobsetup:server:save', point)
+    end
+    cb('ok')
+end)
+
+RegisterNUICallback('toggleMarker', function(data, cb)
+    local id = tonumber(data.id)
+    markerOn[id] = not markerOn[id]
+    cb({ markerOn = markerOn[id] and true or false })
+end)
+
+RegisterNUICallback('toggleCoords', function(_, cb)
+    showCoords = not showCoords
+    cb({ showCoords = showCoords })
+end)
+
+RegisterNUICallback('exportPoints', function(_, cb)
+    TriggerServerEvent('som-jobsetup:server:export')
+    cb('ok')
+end)
+
+RegisterNUICallback('getCoords', function(_, cb)
+    local c, h = captureHere()
+    cb({ x = c.x, y = c.y, z = c.z, heading = h })
+end)
 
 -- ===========================================================================
---  Job-config injection (writes coords straight into qb-policejob /
---  qb-ambulancejob configs so the REAL interaction relocates).
+--  NUI Callbacks — Job Config Injection
 -- ===========================================================================
-local jobLocCache = {}   -- resource -> parsed list
+local jobLocCache = {}
 
 RegisterNetEvent('som-jobsetup:client:jobLocations', function(resource, list)
     jobLocCache[resource] = list
 end)
 
-local function existingFor(resource, locType)
-    local out = {}
-    for _, e in ipairs(jobLocCache[resource] or {}) do
-        if e.type == locType then out[e.index] = e.coords end
+RegisterNUICallback('getJobLocations', function(data, cb)
+    jobLocCache[data.resource] = nil
+    TriggerServerEvent('som-jobsetup:server:getJobLocations', data.resource)
+    local waited = 0
+    while not jobLocCache[data.resource] and waited < 3000 do
+        Wait(50)
+        waited = waited + 50
     end
-    return out
-end
+    cb({ locations = jobLocCache[data.resource] or {} })
+end)
 
-local function patchDialog(resource, locType, locDef, jc)
-    local existing = existingFor(resource, locType)
-    -- build index options from what exists, plus a "new index" choice
-    local idxOpts, maxIdx = {}, 0
-    for i, coords in pairs(existing) do
-        idxOpts[#idxOpts + 1] = { value = tostring(i), label = ('#%d  (%s)'):format(i, coords) }
-        if i > maxIdx then maxIdx = i end
-    end
-    table.sort(idxOpts, function(a, b) return a.label < b.label end)
-    if not locDef.nested then
-        idxOpts[#idxOpts + 1] = { value = 'new', label = ('+ new (#%d)'):format(maxIdx + 1) }
-    end
-    if #idxOpts == 0 then idxOpts[1] = { value = '1', label = '#1' } end
-
+RegisterNUICallback('patchLocation', function(data, cb)
     local c, h = captureHere()
-    local input = lib.inputDialog(('%s · %s'):format(jc.label, locDef.label or locType), {
-        { type = 'select', label = 'Which slot to set', required = true, options = idxOpts, default = idxOpts[1].value,
-          description = 'Pick an existing slot to MOVE it, or "+ new" to add one' },
-        { type = 'number', label = 'Index (if "+ new")', default = maxIdx + 1, min = 1, step = 1 },
-        { type = 'checkbox', label = 'Restart the job now (apply live)', checked = jc.restart and true or false,
-          description = 'Restarts ' .. resource .. ' so the change takes effect immediately' },
-    })
-    if not input then return end
-    local index = input[1] == 'new' and math.floor(input[2]) or tonumber(input[1])
-    local ok = lib.alertDialog({
-        header = 'Confirm write',
-        content = ('Write **%s** `[%s][%d]` =\n`%s`\n\nat your feet (%.2f, %.2f, %.2f, %.1f)?\n\nA backup of the config is saved first.')
-            :format(resource, locType, index, locDef.label or locType, c.x, c.y, c.z, h),
-        centered = true, cancel = true,
-    })
-    if ok ~= 'confirm' then return end
     TriggerServerEvent('som-jobsetup:server:patchJobLocation', {
-        resource = resource, locType = locType, index = index,
-        x = c.x, y = c.y, z = c.z, h = h, restart = input[3] and true or false,
+        resource = data.resource,
+        locType = data.locType,
+        index = tonumber(data.index),
+        x = c.x, y = c.y, z = c.z, h = h,
+        restart = data.restart and true or false,
     })
-end
+    cb('ok')
+end)
 
-local function jobLocTypeMenu(resource, jc)
-    TriggerServerEvent('som-jobsetup:server:getJobLocations', resource) -- refresh cache
-    local options = {}
-    -- stable sorted list of location types
-    local keys = {}
-    for k in pairs(jc.locations) do keys[#keys + 1] = k end
-    table.sort(keys)
-    for _, k in ipairs(keys) do
-        local def = jc.locations[k]
-        local existing = existingFor(resource, k)
-        local count = 0 for _ in pairs(existing) do count = count + 1 end
-        options[#options + 1] = {
-            title = def.label or k,
-            description = ('%s · %d slot(s) · arity %d%s'):format(k, count, def.arity, def.nested and ' · nested' or ''),
-            icon = 'location-crosshairs',
-            onSelect = function() patchDialog(resource, k, def, jc) end,
-        }
-    end
-    lib.registerContext({ id = 'som_js_jobloc', title = jc.label, menu = 'som_js_jobs', options = options })
-    lib.showContext('som_js_jobloc')
-end
-
-local function jobConfigMenu()
-    local options = {}
-    for resource, jc in pairs(Config.JobConfigs) do
-        TriggerServerEvent('som-jobsetup:server:getJobLocations', resource)
-        options[#options + 1] = {
-            title = jc.label, icon = 'screwdriver-wrench', arrow = true,
-            description = 'Write coords into ' .. resource .. '/' .. jc.file,
-            onSelect = function() jobLocTypeMenu(resource, jc) end,
-        }
-    end
-    if #options == 0 then options[1] = { title = 'No job configs defined', disabled = true } end
-    lib.registerContext({ id = 'som_js_jobs', title = 'Set up Job Interactions', menu = 'som_js_main', options = options })
-    lib.showContext('som_js_jobs')
-end
-
-local function mainMenu()
-    lib.registerContext({
-        id = 'som_js_main',
-        title = 'State of Mind · Job Setup',
-        options = {
-            { title = 'Set up Job interactions (PD / EMS configs)', icon = 'screwdriver-wrench', arrow = true,
-              description = 'Move garage, duty, armory, fingerprint, check-in, beds… straight into the job config',
-              onSelect = jobConfigMenu },
-            { title = 'Add custom interaction point (here)', icon = 'plus',
-              description = 'Capture your current position as a new managed point', onSelect = addPointDialog },
-            { title = 'Manage custom points', icon = 'list', description = ('%d point(s)'):format((function()
-                local n = 0 for _ in pairs(points) do n = n + 1 end return n end)()), onSelect = listMenu },
-            { title = (showCoords and 'Hide live coords' or 'Show live coords'), icon = 'crosshairs', onSelect = function()
-                showCoords = not showCoords; mainMenu() end },
-            { title = 'Export points (to console)', icon = 'file-export',
-              description = 'Print the points JSON to F8 console', onSelect = function()
-                TriggerServerEvent('som-jobsetup:server:export') end },
-        }
-    })
-    lib.showContext('som_js_main')
-end
-
-RegisterCommand(Config.Command, function() mainMenu() end, false)
+-- ===========================================================================
+--  Command / lifecycle
+-- ===========================================================================
+RegisterCommand(Config.Command, function() openUI() end, false)
 
 RegisterNetEvent('som-jobsetup:client:export', function(raw)
     print('^5[som-jobsetup]^7 ===== points.json =====')
@@ -397,7 +321,10 @@ RegisterNetEvent('som-jobsetup:client:export', function(raw)
 end)
 
 AddEventHandler('onResourceStop', function(res)
-    if res == GetCurrentResourceName() then clearAll() end
+    if res == GetCurrentResourceName() then
+        closeUI()
+        clearAll()
+    end
 end)
 
 CreateThread(function()
