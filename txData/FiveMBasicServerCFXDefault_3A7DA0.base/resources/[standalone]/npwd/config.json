@@ -109,7 +109,16 @@
     }
   ],
   "disabledApps": [],
-  "apps": [],
+  "apps": [
+    {
+      "id": "GANGBOSS",
+      "nameLocale": "Management",
+      "color": "#FF1493",
+      "backgroundColor": "#0a0a12",
+      "path": "/gangboss",
+      "url": "https://cfx-nui-som-gangboss-app/html/index.html"
+    }
+  ],
   "voiceMessage": {
     "enabled": false,
     "authorizationHeader": "Authorization",

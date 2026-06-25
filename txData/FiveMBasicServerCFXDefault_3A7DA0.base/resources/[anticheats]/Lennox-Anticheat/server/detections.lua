@@ -15,10 +15,16 @@ local SEAL         = LAC.getSeal()
 
 local pendingHB = {}
 
-RegisterNetEvent(HB_RESPONSE, function(response)
+RegisterNetEvent(HB_RESPONSE, function(token, nonce, response)
     local src = source
     local pending = pendingHB[src]
     if not pending then return end
+
+    -- validate session token if provided (backwards-compat: token may be nil during first heartbeat)
+    if token and not LAC.validateToken(src, token, nonce) then
+        pendingHB[src] = nil
+        return
+    end
 
     local expected = ((pending.challenge * MAGIC) % 0x7FFFFFFF) + SEAL
     local pd = LAC.getPlayerData(src)
@@ -298,18 +304,26 @@ CreateThread(function()
 end)
 
 -- =========================================================================
---  8. Client Detector Receivers
+--  8. Client Detector Receivers (token-validated)
 -- =========================================================================
-local DETECT_GODMODE  = LAC.deriveKey('det:godmode')
-local DETECT_RESOURCE = LAC.deriveKey('det:resource')
+local DETECT_GODMODE   = LAC.deriveKey('det:godmode')
+local DETECT_RESOURCE  = LAC.deriveKey('det:resource')
+local DETECT_NOCLIP    = LAC.deriveKey('det:noclip')
+local DETECT_HEALTH    = LAC.deriveKey('det:health')
+local DETECT_WEAPON    = LAC.deriveKey('det:weapon')
+local DETECT_ANTITAMP  = LAC.deriveKey('det:antitamper')
 
-RegisterNetEvent(DETECT_GODMODE, function(detail)
+local function validateClientEvent(src, token, nonce)
+    if not token then return true end
+    return LAC.validateToken(src, token, nonce)
+end
+
+RegisterNetEvent(DETECT_GODMODE, function(token, nonce, detail)
     local src = source
     if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
     if type(detail) ~= 'string' then return end
 
-    -- Client-reported and FP-prone (spawn protection, cutscenes, interiors all
-    -- set invincibility) -> SOFT. Escalates to a kick, never a lone ban.
     LAC.flagPlayer(src, 'God Mode (client)', detail:sub(1, 100), 8, false)
 
     LAC.sendDiscord('events', 'God Mode Detected',
@@ -318,9 +332,10 @@ RegisterNetEvent(DETECT_GODMODE, function(detail)
         16711680)
 end)
 
-RegisterNetEvent(DETECT_RESOURCE, function(resName)
+RegisterNetEvent(DETECT_RESOURCE, function(token, nonce, resName)
     local src = source
     if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
     if type(resName) ~= 'string' then return end
 
     LAC.sendDiscord('connections', 'Blacklisted Resource Detected',
@@ -329,6 +344,62 @@ RegisterNetEvent(DETECT_RESOURCE, function(resName)
         16711680, true)
 
     LAC.banPlayer(src, 'Cheat Menu Detected', ('Resource: %s'):format(resName:sub(1, 80)))
+end)
+
+RegisterNetEvent(DETECT_NOCLIP, function(token, nonce, detail)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    if type(detail) ~= 'string' then return end
+
+    LAC.flagPlayer(src, 'Noclip (client)', detail:sub(1, 100), 8, false)
+
+    LAC.sendDiscord('events', 'Noclip Detected',
+        ('**Player:** %s (id: %s)\n**Detail:** %s')
+            :format(GetPlayerName(src) or '?', src, detail:sub(1, 100)),
+        16744192)
+end)
+
+RegisterNetEvent(DETECT_HEALTH, function(token, nonce, detail)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    if type(detail) ~= 'string' then return end
+
+    LAC.flagPlayer(src, 'Health Snap (client)', detail:sub(1, 100), 5, false)
+
+    LAC.sendDiscord('events', 'Suspicious Health Change',
+        ('**Player:** %s (id: %s)\n**Detail:** %s')
+            :format(GetPlayerName(src) or '?', src, detail:sub(1, 100)),
+        16776960)
+end)
+
+RegisterNetEvent(DETECT_WEAPON, function(token, nonce, detail)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    if type(detail) ~= 'string' then return end
+
+    LAC.flagPlayer(src, 'Blacklisted Weapon (client)', detail:sub(1, 100), 10, true)
+
+    LAC.sendDiscord('events', 'Weapon Injection Detected',
+        ('**Player:** %s (id: %s)\n**Weapon:** `%s`')
+            :format(GetPlayerName(src) or '?', src, detail:sub(1, 80)),
+        16711680)
+end)
+
+RegisterNetEvent(DETECT_ANTITAMP, function(token, nonce, detail)
+    local src = source
+    if LAC.isAdmin(src) then return end
+    if not validateClientEvent(src, token, nonce) then return end
+    if type(detail) ~= 'string' then return end
+
+    LAC.flagPlayer(src, 'Anti-Tamper / Executor', detail:sub(1, 100), 15, true)
+
+    LAC.sendDiscord('bans', 'EXECUTOR / TAMPER DETECTED',
+        ('**Player:** %s (id: %s)\n**Detail:** %s\n**Verdict:** Cheat tool signature or tampered client.')
+            :format(GetPlayerName(src) or '?', src, detail:sub(1, 100)),
+        16711680, true)
 end)
 
 -- Periodic silent integrity re-check

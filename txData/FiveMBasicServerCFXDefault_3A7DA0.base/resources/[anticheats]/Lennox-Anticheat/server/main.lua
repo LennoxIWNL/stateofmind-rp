@@ -313,6 +313,87 @@ CreateThread(function()
 end)
 
 -- =========================================================================
+--  Session Token System
+-- =========================================================================
+local SessionTokens = {}
+local SeenNonces = {}
+
+local function generateToken()
+    math.randomseed(os.time() + GetGameTimer())
+    local parts = {}
+    for i = 1, 4 do
+        parts[i] = ('%08X'):format(math.random(0, 0x7FFFFFFF))
+    end
+    return table.concat(parts, '-')
+end
+
+function LAC.issueSessionToken(src)
+    src = tonumber(src)
+    if not src then return end
+    local token = generateToken()
+    SessionTokens[src] = {
+        token = token,
+        issuedAt = GetGameTimer(),
+        eventCount = 0,
+        lastEventTime = 0,
+    }
+    SeenNonces[src] = {}
+    local initEvent = LAC.deriveKey('lac:session:init')
+    TriggerClientEvent(initEvent, src, token)
+end
+
+function LAC.validateToken(src, token, nonce)
+    src = tonumber(src)
+    if not src then return false end
+    local session = SessionTokens[src]
+    if not session then return false end
+    if session.token ~= token then
+        LAC.flagPlayer(src, 'Invalid Session Token', 'Token mismatch — possible event spoofing', 15, true)
+        return false
+    end
+
+    if nonce then
+        local playerNonces = SeenNonces[src]
+        if playerNonces then
+            if playerNonces[nonce] then
+                LAC.flagPlayer(src, 'Nonce Replay', 'Duplicate nonce — possible event replay', 10, true)
+                return false
+            end
+            playerNonces[nonce] = true
+        end
+    end
+
+    local now = GetGameTimer()
+    session.eventCount = session.eventCount + 1
+    if now - session.lastEventTime < 100 then
+        if session.eventCount > 50 then
+            LAC.flagPlayer(src, 'Event Flood', ('Sent %d events rapidly'):format(session.eventCount), 5, false)
+            return false
+        end
+    else
+        session.eventCount = 0
+    end
+    session.lastEventTime = now
+
+    return true
+end
+
+function LAC.getSessionToken(src)
+    local session = SessionTokens[tonumber(src)]
+    return session and session.token or nil
+end
+
+-- Nonce garbage collection (prevent memory leak)
+CreateThread(function()
+    while true do
+        Wait(300000)
+        for src, nonces in pairs(SeenNonces) do
+            SeenNonces[src] = {}
+        end
+    end
+end)
+
+-- =========================================================================
 --  Exports
 -- =========================================================================
 function LAC.getSeal() return SEAL end
@@ -343,5 +424,23 @@ AddEventHandler('onResourceStart', function(res)
 end)
 
 AddEventHandler('playerDropped', function()
-    PlayerData[source] = nil
+    local src = source
+    PlayerData[src] = nil
+    SessionTokens[src] = nil
+    SeenNonces[src] = nil
+end)
+
+-- Issue session tokens to players once they've fully loaded
+RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
+    LAC.issueSessionToken(source)
+end)
+
+-- Fallback: issue token after a delay for non-QB frameworks
+AddEventHandler('playerJoining', function()
+    local src = source
+    SetTimeout(5000, function()
+        if GetPlayerName(src) and not SessionTokens[tonumber(src)] then
+            LAC.issueSessionToken(src)
+        end
+    end)
 end)
