@@ -53,9 +53,9 @@ Config.AutoNamePrefix = 'Door'
 --  Bulk Selection
 -- =========================================================================
 Config.BulkDefaultRadius = 10.0
-Config.BulkMaxRadius = 50.0
+Config.BulkMaxRadius = 100.0
 Config.BulkMinRadius = 1.0
-Config.MaxBulkDoors = 100
+Config.MaxBulkDoors = 1000
 
 -- =========================================================================
 --  Backups
