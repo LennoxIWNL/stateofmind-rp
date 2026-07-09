@@ -1,10 +1,7 @@
 local QBCore = exports['qb-core']:GetCoreObject()
 
--- ---------------------------------------------------------------------------
---  Points database (persisted to data/points.json in this resource)
--- ---------------------------------------------------------------------------
 local POINTS_FILE = 'data/points.json'
-local points = {}        -- id -> point
+local points = {}
 local nextId = 1
 
 local function loadPoints()
@@ -33,16 +30,10 @@ local function listPoints()
     return list
 end
 
--- ---------------------------------------------------------------------------
---  Permission
--- ---------------------------------------------------------------------------
 local function isAllowed(src)
     return IsPlayerAceAllowed(src, Config.AdminAce) or IsPlayerAceAllowed(src, 'command')
 end
 
--- ---------------------------------------------------------------------------
---  Sync
--- ---------------------------------------------------------------------------
 local function syncAll()
     TriggerClientEvent('som-jobsetup:client:sync', -1, listPoints())
 end
@@ -56,9 +47,6 @@ RegisterNetEvent('som-jobsetup:server:requestSync', function()
     TriggerClientEvent('som-jobsetup:client:sync', source, listPoints())
 end)
 
--- ---------------------------------------------------------------------------
---  Create / update / delete (all admin-gated)
--- ---------------------------------------------------------------------------
 RegisterNetEvent('som-jobsetup:server:save', function(point)
     local src = source
     if not isAllowed(src) then return end
@@ -88,9 +76,6 @@ RegisterNetEvent('som-jobsetup:server:delete', function(id)
     end
 end)
 
--- ---------------------------------------------------------------------------
---  Export the whole DB as a paste-able snippet (printed to the player's console)
--- ---------------------------------------------------------------------------
 RegisterNetEvent('som-jobsetup:server:export', function()
     local src = source
     if not isAllowed(src) then return end
@@ -98,7 +83,6 @@ RegisterNetEvent('som-jobsetup:server:export', function()
     TriggerClientEvent('som-jobsetup:client:export', src, raw)
 end)
 
--- Server-side dispatch for points whose action must run on the server
 RegisterNetEvent('som-jobsetup:server:dispatch', function(action)
     local src = source
     if type(action) ~= 'table' then return end

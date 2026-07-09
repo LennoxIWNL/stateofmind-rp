@@ -1,13 +1,10 @@
 local QBCore = exports['qb-core']:GetCoreObject()
 
-local points = {}          -- id -> point (synced from server)
-local spawned = {}         -- id -> { blip, ped, zoneName }
-local markerOn = {}        -- id -> bool (draw marker)
+local points = {}
+local spawned = {}
+local markerOn = {}
 local showCoords = false
 
--- ===========================================================================
---  Helpers
--- ===========================================================================
 local function vec(p) return vector3(p.coords.x + 0.0, p.coords.y + 0.0, p.coords.z + 0.0) end
 
 local function zoneName(id) return ('som_js_%s'):format(id) end
@@ -27,9 +24,6 @@ local function runAction(point)
     end
 end
 
--- ===========================================================================
---  Render / clear points
--- ===========================================================================
 local function clearPoint(id)
     local s = spawned[id]
     if not s then return end
@@ -49,7 +43,6 @@ local function renderPoint(point)
     local coords = vec(point)
     local typeDef = Config.Types[point.type] or {}
 
-    -- Blip
     local blipCfg = point.blip or typeDef.blip
     if blipCfg then
         local blip = AddBlipForCoord(coords.x, coords.y, coords.z)
@@ -63,7 +56,6 @@ local function renderPoint(point)
         s.blip = blip
     end
 
-    -- Ped (the relocatable "garage entity" etc.)
     local pedModel = point.ped or typeDef.ped
     if pedModel then
         local hash = type(pedModel) == 'number' and pedModel or GetHashKey(pedModel)
@@ -80,7 +72,6 @@ local function renderPoint(point)
         end
     end
 
-    -- qb-target interaction zone (covers the spot / ped)
     local hasAction = (point.action and point.action.kind) and true or false
     if hasAction or point.type ~= 'blip' then
         local zn = zoneName(point.id)
@@ -113,7 +104,6 @@ RegisterNetEvent('som-jobsetup:client:sync', function(list)
     renderAll()
 end)
 
--- Marker draw loop
 CreateThread(function()
     while true do
         local sleep = 500
@@ -147,9 +137,6 @@ CreateThread(function()
     end
 end)
 
--- ===========================================================================
---  Menu (ox_lib)
--- ===========================================================================
 local function captureHere()
     local ped = PlayerPedId()
     local c = GetEntityCoords(ped)
@@ -273,11 +260,7 @@ local function listMenu()
     lib.showContext('som_js_list')
 end
 
--- ===========================================================================
---  Job-config injection (writes coords straight into qb-policejob /
---  qb-ambulancejob configs so the REAL interaction relocates).
--- ===========================================================================
-local jobLocCache = {}   -- resource -> parsed list
+local jobLocCache = {}
 
 RegisterNetEvent('som-jobsetup:client:jobLocations', function(resource, list)
     jobLocCache[resource] = list
@@ -293,7 +276,6 @@ end
 
 local function patchDialog(resource, locType, locDef, jc)
     local existing = existingFor(resource, locType)
-    -- build index options from what exists, plus a "new index" choice
     local idxOpts, maxIdx = {}, 0
     for i, coords in pairs(existing) do
         idxOpts[#idxOpts + 1] = { value = tostring(i), label = ('#%d  (%s)'):format(i, coords) }
@@ -329,9 +311,8 @@ local function patchDialog(resource, locType, locDef, jc)
 end
 
 local function jobLocTypeMenu(resource, jc)
-    TriggerServerEvent('som-jobsetup:server:getJobLocations', resource) -- refresh cache
+    TriggerServerEvent('som-jobsetup:server:getJobLocations', resource)
     local options = {}
-    -- stable sorted list of location types
     local keys = {}
     for k in pairs(jc.locations) do keys[#keys + 1] = k end
     table.sort(keys)
@@ -371,7 +352,7 @@ local function mainMenu()
         title = 'State of Mind · Job Setup',
         options = {
             { title = 'Set up Job interactions (PD / EMS configs)', icon = 'screwdriver-wrench', arrow = true,
-              description = 'Move garage, duty, armory, fingerprint, check-in, beds… straight into the job config',
+              description = 'Move garage, duty, armory, fingerprint, check-in, beds straight into the job config',
               onSelect = jobConfigMenu },
             { title = 'Add custom interaction point (here)', icon = 'plus',
               description = 'Capture your current position as a new managed point', onSelect = addPointDialog },
