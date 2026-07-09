@@ -47,6 +47,17 @@ AddEventHandler('QBCore:Server:PlayerLoaded', function(Player)
     end
 end)
 
+RegisterNetEvent('qb-policejob:server:stockVehicleTrunk', function(plate, netId)
+    local src = source
+    if type(plate) ~= 'string' or not tonumber(netId) then return end
+    if not QBCore.Functions.GetPlayer(src) then return end
+
+    local trunkId = 'trunk' .. plate
+    for _, item in ipairs(Config.CarItems) do
+        exports.ox_inventory:AddItem(trunkId, item.name, item.amount)
+    end
+end)
+
 RegisterNetEvent('qb-policejob:server:openEvidenceDrawer', function(evidenceLocation, slot)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
@@ -529,8 +540,7 @@ QBCore.Commands.Add('takedna', Lang:t('commands.takedna'), { { name = 'id', help
             type = 'dna',
             dnalabel = DnaHash(OtherPlayer.PlayerData.citizenid)
         }
-        if not Player.Functions.AddItem('filled_evidence_bag', 1, false, info) then return end
-        TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items['filled_evidence_bag'], 'add')
+        if not exports.ox_inventory:AddItem(src, 'filled_evidence_bag', 1, info) then return end
     else
         TriggerClientEvent('QBCore:Notify', src, Lang:t('error.have_evidence_bag'), 'error')
     end
@@ -898,6 +908,24 @@ RegisterNetEvent('police:server:SearchPlayer', function(playerId)
     TriggerClientEvent('QBCore:Notify', SearchedPlayer.PlayerData.source, Lang:t('info.being_searched'))
 end)
 
+RegisterNetEvent('police:server:AllowRobPlayer', function(playerId)
+    local src = source
+    playerId = tonumber(playerId)
+    if not playerId then return end
+
+    local playerPed = GetPlayerPed(src)
+    local targetPed = GetPlayerPed(playerId)
+    if not targetPed or targetPed == 0 then return end
+    if #(GetEntityCoords(playerPed) - GetEntityCoords(targetPed)) > 2.5 then return DropPlayer(src, 'Attempted exploit abuse') end
+
+    Player(playerId).state:set('canSteal', true, true)
+    SetTimeout(15000, function()
+        if GetPlayerPed(playerId) ~= 0 then
+            Player(playerId).state:set('canSteal', false, true)
+        end
+    end)
+end)
+
 RegisterNetEvent('police:server:SeizeCash', function(playerId)
     local src = source
     local playerPed = GetPlayerPed(src)
@@ -913,8 +941,7 @@ RegisterNetEvent('police:server:SeizeCash', function(playerId)
     local moneyAmount = SearchedPlayer.PlayerData.money['cash']
     local info = { cash = moneyAmount }
     SearchedPlayer.Functions.RemoveMoney('cash', moneyAmount, 'police-cash-seized')
-    Player.Functions.AddItem('moneybag', 1, false, info)
-    TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items['moneybag'], 'add')
+    exports.ox_inventory:AddItem(src, 'moneybag', 1, info)
     TriggerClientEvent('QBCore:Notify', SearchedPlayer.PlayerData.source, Lang:t('info.cash_confiscated'))
 end)
 

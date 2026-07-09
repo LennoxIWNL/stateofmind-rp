@@ -154,7 +154,7 @@ function TakeOutVehicle(vehicleInfo)
             end
             TaskWarpPedIntoVehicle(PlayerPedId(), veh, -1)
             TriggerEvent('vehiclekeys:client:SetOwner', QBCore.Functions.GetPlate(veh))
-            TriggerServerEvent('inventory:server:addTrunkItems', QBCore.Functions.GetPlate(veh), Config.CarItems)
+            TriggerServerEvent('qb-policejob:server:stockVehicleTrunk', QBCore.Functions.GetPlate(veh), NetworkGetNetworkIdFromEntity(veh))
             SetVehicleEngineOn(veh, true, true)
         end, vehicleInfo, coords, true)
     end
