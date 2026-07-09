@@ -127,6 +127,11 @@ RegisterNetEvent('qb-bossmenu:client:employeelist', function()
         },
     }
     QBCore.Functions.TriggerCallback('qb-bossmenu:server:GetEmployees', function(cb)
+        if not cb or #cb == 0 then
+            QBCore.Functions.Notify("You do not have permission to do this!", "error")
+            TriggerEvent('qb-bossmenu:client:OpenMenu')
+            return
+        end
         for _, v in pairs(cb) do
             EmployeesMenu[#EmployeesMenu + 1] = {
                 header = v.name,

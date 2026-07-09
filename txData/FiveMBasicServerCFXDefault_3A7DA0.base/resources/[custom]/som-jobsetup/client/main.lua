@@ -6,9 +6,6 @@ local markerOn = {}
 local showCoords = false
 local uiOpen = false
 
--- ===========================================================================
---  Helpers
--- ===========================================================================
 local function vec(p) return vector3(p.coords.x + 0.0, p.coords.y + 0.0, p.coords.z + 0.0) end
 local function zoneName(id) return ('som_js_%s'):format(id) end
 
@@ -106,9 +103,6 @@ local function runAction(point)
     end
 end
 
--- ===========================================================================
---  Render / clear points
--- ===========================================================================
 local function clearPoint(id)
     local s = spawned[id]
     if not s then return end
@@ -184,9 +178,6 @@ local function renderAll()
     for _, p in pairs(points) do renderPoint(p) end
 end
 
--- ===========================================================================
---  Sync
--- ===========================================================================
 local function sortedPointsList()
     local list = {}
     for _, p in pairs(points) do list[#list + 1] = p end
@@ -203,9 +194,6 @@ RegisterNetEvent('som-jobsetup:client:sync', function(list)
     end
 end)
 
--- ===========================================================================
---  Marker / coords draw loop
--- ===========================================================================
 CreateThread(function()
     while true do
         local sleep = 500
@@ -239,9 +227,6 @@ CreateThread(function()
     end
 end)
 
--- ===========================================================================
---  NUI — open / close
--- ===========================================================================
 local setFocus = SetNuiFocus or SetNUIFocus
 
 local function openUI()
@@ -272,9 +257,6 @@ RegisterNUICallback('close', function(_, cb)
     cb('ok')
 end)
 
--- ===========================================================================
---  NUI Callbacks — Points
--- ===========================================================================
 RegisterNUICallback('addPoint', function(data, cb)
     cb('ok')
     closeUI()
@@ -362,9 +344,6 @@ RegisterNUICallback('getCoords', function(_, cb)
     end
 end)
 
--- ===========================================================================
---  NUI Callbacks — Job Config Injection
--- ===========================================================================
 local jobLocCache = {}
 
 RegisterNetEvent('som-jobsetup:client:jobLocations', function(resource, list)
@@ -397,9 +376,6 @@ RegisterNUICallback('patchLocation', function(data, cb)
     end)
 end)
 
--- ===========================================================================
---  Command / lifecycle
--- ===========================================================================
 RegisterCommand(Config.Command, function() openUI() end, false)
 
 RegisterNetEvent('som-jobsetup:client:export', function(raw)

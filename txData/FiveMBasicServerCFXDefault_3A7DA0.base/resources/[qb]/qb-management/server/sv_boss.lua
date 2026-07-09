@@ -4,17 +4,8 @@ local QBCore = exports['qb-core']:GetCoreObject()
 local Accounts = {}
 
 function ExploitBan(id, reason)
-	MySQL.insert('INSERT INTO bans (name, license, discord, ip, reason, expire, bannedby) VALUES (?, ?, ?, ?, ?, ?, ?)', {
-		GetPlayerName(id),
-		QBCore.Functions.GetIdentifier(id, 'license'),
-		QBCore.Functions.GetIdentifier(id, 'discord'),
-		QBCore.Functions.GetIdentifier(id, 'ip'),
-		reason,
-		2147483647,
-		'qb-management'
-	})
-	TriggerEvent('qb-log:server:CreateLog', 'bans', 'Player Banned', 'red', string.format('%s was banned by %s for %s', GetPlayerName(id), 'qb-management', reason), true)
-	DropPlayer(id, 'You were permanently banned by the server for: Exploiting')
+	TriggerEvent('qb-log:server:CreateLog', 'bossmenu', 'Permission Check Failed', 'orange', string.format('%s failed a boss/gang permission check for %s', GetPlayerName(id), reason), false)
+	print(string.format('[qb-management] Permission check failed: %s (id %s) for %s', GetPlayerName(id), id, reason))
 end
 
 function GetAccount(account)
@@ -65,7 +56,12 @@ RegisterNetEvent("qb-bossmenu:server:withdrawMoney", function(amount)
 	local src = source
 	local Player = QBCore.Functions.GetPlayer(src)
 
-	if not Player.PlayerData.job.isboss then ExploitBan(src, 'withdrawMoney Exploiting') return end
+	if not Player.PlayerData.job.isboss then
+		ExploitBan(src, 'withdrawMoney Exploiting')
+		TriggerClientEvent('QBCore:Notify', src, "You do not have permission to do this!", "error")
+		TriggerClientEvent('qb-bossmenu:client:OpenMenu', src)
+		return
+	end
 
 	local job = Player.PlayerData.job.name
 	if RemoveMoney(job, amount) then
@@ -83,7 +79,12 @@ RegisterNetEvent("qb-bossmenu:server:depositMoney", function(amount)
 	local src = source
 	local Player = QBCore.Functions.GetPlayer(src)
 
-	if not Player.PlayerData.job.isboss then ExploitBan(src, 'depositMoney Exploiting') return end
+	if not Player.PlayerData.job.isboss then
+		ExploitBan(src, 'depositMoney Exploiting')
+		TriggerClientEvent('QBCore:Notify', src, "You do not have permission to do this!", "error")
+		TriggerClientEvent('qb-bossmenu:client:OpenMenu', src)
+		return
+	end
 
 	if Player.Functions.RemoveMoney("cash", amount) then
 		local job = Player.PlayerData.job.name
@@ -107,7 +108,11 @@ QBCore.Functions.CreateCallback('qb-bossmenu:server:GetEmployees', function(sour
 	local src = source
 	local Player = QBCore.Functions.GetPlayer(src)
 
-	if not Player.PlayerData.job.isboss then ExploitBan(src, 'GetEmployees Exploiting') return end
+	if not Player.PlayerData.job.isboss then
+		ExploitBan(src, 'GetEmployees Exploiting')
+		cb({})
+		return
+	end
 
 	local employees = {}
 	local players = MySQL.query.await("SELECT * FROM `players` WHERE `job` LIKE '%".. jobname .."%'", {})
@@ -144,9 +149,18 @@ RegisterNetEvent('qb-bossmenu:server:GradeUpdate', function(data)
 	local Player = QBCore.Functions.GetPlayer(src)
 	local Employee = QBCore.Functions.GetPlayerByCitizenId(data.cid)
 
-	if not Player.PlayerData.job.isboss then ExploitBan(src, 'GradeUpdate Exploiting') return end
-	if data.grade > Player.PlayerData.job.grade.level then TriggerClientEvent('QBCore:Notify', src, "You cannot promote to this rank!", "error") return end
-	
+	if not Player.PlayerData.job.isboss then
+		ExploitBan(src, 'GradeUpdate Exploiting')
+		TriggerClientEvent('QBCore:Notify', src, "You do not have permission to do this!", "error")
+		TriggerClientEvent('qb-bossmenu:client:OpenMenu', src)
+		return
+	end
+	if data.grade > Player.PlayerData.job.grade.level then
+		TriggerClientEvent('QBCore:Notify', src, "You cannot promote to this rank!", "error")
+		TriggerClientEvent('qb-bossmenu:client:OpenMenu', src)
+		return
+	end
+
 	if Employee then
 		if Employee.Functions.SetJob(Player.PlayerData.job.name, data.grade) then
 			TriggerClientEvent('QBCore:Notify', src, "Sucessfulluy promoted!", "success")
@@ -166,11 +180,20 @@ RegisterNetEvent('qb-bossmenu:server:FireEmployee', function(target)
 	local Player = QBCore.Functions.GetPlayer(src)
 	local Employee = QBCore.Functions.GetPlayerByCitizenId(target)
 
-	if not Player.PlayerData.job.isboss then ExploitBan(src, 'FireEmployee Exploiting') return end
+	if not Player.PlayerData.job.isboss then
+		ExploitBan(src, 'FireEmployee Exploiting')
+		TriggerClientEvent('QBCore:Notify', src, "You do not have permission to do this!", "error")
+		TriggerClientEvent('qb-bossmenu:client:OpenMenu', src)
+		return
+	end
 
 	if Employee then
 		if target ~= Player.PlayerData.citizenid then
-			if Employee.PlayerData.job.grade.level > Player.PlayerData.job.grade.level then TriggerClientEvent('QBCore:Notify', src, "You cannot fire this citizen!", "error") return end
+			if Employee.PlayerData.job.grade.level > Player.PlayerData.job.grade.level then
+				TriggerClientEvent('QBCore:Notify', src, "You cannot fire this citizen!", "error")
+				TriggerClientEvent('qb-bossmenu:client:OpenMenu', src)
+				return
+			end
 			if Employee.Functions.SetJob("unemployed", '0') then
 				TriggerEvent("qb-log:server:CreateLog", "bossmenu", "Job Fire", "red", Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname .. ' successfully fired ' .. Employee.PlayerData.charinfo.firstname .. " " .. Employee.PlayerData.charinfo.lastname .. " (" .. Player.PlayerData.job.name .. ")", false)
 				TriggerClientEvent('QBCore:Notify', src, "Employee fired!", "success")
@@ -186,7 +209,11 @@ RegisterNetEvent('qb-bossmenu:server:FireEmployee', function(target)
 		if player[1] ~= nil then
 			Employee = player[1]
 			Employee.job = json.decode(Employee.job)
-			if Employee.job.grade.level > Player.PlayerData.job.grade.level then TriggerClientEvent('QBCore:Notify', src, "You cannot fire this citizen!", "error") return end
+			if Employee.job.grade.level > Player.PlayerData.job.grade.level then
+				TriggerClientEvent('QBCore:Notify', src, "You cannot fire this citizen!", "error")
+				TriggerClientEvent('qb-bossmenu:client:OpenMenu', src)
+				return
+			end
 			local job = {}
 			job.name = "unemployed"
 			job.label = "Unemployed"
@@ -212,7 +239,12 @@ RegisterNetEvent('qb-bossmenu:server:HireEmployee', function(recruit)
 	local Player = QBCore.Functions.GetPlayer(src)
 	local Target = QBCore.Functions.GetPlayer(recruit)
 
-	if not Player.PlayerData.job.isboss then ExploitBan(src, 'HireEmployee Exploiting') return end
+	if not Player.PlayerData.job.isboss then
+		ExploitBan(src, 'HireEmployee Exploiting')
+		TriggerClientEvent('QBCore:Notify', src, "You do not have permission to do this!", "error")
+		TriggerClientEvent('qb-bossmenu:client:OpenMenu', src)
+		return
+	end
 
 	if Target and Target.Functions.SetJob(Player.PlayerData.job.name, 0) then
 		TriggerClientEvent('QBCore:Notify', src, "You hired " .. (Target.PlayerData.charinfo.firstname .. ' ' .. Target.PlayerData.charinfo.lastname) .. " come " .. Player.PlayerData.job.label .. "", "success")

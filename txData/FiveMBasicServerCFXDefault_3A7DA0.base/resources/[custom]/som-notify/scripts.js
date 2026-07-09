@@ -111,39 +111,33 @@ var warningSvg = `<svg width="40" height="42" viewBox="0 0 40 42" fill="none" xm
 
 });
 
-// Function to update the progress
 function updateProgress(e, progress) {
-  // Calculate the dashoffset value
-  const circumference = 2 * Math.PI * 5; // Assuming radius is 5
+  const circumference = 2 * Math.PI * 5;
   const offset = (1 - (progress / 100)) * circumference;
-  
+
   var c = $(e).find('.progressCircle');
-  // Update the stroke-dashoffset to simulate fill
   c.attr('stroke-dashoffset', offset);
 }
 
-// Start the timer
 function startTimer(notification) {
- 
+
   var notif = $(notification);
- 
-  
+
+
   const totalTime = parseInt($(notification).attr('data-total-time'), 10);
   let remainingTime = totalTime;
-  const intervalTime = 100; // Update every 100 ms
-  
+  const intervalTime = 100;
+
   const interval = setInterval(() => {
-    remainingTime -= intervalTime; // Subtract the interval time from the remaining time
-    
-    // Calculate the progress as a percentage
+    remainingTime -= intervalTime;
+
     const progress = ((totalTime - remainingTime) / totalTime) * 100;
-    
-    // Update the circle progress
-    updateProgress(notification, 100 - progress); // Subtract progress from 100 to unfill the circle
+
+    updateProgress(notification, 100 - progress);
 
     if (remainingTime <= 0) {
-      clearInterval(interval); // Stop the timer when the remaining time reaches zero
-      updateProgress(notification, 0); // Ensure the circle is fully unfilled
+      clearInterval(interval);
+      updateProgress(notification, 0);
     }
   }, intervalTime);
 }

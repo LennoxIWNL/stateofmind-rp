@@ -1,10 +1,3 @@
--- ===========================================================================
---  Job-config injection: write coordinates straight into a job's
---  Config.Locations table (qb-policejob / qb-ambulancejob style).
---  Every write makes a timestamped backup first; nothing is overwritten
---  blindly and a failed match aborts without changing the file.
--- ===========================================================================
-
 local function isAllowed(src)
     return IsPlayerAceAllowed(src, Config.AdminAce) or IsPlayerAceAllowed(src, 'command')
 end
@@ -24,7 +17,6 @@ local function makeVec(arity, x, y, z, h)
     return ('vector3(%s, %s, %s)'):format(num(x), num(y), num(z))
 end
 
--- Parse current Config.Locations entries (for the menu to show what exists)
 local function parseLocations(content, wantedTypes)
     local out = {}
     local inLoc, curType = false, nil
@@ -48,7 +40,6 @@ local function parseLocations(content, wantedTypes)
     return out
 end
 
--- Replace (or append) one Config.Locations[type][index] entry.
 local function patchLocation(content, locType, index, arity, nested, x, y, z, h)
     local lines = splitLines(content)
     local inLoc, curType, typeCloseLine = false, nil, nil
@@ -73,18 +64,16 @@ local function patchLocation(content, locType, index, arity, nested, x, y, z, h)
             end
         end
     end
-    -- not found -> append a NEW simple entry (nested types are replace-only)
     if typeCloseLine and not nested then
         local entry = ('        [%d] = %s,'):format(index, makeVec(arity, x, y, z, h))
         table.insert(lines, typeCloseLine, entry)
         return table.concat(lines, '\n') .. '\n'
     elseif typeCloseLine and nested then
-        return nil, ('index %d does not exist for "%s" (nested types are replace-only — pick an existing bed)'):format(index, locType)
+        return nil, ('index %d does not exist for "%s" (nested types are replace-only, pick an existing bed)'):format(index, locType)
     end
     return nil, ('location type "%s" not found in config'):format(locType)
 end
 
--- -------------------------------------------------------------------------
 RegisterNetEvent('som-jobsetup:server:getJobLocations', function(resource)
     local src = source
     if not isAllowed(src) then return end
@@ -117,7 +106,6 @@ RegisterNetEvent('som-jobsetup:server:patchJobLocation', function(data)
         return
     end
 
-    -- backup first
     local stamp = os.date('%Y%m%d-%H%M%S')
     SaveResourceFile(GetCurrentResourceName(),
         ('data/backups/%s-%s.lua'):format(data.resource, stamp), content, -1)
@@ -143,10 +131,10 @@ RegisterNetEvent('som-jobsetup:server:patchJobLocation', function(data)
 
     if data.restart then
         SetTimeout(400, function()
-            ExecuteCommand('ensure ' .. data.resource)   -- start if stopped
-            ExecuteCommand('restart ' .. data.resource)  -- apply new config live
+            ExecuteCommand('ensure ' .. data.resource)
+            ExecuteCommand('restart ' .. data.resource)
             TriggerClientEvent('ox_lib:notify', src, { title = 'Job Setup',
-                description = ('Restarted %s — change is live.'):format(data.resource), type = 'inform' })
+                description = ('Restarted %s, change is live.'):format(data.resource), type = 'inform' })
         end)
     end
 end)
