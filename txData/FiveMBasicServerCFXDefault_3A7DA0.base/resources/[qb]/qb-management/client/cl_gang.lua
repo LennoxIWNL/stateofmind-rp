@@ -140,6 +140,11 @@ RegisterNetEvent('qb-gangmenu:client:ManageGang', function()
         },
     }
     QBCore.Functions.TriggerCallback('qb-gangmenu:server:GetEmployees', function(cb)
+        if not cb or #cb == 0 then
+            QBCore.Functions.Notify("You do not have permission to do this!", "error")
+            TriggerEvent('qb-gangmenu:client:OpenMenu')
+            return
+        end
         for _, v in pairs(cb) do
             GangMembersMenu[#GangMembersMenu + 1] = {
                 header = v.name,
