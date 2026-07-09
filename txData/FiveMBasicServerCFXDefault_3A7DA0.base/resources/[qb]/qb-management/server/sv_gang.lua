@@ -3,6 +3,12 @@
 local QBCore = exports['qb-core']:GetCoreObject()
 local GangAccounts = {}
 
+CreateThread(function()
+	for gangName in pairs(QBCore.Shared.Gangs) do
+		exports.ox_inventory:RegisterStash('boss_' .. gangName, 'Gang Stash', 100, 4000000)
+	end
+end)
+
 function GetGangAccount(account)
 	return GangAccounts[account] or 0
 end

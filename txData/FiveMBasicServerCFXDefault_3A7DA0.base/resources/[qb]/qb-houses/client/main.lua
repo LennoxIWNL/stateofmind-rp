@@ -1007,13 +1007,7 @@ local function openHouseStash()
     if not CurrentHouse then return end
     local stashLoc = vector3(stashLocation.x, stashLocation.y, stashLocation.z)
     if CheckDistance(stashLoc, 1.5) then
-        local houseTier = tonumber(Config.Houses[CurrentHouse].tier)
-        if Config.StashWeights[houseTier] and tonumber(Config.StashWeights[houseTier].maxweight) and tonumber(Config.StashWeights[houseTier].slots) then
-            TriggerServerEvent('inventory:server:OpenInventory', 'stash', CurrentHouse, Config.StashWeights[houseTier])
-        else
-            TriggerServerEvent('inventory:server:OpenInventory', 'stash', CurrentHouse)
-        end
-        TriggerEvent('inventory:client:SetCurrentStash', CurrentHouse)
+        exports.ox_inventory:openInventory('stash', CurrentHouse)
         TriggerServerEvent('InteractSound_SV:PlayOnSource', 'StashOpen', 0.4)
     end
 end

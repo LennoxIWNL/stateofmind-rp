@@ -4,6 +4,11 @@ local houseownercid = {}
 local housekeyholders = {}
 local housesLoaded = false
 
+local function registerHouseStash(name, tier)
+    local weights = Config.StashWeights[tonumber(tier)] or Config.StashWeights[1]
+    exports.ox_inventory:RegisterStash(name, 'House Stash', weights.slots, weights.maxweight)
+end
+
 -- Threads
 
 CreateThread(function()
@@ -26,6 +31,7 @@ CreateThread(function()
                 garage = garage,
                 decorations = {}
             }
+            registerHouseStash(v.name, v.tier)
             HouseGarages[v.name] = {
                 label = v.label,
                 takeVehicle = garage
@@ -191,6 +197,7 @@ RegisterNetEvent('qb-houses:server:addNewHouse', function(street, coords, price,
         garage = {},
         decorations = {}
     }
+    registerHouseStash(name, tier)
     TriggerClientEvent('qb-houses:client:setHouseConfig', -1, Config.Houses)
     TriggerClientEvent('QBCore:Notify', src, Lang:t('info.added_house', { value = label }))
     TriggerEvent('qb-log:server:CreateLog', 'house', Lang:t('log.house_created'), 'green', Lang:t('log.house_address', { label = label, price = price, tier = tier, agent = GetPlayerName(src) }))

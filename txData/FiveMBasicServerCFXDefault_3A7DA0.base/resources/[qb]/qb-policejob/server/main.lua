@@ -8,6 +8,56 @@ local Objects = {}
 local QBCore = exports['qb-core']:GetCoreObject()
 local updatingCops = false
 
+CreateThread(function()
+    exports.ox_inventory:RegisterStash('policetrash', 'Evidence Trash', 300, 4000000)
+
+    local shopItems = {}
+    for grade, items in pairs(Config.Items) do
+        for _, item in ipairs(items) do
+            shopItems[#shopItems + 1] = {
+                name = item.name,
+                price = item.price,
+                count = item.amount,
+                metadata = item.info,
+                grade = tonumber(grade),
+            }
+        end
+    end
+    exports.ox_inventory:RegisterShop('police', {
+        name = 'Police Armory',
+        inventory = shopItems,
+        groups = { police = 0 },
+    })
+end)
+
+local function registerPoliceStash(citizenid)
+    exports.ox_inventory:RegisterStash('policestash_' .. citizenid, 'Personal Locker', 40, 40000, citizenid)
+end
+
+RegisterNetEvent('QBCore:Server:OnJobUpdate', function(src, job)
+    if job.name == 'police' then
+        local Player = QBCore.Functions.GetPlayer(src)
+        if Player then registerPoliceStash(Player.PlayerData.citizenid) end
+    end
+end)
+
+AddEventHandler('QBCore:Server:PlayerLoaded', function(Player)
+    if Player.PlayerData.job.name == 'police' then
+        registerPoliceStash(Player.PlayerData.citizenid)
+    end
+end)
+
+RegisterNetEvent('qb-policejob:server:openEvidenceDrawer', function(evidenceLocation, slot)
+    local src = source
+    local Player = QBCore.Functions.GetPlayer(src)
+    if not Player or Player.PlayerData.job.type ~= 'leo' then return end
+    if type(evidenceLocation) ~= 'string' or not tonumber(slot) then return end
+
+    local drawerId = ('evidence_%s_%s'):format(evidenceLocation, tonumber(slot))
+    exports.ox_inventory:RegisterStash(drawerId, 'Evidence Locker', 500, 4000000)
+    TriggerClientEvent('ox_inventory:openInventory', src, 'stash', drawerId)
+end)
+
 -- Functions
 local function UpdateBlips()
     local dutyPlayers = {}
