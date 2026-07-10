@@ -74,7 +74,7 @@ end
 function AddItem(source, name, amount, metadata)
     if (CoreName == "qb-core" or CoreName == "qbx_core") and Config.OldInv ~= "ox"  then
         local player = Core.Functions.GetPlayer(source)
-        player.Functions.AddItem(name, amount, false, metadata)
+        exports.ox_inventory:AddItem(source, name, amount, metadata)
     elseif (CoreName == "qb-core" or CoreName == "qbx_core") and Config.OldInv == "ox" then
         local player = Core.Functions.GetPlayer(source)
         exports['ox_inventory']:AddItem(source, name, amount)
@@ -103,7 +103,7 @@ end
 function RemoveItem(source, name, amount, metadata)
     if CoreName == "qb-core" or CoreName == "qbx_core" then
         local player = Core.Functions.GetPlayer(source)
-        player.Functions.RemoveItem(name, amount, metadata)
+        exports.ox_inventory:RemoveItem(source, name, amount, nil, metadata)
     elseif CoreName == "es_extended" then
         local player = Core.GetPlayerFromId(source)
         local hasQs = GetResourceState('qs-inventory') == 'started'
@@ -125,7 +125,7 @@ end
 function GetItem(source, name)
     if CoreName == "qb-core" or CoreName == "qbx_core" then
         local player = Core.Functions.GetPlayer(source)
-        return player.Functions.GetItemByName(name)
+        return exports.ox_inventory:GetItem(source, name, nil, false)
     elseif CoreName == "es_extended" then
         local player = Core.GetPlayerFromId(source)
         local hasQs = GetResourceState('qs-inventory') == 'started'
@@ -170,8 +170,8 @@ end
 function GetItems(source, name)
     if CoreName == "qb-core" or CoreName == "qbx_core" then
         local player = Core.Functions.GetPlayer(source)
-        
-        return player.Functions.GetItemsByName(name)
+
+        return exports.ox_inventory:Search(source, 'slots', name)
     elseif CoreName == "es_extended" then
         local player = Core.GetPlayerFromId(source)
         local hasQs = GetResourceState('qs-inventory') == 'started'
@@ -246,7 +246,7 @@ end
 function ItemCountControl(source, name, amount)
     if CoreName == "qb-core" or CoreName == "qbx_core" then
         local player = Core.Functions.GetPlayer(source)
-        return player.Functions.GetItemByName(name).amount >= amount
+        return exports.ox_inventory:GetItemCount(source, name) >= amount
     elseif CoreName == "es_extended" then
         local player = Core.GetPlayerFromId(source)
         local hasQs = GetResourceState('qs-inventory') == 'started'
