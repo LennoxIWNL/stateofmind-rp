@@ -1,11 +1,17 @@
-$mainColor: #22232c;
-$textColor: #c1c2c5;
-$mainFont: Roboto;
+@import url('https://fonts.googleapis.com/css2?family=Oswald:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
 
-$secondaryColor: rgba(12, 12, 12, 0.4);
-$secondaryColorHighlight: #33343F;
-$secondaryColorLight: rgba(0, 0, 0, 0.5);
-$secondaryColorDark: rgba(12, 12, 12, 0.8);
+$mainColor: rgb(10, 12, 16);
+$textColor: #e7e7e7;
+$mainFont: 'Oswald', sans-serif;
+
+$accentColor: #ff1493;
+$accentColorLight: #ff69b4;
+$accentColorMuted: #c2185b;
+
+$secondaryColor: rgba(120, 120, 120, 0.12);
+$secondaryColorHighlight: rgba(255, 20, 147, 0.18);
+$secondaryColorLight: rgba(255, 105, 180, 0.08);
+$secondaryColorDark: rgba(8, 6, 10, 0.85);
 
 $gridCols: 5;
 $gridRows: 5;
@@ -34,7 +40,21 @@ code {
 }
 
 ::-webkit-scrollbar {
-  display: none;
+  width: 0.35rem;
+  border-radius: 2.23rem;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 105, 180, 0.65);
+  border-radius: 2.23rem;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 20, 147, 0.5);
 }
 
 p {
@@ -61,8 +81,8 @@ input[type='number']::-webkit-outer-spin-button {
   background-color: $mainColor;
   color: $textColor;
   padding: 4px;
-  border-color: rgba(0, 0, 0, 0.2);
-  border-style: inset;
+  border-color: rgba(255, 105, 180, 0.14);
+  border-style: solid;
   border-width: 1px;
   border-radius: 4px;
   outline: none;
@@ -144,28 +164,28 @@ button:active {
     font-size: 16px;
     text-align: center;
     outline: none;
-    border: none;
+    border: 1px solid rgba(255, 105, 180, 0.14);
     color: #fff;
-    background-color: $secondaryColor;
+    background-color: $secondaryColorDark;
     &:focus-within {
-      background-color: $secondaryColorDark;
+      border-color: $accentColor;
     }
   }
 
   .inventory-control-button {
     font-size: 14px;
     color: #fff;
-    background-color: $secondaryColor;
+    background-color: $secondaryColorDark;
     transition: 200ms;
     padding: 12px 8px;
     border-radius: 2.5%;
-    border: none;
+    border: 1px solid rgba(255, 105, 180, 0.14);
     text-transform: uppercase;
     font-family: $mainFont;
     width: 100%;
     font-weight: 500;
     &:hover {
-      background-color: $secondaryColorDark;
+      background-color: $accentColor;
     }
   }
 }
@@ -268,6 +288,18 @@ button:active {
   justify-content: space-between;
   p {
     font-size: 16px;
+    font-family: $mainFont;
+    letter-spacing: 0.03em;
+    &:first-child {
+      color: $accentColor;
+      text-shadow: 0 0 1vh rgba(255, 20, 147, 0.5);
+      font-weight: 500;
+    }
+    &:last-child {
+      color: rgb(175, 175, 175);
+      font-weight: 700;
+      font-size: 12px;
+    }
   }
 }
 
@@ -285,14 +317,19 @@ button:active {
   background-color: $secondaryColor;
   background-repeat: no-repeat;
   background-position: center;
-  border-radius: 2.5%;
+  border-radius: 4px;
   image-rendering: -webkit-optimize-contrast;
   position: relative;
   background-size: 7vh;
   color: $textColor;
-  border-color: rgba(0, 0, 0, 0.2);
-  border-style: inset;
+  border-color: rgba(255, 105, 180, 0.14);
+  border-style: solid;
   border-width: 1px;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+  &:hover {
+    background-color: rgba(255, 20, 147, 0.14);
+    border-color: rgba(255, 20, 147, 0.4);
+  }
 }
 
 .inventory-slot-label-box {
@@ -301,8 +338,8 @@ button:active {
   text-align: center;
   border-bottom-left-radius: 0.25vh;
   border-bottom-right-radius: 0.25vh;
-  border-top-color: rgba(0, 0, 0, 0.2);
-  border-top-style: inset;
+  border-top-color: rgba(255, 105, 180, 0.14);
+  border-top-style: solid;
   border-top-width: 1px;
 }
 
@@ -318,13 +355,14 @@ button:active {
 }
 
 .inventory-slot-number {
-  background-color: white;
-  color: black;
+  background-color: rgba(255, 20, 147, 0.16);
+  color: $accentColorLight;
   height: 12px;
   border-top-left-radius: 0.25vh;
   border-bottom-right-radius: 0.25vh;
   padding: 3px;
   font-size: 12px;
+  font-weight: 700;
   font-family: $mainFont;
 }
 
@@ -387,7 +425,7 @@ button:active {
 .tooltip-wrapper {
   pointer-events: none;
   display: flex;
-  background-color: $mainColor;
+  background: radial-gradient(83% 83% at 50% 50%, rgba(85, 84, 84, 0.9), rgba(54, 54, 54, 0.3)), $mainColor;
   width: 200px;
   padding: 8px;
   flex-direction: column;
@@ -395,8 +433,8 @@ button:active {
   color: $textColor;
   font-family: $mainFont;
   border-radius: 4px;
-  border-color: rgba(0, 0, 0, 0.2);
-  border-style: inset;
+  border-color: rgba(255, 105, 180, 0.14);
+  border-style: solid;
   border-width: 1px;
   p {
     font-size: 12px;
@@ -483,8 +521,8 @@ button:active {
 
 .item-notification-action-box {
   width: 100%;
-  color: $textColor;
-  background-color: $secondaryColor;
+  color: $accentColor;
+  background-color: rgba(61, 23, 53, 0.85);
   text-transform: uppercase;
   text-align: center;
   border-top-left-radius: 0.25vh;
@@ -511,9 +549,9 @@ button:active {
 
 .weight-bar {
   background: rgba(0, 0, 0, 0.4);
-  border: 1px inset rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 105, 180, 0.14);
   height: 0.8vh;
-  border-radius: 5%;
+  border-radius: 15px;
   overflow: hidden;
 }
 
