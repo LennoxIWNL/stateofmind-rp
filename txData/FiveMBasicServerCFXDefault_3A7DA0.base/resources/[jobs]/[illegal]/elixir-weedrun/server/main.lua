@@ -62,10 +62,10 @@ end)
 QBCore.Functions.CreateCallback('elixir-weedrun:ItemCheck', function(source, cb, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local hasItem = Player.Functions.GetItemByName(item)
+    local hasItem = exports.ox_inventory:GetItem(src, item, nil, false)
 
 	if hasItem ~= nil then
-		if hasItem.amount >= Config.ItemAmount then
+		if hasItem.count >= Config.ItemAmount then
 		  cb(true)
 		else
 		  cb(false)
@@ -79,7 +79,7 @@ RegisterServerEvent('weed:processWeed', function()
 	local src = source
 	local ply = QBCore.Functions.GetPlayer(source)
 
-	ply.Functions.RemoveItem('weedbud', Config.ItemAmount)
+	exports.ox_inventory:RemoveItem(src, 'weedbud', Config.ItemAmount)
 
 	Wait(15000) --15 sn
 	TriggerClientEvent('now-can-collect-package', src)
@@ -94,8 +94,7 @@ RegisterServerEvent("elixir-weedrun:server:packagereward", function()
     if not packagerecieved then
         packagerecieved = false
 
-        Player.Functions.AddItem("weedpackage", 1, false)
-        TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items["weedpackage"], 'add')
+        exports.ox_inventory:AddItem(src, "weedpackage", 1)
 		TriggerClientEvent('QBCore:Notify', src, Lang:t("success.there_u_go"), 'success')
 
 		TriggerClientEvent('elixir-weedrun:client:removetarget', src)
@@ -110,51 +109,47 @@ end)
 RegisterServerEvent('package-delivered', function()
 	local Player = QBCore.Functions.GetPlayer(source)
 	local ply = QBCore.Functions.GetPlayer(source)
-	local hasBags = Player.Functions.GetItemByName("markedbills")
-	local hasBands = Player.Functions.GetItemByName("bands")
-	local hasRolls = Player.Functions.GetItemByName("rolls")
+	local hasBags = exports.ox_inventory:GetItem(source, "markedbills", nil, false)
+	local hasBands = exports.ox_inventory:GetItem(source, "bands", nil, false)
+	local hasRolls = exports.ox_inventory:GetItem(source, "rolls", nil, false)
 	local itemCount = math.random(Config.MinSpecialReward, Config.MaxSpecialReward)
 
 	local chance = math.random(0,100)
 
-	ply.Functions.RemoveItem('weedpackage', 1)
+	exports.ox_inventory:RemoveItem(source, 'weedpackage', 1)
 	ply.Functions.AddMoney('cash', math.random(2500, 4000))
 
 	if chance <= Config.SpecialRewardChance then
-		Player.Functions.AddItem(Config.SpecialItem, itemCount)
-		TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.SpecialItem], "add", itemCount)
+		exports.ox_inventory:AddItem(source, Config.SpecialItem, itemCount)
 	end
 
 		if Config.CleanMoney then
 
 			if chance < Config.BagChance then
 				if hasBags then
-					worth = Player.Functions.GetItemByName('markedbills').info.worth
-					bagAmount = math.random(Player.Functions.GetItemByName("markedbills").amount)
+					worth = exports.ox_inventory:GetItem(source, 'markedbills', nil, false).metadata.worth
+					bagAmount = math.random(exports.ox_inventory:GetItem(source, "markedbills", nil, false).count)
 					Player.Functions.AddMoney('cash', bagAmount*worth)
 
-					Player.Functions.RemoveItem("markedbills", bagAmount)
-					TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["markedbills"], "remove")
+					exports.ox_inventory:RemoveItem(source, "markedbills", bagAmount)
 				end
 			end
 
 			if chance < Config.BandChance then
 				if hasBands then
-					bandAmount = math.random(Player.Functions.GetItemByName("bands").amount)
+					bandAmount = math.random(exports.ox_inventory:GetItem(source, "bands", nil, false).count)
 					Player.Functions.AddMoney('cash', bandAmount*math.random(Config.BandMinPayout, Config.BandMaxPayout))
 
-					Player.Functions.RemoveItem("bands", bandAmount)
-					TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["bands"], "remove")
+					exports.ox_inventory:RemoveItem(source, "bands", bandAmount)
 				end
 			end
 
 			if chance < Config.RollChance then
 				if hasRolls then
-					rollAmount = math.random(Player.Functions.GetItemByName("rolls").amount)
+					rollAmount = math.random(exports.ox_inventory:GetItem(source, "rolls", nil, false).count)
 					Player.Functions.AddMoney('cash', rollAmount*math.random(Config.RollMinPayout, Config.RollMaxPayout))
 
-					Player.Functions.RemoveItem("rolls", rollAmount)
-					TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["rolls"], "remove")
+					exports.ox_inventory:RemoveItem(source, "rolls", rollAmount)
 				end
 			end
 
@@ -199,7 +194,7 @@ end)
 QBCore.Functions.CreateCallback('elixir-weedrun:server:hasPackage', function(source, cb)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	local hasPackage = Player.Functions.GetItemByName("weedpackage")
+	local hasPackage = exports.ox_inventory:GetItem(src, "weedpackage", nil, false)
  
 	if hasPackage ~= nil then
         cb(true)
@@ -212,9 +207,8 @@ QBCore.Functions.CreateCallback('elixir-weedrun:server:canCarry', function(sourc
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
  
-	if Player.Functions.AddItem("package", 1) then
+	if exports.ox_inventory:AddItem(src, "package", 1) then
 		cb(true)
-		TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items['package'], "add")
 	else
 		cb(false)
 	end

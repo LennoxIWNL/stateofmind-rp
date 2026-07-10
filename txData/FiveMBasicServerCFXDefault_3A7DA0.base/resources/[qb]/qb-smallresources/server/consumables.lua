@@ -12,7 +12,7 @@ end
 for k, _ in pairs(Config.Consumables.eat) do
     QBCore.Functions.CreateUseableItem(k, function(source, item)
         local Player = QBCore.Functions.GetPlayer(source)
-        if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+        if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
         TriggerClientEvent('consumables:client:Eat', source, item.name)
     end)
 end
@@ -21,7 +21,7 @@ end
 for k, _ in pairs(Config.Consumables.drink) do
     QBCore.Functions.CreateUseableItem(k, function(source, item)
         local Player = QBCore.Functions.GetPlayer(source)
-        if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+        if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
         TriggerClientEvent('consumables:client:Drink', source, item.name)
     end)
 end
@@ -30,7 +30,7 @@ end
 for k, _ in pairs(Config.Consumables.custom) do
     QBCore.Functions.CreateUseableItem(k, function(source, item)
         local Player = QBCore.Functions.GetPlayer(source)
-        if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+        if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
         TriggerClientEvent('consumables:client:Custom', source, item.name)
     end)
 end
@@ -38,7 +38,7 @@ end
 local function createItem(name, type)
     QBCore.Functions.CreateUseableItem(name, function(source, item)
         local Player = QBCore.Functions.GetPlayer(source)
-        if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+        if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
         TriggerClientEvent('consumables:client:' .. type, source, item.name)
     end)
 end
@@ -46,7 +46,7 @@ end
 
 QBCore.Functions.CreateUseableItem('joint', function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-    if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+    if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent('consumables:client:UseJoint', source)
 end)
 
@@ -95,7 +95,7 @@ end)
 
 QBCore.Functions.CreateUseableItem('parachute', function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-    if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+    if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent('consumables:client:UseParachute', source)
 end)
 
@@ -106,122 +106,122 @@ end)
 RegisterNetEvent('qb-smallpenis:server:AddParachute', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.AddItem('parachute', 1)
+    exports.ox_inventory:AddItem(source, 'parachute', 1)
 end)
 
 --Burger Shot
 
 QBCore.Functions.CreateUseableItem("burgershot_bigking", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Eat", source, item.name)
 end)
 
 QBCore.Functions.CreateUseableItem("burgershot_bleeder", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Eat", source, item.name)
 end)
 
 QBCore.Functions.CreateUseableItem("burgershot_goatwrap", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Eat", source, item.name)
 end)
 
 QBCore.Functions.CreateUseableItem("burgershot_macaroon", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Eat", source, item.name)
 end)
 
 QBCore.Functions.CreateUseableItem("burgershot_patatob", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Eat", source, item.name)
 end)
 
 QBCore.Functions.CreateUseableItem("burgershot_patatos", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Eat", source, item.name)
 end)
 
 QBCore.Functions.CreateUseableItem("burgershot_shotnuggets", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Eat", source, item.name)
 end)
 
 QBCore.Functions.CreateUseableItem("burgershot_shotrings", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Eat", source, item.name)
 end)
 
 QBCore.Functions.CreateUseableItem("burgershot_thesmurfsicecream", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Eat", source, item.name)
 end)
 
 QBCore.Functions.CreateUseableItem("burgershot_smurfetteicecream", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Eat", source, item.name)
 end)
 
 QBCore.Functions.CreateUseableItem("burgershot_matchaicecream", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Eat", source, item.name)
 end)
 
 QBCore.Functions.CreateUseableItem("burgershot_ubeicecream", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Eat", source, item.name)
 end)
 
 QBCore.Functions.CreateUseableItem("burgershot_unicornicecream", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Eat", source, item.name)
 end)
 
 QBCore.Functions.CreateUseableItem("burgershot_vanillaicecream", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Eat", source, item.name)
 end)
 
 QBCore.Functions.CreateUseableItem("burgershot_chocolateicecream", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Eat", source, item.name)
 end)
 
 QBCore.Functions.CreateUseableItem("burgershot_strawberryicecream", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Eat", source, item.name)
 end)
 
 QBCore.Functions.CreateUseableItem("burgershot_colab", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Drink", source, item.name)
 end)
 
 QBCore.Functions.CreateUseableItem("burgershot_colas", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Drink", source, item.name)
 end)
 
 QBCore.Functions.CreateUseableItem("burgershot_coffee", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
-	if not Player.Functions.RemoveItem(item.name, 1, item.slot) then return end
+	if not exports.ox_inventory:RemoveItem(source, item.name, 1, nil, item.slot) then return end
     TriggerClientEvent("consumables:client:Drink", source, item.name)
 end)
 
@@ -230,105 +230,105 @@ end)
 QBCore.Functions.CreateUseableItem("cherrycocktail", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("consumables:client:DrinkAlcohol", src, item.name)
     end
 end)
 QBCore.Functions.CreateUseableItem("applecocktail", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("consumables:client:DrinkAlcohol", src, item.name)
     end
 end)
 QBCore.Functions.CreateUseableItem("bananacocktail", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("consumables:client:DrinkAlcohol", src, item.name)
     end
 end)
 QBCore.Functions.CreateUseableItem("cherrydrink", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("consumables:client:Drink", src, item.name)
     end
 end)
 QBCore.Functions.CreateUseableItem("kiwicocktail", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("consumables:client:DrinkAlcohol", src, item.name)
     end
 end)
 QBCore.Functions.CreateUseableItem("lemondrink", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("consumables:client:Drink", src, item.name)
     end
 end)
 QBCore.Functions.CreateUseableItem("limedrink", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("consumables:client:Drink", src, item.name)
     end
 end)
 QBCore.Functions.CreateUseableItem("orangedrink", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("consumables:client:Drink", src, item.name)
     end
 end)
 QBCore.Functions.CreateUseableItem("paradisecocktail", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("consumables:client:DrinkAlcohol", src, item.name)
     end
 end)
 QBCore.Functions.CreateUseableItem("watermelondrink", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("consumables:client:Drink", src, item.name)
     end
 end)
 QBCore.Functions.CreateUseableItem("limeysgum", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("consumables:client:Eat", src, item.name)
     end
 end)
 QBCore.Functions.CreateUseableItem("limeyschocolate", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("consumables:client:Eat", src, item.name)
     end
 end)
 QBCore.Functions.CreateUseableItem("limeyschocolate2", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("consumables:client:Eat", src, item.name)
     end
 end)
 QBCore.Functions.CreateUseableItem("limeysdonut", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("consumables:client:Eat", src, item.name)
     end
 end)
 QBCore.Functions.CreateUseableItem("limeysdonut2", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("consumables:client:Eat", src, item.name)
     end
 end)
@@ -356,14 +356,13 @@ end)
 RegisterNetEvent('consumables:server:resetArmor', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.AddItem('heavyarmor', 1)
+    exports.ox_inventory:AddItem(source, 'heavyarmor', 1)
 end)
 
 RegisterNetEvent('consumables:server:useHeavyArmor', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    if not Player.Functions.RemoveItem('heavyarmor', 1) then return end
-    TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items['heavyarmor'], 'remove')
+    if not exports.ox_inventory:RemoveItem(source, 'heavyarmor', 1) then return end
     TriggerClientEvent('hospital:server:SetArmor', source, 100)
     SetPedArmour(GetPlayerPed(source), 100)
 end)
@@ -371,8 +370,7 @@ end)
 RegisterNetEvent('consumables:server:useArmor', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    if not Player.Functions.RemoveItem('armor', 1) then return end
-    TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items['armor'], 'remove')
+    if not exports.ox_inventory:RemoveItem(source, 'armor', 1) then return end
     TriggerClientEvent('hospital:server:SetArmor', source, 75)
     SetPedArmour(GetPlayerPed(source), 75)
 end)
@@ -380,31 +378,31 @@ end)
 RegisterNetEvent('consumables:server:useMeth', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.RemoveItem('meth', 1)
+    exports.ox_inventory:RemoveItem(source, 'meth', 1)
 end)
 
 RegisterNetEvent('consumables:server:useOxy', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.RemoveItem('oxy', 1)
+    exports.ox_inventory:RemoveItem(source, 'oxy', 1)
 end)
 
 RegisterNetEvent('consumables:server:useXTCBaggy', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.RemoveItem('xtcbaggy', 1)
+    exports.ox_inventory:RemoveItem(source, 'xtcbaggy', 1)
 end)
 
 RegisterNetEvent('consumables:server:useCrackBaggy', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.RemoveItem('crack_baggy', 1)
+    exports.ox_inventory:RemoveItem(source, 'crack_baggy', 1)
 end)
 
 RegisterNetEvent('consumables:server:useCokeBaggy', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.RemoveItem('cokebaggy', 1)
+    exports.ox_inventory:RemoveItem(source, 'cokebaggy', 1)
 end)
 
 RegisterNetEvent('consumables:server:drinkAlcohol', function(item)
@@ -420,7 +418,7 @@ RegisterNetEvent('consumables:server:drinkAlcohol', function(item)
     end
 
     if not foundItem then return end
-    Player.Functions.RemoveItem(foundItem, 1)
+    exports.ox_inventory:RemoveItem(source, foundItem, 1)
 end)
 
 RegisterNetEvent('consumables:server:UseFirework', function(item)
@@ -436,7 +434,7 @@ RegisterNetEvent('consumables:server:UseFirework', function(item)
     end
 
     if not foundItem then return end
-    Player.Functions.RemoveItem(foundItem, 1)
+    exports.ox_inventory:RemoveItem(source, foundItem, 1)
 end)
 
 RegisterNetEvent('consumables:server:addThirst', function(amount)

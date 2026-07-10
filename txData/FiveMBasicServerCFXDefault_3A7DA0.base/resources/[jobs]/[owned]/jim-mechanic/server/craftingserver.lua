@@ -80,12 +80,11 @@ RegisterServerEvent('jim-mechanic:Crafting:GetItem', function(ItemMake, craftabl
 	else
 		for k, v in pairs(craftable[ItemMake]) do
 			TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[tostring(k)], "remove", v)
-			Player.Functions.RemoveItem(tostring(k), v)
+			exports.ox_inventory:RemoveItem(src, tostring(k), v)
 		end
 	end
 	--This should give the item, while the rest removes the requirements
-	Player.Functions.AddItem(ItemMake, amount)
-	TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[ItemMake], "add", amount)
+	exports.ox_inventory:AddItem(src, ItemMake, amount)
 end)
 
 ---ITEM REQUIREMENT CHECKS
@@ -104,7 +103,7 @@ QBCore.Functions.CreateCallback('jim-mechanic:Crafting:get', function(source, cb
 		end
 	else
 		for k, v in pairs(craftable[item]) do
-			if QBCore.Functions.GetPlayer(source).Functions.GetItemByName(k) and QBCore.Functions.GetPlayer(source).Functions.GetItemByName(k).amount >= v then
+			if exports.ox_inventory:GetItem(source, k, nil, false) and exports.ox_inventory:GetItem(source, k, nil, false).count >= v then
 				testtable[k] = true if Config.Debug then print("^5Debug^7: ^3Crafting^7: ^6"..k.." ^7(^2x^6"..v.."^7) ^2found^7") end
 			end
 		end

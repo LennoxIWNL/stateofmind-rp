@@ -137,9 +137,7 @@ end)
 
 RegisterNetEvent("jim-mechanic:server:giveList", function(info)
 	local src = source
-	local Player = QBCore.Functions.GetPlayer(src)
-	Player.Functions.AddItem("mechboard", 1, nil, info)
-	TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["mechboard"], "add", 1)
+	exports.ox_inventory:AddItem(src, "mechboard", 1, info)
 end)
 
 QBCore.Functions.CreateUseableItem("mechboard", function(source, item)

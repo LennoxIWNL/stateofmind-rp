@@ -49,11 +49,10 @@ RegisterNetEvent('qb-houserobbery:server:searchFurniture', function(cabin, house
             local itemInfo = QBCore.Shared.Items[selectedItem.item]
 
             if not itemInfo.unique then
-                player.Functions.AddItem(selectedItem.item, math.random(selectedItem.min, selectedItem.max))
+                exports.ox_inventory:AddItem(src, selectedItem.item, math.random(selectedItem.min, selectedItem.max))
             else
-                player.Functions.AddItem(selectedItem.item, 1)
+                exports.ox_inventory:AddItem(src, selectedItem.item, 1)
             end
-            TriggerClientEvent('inventory:client:ItemBox', src, itemInfo, 'add')
             Wait(500)
         end
     else
@@ -68,12 +67,12 @@ RegisterNetEvent('qb-houserobbery:server:removeAdvancedLockpick', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
 
-    Player.Functions.RemoveItem('advancedlockpick', 1)
+    exports.ox_inventory:RemoveItem(source, 'advancedlockpick', 1)
 end)
 
 RegisterNetEvent('qb-houserobbery:server:removeLockpick', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
 
-    Player.Functions.RemoveItem('lockpick', 1)
+    exports.ox_inventory:RemoveItem(source, 'lockpick', 1)
 end)

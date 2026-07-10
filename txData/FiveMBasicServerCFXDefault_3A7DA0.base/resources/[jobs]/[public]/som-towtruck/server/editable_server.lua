@@ -84,14 +84,14 @@ Koci.getPlayer = function(playerId)
             return TriggerClientEvent("som-towtruck:client:notification", playerId, msg)
         end
         self.getItem = function(itemName)
-            return Player.Functions.GetItemByName(itemName)
+            return exports.ox_inventory:GetItem(playerId, itemName, nil, false)
         end
         self.addItem = function(itemName, count)
-            return Player.Functions.AddItem(itemName, count)
+            return exports.ox_inventory:AddItem(playerId, itemName, count)
         end
 
         self.removeItem = function(itemName, count)
-            return Player.Functions.RemoveItem(itemName, count)
+            return exports.ox_inventory:RemoveItem(playerId, itemName, count)
         end
         self.getMoney = function(moneyType)
             return Player.PlayerData.money[moneyType or "cash"]

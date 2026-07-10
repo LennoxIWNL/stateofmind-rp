@@ -53,16 +53,15 @@ function tryTakeChips(source,amount)
     local ItemList = {
         ["casino_goldchip"] = 1,
     }
-    local playerChips = Player.Functions.GetItemByName("casino_goldchip")
+    local playerChips = exports.ox_inventory:GetItem(source, "casino_goldchip", nil, false)
     local canBet = false
 
-    if Player.PlayerData.items ~= nil and next(Player.PlayerData.items) ~= nil then 
-        for k, v in pairs(Player.PlayerData.items) do 
-            if Player.PlayerData.items[k] ~= nil then 
-                if ItemList[Player.PlayerData.items[k].name] ~= nil then 
-                    if playerChips.amount >= amount then 
-                        Player.Functions.RemoveItem("casino_goldchip", amount)
-                        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["casino_goldchip"], 'remove')
+    if Player.PlayerData.items ~= nil and next(Player.PlayerData.items) ~= nil then
+        for k, v in pairs(Player.PlayerData.items) do
+            if Player.PlayerData.items[k] ~= nil then
+                if ItemList[Player.PlayerData.items[k].name] ~= nil then
+                    if playerChips.count >= amount then
+                        exports.ox_inventory:RemoveItem(source, "casino_goldchip", amount)
                         canBet = true
                     end
                 end
@@ -78,8 +77,7 @@ function giveChips(source,amount)
     local src = source 
     local Player = QBCore.Functions.GetPlayer(src)
     if Player ~= nil then
-        if Player.Functions.AddItem('casino_goldchip', amount, nil, {["quality"] = 100}) then
-            TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items["casino_goldchip"], "add", amount)
+        if exports.ox_inventory:AddItem(src, 'casino_goldchip', amount, {["quality"] = 100}) then
             TriggerClientEvent('QBCore:Notify', src, "You Won "..math.floor(amount).." Casino Chips!")
         else
             TriggerClientEvent('QBCore:Notify', src, 'You have to much in your pockets', 'error')

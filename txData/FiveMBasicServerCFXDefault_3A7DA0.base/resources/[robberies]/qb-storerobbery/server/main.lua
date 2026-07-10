@@ -48,8 +48,7 @@ RegisterNetEvent('qb-storerobbery:server:takeMoney', function(register, isDone)
         local info = {
             worth = math.random(cashA, cashB)
         }
-        Player.Functions.AddItem('markedbills', bags, false, info)
-        TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items['markedbills'], 'add')
+        exports.ox_inventory:AddItem(src, 'markedbills', bags, info)
         if math.random(1, 100) <= 10 then
             local code = SafeCodes[Config.Registers[register].safeKey]
             if Config.Safes[Config.Registers[register].safeKey].type == 'keypad' then
@@ -61,8 +60,7 @@ RegisterNetEvent('qb-storerobbery:server:takeMoney', function(register, isDone)
                     label = Lang:t('text.safe_code') .. tostring(math.floor((code[1] % 360) / 3.60)) .. '-' .. tostring(math.floor((code[2] % 360) / 3.60)) .. '-' .. tostring(math.floor((code[3] % 360) / 3.60)) .. '-' .. tostring(math.floor((code[4] % 360) / 3.60)) .. '-' .. tostring(math.floor((code[5] % 360) / 3.60))
                 }
             end
-            Player.Functions.AddItem('stickynote', 1, false, info)
-            TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items['stickynote'], 'add')
+            exports.ox_inventory:AddItem(src, 'stickynote', 1, info)
         end
     end
 end)
@@ -98,18 +96,15 @@ RegisterNetEvent('qb-storerobbery:server:SafeReward', function(safe)
     local info = {
         worth = math.random(cashA, cashB)
     }
-    Player.Functions.AddItem('markedbills', bags, false, info)
-    TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items['markedbills'], 'add')
+    exports.ox_inventory:AddItem(src, 'markedbills', bags, info)
 
     local luck = math.random(1, 100)
     local odd = math.random(1, 100)
     if luck <= 10 then
-        Player.Functions.AddItem('rolex', math.random(3, 7))
-        TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items['rolex'], 'add')
+        exports.ox_inventory:AddItem(src, 'rolex', math.random(3, 7))
         if luck == odd then
             Wait(500)
-            Player.Functions.AddItem('goldbar', 1)
-            TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items['goldbar'], 'add')
+            exports.ox_inventory:AddItem(src, 'goldbar', 1)
         end
     end
 end)
@@ -133,13 +128,13 @@ end)
 RegisterNetEvent('qb-storerobbery:server:removeAdvancedLockpick', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.RemoveItem('advancedlockpick', 1)
+    exports.ox_inventory:RemoveItem(source, 'advancedlockpick', 1)
 end)
 
 RegisterNetEvent('qb-storerobbery:server:removeLockpick', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.RemoveItem('lockpick', 1)
+    exports.ox_inventory:RemoveItem(source, 'lockpick', 1)
 end)
 
 CreateThread(function()

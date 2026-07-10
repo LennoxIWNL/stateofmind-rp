@@ -30,8 +30,7 @@ if Config.Settings.Framework == "QB" then
     end
     QBCore.Functions.CreateUseableItem(Config.Settings.ItemName, function(source, item)
         local src = source
-        local Player = QBCore.Functions.GetPlayer(src)
-        if Player.Functions.GetItemByName(item.name) then
+        if exports.ox_inventory:GetItem(src, item.name, nil, false) then
             TriggerClientEvent('bbv-cctv:open', src)
         end
     end)

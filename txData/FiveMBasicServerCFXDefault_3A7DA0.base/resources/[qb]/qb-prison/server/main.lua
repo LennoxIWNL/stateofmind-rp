@@ -38,7 +38,7 @@ RegisterNetEvent('prison:server:GiveJailItems', function(escaped)
         return
     end
     for _, v in pairs(Player.PlayerData.metadata["jailitems"]) do
-        Player.Functions.AddItem(v.name, v.amount, false, v.info)
+        exports.ox_inventory:AddItem(src, v.name, v.amount, v.info)
     end
     Player.Functions.SetMetaData("jailitems", {})
 end)
@@ -114,8 +114,7 @@ RegisterNetEvent('prison:server:CheckChance', function()
     local chance = math.random(100)
     local odd = math.random(100)
     if chance ~= odd then return end
-    if not Player.Functions.AddItem('phone', 1) then return end
-    TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items['phone'], 'add')
+    if not exports.ox_inventory:AddItem(src, 'phone', 1) then return end
     TriggerClientEvent('QBCore:Notify', src, Lang:t('success.found_phone'), 'success')
     GotItems[src] = true
 end)

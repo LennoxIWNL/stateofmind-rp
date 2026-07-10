@@ -11,8 +11,7 @@ RegisterServerEvent('mt-ammurobbery:server:getVitrineItems', function(vitrineKey
         if(prob <= vitrine.items[i].maxChance and prob >= vitrine.items[i].minChance) then
             itemFound = true
             local quantity = math.random(vitrine.items[i].minQuantity, vitrine.items[i].maxQuantity)
-            if Player.Functions.AddItem(vitrine.items[i].item, quantity) then
-                TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[vitrine.items[i].item], 'add')
+            if exports.ox_inventory:AddItem(src, vitrine.items[i].item, quantity) then
             else
                 TriggerClientEvent('QBCore:Notify', src, Lang:t("ammurobbery.error_inventory"), 'error')
             end  

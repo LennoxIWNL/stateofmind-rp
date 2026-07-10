@@ -45,8 +45,7 @@ RegisterNetEvent('qb-tow:server:nano', function(vehNetID)
 
     local chance = math.random(1,100)
     if chance < 26 then
-        Player.Functions.AddItem("cryptostick", 1, false)
-        TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items["cryptostick"], "add")
+        exports.ox_inventory:AddItem(src, "cryptostick", 1)
     end
 end)
 

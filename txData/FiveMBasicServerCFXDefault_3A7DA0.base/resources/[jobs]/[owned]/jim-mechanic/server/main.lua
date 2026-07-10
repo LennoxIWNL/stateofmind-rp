@@ -46,13 +46,10 @@ end
 RegisterNetEvent('jim-mechanic:server:swapItem', function(level, current, item)
 	local src = source
 	if level then
-		QBCore.Functions.GetPlayer(src).Functions.RemoveItem(item..level+1, 1)
-		TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[item..level+1], "remove", 1)
+		exports.ox_inventory:RemoveItem(src, item..level+1, 1)
 	end
 	if current ~= -1 then
-		if QBCore.Functions.GetPlayer(src).Functions.AddItem(item..current+1, 1) then
-			TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[item..current+1], "add", 1)
-		end
+		exports.ox_inventory:AddItem(src, item..current+1, 1)
 	end
 end)
 
@@ -88,23 +85,20 @@ RegisterNetEvent('jim-mechanic:server:toggleItem', function(give, item, amount)
 	local src = source
 	if not give then
 		if HasItem(src, item, amount) then -- check if you still have the item
-			if QBCore.Functions.GetPlayer(src).Functions.GetItemByName(item).unique then -- If unique item, keep removing until gone
+			if exports.ox_inventory:GetItem(src, item, nil, false).unique then -- If unique item, keep removing until gone
 				while remamount > 0 do
-					QBCore.Functions.GetPlayer(src).Functions.RemoveItem(item, 1)
+					exports.ox_inventory:RemoveItem(src, item, 1)
 					remamount -= 1
 				end
-				TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[item], "remove", amount) -- Show removal item box when all are removed
 				return
 			end
-			if QBCore.Functions.GetPlayer(src).Functions.RemoveItem(item, amount) then
+			if exports.ox_inventory:RemoveItem(src, item, amount) then
 				if Config.Debug then print("^5Debug^7: ^1Removing ^2from Player^7(^2"..src.."^7) '^6"..QBCore.Shared.Items[item].label.."^7(^2x^6"..(amount or "1").."^7)'") end
-				TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[item], "remove", amount)
 			end
 		else TriggerEvent("jim-mechanic:server:DupeWarn", item, src) end -- if not boot the player
 	elseif give then
-		if QBCore.Functions.GetPlayer(src).Functions.AddItem(item, amount) then
+		if exports.ox_inventory:AddItem(src, item, amount) then
 			if Config.Debug then print("^5Debug^7: ^4Giving ^2Player^7(^2"..src.."^7) '^6"..QBCore.Shared.Items[item].label.."^7(^2x^6"..(amount or "1").."^7)'") end
-			TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[item], "add", amount)
 		end
 	end
 end)

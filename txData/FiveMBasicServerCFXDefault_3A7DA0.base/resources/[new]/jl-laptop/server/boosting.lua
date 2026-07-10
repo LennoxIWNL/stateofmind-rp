@@ -355,7 +355,7 @@ RegisterNetEvent('jl-laptop:server:SyncPlates', function(success)
         log("Player not found")
         return
     end
-    if not Player.Functions.GetItemByName(Config.Boosting.HackingDevice) then
+    if not exports.ox_inventory:GetItem(src, Config.Boosting.HackingDevice, nil, false) then
         log("Hacking item not found")
         return
     end
@@ -399,16 +399,14 @@ RegisterNetEvent('jl-laptop:server:SyncPlates', function(success)
     else
         log("Failed the hacking")
         Notify(src, Lang:t('boosting.error.disable_fail'), 'success', 7500)
-        if Player and Player.Functions.RemoveItem(Config.Boosting.HackingDevice, 1) then
-            TriggerClientEvent("inventory:client:ItemBox", src, QBCore.Shared.Items[Config.Boosting.HackingDevice],
-                "remove")
+        if Player then
+            exports.ox_inventory:RemoveItem(src, Config.Boosting.HackingDevice, 1)
         end
     end
 end)
 
 QBCore.Functions.CreateUseableItem(Config.Boosting.HackingDevice, function(source, _)
-    local Player = QBCore.Functions.GetPlayer(source)
-    if Player.Functions.GetItemByName(Config.Boosting.HackingDevice) then
+    if exports.ox_inventory:GetItem(source, Config.Boosting.HackingDevice, nil, false) then
         TriggerClientEvent('jl-laptop:client:HackCar', source)
     end
 end)

@@ -130,25 +130,23 @@ end)
 
 RegisterServerEvent('qb-weed:server:removeSeed', function(itemslot, seed)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
-    Player.Functions.RemoveItem(seed, 1, itemslot)
+    exports.ox_inventory:RemoveItem(src, seed, 1, nil, itemslot)
 end)
 
 RegisterNetEvent('qb-weed:server:harvestPlant', function(house, amount, plantName, plantId)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
-    local weedBag = Player.Functions.GetItemByName('empty_weed_bag')
+    local weedBag = exports.ox_inventory:GetItem(src, 'empty_weed_bag', nil, false)
     local sndAmount = math.random(12, 16)
 
-    if weedBag ~= nil and weedBag.amount >= sndAmount then
+    if weedBag ~= nil and weedBag.count >= sndAmount then
         if house ~= nil then
             local result = MySQL.query.await(
                 'SELECT * FROM house_plants WHERE plantid = ? AND building = ?', {plantId, house})
 
             if result[1] ~= nil then
-                Player.Functions.AddItem('weed_' .. plantName .. '_seed', amount)
-                Player.Functions.AddItem('weed_' .. plantName, sndAmount)
-                Player.Functions.RemoveItem('empty_weed_bag', sndAmount)
+                exports.ox_inventory:AddItem(src, 'weed_' .. plantName .. '_seed', amount)
+                exports.ox_inventory:AddItem(src, 'weed_' .. plantName, sndAmount)
+                exports.ox_inventory:RemoveItem(src, 'empty_weed_bag', sndAmount)
                 MySQL.query('DELETE FROM house_plants WHERE plantid = ? AND building = ?', {plantId, house})
                 TriggerClientEvent('QBCore:Notify', src, Lang:t('text.the_plant_has_been_harvested'), 'success', 3500)
                 TriggerClientEvent('qb-weed:client:refreshHousePlants', -1, house)
@@ -165,7 +163,6 @@ end)
 
 RegisterNetEvent('qb-weed:server:foodPlant', function(house, amount, plantName, plantId)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
     local plantStats = MySQL.query.await(
         'SELECT * FROM house_plants WHERE building = ? AND sort = ? AND plantid = ?',
         {house, plantName, tostring(plantId)})
@@ -177,6 +174,6 @@ RegisterNetEvent('qb-weed:server:foodPlant', function(house, amount, plantName, 
 
     MySQL.update('UPDATE house_plants SET food = ? WHERE building = ? AND plantid = ?',
         {updatedFood, house, plantId})
-    Player.Functions.RemoveItem('weed_nutrition', 1)
+    exports.ox_inventory:RemoveItem(src, 'weed_nutrition', 1)
     TriggerClientEvent('qb-weed:client:refreshHousePlants', -1, house)
 end)

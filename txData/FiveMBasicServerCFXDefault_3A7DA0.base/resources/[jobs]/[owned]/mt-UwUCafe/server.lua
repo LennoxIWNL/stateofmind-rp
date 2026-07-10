@@ -5,19 +5,18 @@ local QBCore = exports['qb-core']:GetCoreObject()
 RegisterNetEvent('mt-UwUCafe:server:FazerCupcakeMorango', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local pacoteleite = Player.Functions.GetItemByName('pacote-leite')
-    local barramanteiga = Player.Functions.GetItemByName('barra-manteiga')
-    local pacotefarinha = Player.Functions.GetItemByName('pacote-farinha')
-    local caixamorangos = Player.Functions.GetItemByName('caixa-morangos')
+    local pacoteleite = exports.ox_inventory:GetItem(src, 'pacote-leite', nil, false)
+    local barramanteiga = exports.ox_inventory:GetItem(src, 'barra-manteiga', nil, false)
+    local pacotefarinha = exports.ox_inventory:GetItem(src, 'pacote-farinha', nil, false)
+    local caixamorangos = exports.ox_inventory:GetItem(src, 'caixa-morangos', nil, false)
 
     if pacoteleite ~= nil and barramanteiga ~= nil and pacotefarinha ~= nil and caixamorangos ~= nil then
 
-        Player.Functions.RemoveItem('pacote-leite', 1)
-        Player.Functions.RemoveItem('barra-manteiga', 1)
-        Player.Functions.RemoveItem('pacote-farinha', 1)
-        Player.Functions.RemoveItem('caixa-morangos', 1)
-        Player.Functions.AddItem('cupcake-morango', 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["cupcake-morango"], "add")
+        exports.ox_inventory:RemoveItem(src, 'pacote-leite', 1)
+        exports.ox_inventory:RemoveItem(src, 'barra-manteiga', 1)
+        exports.ox_inventory:RemoveItem(src, 'pacote-farinha', 1)
+        exports.ox_inventory:RemoveItem(src, 'caixa-morangos', 1)
+        exports.ox_inventory:AddItem(src, 'cupcake-morango', 1)
     else
         TriggerClientEvent('QBCore:Notify', src, 'You do not have the right items...', 'error')
     end
@@ -26,19 +25,18 @@ end)
 RegisterNetEvent('mt-UwUCafe:server:FazerCupcakeLimao', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local pacoteleite = Player.Functions.GetItemByName('pacote-leite')
-    local barramanteiga = Player.Functions.GetItemByName('barra-manteiga')
-    local pacotefarinha = Player.Functions.GetItemByName('pacote-farinha')
-    local limao = Player.Functions.GetItemByName('limao')
+    local pacoteleite = exports.ox_inventory:GetItem(src, 'pacote-leite', nil, false)
+    local barramanteiga = exports.ox_inventory:GetItem(src, 'barra-manteiga', nil, false)
+    local pacotefarinha = exports.ox_inventory:GetItem(src, 'pacote-farinha', nil, false)
+    local limao = exports.ox_inventory:GetItem(src, 'limao', nil, false)
 
     if pacoteleite ~= nil and barramanteiga ~= nil and pacotefarinha ~= nil and limao ~= nil then
 
-        Player.Functions.RemoveItem('pacote-leite', 1)
-        Player.Functions.RemoveItem('barra-manteiga', 1)
-        Player.Functions.RemoveItem('pacote-farinha', 1)
-        Player.Functions.RemoveItem('limao', 1)
-        Player.Functions.AddItem('cupcake-limao', 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["cupcake-limao"], "add")
+        exports.ox_inventory:RemoveItem(src, 'pacote-leite', 1)
+        exports.ox_inventory:RemoveItem(src, 'barra-manteiga', 1)
+        exports.ox_inventory:RemoveItem(src, 'pacote-farinha', 1)
+        exports.ox_inventory:RemoveItem(src, 'limao', 1)
+        exports.ox_inventory:AddItem(src, 'cupcake-limao', 1)
     else
         TriggerClientEvent('QBCore:Notify', src, 'You do not have the right items...', 'error')
     end
@@ -47,19 +45,18 @@ end)
 RegisterNetEvent('mt-UwUCafe:server:FazerCupcakeChocolate', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local pacoteleite = Player.Functions.GetItemByName('pacote-leite')
-    local barramanteiga = Player.Functions.GetItemByName('barra-manteiga')
-    local pacotefarinha = Player.Functions.GetItemByName('pacote-farinha')
-    local barrachocolate = Player.Functions.GetItemByName('barra-chocolate')
+    local pacoteleite = exports.ox_inventory:GetItem(src, 'pacote-leite', nil, false)
+    local barramanteiga = exports.ox_inventory:GetItem(src, 'barra-manteiga', nil, false)
+    local pacotefarinha = exports.ox_inventory:GetItem(src, 'pacote-farinha', nil, false)
+    local barrachocolate = exports.ox_inventory:GetItem(src, 'barra-chocolate', nil, false)
 
     if pacoteleite ~= nil and barramanteiga ~= nil and pacotefarinha ~= nil and barrachocolate ~= nil then
 
-        Player.Functions.RemoveItem('pacote-leite', 1)
-        Player.Functions.RemoveItem('barra-manteiga', 1)
-        Player.Functions.RemoveItem('pacote-farinha', 1)
-        Player.Functions.RemoveItem('barra-chocolate', 1)
-        Player.Functions.AddItem('cupcake-chocolate', 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["cupcake-chocolate"], "add")
+        exports.ox_inventory:RemoveItem(src, 'pacote-leite', 1)
+        exports.ox_inventory:RemoveItem(src, 'barra-manteiga', 1)
+        exports.ox_inventory:RemoveItem(src, 'pacote-farinha', 1)
+        exports.ox_inventory:RemoveItem(src, 'barra-chocolate', 1)
+        exports.ox_inventory:AddItem(src, 'cupcake-chocolate', 1)
     else
         TriggerClientEvent('QBCore:Notify', src, 'You do not have the right items...', 'error')
     end
@@ -68,17 +65,16 @@ end)
 RegisterNetEvent('mt-UwUCafe:server:FazerGeladoMorango', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local pacotenatas = Player.Functions.GetItemByName('pacote-natas')
-    local leitecondensado = Player.Functions.GetItemByName('leite-condensado')
-    local caixamorangos = Player.Functions.GetItemByName('caixa-morangos')
+    local pacotenatas = exports.ox_inventory:GetItem(src, 'pacote-natas', nil, false)
+    local leitecondensado = exports.ox_inventory:GetItem(src, 'leite-condensado', nil, false)
+    local caixamorangos = exports.ox_inventory:GetItem(src, 'caixa-morangos', nil, false)
 
     if pacotenatas ~= nil and leitecondensado ~= nil and caixamorangos ~= nil then
 
-        Player.Functions.RemoveItem('pacote-natas', 1)
-        Player.Functions.RemoveItem('leite-condensado', 1)
-        Player.Functions.RemoveItem('caixa-morangos', 1)
-        Player.Functions.AddItem('gelado-morango', 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["gelado-morango"], "add")
+        exports.ox_inventory:RemoveItem(src, 'pacote-natas', 1)
+        exports.ox_inventory:RemoveItem(src, 'leite-condensado', 1)
+        exports.ox_inventory:RemoveItem(src, 'caixa-morangos', 1)
+        exports.ox_inventory:AddItem(src, 'gelado-morango', 1)
     else
         TriggerClientEvent('QBCore:Notify', src, 'You do not have the right items...', 'error')
     end
@@ -87,17 +83,16 @@ end)
 RegisterNetEvent('mt-UwUCafe:server:FazerGeladoChocolate', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local pacotenatas = Player.Functions.GetItemByName('pacote-natas')
-    local leitecondensado = Player.Functions.GetItemByName('leite-condensado')
-    local barrachocolate = Player.Functions.GetItemByName('barra-chocolate')
+    local pacotenatas = exports.ox_inventory:GetItem(src, 'pacote-natas', nil, false)
+    local leitecondensado = exports.ox_inventory:GetItem(src, 'leite-condensado', nil, false)
+    local barrachocolate = exports.ox_inventory:GetItem(src, 'barra-chocolate', nil, false)
 
     if pacotenatas ~= nil and leitecondensado ~= nil and barrachocolate ~= nil then
 
-        Player.Functions.RemoveItem('pacote-natas', 1)
-        Player.Functions.RemoveItem('leite-condensado', 1)
-        Player.Functions.RemoveItem('barra-chocolate', 1)
-        Player.Functions.AddItem('gelado-chocolate', 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["gelado-chocolate"], "add")
+        exports.ox_inventory:RemoveItem(src, 'pacote-natas', 1)
+        exports.ox_inventory:RemoveItem(src, 'leite-condensado', 1)
+        exports.ox_inventory:RemoveItem(src, 'barra-chocolate', 1)
+        exports.ox_inventory:AddItem(src, 'gelado-chocolate', 1)
     else
         TriggerClientEvent('QBCore:Notify', src, 'You do not have the right items...', 'error')
     end
@@ -106,17 +101,16 @@ end)
 RegisterNetEvent('mt-UwUCafe:server:FazerGeladoBaunilha', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local pacotenatas = Player.Functions.GetItemByName('pacote-natas')
-    local leitecondensado = Player.Functions.GetItemByName('leite-condensado')
-    local extratobaunilha = Player.Functions.GetItemByName('extrato-baunilha')
+    local pacotenatas = exports.ox_inventory:GetItem(src, 'pacote-natas', nil, false)
+    local leitecondensado = exports.ox_inventory:GetItem(src, 'leite-condensado', nil, false)
+    local extratobaunilha = exports.ox_inventory:GetItem(src, 'extrato-baunilha', nil, false)
 
     if pacotenatas ~= nil and leitecondensado ~= nil and extratobaunilha ~= nil then
 
-        Player.Functions.RemoveItem('pacote-natas', 1)
-        Player.Functions.RemoveItem('leite-condensado', 1)
-        Player.Functions.RemoveItem('extrato-baunilha', 1)
-        Player.Functions.AddItem('gelado-baunilha', 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["gelado-baunilha"], "add")
+        exports.ox_inventory:RemoveItem(src, 'pacote-natas', 1)
+        exports.ox_inventory:RemoveItem(src, 'leite-condensado', 1)
+        exports.ox_inventory:RemoveItem(src, 'extrato-baunilha', 1)
+        exports.ox_inventory:AddItem(src, 'gelado-baunilha', 1)
     else
         TriggerClientEvent('QBCore:Notify', src, 'You do not have the right items...', 'error')
     end
@@ -125,19 +119,18 @@ end)
 RegisterNetEvent('mt-UwUCafe:server:FazerPanquencaNutela', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local pacotefarinha = Player.Functions.GetItemByName('pacote-farinha')
-    local pacoteleite = Player.Functions.GetItemByName('pacote-leite')
-    local pacoteacucar = Player.Functions.GetItemByName('pacote-acucar')
-    local frasconutela = Player.Functions.GetItemByName('frasco-nutela')
+    local pacotefarinha = exports.ox_inventory:GetItem(src, 'pacote-farinha', nil, false)
+    local pacoteleite = exports.ox_inventory:GetItem(src, 'pacote-leite', nil, false)
+    local pacoteacucar = exports.ox_inventory:GetItem(src, 'pacote-acucar', nil, false)
+    local frasconutela = exports.ox_inventory:GetItem(src, 'frasco-nutela', nil, false)
 
     if pacotefarinha ~= nil and pacoteleite ~= nil and pacoteacucar ~= nil and frasconutela ~= nil then
 
-        Player.Functions.RemoveItem('pacote-farinha', 1)
-        Player.Functions.RemoveItem('pacote-leite', 1)
-        Player.Functions.RemoveItem('pacote-acucar', 1)
-        Player.Functions.RemoveItem('frasco-nutela', 1)
-        Player.Functions.AddItem('panqueca-nutela', 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["panqueca-nutela"], "add")
+        exports.ox_inventory:RemoveItem(src, 'pacote-farinha', 1)
+        exports.ox_inventory:RemoveItem(src, 'pacote-leite', 1)
+        exports.ox_inventory:RemoveItem(src, 'pacote-acucar', 1)
+        exports.ox_inventory:RemoveItem(src, 'frasco-nutela', 1)
+        exports.ox_inventory:AddItem(src, 'panqueca-nutela', 1)
     else
         TriggerClientEvent('QBCore:Notify', src, 'You do not have the right items...', 'error')
     end
@@ -146,19 +139,18 @@ end)
 RegisterNetEvent('mt-UwUCafe:server:FazerPanquencaOreo', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local pacotefarinha = Player.Functions.GetItemByName('pacote-farinha')
-    local pacoteleite = Player.Functions.GetItemByName('pacote-leite')
-    local pacoteacucar = Player.Functions.GetItemByName('pacote-acucar')
-    local pacoteoreo = Player.Functions.GetItemByName('pacote-oreo')
+    local pacotefarinha = exports.ox_inventory:GetItem(src, 'pacote-farinha', nil, false)
+    local pacoteleite = exports.ox_inventory:GetItem(src, 'pacote-leite', nil, false)
+    local pacoteacucar = exports.ox_inventory:GetItem(src, 'pacote-acucar', nil, false)
+    local pacoteoreo = exports.ox_inventory:GetItem(src, 'pacote-oreo', nil, false)
 
     if pacotefarinha ~= nil and pacoteleite ~= nil and pacoteacucar ~= nil and pacoteoreo ~= nil then
 
-        Player.Functions.RemoveItem('pacote-farinha', 1)
-        Player.Functions.RemoveItem('pacote-leite', 1)
-        Player.Functions.RemoveItem('pacote-acucar', 1)
-        Player.Functions.RemoveItem('pacote-oreo', 1)
-        Player.Functions.AddItem('panqueca-oreo', 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["panqueca-oreo"], "add")
+        exports.ox_inventory:RemoveItem(src, 'pacote-farinha', 1)
+        exports.ox_inventory:RemoveItem(src, 'pacote-leite', 1)
+        exports.ox_inventory:RemoveItem(src, 'pacote-acucar', 1)
+        exports.ox_inventory:RemoveItem(src, 'pacote-oreo', 1)
+        exports.ox_inventory:AddItem(src, 'panqueca-oreo', 1)
     else
         TriggerClientEvent('QBCore:Notify', src, 'You do not have the right items...', 'error')
     end
@@ -167,17 +159,16 @@ end)
 RegisterNetEvent('mt-UwUCafe:server:FazerMuffinChocolate', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local pacotefarinha = Player.Functions.GetItemByName('pacote-farinha')
-    local pacoteleite = Player.Functions.GetItemByName('pacote-leite')
-    local barrachocolate = Player.Functions.GetItemByName('barra-chocolate')
+    local pacotefarinha = exports.ox_inventory:GetItem(src, 'pacote-farinha', nil, false)
+    local pacoteleite = exports.ox_inventory:GetItem(src, 'pacote-leite', nil, false)
+    local barrachocolate = exports.ox_inventory:GetItem(src, 'barra-chocolate', nil, false)
 
     if pacotefarinha ~= nil and pacoteleite ~= nil and barrachocolate ~= nil then
 
-        Player.Functions.RemoveItem('pacote-farinha', 1)
-        Player.Functions.RemoveItem('pacote-leite', 1)
-        Player.Functions.RemoveItem('barra-chocolate', 1)
-        Player.Functions.AddItem('muffin-chocolate', 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["muffin-chocolate"], "add")
+        exports.ox_inventory:RemoveItem(src, 'pacote-farinha', 1)
+        exports.ox_inventory:RemoveItem(src, 'pacote-leite', 1)
+        exports.ox_inventory:RemoveItem(src, 'barra-chocolate', 1)
+        exports.ox_inventory:AddItem(src, 'muffin-chocolate', 1)
     else
         TriggerClientEvent('QBCore:Notify', src, 'You do not have the right items...', 'error')
     end
@@ -186,17 +177,16 @@ end)
 RegisterNetEvent('mt-UwUCafe:server:FazerWaffleNutela', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local pacotefarinha = Player.Functions.GetItemByName('pacote-farinha')
-    local pacoteleite = Player.Functions.GetItemByName('pacote-leite')
-    local frasconutela = Player.Functions.GetItemByName('frasco-nutela')
+    local pacotefarinha = exports.ox_inventory:GetItem(src, 'pacote-farinha', nil, false)
+    local pacoteleite = exports.ox_inventory:GetItem(src, 'pacote-leite', nil, false)
+    local frasconutela = exports.ox_inventory:GetItem(src, 'frasco-nutela', nil, false)
 
     if pacotefarinha ~= nil and pacoteleite ~= nil and frasconutela ~= nil then
 
-        Player.Functions.RemoveItem('pacote-farinha', 1)
-        Player.Functions.RemoveItem('pacote-leite', 1)
-        Player.Functions.RemoveItem('frasco-nutela', 1)
-        Player.Functions.AddItem('waffle-nutela', 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["waffle-nutela"], "add")
+        exports.ox_inventory:RemoveItem(src, 'pacote-farinha', 1)
+        exports.ox_inventory:RemoveItem(src, 'pacote-leite', 1)
+        exports.ox_inventory:RemoveItem(src, 'frasco-nutela', 1)
+        exports.ox_inventory:AddItem(src, 'waffle-nutela', 1)
     else
         TriggerClientEvent('QBCore:Notify', src, 'You do not have the right items...', 'error')
     end
@@ -205,17 +195,16 @@ end)
 RegisterNetEvent('mt-UwUCafe:server:FazerPastelFrango', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local pacotefarinha = Player.Functions.GetItemByName('pacote-farinha')
-    local barramanteiga = Player.Functions.GetItemByName('barra-manteiga')
-    local frango = Player.Functions.GetItemByName('frango')
+    local pacotefarinha = exports.ox_inventory:GetItem(src, 'pacote-farinha', nil, false)
+    local barramanteiga = exports.ox_inventory:GetItem(src, 'barra-manteiga', nil, false)
+    local frango = exports.ox_inventory:GetItem(src, 'frango', nil, false)
 
     if pacotefarinha ~= nil and barramanteiga ~= nil and frango ~= nil then
 
-        Player.Functions.RemoveItem('pacote-farinha', 1)
-        Player.Functions.RemoveItem('barra-manteiga', 1)
-        Player.Functions.RemoveItem('frango', 1)
-        Player.Functions.AddItem('pastel-frango', 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["pastel-frango"], "add")
+        exports.ox_inventory:RemoveItem(src, 'pacote-farinha', 1)
+        exports.ox_inventory:RemoveItem(src, 'barra-manteiga', 1)
+        exports.ox_inventory:RemoveItem(src, 'frango', 1)
+        exports.ox_inventory:AddItem(src, 'pastel-frango', 1)
     else
         TriggerClientEvent('QBCore:Notify', src, 'You do not have the right items...', 'error')
     end
@@ -227,15 +216,14 @@ end)
 RegisterNetEvent('mt-UwUCafe:server:FazerCafe', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local water_bottle = Player.Functions.GetItemByName('water_bottle')
-    local graoscafe = Player.Functions.GetItemByName('graos-cafe')
+    local water_bottle = exports.ox_inventory:GetItem(src, 'water_bottle', nil, false)
+    local graoscafe = exports.ox_inventory:GetItem(src, 'graos-cafe', nil, false)
 
     if water_bottle ~= nil and graoscafe ~= nil then
 
-        Player.Functions.RemoveItem('water_bottle', 1)
-        Player.Functions.RemoveItem('graos-cafe', 1)
-        Player.Functions.AddItem('cafe-uwu', 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["cafe-uwu"], "add")
+        exports.ox_inventory:RemoveItem(src, 'water_bottle', 1)
+        exports.ox_inventory:RemoveItem(src, 'graos-cafe', 1)
+        exports.ox_inventory:AddItem(src, 'cafe-uwu', 1)
     else
         TriggerClientEvent('QBCore:Notify', src, 'You do not have the right items...', 'error')
     end
@@ -244,15 +232,14 @@ end)
 RegisterNetEvent('mt-UwUCafe:server:FazerLatte', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local pacoteleite = Player.Functions.GetItemByName('pacote-leite')
-    local graoscafe = Player.Functions.GetItemByName('graos-cafe')
+    local pacoteleite = exports.ox_inventory:GetItem(src, 'pacote-leite', nil, false)
+    local graoscafe = exports.ox_inventory:GetItem(src, 'graos-cafe', nil, false)
 
     if graoscafe ~= nil and pacoteleite ~= nil then
 
-        Player.Functions.RemoveItem('pacote-leite', 1)
-        Player.Functions.RemoveItem('graos-cafe', 1)
-        Player.Functions.AddItem('latte-uwu', 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["latte-uwu"], "add")
+        exports.ox_inventory:RemoveItem(src, 'pacote-leite', 1)
+        exports.ox_inventory:RemoveItem(src, 'graos-cafe', 1)
+        exports.ox_inventory:AddItem(src, 'latte-uwu', 1)
     else
         TriggerClientEvent('QBCore:Notify', src, 'You do not have the right items...', 'error')
     end
@@ -261,15 +248,14 @@ end)
 RegisterNetEvent('mt-UwUCafe:server:FazerBubbleTeaAmora', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local water_bottle = Player.Functions.GetItemByName('water_bottle')
-    local caixaamoras = Player.Functions.GetItemByName('caixa-amoras')
+    local water_bottle = exports.ox_inventory:GetItem(src, 'water_bottle', nil, false)
+    local caixaamoras = exports.ox_inventory:GetItem(src, 'caixa-amoras', nil, false)
 
     if water_bottle ~= nil and caixaamoras ~= nil then
 
-        Player.Functions.RemoveItem('water_bottle', 1)
-        Player.Functions.RemoveItem('caixa-amoras', 1)
-        Player.Functions.AddItem('bubble-amora', 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["bubble-amora"], "add")
+        exports.ox_inventory:RemoveItem(src, 'water_bottle', 1)
+        exports.ox_inventory:RemoveItem(src, 'caixa-amoras', 1)
+        exports.ox_inventory:AddItem(src, 'bubble-amora', 1)
     else
         TriggerClientEvent('QBCore:Notify', src, 'You do not have the right items...', 'error')
     end
@@ -278,15 +264,14 @@ end)
 RegisterNetEvent('mt-UwUCafe:server:FazerBubbleTeaMorango', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local water_bottle = Player.Functions.GetItemByName('water_bottle')
-    local caixamorangos = Player.Functions.GetItemByName('caixa-morangos')
+    local water_bottle = exports.ox_inventory:GetItem(src, 'water_bottle', nil, false)
+    local caixamorangos = exports.ox_inventory:GetItem(src, 'caixa-morangos', nil, false)
 
     if water_bottle ~= nil and caixamorangos ~= nil then
 
-        Player.Functions.RemoveItem('water_bottle', 1)
-        Player.Functions.RemoveItem('caixa-morangos', 1)
-        Player.Functions.AddItem('bubble-morango', 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["bubble-morango"], "add")
+        exports.ox_inventory:RemoveItem(src, 'water_bottle', 1)
+        exports.ox_inventory:RemoveItem(src, 'caixa-morangos', 1)
+        exports.ox_inventory:AddItem(src, 'bubble-morango', 1)
     else
         TriggerClientEvent('QBCore:Notify', src, 'You do not have the right items...', 'error')
     end
@@ -295,15 +280,14 @@ end)
 RegisterNetEvent('mt-UwUCafe:server:FazerBubbleTeaMenta', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local water_bottle = Player.Functions.GetItemByName('water_bottle')
-    local extratomenta = Player.Functions.GetItemByName('extrato-menta')
+    local water_bottle = exports.ox_inventory:GetItem(src, 'water_bottle', nil, false)
+    local extratomenta = exports.ox_inventory:GetItem(src, 'extrato-menta', nil, false)
 
     if water_bottle ~= nil and extratomenta ~= nil then
 
-        Player.Functions.RemoveItem('water_bottle', 1)
-        Player.Functions.RemoveItem('extrato-menta', 1)
-        Player.Functions.AddItem('bubble-menta', 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["bubble-menta"], "add")
+        exports.ox_inventory:RemoveItem(src, 'water_bottle', 1)
+        exports.ox_inventory:RemoveItem(src, 'extrato-menta', 1)
+        exports.ox_inventory:AddItem(src, 'bubble-menta', 1)
     else
         TriggerClientEvent('QBCore:Notify', src, 'You do not have the right items...', 'error')
     end
@@ -312,15 +296,14 @@ end)
 RegisterNetEvent('mt-UwUCafe:server:FazerMilkshakeChocolate', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local pacoteleite = Player.Functions.GetItemByName('pacote-leite')
-    local barrachocolate = Player.Functions.GetItemByName('barra-chocolate')
+    local pacoteleite = exports.ox_inventory:GetItem(src, 'pacote-leite', nil, false)
+    local barrachocolate = exports.ox_inventory:GetItem(src, 'barra-chocolate', nil, false)
 
     if pacoteleite ~= nil and barrachocolate ~= nil then
 
-        Player.Functions.RemoveItem('pacote-leite', 1)
-        Player.Functions.RemoveItem('barra-chocolate', 1)
-        Player.Functions.AddItem('milkshake-chocolate', 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["milkshake-chocolate"], "add")
+        exports.ox_inventory:RemoveItem(src, 'pacote-leite', 1)
+        exports.ox_inventory:RemoveItem(src, 'barra-chocolate', 1)
+        exports.ox_inventory:AddItem(src, 'milkshake-chocolate', 1)
     else
         TriggerClientEvent('QBCore:Notify', src, 'You do not have the right items...', 'error')
     end
@@ -329,15 +312,14 @@ end)
 RegisterNetEvent('mt-UwUCafe:server:FazerMilkshakeMorango', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local pacoteleite = Player.Functions.GetItemByName('pacote-leite')
-    local caixamorangos = Player.Functions.GetItemByName('caixa-morangos')
+    local pacoteleite = exports.ox_inventory:GetItem(src, 'pacote-leite', nil, false)
+    local caixamorangos = exports.ox_inventory:GetItem(src, 'caixa-morangos', nil, false)
 
     if pacoteleite ~= nil and caixamorangos ~= nil then
 
-        Player.Functions.RemoveItem('pacote-leite', 1)
-        Player.Functions.RemoveItem('caixa-morangos', 1)
-        Player.Functions.AddItem('milkshake-morango', 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["milkshake-morango"], "add")
+        exports.ox_inventory:RemoveItem(src, 'pacote-leite', 1)
+        exports.ox_inventory:RemoveItem(src, 'caixa-morangos', 1)
+        exports.ox_inventory:AddItem(src, 'milkshake-morango', 1)
     else
         TriggerClientEvent('QBCore:Notify', src, 'You do not have the right items...', 'error')
     end
@@ -374,7 +356,7 @@ QBCore.Functions.CreateUseableItem("cafe-uwu", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
 	if Player.Functions.GetItemBySlot(item.slot) ~= nil then
         TriggerClientEvent('mt-UwUCafe:client:BeberCafe', source)
-        Player.Functions.RemoveItem('cafe-uwu', 1)
+        exports.ox_inventory:RemoveItem(source, 'cafe-uwu', 1)
     end
 end)
 
@@ -382,7 +364,7 @@ QBCore.Functions.CreateUseableItem("latte-uwu", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
 	if Player.Functions.GetItemBySlot(item.slot) ~= nil then
         TriggerClientEvent('mt-UwUCafe:client:BeberLatte', source)
-        Player.Functions.RemoveItem('latte-uwu', 1)
+        exports.ox_inventory:RemoveItem(source, 'latte-uwu', 1)
     end
 end)
 
@@ -390,7 +372,7 @@ QBCore.Functions.CreateUseableItem("bubble-amora", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
 	if Player.Functions.GetItemBySlot(item.slot) ~= nil then
         TriggerClientEvent('mt-UwUCafe:client:BeberBubbleTea', source)
-        Player.Functions.RemoveItem('bubble-amora', 1)
+        exports.ox_inventory:RemoveItem(source, 'bubble-amora', 1)
     end
 end)
 
@@ -398,7 +380,7 @@ QBCore.Functions.CreateUseableItem("bubble-morango", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
 	if Player.Functions.GetItemBySlot(item.slot) ~= nil then
         TriggerClientEvent('mt-UwUCafe:client:BeberBubbleTea', source)
-        Player.Functions.RemoveItem('bubble-morango', 1)
+        exports.ox_inventory:RemoveItem(source, 'bubble-morango', 1)
     end
 end)
 
@@ -406,7 +388,7 @@ QBCore.Functions.CreateUseableItem("bubble-menta", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
 	if Player.Functions.GetItemBySlot(item.slot) ~= nil then
         TriggerClientEvent('mt-UwUCafe:client:BeberBubbleTea', source)
-        Player.Functions.RemoveItem('bubble-menta', 1)
+        exports.ox_inventory:RemoveItem(source, 'bubble-menta', 1)
     end
 end)
 
@@ -414,7 +396,7 @@ QBCore.Functions.CreateUseableItem("milkshake-chocolate", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
 	if Player.Functions.GetItemBySlot(item.slot) ~= nil then
         TriggerClientEvent('mt-UwUCafe:client:BeberMilkshake', source)
-        Player.Functions.RemoveItem('milkshake-chocolate', 1)
+        exports.ox_inventory:RemoveItem(source, 'milkshake-chocolate', 1)
     end
 end)
 
@@ -422,7 +404,7 @@ QBCore.Functions.CreateUseableItem("milkshake-morango", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
 	if Player.Functions.GetItemBySlot(item.slot) ~= nil then
         TriggerClientEvent('mt-UwUCafe:client:BeberMilkshake', source)
-        Player.Functions.RemoveItem('milkshake-morango', 1)
+        exports.ox_inventory:RemoveItem(source, 'milkshake-morango', 1)
     end
 end)
 
@@ -434,7 +416,7 @@ QBCore.Functions.CreateUseableItem("cupcake-morango", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
 	if Player.Functions.GetItemBySlot(item.slot) ~= nil then
         TriggerClientEvent('mt-UwUCafe:client:ComerCupcake', source)
-        Player.Functions.RemoveItem('cupcake-morango', 1)
+        exports.ox_inventory:RemoveItem(source, 'cupcake-morango', 1)
     end
 end)
 
@@ -442,7 +424,7 @@ QBCore.Functions.CreateUseableItem("cupcake-chocolate", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
 	if Player.Functions.GetItemBySlot(item.slot) ~= nil then
         TriggerClientEvent('mt-UwUCafe:client:ComerCupcake', source)
-        Player.Functions.RemoveItem('cupcake-chocolate', 1)
+        exports.ox_inventory:RemoveItem(source, 'cupcake-chocolate', 1)
     end
 end)
 
@@ -450,7 +432,7 @@ QBCore.Functions.CreateUseableItem("cupcake-limao", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
 	if Player.Functions.GetItemBySlot(item.slot) ~= nil then
         TriggerClientEvent('mt-UwUCafe:client:ComerCupcake', source)
-        Player.Functions.RemoveItem('cupcake-limao', 1)
+        exports.ox_inventory:RemoveItem(source, 'cupcake-limao', 1)
     end
 end)
 
@@ -458,7 +440,7 @@ QBCore.Functions.CreateUseableItem("gelado-morango", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
 	if Player.Functions.GetItemBySlot(item.slot) ~= nil then
         TriggerClientEvent('mt-UwUCafe:client:ComerGelado', source)
-        Player.Functions.RemoveItem('gelado-morango', 1)
+        exports.ox_inventory:RemoveItem(source, 'gelado-morango', 1)
     end
 end)
 
@@ -466,7 +448,7 @@ QBCore.Functions.CreateUseableItem("gelado-chocolate", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
 	if Player.Functions.GetItemBySlot(item.slot) ~= nil then
         TriggerClientEvent('mt-UwUCafe:client:ComerGelado', source)
-        Player.Functions.RemoveItem('gelado-chocolate', 1)
+        exports.ox_inventory:RemoveItem(source, 'gelado-chocolate', 1)
     end
 end)
 
@@ -474,7 +456,7 @@ QBCore.Functions.CreateUseableItem("gelado-baunilha", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
 	if Player.Functions.GetItemBySlot(item.slot) ~= nil then
         TriggerClientEvent('mt-UwUCafe:client:ComerGelado', source)
-        Player.Functions.RemoveItem('gelado-baunilha', 1)
+        exports.ox_inventory:RemoveItem(source, 'gelado-baunilha', 1)
     end
 end)
 
@@ -482,7 +464,7 @@ QBCore.Functions.CreateUseableItem("panqueca-nutela", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
 	if Player.Functions.GetItemBySlot(item.slot) ~= nil then
         TriggerClientEvent('mt-UwUCafe:client:ComerPanqueca', source)
-        Player.Functions.RemoveItem('panqueca-nutela', 1)
+        exports.ox_inventory:RemoveItem(source, 'panqueca-nutela', 1)
     end
 end)
 
@@ -490,7 +472,7 @@ QBCore.Functions.CreateUseableItem("panqueca-oreo", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
 	if Player.Functions.GetItemBySlot(item.slot) ~= nil then
         TriggerClientEvent('mt-UwUCafe:client:ComerPanqueca', source)
-        Player.Functions.RemoveItem('panqueca-oreo', 1)
+        exports.ox_inventory:RemoveItem(source, 'panqueca-oreo', 1)
     end
 end)
 
@@ -498,7 +480,7 @@ QBCore.Functions.CreateUseableItem("muffin-chocolate", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
 	if Player.Functions.GetItemBySlot(item.slot) ~= nil then
         TriggerClientEvent('mt-UwUCafe:client:ComerMuffin', source)
-        Player.Functions.RemoveItem('muffin-chocolate', 1)
+        exports.ox_inventory:RemoveItem(source, 'muffin-chocolate', 1)
     end
 end)
 
@@ -506,7 +488,7 @@ QBCore.Functions.CreateUseableItem("waffle-nutela", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
 	if Player.Functions.GetItemBySlot(item.slot) ~= nil then
         TriggerClientEvent('mt-UwUCafe:client:ComerWaffle', source)
-        Player.Functions.RemoveItem('waffle-nutela', 1)
+        exports.ox_inventory:RemoveItem(source, 'waffle-nutela', 1)
     end
 end)
 
@@ -514,7 +496,7 @@ QBCore.Functions.CreateUseableItem("pastel-frango", function(source, item)
     local Player = QBCore.Functions.GetPlayer(source)
 	if Player.Functions.GetItemBySlot(item.slot) ~= nil then
         TriggerClientEvent('mt-UwUCafe:client:ComerPastel', source)
-        Player.Functions.RemoveItem('pastel-frango', 1)
+        exports.ox_inventory:RemoveItem(source, 'pastel-frango', 1)
     end
 end)
 
@@ -555,7 +537,5 @@ AddEventHandler("mt-UwUCafe:server:FaturarPlayer", function(playerId, amount)
 end)
 
 RegisterNetEvent('mt-UwUCafe:Server:AddItem', function(item, amount)
-    local Player = QBCore.Functions.GetPlayer(source)
-
-    Player.Functions.AddItem(item, amount)
+    exports.ox_inventory:AddItem(source, item, amount)
 end)

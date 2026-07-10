@@ -6,7 +6,7 @@ Config = {
 
 	img = "qb-inventory/html/images/", -- Set this to your inventory
 
-	Inv = "qb", -- set to "ox" if using OX Inventory
+	Inv = "ox", -- set to "ox" if using OX Inventory
 	Menu = "qb",
 	ProgressBar = "qb",
 	Notify = "qb",

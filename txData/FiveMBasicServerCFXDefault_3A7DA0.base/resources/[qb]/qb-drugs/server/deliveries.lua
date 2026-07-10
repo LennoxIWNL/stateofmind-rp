@@ -21,7 +21,7 @@ RegisterNetEvent('qb-drugs:server:updateDealerItems', function(itemData, amount,
         Config.Dealers[dealer]["products"][itemData.slot].amount = Config.Dealers[dealer]["products"][itemData.slot].amount - amount
         TriggerClientEvent('qb-drugs:client:setDealerItems', -1, itemData, amount, dealer)
     else
-        Player.Functions.RemoveItem(itemData.name, amount)
+        exports.ox_inventory:RemoveItem(src, itemData.name, amount)
         Player.Functions.AddMoney('cash', amount * Config.Dealers[dealer]["products"][itemData.slot].price)
         TriggerClientEvent("QBCore:Notify", src, Lang:t("error.item_unavailable"), "error")
     end
@@ -37,8 +37,7 @@ RegisterNetEvent('qb-drugs:server:giveDeliveryItems', function(deliveryData)
 
     if not item then return end
 
-    Player.Functions.AddItem(item, deliveryData.amount)
-    TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[item], "add")
+    exports.ox_inventory:AddItem(src, item, deliveryData.amount)
 end)
 
 RegisterNetEvent('qb-drugs:server:successDelivery', function(deliveryData, inTime)
@@ -52,27 +51,26 @@ RegisterNetEvent('qb-drugs:server:successDelivery', function(deliveryData, inTim
     local payout = deliveryData.itemData.payout * itemAmount
     local copsOnline = QBCore.Functions.GetDutyCount('police')
     local curRep = Player.PlayerData.metadata["dealerrep"]
-    local invItem = Player.Functions.GetItemByName(item)
+    local invItem = exports.ox_inventory:GetItem(src, item, nil, false)
     if inTime then
-        if invItem and invItem.amount >= itemAmount then -- on time correct amount
-            Player.Functions.RemoveItem(item, itemAmount)
+        if invItem and invItem.count >= itemAmount then -- on time correct amount
+            exports.ox_inventory:RemoveItem(src, item, itemAmount)
             if copsOnline > 0 then
                 local copModifier = copsOnline * Config.PoliceDeliveryModifier
                 if Config.UseMarkedBills then
                     local info = {worth = math.floor(payout * copModifier)}
-                    Player.Functions.AddItem('markedbills', 1, false, info)
+                    exports.ox_inventory:AddItem(src, 'markedbills', 1, info)
                 else
                     Player.Functions.AddMoney('cash', math.floor(payout * copModifier), 'drug-delivery')
                 end
             else
                 if Config.UseMarkedBills then
                     local info = {worth = payout}
-                    Player.Functions.AddItem('markedbills', 1, false, info)
+                    exports.ox_inventory:AddItem(src, 'markedbills', 1, info)
                 else
                     Player.Functions.AddMoney('cash', payout, 'drug-delivery')
                 end
             end
-            TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[item], "remove")
             TriggerClientEvent('QBCore:Notify', src, Lang:t("success.order_delivered"), 'success')
             SetTimeout(math.random(5000, 10000), function()
                 TriggerClientEvent('qb-drugs:client:sendDeliveryMail', src, 'perfect', deliveryData)
@@ -81,10 +79,9 @@ RegisterNetEvent('qb-drugs:server:successDelivery', function(deliveryData, inTim
         else
             TriggerClientEvent('QBCore:Notify', src, Lang:t("error.order_not_right"), 'error')-- on time incorrect amount
             if invItem then
-                local newItemAmount = invItem.amount
+                local newItemAmount = invItem.count
                 local modifiedPayout = deliveryData.itemData.payout * newItemAmount
-                Player.Functions.RemoveItem(item, newItemAmount)
-                TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[item], "remove")
+                exports.ox_inventory:RemoveItem(src, item, newItemAmount)
                 Player.Functions.AddMoney('cash', math.floor(modifiedPayout / Config.WrongAmountFee))
             end
             SetTimeout(math.random(5000, 10000), function()
@@ -97,11 +94,10 @@ RegisterNetEvent('qb-drugs:server:successDelivery', function(deliveryData, inTim
             end)
         end
     else
-        if invItem and invItem.amount >= itemAmount then -- late correct amount
+        if invItem and invItem.count >= itemAmount then -- late correct amount
             TriggerClientEvent('QBCore:Notify', src, Lang:t("error.too_late"), 'error')
-            Player.Functions.RemoveItem(item, itemAmount)
+            exports.ox_inventory:RemoveItem(src, item, itemAmount)
             Player.Functions.AddMoney('cash', math.floor(payout / Config.OverdueDeliveryFee), "delivery-drugs-too-late")
-            TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[item], "remove")
             SetTimeout(math.random(5000, 10000), function()
                 TriggerClientEvent('qb-drugs:client:sendDeliveryMail', src, 'late', deliveryData)
                 if curRep - 1 > 0 then
@@ -112,12 +108,11 @@ RegisterNetEvent('qb-drugs:server:successDelivery', function(deliveryData, inTim
             end)
         else
             if invItem then -- late incorrect amount
-                local newItemAmount = invItem.amount
+                local newItemAmount = invItem.count
                 local modifiedPayout = deliveryData.itemData.payout * newItemAmount
                 TriggerClientEvent('QBCore:Notify', src, Lang:t("error.too_late"), 'error')
-                Player.Functions.RemoveItem(item, itemAmount)
+                exports.ox_inventory:RemoveItem(src, item, itemAmount)
                 Player.Functions.AddMoney('cash', math.floor(modifiedPayout / Config.OverdueDeliveryFee), "delivery-drugs-too-late")
-                TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[item], "remove")
                 SetTimeout(math.random(5000, 10000), function()
                     TriggerClientEvent('qb-drugs:client:sendDeliveryMail', src, 'late', deliveryData)
                     if curRep - 1 > 0 then

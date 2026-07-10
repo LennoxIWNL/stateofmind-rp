@@ -2,7 +2,7 @@ local QBCore = exports['qb-core']:GetCoreObject()
 
 RegisterNetEvent('jl-laptop:server:crateOpened', function(crateID)
     local _s = source
-    QBCore.Functions.GetPlayer(_s).Functions.RemoveItem('drill', 1)
+    exports.ox_inventory:RemoveItem(_s, 'drill', 1)
     crates[crateID].isOpened = true
     TriggerClientEvent('jl-laptop:client:updateCrates', -1, crates)
 end)

@@ -61,11 +61,9 @@ function SearchVehicle(source, vehicle, players)
 end
 
 function HasIllegalItems(target)
-	local Player = QBCore.Functions.GetPlayer(target)
-
 	for i = 1, #Config.K9Search do
 
- 		local item = Player.Functions.GetItemByName(Config.K9Search[i])
+ 		local item = exports.ox_inventory:GetItem(target, Config.K9Search[i], nil, false)
 
  		if item ~= nil then
  			return true

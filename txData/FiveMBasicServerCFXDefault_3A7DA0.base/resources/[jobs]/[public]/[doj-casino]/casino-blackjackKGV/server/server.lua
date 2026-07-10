@@ -163,13 +163,13 @@ function CheckPlayerBet(i, bet)
 	local ItemList = {
 		["casino_goldchip"] = 1,
 	}
-	local playerChips = Player.Functions.GetItemByName("casino_goldchip")
+	local playerChips = exports.ox_inventory:GetItem(source, "casino_goldchip", nil, false)
 	local canBet = false
     if Player.PlayerData.items ~= nil and next(Player.PlayerData.items) ~= nil then
         for k, v in pairs(Player.PlayerData.items) do
             if Player.PlayerData.items[k] ~= nil then
 				if ItemList[Player.PlayerData.items[k].name] ~= nil then
-					if playerChips.amount >= bet then
+					if playerChips.count >= bet then
 						canBet = true
 					end
                 end
@@ -919,10 +919,10 @@ function SetExports()
 	exports["casino-blackjackKGV"]:SetGetChipsCallback(function(source)
 		local src = source 
 		local Player = QBCore.Functions.GetPlayer(src)
-		local Chips = Player.Functions.GetItemByName("casino_goldchip")
+		local Chips = exports.ox_inventory:GetItem(src, "casino_goldchip", nil, false)
 		local minAmount = 10
-		if Chips ~= nil then 
-			if Chips.amount >= minAmount then
+		if Chips ~= nil then
+			if Chips.count >= minAmount then
 				Chips = Chips 
 			else
 				return TriggerClientEvent('QBCore:Notify', src, 'You dont have enough Casino Chips', 'error')
@@ -935,17 +935,15 @@ function SetExports()
     exports["casino-blackjackKGV"]:SetTakeChipsCallback(function(source, amount)
 		local Player = QBCore.Functions.GetPlayer(source)
         if Player ~= nil then
-            Player.Functions.RemoveItem("casino_goldchip", amount)
-            TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items['casino_goldchip'], "remove", amount)
+            exports.ox_inventory:RemoveItem(source, "casino_goldchip", amount)
         end
-    end) 
+    end)
 
     exports["casino-blackjackKGV"]:SetGiveChipsCallback(function(source, amount)
 		local src = source 
         local Player = QBCore.Functions.GetPlayer(source)
         if Player ~= nil then
-			if Player.Functions.AddItem('casino_goldchip', amount, nil, {["quality"] = 100}) then
-				TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items["casino_goldchip"], "add", amount)
+			if exports.ox_inventory:AddItem(src, 'casino_goldchip', amount, {["quality"] = 100}) then
 				TriggerClientEvent('QBCore:Notify', src, "You Won "..math.floor(amount).." Casino Chips!")
 			else
 				TriggerClientEvent('QBCore:Notify', src, 'You have to much in your pockets', 'error')

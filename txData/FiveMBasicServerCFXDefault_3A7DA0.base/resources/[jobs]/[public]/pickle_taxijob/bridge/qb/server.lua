@@ -1,4 +1,4 @@
-if GetResourceState('qb-core') ~= 'started' then return end
+if GetResourceState('qb-core') ~= 'started' and GetResourceState('qbx_core') ~= 'started' then return end
 
 QBCore = exports['qb-core']:GetCoreObject()
 
@@ -21,9 +21,9 @@ function Search(source, name)
     elseif (name == "bank") then
         return xPlayer.PlayerData.money['cash'] -- If anyone knows how to get bank balance for QBCore, let me know.
     else
-        local item = xPlayer.Functions.GetItemByName(name)
-        if item ~= nil then 
-            return item.amount
+        local item = exports.ox_inventory:GetItem(source, name, nil, false)
+        if item ~= nil then
+            return item.count
         else
             return 0
         end
@@ -37,7 +37,7 @@ function AddItem(source, name, amount, metadata)
     elseif (name == "bank") then
         return xPlayer.Functions.AddMoney("cash", amount) -- If anyone knows how to add to bank balance for QBCore, let me know.
     else
-        return xPlayer.Functions.AddItem(name, amount, nil, metadata)
+        return exports.ox_inventory:AddItem(source, name, amount, metadata)
     end
 end
 
@@ -48,7 +48,7 @@ function RemoveItem(source, name, amount)
     elseif (name == "bank") then
         return xPlayer.Functions.RemoveMoney("cash", amount) -- If anyone knows how to remove from bank balance for QBCore, let me know.
     else
-        return xPlayer.Functions.RemoveItem(name, amount)
+        return exports.ox_inventory:RemoveItem(source, name, amount)
     end
 end 
 

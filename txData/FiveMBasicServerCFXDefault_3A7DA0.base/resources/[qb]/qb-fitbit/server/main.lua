@@ -8,7 +8,7 @@ RegisterNetEvent('qb-fitbit:server:setValue', function(type, value)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
     if not Player then return end
-    if not Player.Functions.GetItemByName("fitbit") then return end
+    if not exports.ox_inventory:GetItem(src, "fitbit", nil, false) then return end
 
     local currentMeta = Player.PlayerData.metadata["fitbit"]
     local fitbitData = {

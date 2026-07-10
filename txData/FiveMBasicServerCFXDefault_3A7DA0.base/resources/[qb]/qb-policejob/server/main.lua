@@ -534,7 +534,7 @@ QBCore.Commands.Add('takedna', Lang:t('commands.takedna'), { { name = 'id', help
     local Player = QBCore.Functions.GetPlayer(src)
     local OtherPlayer = QBCore.Functions.GetPlayer(tonumber(args[1]))
     if not OtherPlayer or Player.PlayerData.job.name ~= 'police' or not Player.PlayerData.job.onduty then return end
-    if Player.Functions.RemoveItem('empty_evidence_bag', 1) then
+    if exports.ox_inventory:RemoveItem(src, 'empty_evidence_bag', 1) then
         local info = {
             label = Lang:t('info.dna_sample'),
             type = 'dna',
@@ -582,14 +582,14 @@ end)
 QBCore.Functions.CreateUseableItem('handcuffs', function(source)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    if not Player.Functions.GetItemByName('handcuffs') then return end
+    if not exports.ox_inventory:GetItem(src, 'handcuffs', nil, false) then return end
     TriggerClientEvent('police:client:CuffPlayerSoft', src)
 end)
 
 QBCore.Functions.CreateUseableItem('moneybag', function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    if not Player or not Player.Functions.GetItemByName('moneybag') or not item.info or item.info == '' or Player.PlayerData.job.type == 'leo' or not Player.Functions.RemoveItem('moneybag', 1, item.slot) then return end
+    if not Player or not exports.ox_inventory:GetItem(src, 'moneybag', nil, false) or not item.info or item.info == '' or Player.PlayerData.job.type == 'leo' or not exports.ox_inventory:RemoveItem(src, 'moneybag', 1, nil, item.slot) then return end
     Player.Functions.AddMoney('cash', tonumber(item.info.cash), 'used-moneybag')
 end)
 
@@ -613,16 +613,15 @@ QBCore.Functions.CreateCallback('police:GetPlayerStatus', function(_, cb, player
 end)
 
 QBCore.Functions.CreateCallback('police:IsSilencedWeapon', function(source, cb, weapon)
-    local Player = QBCore.Functions.GetPlayer(source)
-    local itemInfo = Player.Functions.GetItemByName(QBCore.Shared.Weapons[weapon]['name'])
+    local itemInfo = exports.ox_inventory:GetItem(source, QBCore.Shared.Weapons[weapon]['name'], nil, false)
     local retval = false
     if itemInfo then
-        if itemInfo.info and itemInfo.info.attachments then
-            for k in pairs(itemInfo.info.attachments) do
-                if itemInfo.info.attachments[k].component == 'COMPONENT_AT_AR_SUPP_02' or
-                    itemInfo.info.attachments[k].component == 'COMPONENT_AT_AR_SUPP' or
-                    itemInfo.info.attachments[k].component == 'COMPONENT_AT_PI_SUPP_02' or
-                    itemInfo.info.attachments[k].component == 'COMPONENT_AT_PI_SUPP' then
+        if itemInfo.metadata and itemInfo.metadata.attachments then
+            for k in pairs(itemInfo.metadata.attachments) do
+                if itemInfo.metadata.attachments[k].component == 'COMPONENT_AT_AR_SUPP_02' or
+                    itemInfo.metadata.attachments[k].component == 'COMPONENT_AT_AR_SUPP' or
+                    itemInfo.metadata.attachments[k].component == 'COMPONENT_AT_PI_SUPP_02' or
+                    itemInfo.metadata.attachments[k].component == 'COMPONENT_AT_PI_SUPP' then
                     retval = true
                 end
             end
@@ -733,7 +732,7 @@ RegisterNetEvent('police:server:CuffPlayer', function(playerId, isSoftcuff)
 
     local Player = QBCore.Functions.GetPlayer(src)
     local CuffedPlayer = QBCore.Functions.GetPlayer(playerId)
-    if not Player or not CuffedPlayer or (not Player.Functions.GetItemByName('handcuffs') and Player.PlayerData.job.name ~= 'police') then return end
+    if not Player or not CuffedPlayer or (not exports.ox_inventory:GetItem(src, 'handcuffs', nil, false) and Player.PlayerData.job.name ~= 'police') then return end
 
     TriggerClientEvent('police:client:GetCuffed', CuffedPlayer.PlayerData.source, Player.PlayerData.source, isSoftcuff)
 end)
