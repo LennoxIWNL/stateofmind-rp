@@ -9,7 +9,7 @@ description 'ammurobbery'
 version '0.2'
 
 shared_scripts {
-    '@qb-core/shared/locale.lua',
+    '@qbx_core/shared/locale.lua',
     'locales/en.lua',
     'config/config.lua',
 }

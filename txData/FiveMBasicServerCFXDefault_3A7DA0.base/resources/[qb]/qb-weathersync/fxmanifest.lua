@@ -7,7 +7,7 @@ version '2.1.0'
 
 shared_scripts {
     'config.lua',
-    '@qb-core/shared/locale.lua',
+    '@qbx_core/shared/locale.lua',
     'locales/en.lua',
     'locales/*.lua'
 }

@@ -14,6 +14,6 @@ files {
     'html/style.css',
 }
 
-dependency 'qb-core'
+dependency 'qbx_core'
 
 lua54 'yes'

@@ -5,7 +5,7 @@ description 'QB-Jewelry'
 version '1.2.0'
 
 shared_scripts {
-    '@qb-core/shared/locale.lua',
+    '@qbx_core/shared/locale.lua',
     'locale/en.lua',
     'locale/*.lua',
     'config.lua'

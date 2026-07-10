@@ -10,7 +10,7 @@ lua54 'yes' -- Add in case you want to use lua 5.4 (https://www.lua.org/manual/5
 
 shared_scripts {
     '@ox_lib/init.lua',
-    '@qb-core/shared/locale.lua',
+    '@qbx_core/shared/locale.lua',
     'locales/*.lua',
     'shared/config.lua',
     'shared/boosting.lua',
