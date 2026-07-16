@@ -23,8 +23,9 @@ Config = {
 		{ 	zoneEnable = true,
 			job = "police",
 			garage = {
-				spawn = vector4(-1107.40, -827.43, 5.06, 129.74),
-				out = vector4(-1106.61, -832.95, 5.06, 34.76),
+				-- MRPD back lot, near the vehicle gate at 488.89,-1017.21,27.15 (see ox_doorlock "mrpd gate"). Fine-tune in-game if needed.
+				spawn = vector4(492.65, -1017.85, 27.15, 90.0),
+				out = vector4(481.85, -1009.65, 27.16, 0.0),
 				list = {
 					["clrgc8"] = {
 						CustomName = "CL Corvette C8",

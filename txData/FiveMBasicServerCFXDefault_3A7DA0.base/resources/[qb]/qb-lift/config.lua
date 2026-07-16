@@ -102,48 +102,6 @@ Config.Elevators = {
             },
         }
     },
-    ["vespuccipd"] = {
-        Group = {"police"},
-        Sound = "liftSoundBellRing",
-        Name = "Vespucci PD",
-        Floors = {
-            [1] = {
-                Label = "Garage",
-                FloorDesc = "Go to the Garage",
-                Restricted = false,
-                Coords = vector3(-1097.37, -849.39, 5.06),
-                ExitHeading = "221.42"
-            },
-            [2] = {
-                Label = "Main Floor",
-                FloorDesc = "Go to the Main Floor",
-                Restricted = false,
-                Coords = vector3(-1097.30, -849.20, 19.31),
-                ExitHeading = "216.03"
-            },
-            [3] = {
-                Label = "Second Floor",
-                FloorDesc = "Go to the Second Floor",
-                Restricted = false,
-                Coords = vector3(-1097.26, -849.29, 26.83),
-                ExitHeading = "227.93"
-            },
-            [4] = {
-                Label = "Third Floor",
-                FloorDesc = "Go to the Third Floor",
-                Restricted = false,
-                Coords = vector3(-1097.29, -849.29, 30.95),
-                ExitHeading = "234.03"
-            },
-            [5] = {
-                Label = "Top Floor",
-                FloorDesc = "Go to the Top Floor",
-                Restricted = true,
-                Coords = vector3(-1097.31, -849.23, 34.28),
-                ExitHeading = "225.89"
-            },
-        }
-    },
 }
 
 Config.Language = {

@@ -1,13 +1,22 @@
 -- ============================================================================
---  server_setup.sql  --  State of Mind RP (QBCore, build 2944)
---  Consolidated & re-runnable database schema.
---  Generated from all per-resource .sql files + confirmed missing tables.
+--  server_setup.sql  --  State of Mind RP (Qbox / qbx_core, build 2944)
+--  Consolidated & re-runnable database schema. Single source of truth for
+--  the database: every other per-resource .sql file in this repo has been
+--  folded in here and removed (2026-07-16 consolidation pass).
 --
 --  Structure:  (1) all CREATE TABLE IF NOT EXISTS   (2) all INSERT IGNORE seed data
 --  Safe to import multiple times: no duplicate-key (#1062) or "table exists" errors.
 --
+--  Framework: qbx_core (qb-core's replacement) + qbx_vehicles + ox_inventory.
 --  Phone: npwd (replaces old qb-phone). Old phone tables kept for compat but
 --         npwd_* tables are the active ones. Run on fresh DB or existing.
+--  MDT: ps-mdt is the active MDT resource (ds-mdt is disabled). If this DB
+--       was ever provisioned from an OLDER copy of this file that had the
+--       ds-mdt schema (mdt_config/mdt_evidences/mdt_profiles/mdt_vehicles/
+--       mdt_warrants + old-shape mdt_incidents/mdt_reports), those tables
+--       already exist with incompatible columns and CREATE TABLE IF NOT
+--       EXISTS below will NOT fix them -- run ps-mdt-migrate.sql once first
+--       (it DROPs the old ds-mdt tables and recreates the ps-mdt schema).
 -- ============================================================================
 
 SET NAMES utf8mb4;
@@ -197,6 +206,13 @@ CREATE TABLE IF NOT EXISTS `jobs` (
   `whitelisted` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- table: kloud_delivery (kloud-food-delivery; self-provisioned by the resource too)
+CREATE TABLE IF NOT EXISTS `kloud_delivery` (
+  `job` varchar(55) NOT NULL,
+  `stock` int(11) NOT NULL DEFAULT 1,
+  PRIMARY KEY (`job`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- table: lapraces
 CREATE TABLE IF NOT EXISTS `lapraces` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -209,6 +225,64 @@ CREATE TABLE IF NOT EXISTS `lapraces` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=utf8mb4;
 
+-- table: lennox_buildings (Lennox-DoorCreator)
+CREATE TABLE IF NOT EXISTS `lennox_buildings` (
+    `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+    `name` varchar(100) NOT NULL,
+    `description` text DEFAULT NULL,
+    `doors` longtext NOT NULL,
+    `permissions` longtext DEFAULT NULL,
+    `metadata` longtext DEFAULT NULL,
+    `created_by` varchar(100) DEFAULT NULL,
+    `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- table: lennox_templates (Lennox-DoorCreator)
+CREATE TABLE IF NOT EXISTS `lennox_templates` (
+    `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+    `name` varchar(100) NOT NULL,
+    `description` text DEFAULT NULL,
+    `type` enum('single', 'building') NOT NULL DEFAULT 'single',
+    `data` longtext NOT NULL,
+    `author` varchar(100) DEFAULT NULL,
+    `version` varchar(20) DEFAULT '1.0.0',
+    `export_code` varchar(32) DEFAULT NULL,
+    `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `export_code` (`export_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- table: lennox_backups (Lennox-DoorCreator)
+CREATE TABLE IF NOT EXISTS `lennox_backups` (
+    `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+    `name` varchar(100) NOT NULL,
+    `type` enum('auto', 'manual') NOT NULL DEFAULT 'auto',
+    `door_count` int(11) NOT NULL DEFAULT 0,
+    `building_count` int(11) NOT NULL DEFAULT 0,
+    `data` longtext NOT NULL,
+    `created_by` varchar(100) DEFAULT NULL,
+    `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- table: lennox_door_logs (Lennox-DoorCreator)
+CREATE TABLE IF NOT EXISTS `lennox_door_logs` (
+    `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+    `action` varchar(50) NOT NULL,
+    `door_id` int(11) DEFAULT NULL,
+    `building_id` int(11) DEFAULT NULL,
+    `player_name` varchar(100) DEFAULT NULL,
+    `player_identifier` varchar(100) DEFAULT NULL,
+    `details` longtext DEFAULT NULL,
+    `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_action` (`action`),
+    KEY `idx_door_id` (`door_id`),
+    KEY `idx_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- table: management_funds
 CREATE TABLE IF NOT EXISTS `management_funds` (
 `id` INT(11) NOT NULL AUTO_INCREMENT,
@@ -220,80 +294,161 @@ UNIQUE KEY `job_name` (`job_name`),
 KEY `type` (`type`)
 );
 
--- table: mdt_config
-CREATE TABLE IF NOT EXISTS `mdt_config` (
-  `citizenid` VARCHAR(10) NOT NULL,
-  `theme` int(11) NOT NULL,
-  `sidebar` int(11) NOT NULL,
-  UNIQUE KEY `citizenid` (`citizenid`) USING HASH
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+-- ===== ps-mdt schema (active MDT resource; ds-mdt is disabled) =====
+-- If this DB already has the OLD ds-mdt tables (mdt_config, mdt_evidences,
+-- mdt_profiles, mdt_vehicles, mdt_warrants, and old-shape mdt_incidents/
+-- mdt_reports) from a previous version of this file, CREATE TABLE IF NOT
+-- EXISTS will leave them untouched and ps-mdt will break on missing columns.
+-- Run ps-mdt-migrate.sql once (DROPs the old tables, creates the ps-mdt ones)
+-- before relying on this file alone for an upgrade.
 
--- table: mdt_evidences
-CREATE TABLE IF NOT EXISTS `mdt_evidences` (
+-- table: mdt_data
+CREATE TABLE IF NOT EXISTS `mdt_data` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `imgurl` text NOT NULL,
-  `description` text NOT NULL,
-  `type` text NOT NULL,
-  `date` text NOT NULL,
-  `createdby` text NOT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=latin1;
+  `cid` varchar(20) DEFAULT NULL,
+  `information` mediumtext DEFAULT NULL,
+  `tags` text NOT NULL,
+  `gallery` text NOT NULL,
+  `jobtype` varchar(25) DEFAULT 'police',
+  `pfp` text DEFAULT NULL,
+  `fingerprint` varchar(50) DEFAULT NULL,
+  PRIMARY KEY (`cid`),
+  KEY `id` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- table: mdt_incidents
-CREATE TABLE IF NOT EXISTS `mdt_incidents` (
+-- table: mdt_bulletin
+CREATE TABLE IF NOT EXISTS `mdt_bulletin` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `title` text NOT NULL,
-  `description` text NOT NULL,
-  `persons` text NOT NULL,
-  `officers` text NOT NULL,
-  `evidences` text NOT NULL,
-  `vehicles` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`vehicles`)),
-  `criminals` text NOT NULL,
-  `date` text NOT NULL,
-  `createdby` text NOT NULL,
+  `desc` text NOT NULL,
+  `author` varchar(50) NOT NULL,
+  `time` varchar(20) NOT NULL,
+  `jobtype` varchar(25) DEFAULT 'police',
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=latin1;
-
--- table: mdt_profiles
-CREATE TABLE IF NOT EXISTS `mdt_profiles` (
-  `citizenid` VARCHAR(10) NOT NULL,
-  `notes` text NOT NULL,
-  `image` text NOT NULL,
-  UNIQUE KEY `citizenid` (`citizenid`) USING HASH
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- table: mdt_reports
 CREATE TABLE IF NOT EXISTS `mdt_reports` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `type` text NOT NULL,
-  `title` text NOT NULL,
-  `description` text NOT NULL,
-  `persons` text NOT NULL,
-  `officers` text NOT NULL,
-  `vehicles` text NOT NULL,
-  `evidences` text NOT NULL,
-  `date` text NOT NULL,
-  `createdby` text NOT NULL,
+  `author` varchar(50) DEFAULT NULL,
+  `title` varchar(255) DEFAULT NULL,
+  `type` varchar(50) DEFAULT NULL,
+  `details` text DEFAULT NULL,
+  `tags` text DEFAULT NULL,
+  `officersinvolved` text DEFAULT NULL,
+  `civsinvolved` text DEFAULT NULL,
+  `gallery` text DEFAULT NULL,
+  `time` varchar(20) DEFAULT NULL,
+  `jobtype` varchar(25) DEFAULT 'police',
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- table: mdt_vehicles
-CREATE TABLE IF NOT EXISTS `mdt_vehicles` (
-  `plate` VARCHAR(10) NOT NULL,
-  `image` text NOT NULL,
-  `notes` text NOT NULL,
-  UNIQUE KEY `plate` (`plate`) USING HASH
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-
--- table: mdt_warrants
-CREATE TABLE IF NOT EXISTS `mdt_warrants` (
+-- table: mdt_bolos
+CREATE TABLE IF NOT EXISTS `mdt_bolos` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `incident` int(11) NOT NULL,
-  `citizenid` text NOT NULL,
-  `date` text NOT NULL,
-  `approved` int(11) NOT NULL DEFAULT 0,
+  `author` varchar(50) DEFAULT NULL,
+  `title` varchar(50) DEFAULT NULL,
+  `plate` varchar(50) DEFAULT NULL,
+  `owner` varchar(50) DEFAULT NULL,
+  `individual` varchar(50) DEFAULT NULL,
+  `detail` text DEFAULT NULL,
+  `tags` text DEFAULT NULL,
+  `gallery` text DEFAULT NULL,
+  `officersinvolved` text DEFAULT NULL,
+  `time` varchar(20) DEFAULT NULL,
+  `jobtype` varchar(25) NOT NULL DEFAULT 'police',
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- table: mdt_convictions
+CREATE TABLE IF NOT EXISTS `mdt_convictions` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `cid` varchar(50) DEFAULT NULL,
+  `linkedincident` int(11) NOT NULL DEFAULT 0,
+  `warrant` varchar(50) DEFAULT NULL,
+  `guilty` varchar(50) DEFAULT NULL,
+  `processed` varchar(50) DEFAULT NULL,
+  `associated` varchar(50) DEFAULT '0',
+  `charges` text DEFAULT NULL,
+  `fine` int(11) DEFAULT 0,
+  `sentence` int(11) DEFAULT 0,
+  `recfine` int(11) DEFAULT 0,
+  `recsentence` int(11) DEFAULT 0,
+  `time` varchar(20) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- table: mdt_incidents
+CREATE TABLE IF NOT EXISTS `mdt_incidents` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `author` varchar(50) NOT NULL DEFAULT '',
+  `title` varchar(50) NOT NULL DEFAULT '0',
+  `details` text NOT NULL,
+  `tags` text NOT NULL,
+  `officersinvolved` text NOT NULL,
+  `civsinvolved` text NOT NULL,
+  `evidence` text NOT NULL,
+  `time` varchar(20) DEFAULT NULL,
+  `jobtype` varchar(25) NOT NULL DEFAULT 'police',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- table: mdt_logs
+CREATE TABLE IF NOT EXISTS `mdt_logs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `text` text NOT NULL,
+  `time` varchar(20) DEFAULT NULL,
+  `jobtype` varchar(25) DEFAULT 'police',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- table: mdt_vehicleinfo
+CREATE TABLE IF NOT EXISTS `mdt_vehicleinfo` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `plate` varchar(50) DEFAULT NULL,
+  `information` text NOT NULL DEFAULT '',
+  `stolen` tinyint(1) NOT NULL DEFAULT 0,
+  `code5` tinyint(1) NOT NULL DEFAULT 0,
+  `image` text NOT NULL DEFAULT '',
+  `points` int(11) DEFAULT 0,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- table: mdt_weaponinfo
+CREATE TABLE IF NOT EXISTS `mdt_weaponinfo` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `serial` varchar(50) DEFAULT NULL,
+  `owner` varchar(50) DEFAULT NULL,
+  `information` text NOT NULL DEFAULT '',
+  `weapClass` varchar(50) DEFAULT NULL,
+  `weapModel` varchar(50) DEFAULT NULL,
+  `image` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `serial` (`serial`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- table: mdt_impound
+CREATE TABLE IF NOT EXISTS `mdt_impound` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `vehicleid` int(11) NOT NULL,
+  `linkedreport` int(11) NOT NULL,
+  `fee` int(11) DEFAULT NULL,
+  `time` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- table: mdt_clocking
+CREATE TABLE IF NOT EXISTS `mdt_clocking` (
+  `id` int(10) NOT NULL AUTO_INCREMENT,
+  `user_id` varchar(50) NOT NULL DEFAULT '',
+  `firstname` varchar(255) NOT NULL DEFAULT '',
+  `lastname` varchar(255) NOT NULL DEFAULT '',
+  `clock_in_time` varchar(255) NOT NULL DEFAULT '',
+  `clock_out_time` varchar(50) DEFAULT NULL,
+  `total_time` int(10) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`user_id`) USING BTREE,
+  KEY `id` (`id`) USING BTREE
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- table: ox_doorlock
 CREATE TABLE
@@ -303,6 +458,22 @@ CREATE TABLE
         `data` longtext NOT NULL,
         PRIMARY KEY (`id`)
     );
+
+-- table: pa_vehicleshop_stocks (pa-vehicleshop; self-provisioned by the resource too)
+CREATE TABLE IF NOT EXISTS `pa_vehicleshop_stocks` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `dealershipId` int(11) DEFAULT NULL,
+  `data` longtext DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+-- table: pa_vehicleshop_showroom_vehicles (pa-vehicleshop; self-provisioned by the resource too)
+CREATE TABLE IF NOT EXISTS `pa_vehicleshop_showroom_vehicles` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `dealershipId` int(11) DEFAULT NULL,
+  `data` longtext NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- table: phone_gallery (DEPRECATED — replaced by npwd_phone_gallery, kept for compat)
 CREATE TABLE IF NOT EXISTS `phone_gallery` (
@@ -406,6 +577,12 @@ CREATE TABLE IF NOT EXISTS `player_outfits` (
 ) ENGINE=InnoDB AUTO_INCREMENT=8970 DEFAULT CHARSET=utf8mb4;
 
 -- table: player_vehicles
+--   coords: added by qbx_vehicles (active). balance/paymentamount/paymentsleft/
+--     financetime: no currently-active resource reads/writes these (old vehicle
+--     financing feature) but kept per union-of-columns rule since we can't
+--     confirm they're safe to drop -- do not delete real column data.
+--   rentfinish: som-rentacar (active). nosColour/traveldistance/noslevel/hasnitro:
+--     jim-mechanic nitro system (active). logs: qb-garages (active).
 CREATE TABLE IF NOT EXISTS `player_vehicles` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `license` varchar(50) DEFAULT NULL,
@@ -423,15 +600,44 @@ CREATE TABLE IF NOT EXISTS `player_vehicles` (
   `depotprice` int(11) NOT NULL DEFAULT 0,
   `drivingdistance` int(50) DEFAULT NULL,
   `status` text DEFAULT NULL,
+  `coords` text DEFAULT NULL,
   `balance` int(11) NOT NULL DEFAULT 0,
   `paymentamount` int(11) NOT NULL DEFAULT 0,
   `paymentsleft` int(11) NOT NULL DEFAULT 0,
   `financetime` int(11) NOT NULL DEFAULT 0,
+  `rentfinish` date NOT NULL DEFAULT '2025-06-01',
+  `nosColour` text DEFAULT NULL,
+  `traveldistance` int(50) DEFAULT 0,
+  `noslevel` int(10) DEFAULT 0,
+  `hasnitro` tinyint(1) DEFAULT 0,
+  `logs` longtext DEFAULT '[]',
   PRIMARY KEY (`id`),
   KEY `plate` (`plate`),
   KEY `citizenid` (`citizenid`),
   KEY `license` (`license`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1;
+
+-- NOTE: on a pre-existing DB, run these once (idempotent, safe to re-run)
+-- so an already-created `player_vehicles` table picks up all the columns above:
+ALTER TABLE `player_vehicles` ADD COLUMN IF NOT EXISTS `coords` text DEFAULT NULL;
+ALTER TABLE `player_vehicles` ADD COLUMN IF NOT EXISTS `rentfinish` date NOT NULL DEFAULT '2025-06-01';
+ALTER TABLE `player_vehicles` ADD COLUMN IF NOT EXISTS `nosColour` text DEFAULT NULL;
+ALTER TABLE `player_vehicles` ADD COLUMN IF NOT EXISTS `traveldistance` int(50) DEFAULT 0;
+ALTER TABLE `player_vehicles` ADD COLUMN IF NOT EXISTS `noslevel` int(10) DEFAULT 0;
+ALTER TABLE `player_vehicles` ADD COLUMN IF NOT EXISTS `hasnitro` tinyint(1) DEFAULT 0;
+ALTER TABLE `player_vehicles` ADD COLUMN IF NOT EXISTS `logs` longtext DEFAULT '[]';
+
+-- NOTE: qbx_vehicles.sql additionally defines `plate` as UNIQUE KEY and a
+-- FOREIGN KEY (citizenid) REFERENCES players(citizenid) ON DELETE CASCADE ON
+-- UPDATE CASCADE. NOT applied here automatically -- adding a UNIQUE key on
+-- `plate` or an FK on `citizenid` may fail on this live DB if there are
+-- already duplicate plates or vehicle rows whose citizenid doesn't match any
+-- row in `players` (orphaned vehicles). Verify with the queries below before
+-- applying, then run manually:
+--   SELECT plate, COUNT(*) c FROM player_vehicles GROUP BY plate HAVING c > 1;
+--   SELECT pv.citizenid FROM player_vehicles pv LEFT JOIN players p ON p.citizenid = pv.citizenid WHERE p.citizenid IS NULL;
+--   ALTER TABLE `player_vehicles` ADD UNIQUE KEY `plate` (`plate`);
+--   ALTER TABLE `player_vehicles` ADD FOREIGN KEY (`citizenid`) REFERENCES `players` (`citizenid`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- table: player_warns
 CREATE TABLE IF NOT EXISTS `player_warns` (
@@ -443,9 +649,12 @@ CREATE TABLE IF NOT EXISTS `player_warns` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- table: players (phone_number column added for npwd/qb-npwd bridge)
+-- table: players (phone_number column added for npwd/qb-npwd bridge;
+--   userId/last_logged_out added for qbx_core; luckywheel_spins added for
+--   casino-luckywheel)
 CREATE TABLE IF NOT EXISTS `players` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
+  `userId` int(10) unsigned DEFAULT NULL,
   `citizenid` varchar(50) NOT NULL,
   `cid` int(11) DEFAULT NULL,
   `license` varchar(255) NOT NULL,
@@ -458,12 +667,34 @@ CREATE TABLE IF NOT EXISTS `players` (
   `metadata` text NOT NULL,
   `inventory` longtext DEFAULT NULL,
   `phone_number` varchar(20) DEFAULT NULL,
+  `luckywheel_spins` varchar(1) DEFAULT '0',
   `last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `last_logged_out` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`citizenid`),
   KEY `id` (`id`),
   KEY `last_updated` (`last_updated`),
   KEY `license` (`license`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1;
+
+-- NOTE: on a pre-existing DB, run these once (idempotent, safe to re-run)
+-- so an already-created `players` table picks up the qbx_core/luckywheel columns:
+ALTER TABLE `players` ADD COLUMN IF NOT EXISTS `userId` int(10) unsigned DEFAULT NULL AFTER `id`;
+ALTER TABLE `players` ADD COLUMN IF NOT EXISTS `luckywheel_spins` varchar(1) DEFAULT '0';
+ALTER TABLE `players` ADD COLUMN IF NOT EXISTS `last_logged_out` timestamp NULL DEFAULT NULL AFTER `last_updated`;
+
+-- table: player_groups (qbx_core -- permission/gang-boss grade storage)
+-- No explicit COLLATE here: it must match `players`.`citizenid` exactly for the
+-- FK below to succeed (errno 150 "Foreign key constraint is incorrectly formed"
+-- if they differ), so both tables inherit the database's default collation
+-- instead of hardcoding one.
+CREATE TABLE IF NOT EXISTS `player_groups` (
+  `citizenid` varchar(50) NOT NULL,
+  `group` varchar(50) NOT NULL,
+  `type` varchar(50) NOT NULL,
+  `grade` tinyint(3) unsigned NOT NULL,
+  PRIMARY KEY (`citizenid`, `type`, `group`),
+  CONSTRAINT `fk_player_groups_citizenid` FOREIGN KEY (`citizenid`) REFERENCES `players` (`citizenid`) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- table: playerskins
 CREATE TABLE IF NOT EXISTS `playerskins` (

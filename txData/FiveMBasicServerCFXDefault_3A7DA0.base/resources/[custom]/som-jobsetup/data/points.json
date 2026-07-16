@@ -1,16 +1,1 @@
-[
-    {
-        "heading": 112.95,
-        "job": "police",
-        "label": "New Point",
-        "id": 8,
-        "restrictJob": true,
-        "type": "duty",
-        "coords": {
-            "z": 19.14,
-            "x": -1101.54,
-            "y": -830.82
-        },
-        "radius": 1.5
-    }
-]
+[]

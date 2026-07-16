@@ -566,22 +566,18 @@ Config.AirAndWaterVehicleFueling = {
                 ['coords'] = vector4(1338.13, 4269.62, 30.5, 85.00),
             }
         },  
-        -- Bob Smith PD
+        -- MRPD helipad (matches qb-policejob Config.Locations.helicopter)
         [13] = {
             ['PolyZone'] = {
                 ['coords'] = {
-                    vector2(-1083.85, -837.07),
-                    vector2(-1100.36, -849.84),
-                    vector2(-1108.85, -839.11),
-                    vector2(-1107.04, -837.76),
-                    vector2(-1109.65, -834.04),
-                    vector2(-1104.1, -829.69),
-                    vector2(-1104.29, -829.07),
-                    vector2(-1095.62, -822.42),
+                    vector2(444.0, -976.0),
+                    vector2(444.0, -987.0),
+                    vector2(455.0, -987.0),
+                    vector2(455.0, -976.0),
                 },
                 ['minmax'] = {
-                    ['min'] = 36.00,
-                    ['max'] = 42.50
+                    ['min'] = 42.50,
+                    ['max'] = 46.50
                 },
             },
             ['draw_text'] = "[G] Refuel Helicopter",
@@ -595,9 +591,9 @@ Config.AirAndWaterVehicleFueling = {
             },
             ['prop'] = {
                 ['model'] = 'prop_gas_pump_1d',
-                ['coords'] = vector4(-1089.72, -830.6, 36.68, 129.00),
+                ['coords'] = vector4(449.168, -981.325, 43.691, 87.234),
             }
-        },  
+        },
         -- Merryweather Helipad
         [14] = {
             ['PolyZone'] = {

@@ -8,13 +8,13 @@ endpoint_add_udp "0.0.0.0:30120"
 sv_maxclients 6
 # Get a Steam Web API key from https://steamcommunity.com/dev/apikey
 set steam_webApiKey "YOUR_STEAM_WEB_API_KEY"
-sets tags "default, deployer, qbcore, qb-core"
+sets tags "default, deployer, qbox, ox_inventory"
 
 ## You MAY edit the following:
 # Get a license key from https://keymaster.fivem.net
 sv_licenseKey "YOUR_CFX_LICENSE_KEY"
 sv_hostname "State of MindRP By Lennox!"
-sets sv_projectName "[QBCore Framework] State of MindRP"
+sets sv_projectName "[Qbox Framework] State of MindRP"
 sets sv_projectDesc "An advanced FiveM RP framework including jobs, gangs, housing & more!"
 sets locale "en-US"
 load_server_icon server-icon.png
@@ -50,6 +50,10 @@ ensure sessionmanager
 ensure basic-gamemode
 ensure hardcap
 ensure baseevents
+ensure connectqueue
+
+# Anti-cheat (loads before everything else so it monitors from first connect)
+ensure [anticheats]
 
 # QBCore & Extra stuff — load order matters!
 # Core framework + libraries first
