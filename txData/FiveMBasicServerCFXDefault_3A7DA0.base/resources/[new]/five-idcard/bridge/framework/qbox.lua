@@ -23,7 +23,7 @@ local function CreateMetaLicense(src)
         class = 'C',
         pref = 'UNKNOWN'
     }
-    player.Functions.AddItem(Config.ItemName, 1, false, metadata)
+    exports.ox_inventory:AddItem(src, Config.ItemName, 1, metadata)
 end
 
 exports('CreateMetaLicense', CreateMetaLicense)

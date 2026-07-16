@@ -55,10 +55,8 @@ lib.callback.register('qb_vehicle_tracker:placeTracker', function(source, vehicl
     if not utils.isPlayerNearVehicle(GetEntityCoords(GetPlayerPed(source)), vehiclePlate) then return false end
     if not db.addTracker(serialNumber, utils.trim(vehiclePlate)) then return false end
 
-    local Player = QBCore.Functions.GetPlayer(source)
-    if Player.Functions.AddItem(config.trackerTabletItem, 1, false, { plate = utils.trim(vehiclePlate), serialNumber = serialNumber }) then
-        Player.Functions.RemoveItem(config.trackerItem, 1, slot)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[config.trackerTabletItem], 'add')
+    if exports.ox_inventory:AddItem(source, config.trackerTabletItem, 1, { plate = utils.trim(vehiclePlate), serialNumber = serialNumber }) then
+        exports.ox_inventory:RemoveItem(source, config.trackerItem, 1, nil, slot)
     end
 
     return true
@@ -71,10 +69,7 @@ lib.callback.register('qb_vehicle_tracker:removeTracker', function(source, vehic
 
     if not db.deleteTracker(utils.trim(vehiclePlate)) then return false end
 
-    local Player = QBCore.Functions.GetPlayer(source)
-    if Player.Functions.RemoveItem(config.trackerScannerItem, 1, slot) then
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[config.trackerScannerItem], 'remove')
-    end
+    exports.ox_inventory:RemoveItem(source, config.trackerScannerItem, 1, nil, slot)
 
     return true
 end)

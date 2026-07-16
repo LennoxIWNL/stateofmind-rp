@@ -25,11 +25,10 @@ RegisterNetEvent('rcore_spray:addSpray')
 AddEventHandler('rcore_spray:addSpray', function(spray)
     local source = source
     
-    local xPlayer = QBCore.Functions.GetPlayer(source)
-    local item = xPlayer.Functions.GetItemByName("spray")
-    
+    local item = exports.ox_inventory:GetItem(source, "spray", nil, false)
+
     if item then
-        xPlayer.Functions.RemoveItem("spray", 1)
+        exports.ox_inventory:RemoveItem(source, "spray", 1)
         local i = 1
         while true do
             if not SPRAYS[i] then
@@ -106,9 +105,8 @@ end)
 
 RegisterCommand('spray', function(source, args)
     local source = source
-    local xPlayer = QBCore.Functions.GetPlayer(source)
-    local item = xPlayer.Functions.GetItemByName("spray")
-    
+    local item = exports.ox_inventory:GetItem(source, "spray", nil, false)
+
     if item then
         local sprayText = args[1]
 
@@ -144,8 +142,7 @@ end, false)
 
 function HasSpray(serverId, cb)
     local source = source
-    local xPlayer = QBCore.Functions.GetPlayer(source)
-    local item = xPlayer.Functions.GetItemByName("spray")
+    local item = exports.ox_inventory:GetItem(source, "spray", nil, false)
 
     cb(item.count > 0)
 end

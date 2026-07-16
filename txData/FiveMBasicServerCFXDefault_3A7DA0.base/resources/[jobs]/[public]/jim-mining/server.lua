@@ -39,8 +39,9 @@ end)
 RegisterNetEvent("jim-mining:Selling", function(data)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    if Player.Functions.GetItemByName(data.item) ~= nil then
-        local amount = Player.Functions.GetItemByName(data.item).amount
+    local sellItem = exports.ox_inventory:GetItem(src, data.item, nil, false)
+    if sellItem ~= nil then
+        local amount = sellItem.count
         local pay = (amount * Config.SellingPrices[data.item])
 		TriggerEvent("jim-mining:server:toggleItem", false, data.item, amount, src)
         Player.Functions.AddMoney('cash', pay)
@@ -59,18 +60,16 @@ end
 
 RegisterNetEvent('jim-mining:server:toggleItem', function(give, item, amount, newsrc)
 	local src = newsrc or source
-	local Player = QBCore.Functions.GetPlayer(src)
 	local remamount = (amount or 1)
 	if give == 0 or give == false then
 		if HasItem(src, item, amount or 1) then -- check if you still have the item
-			if Config.Inv == "ox" then Player.Functions.RemoveItem(item, amount) else
-			while remamount > 0 do if Player.Functions.RemoveItem(item, 1) then end remamount -= 1 end
-			TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[item], "remove", amount or 1) end
+			if Config.Inv == "ox" then exports.ox_inventory:RemoveItem(src, item, amount) else
+			while remamount > 0 do if exports.ox_inventory:RemoveItem(src, item, 1) then end remamount -= 1 end
+			end
 			if Config.Debug then print("^5Debug^7: ^1Removing ^2from Player^7(^2"..src.."^7) '^6"..QBCore.Shared.Items[item].label.."^7(^2x^6"..(amount or "1").."^7)'") end
 		else dupeWarn(src, item) end -- if not boot the player
 	else
-		if Player.Functions.AddItem(item, amount or 1) then
-			TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[item], "add", amount or 1)
+		if exports.ox_inventory:AddItem(src, item, amount or 1) then
 			if Config.Debug then print("^5Debug^7: ^4Giving ^2Player^7(^2"..src.."^7) '^6"..QBCore.Shared.Items[item].label.."^7(^2x^6"..(amount or "1").."^7)'") end
 		end
 	end

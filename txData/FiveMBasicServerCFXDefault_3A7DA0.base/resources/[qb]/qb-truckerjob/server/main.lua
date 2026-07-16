@@ -47,7 +47,5 @@ end)
 RegisterNetEvent('qb-trucker:server:nano', function()
     local chance = math.random(1,100)
     if chance > 26 then return end
-    local xPlayer = QBCore.Functions.GetPlayer(tonumber(source))
-    xPlayer.Functions.AddItem("cryptostick", 1, false)
-    TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["cryptostick"], "add")
+    exports.ox_inventory:AddItem(source, "cryptostick", 1)
 end)

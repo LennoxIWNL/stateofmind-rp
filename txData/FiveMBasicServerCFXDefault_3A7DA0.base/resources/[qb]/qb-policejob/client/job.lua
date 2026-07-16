@@ -154,7 +154,7 @@ function TakeOutVehicle(vehicleInfo)
             end
             TaskWarpPedIntoVehicle(PlayerPedId(), veh, -1)
             TriggerEvent('vehiclekeys:client:SetOwner', QBCore.Functions.GetPlate(veh))
-            TriggerServerEvent('inventory:server:addTrunkItems', QBCore.Functions.GetPlate(veh), Config.CarItems)
+            TriggerServerEvent('qb-policejob:server:stockVehicleTrunk', QBCore.Functions.GetPlate(veh), NetworkGetNetworkIdFromEntity(veh))
             SetVehicleEngineOn(veh, true, true)
         end, vehicleInfo, coords, true)
     end
@@ -421,11 +421,7 @@ RegisterNetEvent('police:client:EvidenceStashDrawer', function()
         })
         if drawer then
             if not drawer.slot then return end
-            TriggerServerEvent('inventory:server:OpenInventory', 'stash', Lang:t('info.current_evidence', { value = currentEvidence, value2 = drawer.slot }), {
-                maxweight = 4000000,
-                slots = 500,
-            })
-            TriggerEvent('inventory:client:SetCurrentStash', Lang:t('info.current_evidence', { value = currentEvidence, value2 = drawer.slot }))
+            TriggerServerEvent('qb-policejob:server:openEvidenceDrawer', currentEvidence, drawer.slot)
         end
     else
         exports['qb-menu']:closeMenu()
@@ -449,31 +445,7 @@ RegisterNetEvent('qb-police:client:scanFingerPrint', function()
 end)
 
 RegisterNetEvent('qb-police:client:openArmoury', function()
-    local authorizedItemsList = {}
-    local playerGrade = PlayerJob.grade.level
-    for grade = 0, playerGrade do
-        if Config.Items[grade] then
-            for _, item in ipairs(Config.Items[grade]) do
-                local itemInfo = QBCore.Shared.Items[item.name]
-                if itemInfo then
-                    authorizedItemsList[#authorizedItemsList + 1] = {
-                        name = item.name,
-                        price = item.price,
-                        amount = item.amount,
-                        info = item.info or {},
-                        type = itemType,
-                        slot = #authorizedItemsList + 1
-                    }
-                end
-            end
-        end
-    end
-    local authorizedItems = {
-        label = 'Police Armory',
-        slots = #authorizedItemsList,
-        items = authorizedItemsList
-    }
-    TriggerServerEvent('inventory:server:OpenInventory', 'shop', 'police', authorizedItems)
+    exports.ox_inventory:openInventory('shop', 'police')
 end)
 
 RegisterNetEvent('qb-police:client:spawnHelicopter', function(k)
@@ -498,16 +470,11 @@ RegisterNetEvent('qb-police:client:spawnHelicopter', function(k)
 end)
 
 RegisterNetEvent('qb-police:client:openStash', function()
-    TriggerServerEvent('inventory:server:OpenInventory', 'stash', 'policestash_' .. QBCore.Functions.GetPlayerData().citizenid)
-    TriggerEvent('inventory:client:SetCurrentStash', 'policestash_' .. QBCore.Functions.GetPlayerData().citizenid)
+    exports.ox_inventory:openInventory('stash', 'policestash_' .. QBCore.Functions.GetPlayerData().citizenid)
 end)
 
 RegisterNetEvent('qb-police:client:openTrash', function()
-    TriggerServerEvent('inventory:server:OpenInventory', 'stash', 'policetrash', {
-        maxweight = 4000000,
-        slots = 300,
-    })
-    TriggerEvent('inventory:client:SetCurrentStash', 'policetrash')
+    exports.ox_inventory:openInventory('stash', 'policetrash')
 end)
 
 --##### Threads #####--
@@ -541,8 +508,7 @@ local function stash()
             if inStash and PlayerJob.type == 'leo' then
                 if PlayerJob.onduty then sleep = 5 end
                 if IsControlJustReleased(0, 38) then
-                    TriggerServerEvent('inventory:server:OpenInventory', 'stash', 'policestash_' .. QBCore.Functions.GetPlayerData().citizenid)
-                    TriggerEvent('inventory:client:SetCurrentStash', 'policestash_' .. QBCore.Functions.GetPlayerData().citizenid)
+                    exports.ox_inventory:openInventory('stash', 'policestash_' .. QBCore.Functions.GetPlayerData().citizenid)
                     break
                 end
             else
@@ -560,11 +526,7 @@ local function trash()
             if inTrash and PlayerJob.type == 'leo' then
                 if PlayerJob.onduty then sleep = 5 end
                 if IsControlJustReleased(0, 38) then
-                    TriggerServerEvent('inventory:server:OpenInventory', 'stash', 'policetrash', {
-                        maxweight = 4000000,
-                        slots = 300,
-                    })
-                    TriggerEvent('inventory:client:SetCurrentStash', 'policetrash')
+                    exports.ox_inventory:openInventory('stash', 'policetrash')
                     break
                 end
             else

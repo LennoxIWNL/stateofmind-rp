@@ -23,15 +23,16 @@ RegisterNetEvent('equip:harness', function(item)
 
     if not Player then return end
 
-    if not Player.PlayerData.items[item.slot].info.uses then
-        Player.PlayerData.items[item.slot].info.uses = Config.HarnessUses - 1
-        Player.Functions.SetInventory(Player.PlayerData.items)
-    elseif Player.PlayerData.items[item.slot].info.uses == 1 then
-        TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items['harness'], 'remove')
-        Player.Functions.RemoveItem('harness', 1)
+    local slotData = exports.ox_inventory:GetSlot(src, item.slot)
+
+    if not slotData.metadata.uses then
+        slotData.metadata.uses = Config.HarnessUses - 1
+        exports.ox_inventory:SetMetadata(src, item.slot, slotData.metadata)
+    elseif slotData.metadata.uses == 1 then
+        exports.ox_inventory:RemoveItem(src, 'harness', 1)
     else
-        Player.PlayerData.items[item.slot].info.uses -= 1
-        Player.Functions.SetInventory(Player.PlayerData.items)
+        slotData.metadata.uses -= 1
+        exports.ox_inventory:SetMetadata(src, item.slot, slotData.metadata)
     end
 end)
 
@@ -42,10 +43,11 @@ RegisterNetEvent('seatbelt:DoHarnessDamage', function(hp, data)
     if not Player then return end
 
     if hp == 0 then
-        Player.Functions.RemoveItem('harness', 1, data.slot)
+        exports.ox_inventory:RemoveItem(src, 'harness', 1, nil, data.slot)
     else
-        Player.PlayerData.items[data.slot].info.uses -= 1
-        Player.Functions.SetInventory(Player.PlayerData.items)
+        local slotData = exports.ox_inventory:GetSlot(src, data.slot)
+        slotData.metadata.uses -= 1
+        exports.ox_inventory:SetMetadata(src, data.slot, slotData.metadata)
     end
 end)
 

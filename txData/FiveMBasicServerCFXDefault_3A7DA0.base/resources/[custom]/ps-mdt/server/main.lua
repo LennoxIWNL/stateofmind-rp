@@ -1591,7 +1591,7 @@ RegisterNetEvent('mdt:server:setRadio', function(cid, newRadio)
 	local targetSource = targetPlayer.PlayerData.source
 	local targetName = targetPlayer.PlayerData.charinfo.firstname .. ' ' .. targetPlayer.PlayerData.charinfo.lastname
 
-	local radio = targetPlayer.Functions.GetItemByName("radio")
+	local radio = exports.ox_inventory:GetItem(targetSource, "radio", nil, false)
 	if radio ~= nil then
 		TriggerClientEvent('mdt:client:setRadio', targetSource, newRadio)
 	else
@@ -1809,7 +1809,7 @@ local function giveCitationItem(src, citizenId, fine, incidentId)
 		incidentId = "#"..incidentId,
 		officer = OfficerFullName,
 	}
-	Player.Functions.AddItem('mdtcitation', 1, false, info)
+	exports.ox_inventory:AddItem(Player.PlayerData.source, 'mdtcitation', 1, info)
 	TriggerClientEvent('QBCore:Notify', src, PlayerName.." (" ..citizenId.. ") received a citation!")
 	if Config.QBManagementUse then 
 		exports['qb-management']:AddMoney(Officer.PlayerData.job.name, fine) 

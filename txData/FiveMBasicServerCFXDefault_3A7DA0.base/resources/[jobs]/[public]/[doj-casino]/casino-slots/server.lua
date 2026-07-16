@@ -85,7 +85,7 @@ RegisterNetEvent('dc-casino:slots:server:spin', function(ChosenBetAmount)
     if UseCash and Player.Functions.RemoveMoney('cash', SlotReferences[SlotModel].betamounts[ChosenBetAmount], 'Casino Slot Spin')
     or UseBank and Player.Functions.RemoveMoney('bank', SlotReferences[SlotModel].betamounts[ChosenBetAmount], 'Casino Slot Spin')
     -- luacheck: ignore
-    or UseItem and Player.Functions.RemoveItem(ItemName, SlotReferences[SlotModel].betamounts[ChosenBetAmount]) then TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items['casino_goldchip'], "remove", ChosenBetAmount)
+    or UseItem and exports.ox_inventory:RemoveItem(src, ItemName, SlotReferences[SlotModel].betamounts[ChosenBetAmount]) then TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items['casino_goldchip'], "remove", ChosenBetAmount)
 
     else TriggerClientEvent('QBCore:Notify', src, 'Nothing left to bet with', 'error') return end
 
@@ -128,7 +128,7 @@ RegisterNetEvent('dc-casino:slots:server:spin', function(ChosenBetAmount)
         if UseCash and Player.Functions.AddMoney('cash', RewardAmount, 'Casino Slot Spin')
         or UseBank and Player.Functions.AddMoney('bank', RewardAmount, 'Casino Slot Spin')
         -- luacheck: ignore
-        or UseItem and Player.Functions.AddItem(ItemName, RewardAmount) then 
+        or UseItem and exports.ox_inventory:AddItem(src, ItemName, RewardAmount) then
             TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items['casino_goldchip'], "add", RewardAmount) 
             -- TriggerClientEvent('QBCore:Notify', src, 'You won '..tonumber(RewardAmount)..' chips!', 'success')
         end

@@ -5,7 +5,7 @@ description 'QB-Security-Job edited Garbage Job by Kazashimo'
 version '1.2.0'
 
 shared_scripts {
-	'@qb-core/shared/locale.lua',
+	'@qbx_core/shared/locale.lua',
 	'locales/en.lua',
 	'locales/*.lua',
 	'config.lua'

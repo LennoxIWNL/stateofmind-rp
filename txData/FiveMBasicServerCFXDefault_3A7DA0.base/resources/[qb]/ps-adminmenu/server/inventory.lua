@@ -84,7 +84,7 @@ RegisterNetEvent('ps-adminmenu:server:GiveItem', function(data, selectedData)
         return QBCore.Functions.Notify(source, locale("not_online"), 'error', 7500)
     end
 
-    Player.Functions.AddItem(item, amount)
+    exports.ox_inventory:AddItem(target, item, amount)
     QBCore.Functions.Notify(source,
         locale("give_item", tonumber(amount) .. " " .. item,
             Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname), "success", 7500)
@@ -102,8 +102,7 @@ RegisterNetEvent('ps-adminmenu:server:GiveItemAll', function(data, selectedData)
     if not item or not amount then return end
 
     for _, id in pairs(players) do
-        local Player = QBCore.Functions.GetPlayer(id)
-        Player.Functions.AddItem(item, amount)
+        exports.ox_inventory:AddItem(id, item, amount)
         QBCore.Functions.Notify(source, locale("give_item_all", amount .. " " .. item), "success", 7500)
     end
 end)

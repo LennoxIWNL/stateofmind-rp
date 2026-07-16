@@ -65,8 +65,7 @@ QBCore.Functions.CreateCallback('garbagejob:server:NextStop', function(source, c
     local newBagAmount = 0
 
     if (math.random(100) >= Config.CryptoStickChance) and Config.GiveCryptoStick then
-        Player.Functions.AddItem('cryptostick', 1, false)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items['cryptostick'], 'add')
+        exports.ox_inventory:AddItem(source, 'cryptostick', 1)
         TriggerClientEvent('QBCore:Notify', source, Lang:t('info.found_crypto'))
     end
 

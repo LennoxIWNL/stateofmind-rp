@@ -20,8 +20,7 @@ if Config.Framework == 'ESX' then
 else
     for k,_ in pairs (Config.Items) do
         QBCore.Functions.CreateUseableItem(k, function(source, item)
-            local Player = QBCore.Functions.GetPlayer(source)
-            if not Player.Functions.GetItemByName(item.name) then return end
+            if not exports.ox_inventory:GetItem(source, item.name, nil, false) then return end
             TriggerClientEvent('fc_rendermenu:checkmenu', source, k)
         end)
     end

@@ -41,11 +41,7 @@ RegisterNetEvent('QBCore:Client:OnGangUpdate', function(InfoGang)
 end)
 
 RegisterNetEvent('qb-gangmenu:client:Stash', function()
-    TriggerServerEvent("inventory:server:OpenInventory", "stash", "boss_" .. PlayerGang.name, {
-        maxweight = 4000000,
-        slots = 100,
-    })
-    TriggerEvent("inventory:client:SetCurrentStash", "boss_" .. PlayerGang.name)
+    exports.ox_inventory:openInventory('stash', 'boss_' .. PlayerGang.name)
 end)
 
 RegisterNetEvent('qb-gangmenu:client:Warbobe', function()

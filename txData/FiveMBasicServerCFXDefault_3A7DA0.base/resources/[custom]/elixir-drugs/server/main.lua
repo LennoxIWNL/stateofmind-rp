@@ -11,8 +11,7 @@ AddEventHandler('jc-drugs:server:removeSeed', function(seed)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
 
-    Player.Functions.RemoveItem(seed, 1)
-    TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[seed], 'remove')
+    exports.ox_inventory:RemoveItem(src, seed, 1)
 end)
 
 RegisterServerEvent('jc-drugs:server:removeitem')
@@ -20,21 +19,18 @@ AddEventHandler('jc-drugs:server:removeitem', function(item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
 
-    Player.Functions.RemoveItem(item, 1)
-    TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[item], 'remove')
+    exports.ox_inventory:RemoveItem(src, item, 1)
 end)
 
 RegisterServerEvent('jc-drugs:server:giveWeed')
 AddEventHandler('jc-drugs:server:giveWeed', function(reward, amount)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local baggy = Player.Functions.GetItemByName(Config.Weedbag)
+    local baggy = exports.ox_inventory:GetItem(src, Config.Weedbag, nil, false)
 
-    if baggy and baggy.amount >= amount then
-        Player.Functions.AddItem(reward, amount)
-        Player.Functions.RemoveItem(baggy, amount)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[reward], 'add')
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[baggy], 'remove')
+    if baggy and baggy.count >= amount then
+        exports.ox_inventory:AddItem(src, reward, amount)
+        exports.ox_inventory:RemoveItem(src, Config.Weedbag, amount)
     else
         QBCore.Functions.Notify(src, 'You don\'t have enough bags!', 'error', 3000)
     end
@@ -45,8 +41,7 @@ AddEventHandler('jc-drugs:server:giveCokeLeafs', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
 
-    Player.Functions.AddItem(Config.LeafItem, Config.LeafAmount)
-    TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.LeafItem], 'add')
+    exports.ox_inventory:AddItem(src, Config.LeafItem, Config.LeafAmount)
 end)
 
 RegisterServerEvent('jc-drugs:server:givecoke')
@@ -55,25 +50,21 @@ AddEventHandler('jc-drugs:server:givecoke', function(ingredients)
     local Player = QBCore.Functions.GetPlayer(src)
 
     for _, i in pairs(ingredients) do
-        Player.Functions.RemoveItem(i.item, i.amount)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[i.item], 'remove')
+        exports.ox_inventory:RemoveItem(src, i.item, i.amount)
     end
 
-    Player.Functions.AddItem(Config.CokeItem, Config.CokeAmount)
-    TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.CokeItem], 'add')
+    exports.ox_inventory:AddItem(src, Config.CokeItem, Config.CokeAmount)
 
-    Player.Functions.RemoveItem(Config.Weedbag, Config.CokeAmount)
-    TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.Weedbag], 'remove')
+    exports.ox_inventory:RemoveItem(src, Config.Weedbag, Config.CokeAmount)
 end)
 
 RegisterServerEvent('jc-drugs:server:removecokeitems')
 AddEventHandler('jc-drugs:server:removecokeitems', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    
+
     for _, i in pairs(ingredients) do
-        Player.Functions.RemoveItem(i.item, i.amount)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[i.item], 'remove')
+        exports.ox_inventory:RemoveItem(src, i.item, i.amount)
     end
 end)
 
@@ -82,10 +73,8 @@ AddEventHandler('jc-drugs:server:givebrick', function(item, reward, amount)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
 
-    Player.Functions.RemoveItem(item, amount)
-    Player.Functions.AddItem(reward, 1)
-    TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[reward], 'add')
-    TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[item], 'remove')
+    exports.ox_inventory:RemoveItem(src, item, amount)
+    exports.ox_inventory:AddItem(src, reward, 1)
 end)
 
 RegisterServerEvent('jc-drugs:server:removedrugs')
@@ -93,21 +82,18 @@ AddEventHandler('jc-drugs:server:removedrugs', function(item, amount)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
 
-    Player.Functions.RemoveItem(item, amount)
-    TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[item], 'remove')
+    exports.ox_inventory:RemoveItem(src, item, amount)
 end)
 
 RegisterServerEvent('jc-drugs:server:giveacid')
 AddEventHandler('jc-drugs:server:giveacid', function(amount)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local jerrycan = Player.Functions.GetItemByName(Config.ExtractItem)
+    local jerrycan = exports.ox_inventory:GetItem(src, Config.ExtractItem, nil, false)
 
-    if jerrycan and jerrycan.amount >= amount then
-        Player.Functions.AddItem(Config.AcidItem, amount)
-        Player.Functions.RemoveItem(Config.ExtractItem, amount)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.AcidItem], 'add')
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.ExtractItem], 'remove')
+    if jerrycan and jerrycan.count >= amount then
+        exports.ox_inventory:AddItem(src, Config.AcidItem, amount)
+        exports.ox_inventory:RemoveItem(src, Config.ExtractItem, amount)
     else
         QBCore.Functions.Notify('You need atleast ' .. amount .. ' Empty jerry cans!', 'error', 3000)
     end
@@ -117,13 +103,11 @@ RegisterServerEvent('jc-drugs:server:givemethylamine')
 AddEventHandler('jc-drugs:server:givemethylamine', function(amount)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local jerrycan = Player.Functions.GetItemByName(Config.ExtractItem)
+    local jerrycan = exports.ox_inventory:GetItem(src, Config.ExtractItem, nil, false)
 
-    if jerrycan and jerrycan.amount >= amount then
-        Player.Functions.AddItem(Config.MethylamineItem, amount)
-        Player.Functions.RemoveItem(Config.ExtractItem, amount)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.MethylamineItem], 'add')
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.ExtractItem], 'remove')
+    if jerrycan and jerrycan.count >= amount then
+        exports.ox_inventory:AddItem(src, Config.MethylamineItem, amount)
+        exports.ox_inventory:RemoveItem(src, Config.ExtractItem, amount)
     else
         QBCore.Functions.Notify('You need atleast ' .. amount .. ' Empty jerry cans!', 'error', 3000)
     end
@@ -133,13 +117,11 @@ RegisterServerEvent('jc-drugs:server:givegasoline')
 AddEventHandler('jc-drugs:server:givegasoline', function(amount)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local jerrycan = Player.Functions.GetItemByName(Config.ExtractItem)
+    local jerrycan = exports.ox_inventory:GetItem(src, Config.ExtractItem, nil, false)
 
-    if jerrycan and jerrycan.amount >= amount then
-        Player.Functions.AddItem(Config.GasolineItem, amount)
-        Player.Functions.RemoveItem(Config.GasolineExtractItem, amount)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.GasolineItem], 'add')
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.GasolineExtractItem], 'remove')
+    if jerrycan and jerrycan.count >= amount then
+        exports.ox_inventory:AddItem(src, Config.GasolineItem, amount)
+        exports.ox_inventory:RemoveItem(src, Config.GasolineExtractItem, amount)
     else
         QBCore.Functions.Notify('You need atleast ' .. amount .. ' Empty jerry cans!', 'error', 3000)
     end
@@ -150,8 +132,7 @@ AddEventHandler('jc-drugs:server:givecement', function(amount)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
 
-    Player.Functions.AddItem(Config.CementItem, amount)
-    TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.CementItem], 'add')
+    exports.ox_inventory:AddItem(src, Config.CementItem, amount)
 end)
 
 RegisterServerEvent('jc-drugs:server:givelithium')
@@ -164,13 +145,10 @@ AddEventHandler('jc-drugs:server:givelithium', function(amount)
     local item2 = Config.LithiumItems[math.random(1, #Config.LithiumItems)]
     
     if chance <= 50 then
-        Player.Functions.AddItem(item1, math.random(1, 3))
-        Player.Functions.AddItem(item2, math.random(1, 3))
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[item1], 'add')
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[item2], 'add')
+        exports.ox_inventory:AddItem(src, item1, math.random(1, 3))
+        exports.ox_inventory:AddItem(src, item2, math.random(1, 3))
     else
-        Player.Functions.AddItem(item1, math.random(1, 2))
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[item1], 'add')
+        exports.ox_inventory:AddItem(src, item1, math.random(1, 2))
     end
 end)
 
@@ -183,77 +161,68 @@ AddEventHandler('jc-drugs:server:methprocession', function(action)
         local hasIngredients = false
 
         for _, i in pairs(Config.Ingredients) do
-            local hasItem = Player.Functions.GetItemByName(i.item)
-    
-            if not hasItem or hasItem.amount < i.amount then
+            local hasItem = exports.ox_inventory:GetItem(src, i.item, nil, false)
+
+            if not hasItem or hasItem.count < i.amount then
                 hasIngredients = false
                 break
             else
                 hasIngredients = true
-                Player.Functions.RemoveItem(i.item, i.amount)
-                TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[i.item], 'remove')
+                exports.ox_inventory:RemoveItem(src, i.item, i.amount)
             end
         end
-    
+
         if hasIngredients then
-            Player.Functions.AddItem(Config.ProcessedMethItem, Config.ProcessedCokeAmount)
-            TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.ProcessedMethItem], 'add')
+            exports.ox_inventory:AddItem(src, Config.ProcessedMethItem, Config.ProcessedCokeAmount)
         else
             QBCore.Functions.Notify(src, 'You are missing some ingredients!')
         end
     elseif action == "cook" then
-        local hasItem = Player.Functions.GetItemByName(Config.ProcessedMethItem)
+        local hasItem = exports.ox_inventory:GetItem(src, Config.ProcessedMethItem, nil, false)
 
-        Player.Functions.RemoveItem(Config.ProcessedMethItem, 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.ProcessedMethItem], 'remove')
+        exports.ox_inventory:RemoveItem(src, Config.ProcessedMethItem, 1)
 
-        Player.Functions.AddItem(Config.MethTrayItem, 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.MethTrayItem], 'add')
+        exports.ox_inventory:AddItem(src, Config.MethTrayItem, 1)
     elseif action == "cracking" then
-        local hasItem = Player.Functions.GetItemByName(Config.ProcessedMethItem)
+        local hasItem = exports.ox_inventory:GetItem(src, Config.ProcessedMethItem, nil, false)
 
-        Player.Functions.RemoveItem(Config.MethTrayItem, 1)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.MethTrayItem], 'remove')
+        exports.ox_inventory:RemoveItem(src, Config.MethTrayItem, 1)
 
-        Player.Functions.AddItem(Config.MethItem, Config.MethAmount)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.MethItem], 'add')
+        exports.ox_inventory:AddItem(src, Config.MethItem, Config.MethAmount)
     elseif acton == "failedprocession" then
         local hasIngredients = false
 
         for _, i in pairs(Config.Ingredients) do
-            local hasItem = Player.Functions.GetItemByName(i.item)
-    
-            if not hasItem or hasItem.amount < i.amount then
+            local hasItem = exports.ox_inventory:GetItem(src, i.item, nil, false)
+
+            if not hasItem or hasItem.count < i.amount then
                 hasIngredients = false
                 QBCore.Functions.Notify(src, 'You don\'t have enough ingredients!', 'error', 3000)
                 break
             else
                 hasIngredients = true
-                Player.Functions.RemoveItem(i.item, i.amount)
-                TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[i.item], 'remove')
+                exports.ox_inventory:RemoveItem(src, i.item, i.amount)
             end
         end
     elseif acton == "failedcooking" then
-        local hasItem = Player.Functions.GetItemByName(Config.ProcessedMethItem)
-    
-        if not hasItem or hasItem.amount < 1 then
+        local hasItem = exports.ox_inventory:GetItem(src, Config.ProcessedMethItem, nil, false)
+
+        if not hasItem or hasItem.count < 1 then
             hasIngredients = false
             QBCore.Functions.Notify(src, 'You don\'t have enough ingredients!', 'error', 3000)
         else
             hasIngredients = true
-            Player.Functions.RemoveItem(Config.ProcessedMethItem, 1)
-            TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.ProcessedMethItem], 'remove')
+            exports.ox_inventory:RemoveItem(src, Config.ProcessedMethItem, 1)
         end
     elseif acton == "failedcracking" then
-        local hasItem = Player.Functions.GetItemByName(Config.MethTrayItem)
-    
-        if not hasItem or hasItem.amount < 1 then
+        local hasItem = exports.ox_inventory:GetItem(src, Config.MethTrayItem, nil, false)
+
+        if not hasItem or hasItem.count < 1 then
             hasIngredients = false
             QBCore.Functions.Notify(src, 'You don\'t have enough ingredients!', 'error', 3000)
         else
             hasIngredients = true
-            Player.Functions.RemoveItem(Config.MethTrayItem, 1)
-            TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.MethTrayItem], 'remove')
+            exports.ox_inventory:RemoveItem(src, Config.MethTrayItem, 1)
         end
     end
 end)
@@ -268,13 +237,10 @@ AddEventHandler('jc-drugs:server:givecardboarditem', function()
     local item2 = Config.AcetoneItems[math.random(1, #Config.AcetoneItems)]
     
     if chance <= 50 then
-        Player.Functions.AddItem(item1, math.random(1, 3))
-        Player.Functions.AddItem(item2, math.random(1, 3))
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[item1], 'add')
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[item2], 'add')
+        exports.ox_inventory:AddItem(src, item1, math.random(1, 3))
+        exports.ox_inventory:AddItem(src, item2, math.random(1, 3))
     else
-        Player.Functions.AddItem(item1, math.random(1, 2))
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[item1], 'add')
+        exports.ox_inventory:AddItem(src, item1, math.random(1, 2))
     end
 end)
 
@@ -288,12 +254,9 @@ AddEventHandler('jc-drugs:server:givebenzo', function(amount)
     local item2 = Config.BenzocaineItems[math.random(1, #Config.BenzocaineItems)]
     
     if chance <= 50 then
-        Player.Functions.AddItem(item1, math.random(1, 3))
-        Player.Functions.AddItem(item2, math.random(1, 3))
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[item1], 'add')
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[item2], 'add')
+        exports.ox_inventory:AddItem(src, item1, math.random(1, 3))
+        exports.ox_inventory:AddItem(src, item2, math.random(1, 3))
     else
-        Player.Functions.AddItem(item1, math.random(1, 2))
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[item1], 'add')
+        exports.ox_inventory:AddItem(src, item1, math.random(1, 2))
     end
 end)

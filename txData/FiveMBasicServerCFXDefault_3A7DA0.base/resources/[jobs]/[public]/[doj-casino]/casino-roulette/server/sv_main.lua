@@ -15,25 +15,23 @@ function getPlayerChips(source)
 
     local Player = QBCore.Functions.GetPlayer(source)
     local retval = 0
-    local Item = Player.Functions.GetItemByName('casino_goldchip')
+    local Item = exports.ox_inventory:GetItem(source, 'casino_goldchip', nil, false)
     if Item  then
-        retval = Item.amount
+        retval = Item.count
     end
     return retval
 end
 
 function giveChips(source, amount)
     local Player = QBCore.Functions.GetPlayer(source)
-    if Player.Functions.AddItem("casino_goldchip", amount, nil, nil, false, GetCurrentResourceName(), "", "", "")  then
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items['casino_goldchip'], "add")
+    if exports.ox_inventory:AddItem(source, "casino_goldchip", amount)  then
         TriggerClientEvent('QBCore:Notify', source, "+ "..amount.." Chips")
     end
 end 
 
 function removeChips(source, amount)
     local Player = QBCore.Functions.GetPlayer(source)
-    if Player.Functions.RemoveItem("casino_goldchip", amount)  then
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items['casino_goldchip'], "remove")
+    if exports.ox_inventory:RemoveItem(source, "casino_goldchip", amount)  then
         TriggerClientEvent('QBCore:Notify', source, "- "..amount.." Chips")
     end 
 end

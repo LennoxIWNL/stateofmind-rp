@@ -118,23 +118,20 @@ end)
 
 RegisterNetEvent("evidence:server:updatecamerainfo", function(data)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
 
-    if Player.PlayerData.items[data.slot] then
-        Player.PlayerData.items[data.slot].info = data.info
-
-        Player.Functions.SetInventory(Player.PlayerData.items, true)
+    if data.slot then
+        exports.ox_inventory:SetMetadata(src, data.slot, data.info)
     end
 end)
 
 RegisterNetEvent("evidence:server:updateSDcard", function(data)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
 
-    if Player.PlayerData.items[data.slot] then
-        Player.PlayerData.items[data.slot].info.name = data.name
-
-        Player.Functions.SetInventory(Player.PlayerData.items, true)
+    local slotData = data.slot and exports.ox_inventory:GetSlot(src, data.slot)
+    if slotData then
+        local metadata = slotData.metadata or {}
+        metadata.name = data.name
+        exports.ox_inventory:SetMetadata(src, data.slot, metadata)
     end
 end)
 
@@ -147,18 +144,17 @@ RegisterNetEvent('evidence:server:sdcard', function(data) -- this event handles 
     local Player = QBCore.Functions.GetPlayer(src)
 
     if data.info then
-        if Player.Functions.AddItem("sdcard", 1, false, data.info) then
-            TriggerClientEvent("inventory:client:ItemBox", src, QBCore.Shared.Items["sdcard"], "add")
+        if exports.ox_inventory:AddItem(src, "sdcard", 1, data.info) then
             TriggerClientEvent("evidence:client:confirmeject", src)
         else
             Config.Functions.ServerNotify(src, 'Something went wrong!', "error")
         end
     elseif data.slot then
-        local photos = Player.PlayerData.items[data.slot].info.photos
-        local name = Player.PlayerData.items[data.slot].info.name
+        local slotData = exports.ox_inventory:GetSlot(src, data.slot)
+        local photos = slotData and slotData.metadata and slotData.metadata.photos
+        local name = slotData and slotData.metadata and slotData.metadata.name
 
-        if Player.Functions.RemoveItem("sdcard", 1, data.slot) then
-            TriggerClientEvent("inventory:client:ItemBox", src, QBCore.Shared.Items["sdcard"], "remove")
+        if exports.ox_inventory:RemoveItem(src, "sdcard", 1, nil, data.slot) then
             TriggerClientEvent("evidence:client:confirminsert", src, {name = name, photos = photos or {}})
         else
             Config.Functions.ServerNotify(src, 'Something went wrong!', "error")

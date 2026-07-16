@@ -6,7 +6,7 @@ Config.InterctView = 7.5 -- Only used if Config.Target == 'interact' | Does not 
 Config.InteractDist = 2.5 -- Only used if Config.Target == 'interact' | Does not affect 'qb' or 'ox'
 Config.Menu = 'qb' -- 'qb' or 'ox'
 Config.Progressbar = 'qb' -- 'qb' or 'ox'
-Config.Inventory = 'qb' -- 'qb' or 'ox'
+Config.Inventory = 'ox' -- 'qb' or 'ox'
 Config.Skillcheck = 'ps' -- 'ps' or 'ox'
 
 Config.FuelResource = 'cdn-fuel'

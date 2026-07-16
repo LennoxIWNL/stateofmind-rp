@@ -190,11 +190,10 @@ end)
 RegisterServerEvent('qb-crypto:server:ExchangeFail', function()
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local ItemData = Player.Functions.GetItemByName("cryptostick")
+    local ItemData = exports.ox_inventory:GetItem(src, "cryptostick", nil, false)
 
     if ItemData ~= nil then
-        Player.Functions.RemoveItem("cryptostick", 1)
-        TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items["cryptostick"], "remove")
+        exports.ox_inventory:RemoveItem(src, "cryptostick", 1)
         TriggerClientEvent('QBCore:Notify', src, Lang:t('error.cryptostick_malfunctioned'), 'error')
     end
 end)
@@ -216,7 +215,7 @@ end)
 RegisterServerEvent('qb-crypto:server:ExchangeSuccess', function(LuckChance)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local ItemData = Player.Functions.GetItemByName("cryptostick")
+    local ItemData = exports.ox_inventory:GetItem(src, "cryptostick", nil, false)
 
     if ItemData ~= nil then
         local LuckyNumber = math.random(1, 10)
@@ -226,10 +225,9 @@ RegisterServerEvent('qb-crypto:server:ExchangeSuccess', function(LuckChance)
             Amount = (math.random(1599999, 2599999) / DeelNumber)
         end
 
-        Player.Functions.RemoveItem("cryptostick", 1)
+        exports.ox_inventory:RemoveItem(src, "cryptostick", 1)
         Player.Functions.AddMoney('crypto', Amount)
         TriggerClientEvent('QBCore:Notify', src, Lang:t('success.you_have_exchanged_your_cryptostick_for',{amount = Amount}), "success", 3500)
-        TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items["cryptostick"], "remove")
         TriggerClientEvent('qb-phone:client:AddTransaction', src, Player, {},  Lang:t('credit.there_are_amount_credited',{amount = Amount}), "Credit")
     end
 end)
@@ -238,7 +236,7 @@ end)
 
 QBCore.Functions.CreateCallback('qb-crypto:server:HasSticky', function(source, cb)
     local Player = QBCore.Functions.GetPlayer(source)
-    local Item = Player.Functions.GetItemByName("cryptostick")
+    local Item = exports.ox_inventory:GetItem(source, "cryptostick", nil, false)
 
     if Item ~= nil then
         cb(true)

@@ -56,15 +56,13 @@ RegisterServerEvent('AttackTransport:graczZrobilnapad', function()
 	local info = {
 		worth = math.random(Config.Payout.Min, Config.Payout.Max)
 	}
-	xPlayer.Functions.AddItem('markedbills', bags, false, info)
-	TriggerClientEvent('inventory:client:ItemBox', _source, QBCore.Shared.Items['markedbills'], "add")
+	exports.ox_inventory:AddItem(_source, 'markedbills', bags, info)
 
 	local chance = math.random(1, 100)
 	TriggerClientEvent('QBCore:Notify', _source, 'You took '..bags..' bags of cash from the van')
 
 	if chance >= 95 then
-		xPlayer.Functions.AddItem('security_card_01', 1)
-		TriggerClientEvent('inventory:client:ItemBox', _source, QBCore.Shared.Items['security_card_01'], "add")
+		exports.ox_inventory:AddItem(_source, 'security_card_01', 1)
 	end
 	Wait(2500)
 end)

@@ -4,9 +4,8 @@ RegisterNetEvent('kevin-sellped:sellitem', function(item, price, itemAmount, pay
     local PlayerId = source
     local Player = QBCore.Functions.GetPlayer(PlayerId)
     if not item then return end
-    if Player.Functions.RemoveItem(item, math.abs(itemAmount), false) then
+    if exports.ox_inventory:RemoveItem(PlayerId, item, math.abs(itemAmount)) then
         local pay = itemAmount * price
-        TriggerClientEvent('inventory:client:ItemBox', PlayerId, QBCore.Shared.Items[item], "remove", itemAmount)
         Player.Functions.AddMoney(payMethod, pay, 'Items Sold')
     end
 end)

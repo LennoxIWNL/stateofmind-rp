@@ -154,8 +154,7 @@ RegisterNetEvent('hospital:server:TreatWounds', function(playerId)
 	local Patient = QBCore.Functions.GetPlayer(playerId)
 	if Patient then
 		if Player.PlayerData.job.name == 'ambulance' then
-			Player.Functions.RemoveItem('bandage', 1)
-			TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items['bandage'], 'remove')
+			exports.ox_inventory:RemoveItem(src, 'bandage', 1)
 			TriggerClientEvent('hospital:client:HealInjuries', Patient.PlayerData.source, 'full')
 		end
 	end
@@ -197,15 +196,13 @@ RegisterNetEvent('hospital:server:RevivePlayer', function(playerId, isOldMan)
 		if Player.PlayerData.job.name == 'ambulance' or QBCore.Functions.HasItem(src, 'firstaid', 1) then
 			if oldMan then
 				if Player.Functions.RemoveMoney('cash', 5000, 'revived-player') then
-					Player.Functions.RemoveItem('firstaid', 1)
-					TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items['firstaid'], 'remove')
+					exports.ox_inventory:RemoveItem(src, 'firstaid', 1)
 					TriggerClientEvent('hospital:client:Revive', Patient.PlayerData.source)
 				else
 					TriggerClientEvent('QBCore:Notify', src, Lang:t('error.not_enough_money'), 'error')
 				end
 			else
-				Player.Functions.RemoveItem('firstaid', 1)
-				TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items['firstaid'], 'remove')
+				exports.ox_inventory:RemoveItem(src, 'firstaid', 1)
 				TriggerClientEvent('hospital:client:Revive', Patient.PlayerData.source)
 			end
 		else
@@ -264,7 +261,7 @@ RegisterNetEvent('hospital:server:removeBandage', function()
 
 	if not Player then return end
 
-	Player.Functions.RemoveItem('bandage', 1)
+	exports.ox_inventory:RemoveItem(source, 'bandage', 1)
 end)
 
 RegisterNetEvent('hospital:server:removeIfaks', function()
@@ -272,7 +269,7 @@ RegisterNetEvent('hospital:server:removeIfaks', function()
 
 	if not Player then return end
 
-	Player.Functions.RemoveItem('ifaks', 1)
+	exports.ox_inventory:RemoveItem(source, 'ifaks', 1)
 end)
 
 RegisterNetEvent('hospital:server:removePainkillers', function()
@@ -280,7 +277,7 @@ RegisterNetEvent('hospital:server:removePainkillers', function()
 
 	if not Player then return end
 
-	Player.Functions.RemoveItem('painkillers', 1)
+	exports.ox_inventory:RemoveItem(source, 'painkillers', 1)
 end)
 
 RegisterNetEvent('hospital:server:resetHungerThirst', function()
@@ -447,7 +444,7 @@ end, 'admin')
 QBCore.Functions.CreateUseableItem('ifaks', function(source, item)
 	local src = source
 	local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.GetItemByName(item.name) ~= nil then
+	if exports.ox_inventory:GetItem(src, item.name, nil, false) ~= nil then
 		TriggerClientEvent('hospital:client:UseIfaks', src)
 	end
 end)
@@ -455,7 +452,7 @@ end)
 QBCore.Functions.CreateUseableItem('bandage', function(source, item)
 	local src = source
 	local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.GetItemByName(item.name) ~= nil then
+	if exports.ox_inventory:GetItem(src, item.name, nil, false) ~= nil then
 		TriggerClientEvent('hospital:client:UseBandage', src)
 	end
 end)
@@ -463,7 +460,7 @@ end)
 QBCore.Functions.CreateUseableItem('painkillers', function(source, item)
 	local src = source
 	local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.GetItemByName(item.name) ~= nil then
+	if exports.ox_inventory:GetItem(src, item.name, nil, false) ~= nil then
 		TriggerClientEvent('hospital:client:UsePainkillers', src)
 	end
 end)
@@ -471,7 +468,7 @@ end)
 QBCore.Functions.CreateUseableItem('firstaid', function(source, item)
 	local src = source
 	local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.GetItemByName(item.name) ~= nil then
+	if exports.ox_inventory:GetItem(src, item.name, nil, false) ~= nil then
 		TriggerClientEvent('hospital:client:UseFirstAid', src)
 	end
 end)

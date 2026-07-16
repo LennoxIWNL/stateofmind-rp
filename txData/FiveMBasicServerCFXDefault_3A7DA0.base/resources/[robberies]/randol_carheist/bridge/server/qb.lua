@@ -1,4 +1,4 @@
-if GetResourceState('qb-core') ~= 'started' then return end
+if GetResourceState('qb-core') ~= 'started' and GetResourceState('qbx_core') ~= 'started' then return end
 
 local QBCore = exports['qb-core']:GetCoreObject()
 local ox_inv = GetResourceState('ox_inventory') == 'started'
@@ -35,8 +35,12 @@ function GetItemData(Player, item)
 end
 
 function RemoveHeistPapers(Player, item, slot)
-    Player.Functions.RemoveItem(item, 1, slot)
-    TriggerClientEvent('inventory:client:ItemBox', Player.PlayerData.source, QBCore.Shared.Items[item], 'remove')
+    if ox_inv then
+        exports.ox_inventory:RemoveItem(Player.PlayerData.source, item, 1, nil, slot)
+    else
+        Player.Functions.RemoveItem(item, 1, slot)
+        TriggerClientEvent('inventory:client:ItemBox', Player.PlayerData.source, QBCore.Shared.Items[item], 'remove')
+    end
 end
 
 function AddRewardMoney(Player, amount)

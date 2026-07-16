@@ -199,8 +199,8 @@ RegisterNetEvent('evidence:server:bagitem', function(data)
     local item = table.clone(Player.PlayerData.items[data.slot])
 
     if Player.PlayerData.items[data.slot] then       
-        if Player.Functions.RemoveItem("empty_evidence_bag", 1) then
-            if Player.Functions.RemoveItem(item.name, 1, data.slot) then
+        if exports.ox_inventory:RemoveItem(source, "empty_evidence_bag", 1) then
+            if exports.ox_inventory:RemoveItem(source, item.name, 1, nil, data.slot) then
                 local description = ''
 
                 if item.info.serie then description = ('%s <p><strong>%s: </strong><span> %s </span></p>'):format(description, 'Serial Number', item.info.serie) end
@@ -216,12 +216,12 @@ RegisterNetEvent('evidence:server:bagitem', function(data)
                     street = data.street,
                     tracking = CreateEvidenceId(),
                 }
-                if Player.Functions.AddItem("filled_evidence_bag", 1, data.slot, info) then
+                if exports.ox_inventory:AddItem(source, "filled_evidence_bag", 1, info, data.slot) then
                     TriggerClientEvent("inventory:client:ItemBox", source, QBCore.Shared.Items[item.name], "remove")
                     TriggerClientEvent("inventory:client:ItemBox", source, QBCore.Shared.Items["filled_evidence_bag"], "add")  
                 end
             else
-                Player.Functions.AddItem("empty_evidence_bag", 1, false, info)
+                exports.ox_inventory:AddItem(source, "empty_evidence_bag", 1, info)
             end
         else
             Config.Functions.ServerNotify(source, Config.Notification.NoBag, "error")
@@ -236,8 +236,8 @@ RegisterNetEvent('evidence:server:unbagitem', function(data)
     local item = table.clone(Player.PlayerData.items[data.slot] and Player.PlayerData.items[data.slot])
 
     if item and item.name == 'filled_evidence_bag' then
-        if Player.Functions.RemoveItem("filled_evidence_bag", 1, data.slot) then
-            if Player.Functions.AddItem(item.info.item.name, 1, data.slot, item.info.item.info) then
+        if exports.ox_inventory:RemoveItem(source, "filled_evidence_bag", 1, nil, data.slot) then
+            if exports.ox_inventory:AddItem(source, item.info.item.name, 1, item.info.item.info, data.slot) then
                 TriggerClientEvent("inventory:client:ItemBox", source, QBCore.Shared.Items[item.info.item.name], "add")
                 TriggerClientEvent("inventory:client:ItemBox", source, QBCore.Shared.Items['filled_evidence_bag'], "remove")
                 if not Config.AuthorizedJobs.LEO.Check(source) then
@@ -246,7 +246,7 @@ RegisterNetEvent('evidence:server:unbagitem', function(data)
                 end
             end
         else
-            Player.Functions.AddItem("empty_evidence_bag", 1, false, info)
+            exports.ox_inventory:AddItem(source, "empty_evidence_bag", 1, info)
         end
     else
         Config.Functions.ServerNotify(source, 'Something went wrong!', "error")
@@ -345,26 +345,20 @@ end)
 
 RegisterNetEvent('evidence:server:useaccesstool', function(item) -- manages access tool uses if enabled
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
-    local slot = nil
 
-    for k, v in pairs(Player.PlayerData.items) do
-        if v.name == 'accesstool' then
-            slot = k
-        end
-    end
-
-    if not slot then return end
+    local slots = exports.ox_inventory:Search(src, 'slots', 'accesstool')
+    local toolSlot = slots and slots[1]
+    if not toolSlot then return end
 
     if Config.Consume.AccessTool then
-        if not Player.PlayerData.items[slot].info.uses then Player.PlayerData.items[slot].info.uses = Config.Consume.AccessTool end
+        local metadata = toolSlot.metadata or {}
+        if not metadata.uses then metadata.uses = Config.Consume.AccessTool end
 
-        if Player.PlayerData.items[slot].info.uses - 1 == 0 then
-            TriggerClientEvent("inventory:client:ItemBox", src, QBCore.Shared.Items['accesstool'], "remove")
-            Player.Functions.RemoveItem('accesstool', 1, slot)
+        if metadata.uses - 1 == 0 then
+            exports.ox_inventory:RemoveItem(src, 'accesstool', 1, nil, toolSlot.slot)
         else
-            Player.PlayerData.items[slot].info.uses = Player.PlayerData.items[slot].info.uses - 1
-            Player.Functions.SetInventory(Player.PlayerData.items)
+            metadata.uses = metadata.uses - 1
+            exports.ox_inventory:SetMetadata(src, toolSlot.slot, metadata)
         end
     end
 end)
@@ -499,10 +493,10 @@ RegisterNetEvent('evidence:server:CreateCasing', function(data)
     else
         local weaponInfo = QBCore.Shared.Weapons[data.weapon]
         if weaponInfo then
-            local weaponItem = Player.Functions.GetItemByName(weaponInfo["name"])
+            local weaponItem = exports.ox_inventory:GetItem(source, weaponInfo["name"], nil, false)
             if weaponItem then
-                if weaponItem.info and weaponItem.info ~= "" then
-                    serialNumber = weaponItem.info.serie
+                if weaponItem.metadata and weaponItem.metadata ~= "" then
+                    serialNumber = weaponItem.metadata.serie
                 end
             end
         end
@@ -685,10 +679,10 @@ RegisterNetEvent('evidence:server:CreateCarCasing', function(data)
     else
         local weaponInfo = QBCore.Shared.Weapons[data.weapon]
         if weaponInfo then
-            local weaponItem = Player.Functions.GetItemByName(weaponInfo["name"])
+            local weaponItem = exports.ox_inventory:GetItem(source, weaponInfo["name"], nil, false)
             if weaponItem then
-                if weaponItem.info and weaponItem.info ~= "" then
-                    serialNumber = weaponItem.info.serie
+                if weaponItem.metadata and weaponItem.metadata ~= "" then
+                    serialNumber = weaponItem.metadata.serie
                 end
             end
         end
@@ -845,8 +839,8 @@ end)
 RegisterNetEvent('evidence:server:AddEvidenceToInventory', function(evidenceId, info)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    if Player.Functions.RemoveItem("empty_evidence_bag", 1) then
-        if Player.Functions.AddItem("filled_evidence_bag", 1, false, info) then
+    if exports.ox_inventory:RemoveItem(source, "empty_evidence_bag", 1) then
+        if exports.ox_inventory:AddItem(source, "filled_evidence_bag", 1, info) then
             TriggerClientEvent("inventory:client:ItemBox", src, QBCore.Shared.Items["filled_evidence_bag"], "add")
             RemoveEvidence(evidenceId, 'adding evidence to inventory')
         else
@@ -864,12 +858,12 @@ RegisterNetEvent('evidence:server:AddGSRToInventory', function(gsrInfo)
     gsrInfo.tracking = CreateEvidenceId()
 
     if Config.Consume.GSR then 
-        Player.Functions.RemoveItem('gsrtestkit', 1)
+        exports.ox_inventory:RemoveItem(source, 'gsrtestkit', 1)
         TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items["gsrtestkit"], "remove") 
     end
 
-    if Player.Functions.RemoveItem("empty_evidence_bag", 1) then
-        if Player.Functions.AddItem("filled_evidence_bag", 1, false, gsrInfo) then
+    if exports.ox_inventory:RemoveItem(source, "empty_evidence_bag", 1) then
+        if exports.ox_inventory:AddItem(source, "filled_evidence_bag", 1, gsrInfo) then
             TriggerClientEvent("inventory:client:ItemBox", src, QBCore.Shared.Items["filled_evidence_bag"], "add")
         else
             Config.Functions.ServerNotify(src, Config.Notification.Overweight, "error")
@@ -885,8 +879,8 @@ RegisterNetEvent('evidence:server:AddBACToInventory', function(BACInfo)
 
     BACInfo.tracking = CreateEvidenceId()
 
-    if Player.Functions.RemoveItem("empty_evidence_bag", 1) then
-        if Player.Functions.AddItem("filled_evidence_bag", 1, false, BACInfo) then
+    if exports.ox_inventory:RemoveItem(source, "empty_evidence_bag", 1) then
+        if exports.ox_inventory:AddItem(source, "filled_evidence_bag", 1, BACInfo) then
             TriggerClientEvent("inventory:client:ItemBox", src, QBCore.Shared.Items["filled_evidence_bag"], "add")
         else
             Config.Functions.ServerNotify(src, Config.Notification.Overweight, "error")
@@ -907,8 +901,8 @@ RegisterNetEvent('evidence:server:AddDrugTestToInventory', function(drugInfo)
     
     drugInfo.tracking = CreateEvidenceId()
     
-    if Player.Functions.RemoveItem("empty_evidence_bag", 1) then
-        if Player.Functions.AddItem("filled_evidence_bag", 1, false, drugInfo) then
+    if exports.ox_inventory:RemoveItem(source, "empty_evidence_bag", 1) then
+        if exports.ox_inventory:AddItem(source, "filled_evidence_bag", 1, drugInfo) then
             TriggerClientEvent("inventory:client:ItemBox", src, QBCore.Shared.Items["filled_evidence_bag"], "add")
         else
             Config.Functions.ServerNotify(src, Config.Notification.Overweight, "error")
@@ -924,11 +918,11 @@ RegisterNetEvent('evidence:server:AddDNAToInventory', function(playerId, collect
     local OtherPlayer = QBCore.Functions.GetPlayer(playerId)
 
     if Config.Consume.DNA then
-        Player.Functions.RemoveItem('dnatestkit', 1)
+        exports.ox_inventory:RemoveItem(source, 'dnatestkit', 1)
         TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items["dnatestkit"], "remove") 
     end
 
-    if Player.Functions.RemoveItem("empty_evidence_bag", 1) then
+    if exports.ox_inventory:RemoveItem(source, "empty_evidence_bag", 1) then
         local info = {
             label = "DNA Sample",
             type = "dna",
@@ -937,7 +931,7 @@ RegisterNetEvent('evidence:server:AddDNAToInventory', function(playerId, collect
             street = street,
             tracking = CreateEvidenceId(),
         }
-        if Player.Functions.AddItem("filled_evidence_bag", 1, false, info) then
+        if exports.ox_inventory:AddItem(source, "filled_evidence_bag", 1, info) then
             TriggerClientEvent("inventory:client:ItemBox", src, QBCore.Shared.Items["filled_evidence_bag"], "add")
         end
     else
@@ -948,8 +942,8 @@ end)
 RegisterNetEvent('evidence:server:AddCarEvToInventory', function(evidenceId, evinfo, plate)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    if Player.Functions.RemoveItem("empty_evidence_bag", 1) then
-        if Player.Functions.AddItem("filled_evidence_bag", 1, false, evinfo) then
+    if exports.ox_inventory:RemoveItem(source, "empty_evidence_bag", 1) then
+        if exports.ox_inventory:AddItem(source, "filled_evidence_bag", 1, evinfo) then
             TriggerClientEvent("inventory:client:ItemBox", src, QBCore.Shared.Items["filled_evidence_bag"], "add")
             RemoveEvidence(evidenceId, 'adding car evidence to inventory')
 
@@ -968,8 +962,8 @@ RegisterNetEvent('evidence:server:UpdateBag', function(slot, info)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
 
-    Player.Functions.RemoveItem("empty_evidence_bag", 1, slot)
-    Player.Functions.AddItem("filled_evidence_bag", 1, slot, info)
+    exports.ox_inventory:RemoveItem(source, "empty_evidence_bag", 1, nil, slot)
+    exports.ox_inventory:AddItem(source, "filled_evidence_bag", 1, info, slot)
 end)
 
 RegisterNetEvent('evidence:server:ChangePlayerNetID', function(netid)
@@ -1092,8 +1086,8 @@ RegisterNetEvent('evidence:server:fingerprint', function(data)
         date = data.date,
     }
 
-    if Player.Functions.RemoveItem("empty_evidence_bag", 1) then
-        if Player.Functions.AddItem("filled_evidence_bag", 1, false, info) then
+    if exports.ox_inventory:RemoveItem(source, "empty_evidence_bag", 1) then
+        if exports.ox_inventory:AddItem(source, "filled_evidence_bag", 1, info) then
             TriggerClientEvent("inventory:client:ItemBox", src, QBCore.Shared.Items["filled_evidence_bag"], "add")
         else
             Config.Functions.ServerNotify(src, Config.Notification.Overweight, "error")
@@ -1272,7 +1266,7 @@ if Config.DrugTesting.Enabled then
 
         local Player = QBCore.Functions.GetPlayer(source)
 
-        if Player.Functions.RemoveItem('drugtestkit', 1) then
+        if exports.ox_inventory:RemoveItem(source, 'drugtestkit', 1) then
             TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items["drugtestkit"], "remove") 
         else
             Config.Functions.ServerNotify(src, "You do not have a drug test kit!", "error") return

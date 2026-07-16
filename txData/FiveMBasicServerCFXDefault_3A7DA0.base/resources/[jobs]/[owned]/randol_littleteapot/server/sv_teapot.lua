@@ -11,7 +11,7 @@ end)
 QBCore.Functions.CreateUseableItem("pancakesbb", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("randol_littleteapot:client:Eat", src, item.name)
     end
 end)
@@ -19,7 +19,7 @@ end)
 QBCore.Functions.CreateUseableItem("pancakesmaple", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("randol_littleteapot:client:Eat", src, item.name)
     end
 end)
@@ -27,7 +27,7 @@ end)
 QBCore.Functions.CreateUseableItem("baconegg", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("randol_littleteapot:client:Eat", src, item.name)
     end
 end)
@@ -35,7 +35,7 @@ end)
 QBCore.Functions.CreateUseableItem("teapotorange", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("randol_littleteapot:client:Drink", src, item.name)
     end
 end)
@@ -43,7 +43,7 @@ end)
 QBCore.Functions.CreateUseableItem("teapotcoffee", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("randol_littleteapot:client:Drink", src, item.name)
     end
 end)
@@ -51,7 +51,7 @@ end)
 QBCore.Functions.CreateUseableItem("teapottea", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("randol_littleteapot:client:Drink", src, item.name)
     end
 end)
@@ -59,7 +59,7 @@ end)
 QBCore.Functions.CreateUseableItem("smoothieor", function(source, item) -- orange
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("randol_littleteapot:client:Drink", src, item.name)
     end
 end)
@@ -67,7 +67,7 @@ end)
 QBCore.Functions.CreateUseableItem("smoothiera", function(source, item) -- raspberry
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("randol_littleteapot:client:Drink", src, item.name)
     end
 end)
@@ -75,7 +75,7 @@ end)
 QBCore.Functions.CreateUseableItem("smoothiest", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("randol_littleteapot:client:Drink", src, item.name) -- strawberry
     end
 end)
@@ -83,7 +83,7 @@ end)
 QBCore.Functions.CreateUseableItem("smoothiema", function(source, item) -- mango
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("randol_littleteapot:client:Drink", src, item.name)
     end
 end)
@@ -91,7 +91,7 @@ end)
 QBCore.Functions.CreateUseableItem("bltsandwich", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("randol_littleteapot:client:Eat", src, item.name)
     end
 end)
@@ -99,7 +99,7 @@ end)
 QBCore.Functions.CreateUseableItem("ltbox", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("randol_littleteapot:client:unpack", src, item.name)
     end
 end)
@@ -107,7 +107,7 @@ end)
 QBCore.Functions.CreateUseableItem("ltdonut", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("randol_littleteapot:client:Eat", src, item.name)
     end
 end)
@@ -115,7 +115,7 @@ end)
 QBCore.Functions.CreateUseableItem("ltcroissant", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("randol_littleteapot:client:Eat", src, item.name)
     end
 end)
@@ -123,7 +123,7 @@ end)
 QBCore.Functions.CreateUseableItem("ltcookies", function(source, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	if Player.Functions.RemoveItem(item.name, 1, item.slot) then
+	if exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot) then
         TriggerClientEvent("randol_littleteapot:client:Eat", src, item.name)
     end
 end)
@@ -164,94 +164,93 @@ end)
 RegisterNetEvent('randol_littleteapot:server:makebbpancakes', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.RemoveItem('pancakemix', 1)
-    Player.Functions.RemoveItem('blueberries', 1)
-    Player.Functions.AddItem('pancakesbb', 1)
+    exports.ox_inventory:RemoveItem(source, 'pancakemix', 1)
+    exports.ox_inventory:RemoveItem(source, 'blueberries', 1)
+    exports.ox_inventory:AddItem(source, 'pancakesbb', 1)
 end)
 
 RegisterNetEvent('randol_littleteapot:server:makesyruppancakes', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.RemoveItem('pancakemix', 1)
-    Player.Functions.RemoveItem('maplesyrup', 1)
-    Player.Functions.AddItem('pancakesmaple', 1)
+    exports.ox_inventory:RemoveItem(source, 'pancakemix', 1)
+    exports.ox_inventory:RemoveItem(source, 'maplesyrup', 1)
+    exports.ox_inventory:AddItem(source, 'pancakesmaple', 1)
 end)
 
 RegisterNetEvent('randol_littleteapot:server:makebaconegg', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.RemoveItem('ltmuffin', 1)
-    Player.Functions.RemoveItem('ltbacon', 1)
-    Player.Functions.RemoveItem('ltcheese', 1)
-    Player.Functions.RemoveItem('lteggs', 1)
-    Player.Functions.AddItem('baconegg', 1)
+    exports.ox_inventory:RemoveItem(source, 'ltmuffin', 1)
+    exports.ox_inventory:RemoveItem(source, 'ltbacon', 1)
+    exports.ox_inventory:RemoveItem(source, 'ltcheese', 1)
+    exports.ox_inventory:RemoveItem(source, 'lteggs', 1)
+    exports.ox_inventory:AddItem(source, 'baconegg', 1)
 end)
 
 RegisterNetEvent('randol_littleteapot:server:makeBLT', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.RemoveItem('ltbacon', 1)
-    Player.Functions.RemoveItem('ltlettuce', 1)
-    Player.Functions.RemoveItem('lttomato', 1)
-    Player.Functions.RemoveItem('ltbuns', 1)
-    Player.Functions.AddItem('bltsandwich', 1)
+    exports.ox_inventory:RemoveItem(source, 'ltbacon', 1)
+    exports.ox_inventory:RemoveItem(source, 'ltlettuce', 1)
+    exports.ox_inventory:RemoveItem(source, 'lttomato', 1)
+    exports.ox_inventory:RemoveItem(source, 'ltbuns', 1)
+    exports.ox_inventory:AddItem(source, 'bltsandwich', 1)
 end)
 
 RegisterNetEvent('randol_littleteapot:server:makeOJ', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.RemoveItem('oranges', 1)
-    Player.Functions.AddItem('teapotorange', 1)
+    exports.ox_inventory:RemoveItem(source, 'oranges', 1)
+    exports.ox_inventory:AddItem(source, 'teapotorange', 1)
 end)
 
 RegisterNetEvent('randol_littleteapot:server:makeCoffee', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.RemoveItem('coffeebeans', 1)
-    Player.Functions.AddItem('teapotcoffee', 1)
+    exports.ox_inventory:RemoveItem(source, 'coffeebeans', 1)
+    exports.ox_inventory:AddItem(source, 'teapotcoffee', 1)
 end)
 
 RegisterNetEvent('randol_littleteapot:server:makeTea', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.RemoveItem('ltteabags', 1)
-    Player.Functions.AddItem('teapottea', 1)
+    exports.ox_inventory:RemoveItem(source, 'ltteabags', 1)
+    exports.ox_inventory:AddItem(source, 'teapottea', 1)
 end)
 
 RegisterNetEvent('randol_littleteapot:server:makesmoothieOrange', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.RemoveItem('oranges', 1)
-    Player.Functions.AddItem('smoothieor', 1)
+    exports.ox_inventory:RemoveItem(source, 'oranges', 1)
+    exports.ox_inventory:AddItem(source, 'smoothieor', 1)
 end)
 
 RegisterNetEvent('randol_littleteapot:server:makesmoothieRaspberry', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.RemoveItem('ltraspberry', 1)
-    Player.Functions.AddItem('smoothiera', 1)
+    exports.ox_inventory:RemoveItem(source, 'ltraspberry', 1)
+    exports.ox_inventory:AddItem(source, 'smoothiera', 1)
 end)
 
 RegisterNetEvent('randol_littleteapot:server:makesmoothieStrawberry', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.RemoveItem('ltstrawberry', 1)
-    Player.Functions.AddItem('smoothiest', 1)
+    exports.ox_inventory:RemoveItem(source, 'ltstrawberry', 1)
+    exports.ox_inventory:AddItem(source, 'smoothiest', 1)
 end)
 
 RegisterNetEvent('randol_littleteapot:server:makesmoothieMango', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.RemoveItem('ltmango', 1)
-    Player.Functions.AddItem('smoothiema', 1)
+    exports.ox_inventory:RemoveItem(source, 'ltmango', 1)
+    exports.ox_inventory:AddItem(source, 'smoothiema', 1)
 end)
 
 RegisterNetEvent('randol_littleteapot:server:giveBox', function()
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return end
-    Player.Functions.AddItem('ltbox', 1)
+    exports.ox_inventory:AddItem(source, 'ltbox', 1)
     TriggerClientEvent('QBCore:Notify', source, 'You have your ingredients now.', 'success')
-    TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items['ltbox'], 'add')
 end)
 
 RegisterNetEvent('randol_littleteapot:server:openBox', function() -- Open Ingredients Box.
@@ -259,8 +258,7 @@ RegisterNetEvent('randol_littleteapot:server:openBox', function() -- Open Ingred
     if not Player then return end
     for cum, penis in pairs(Config.BoxIngredients) do
         local amount = 30
-        Player.Functions.AddItem(penis, amount)
-        TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[penis], 'add')
+        exports.ox_inventory:AddItem(source, penis, amount)
     end
     TriggerClientEvent('QBCore:Notify', source, 'You unpack all the ingredients.', 'success')
 end)
@@ -272,9 +270,8 @@ RegisterNetEvent('randol_littleteapot:server:buyrandomsweet', function(args)
     local bank = Player.PlayerData.money['bank']
     if args == 1 then
         if bank >= Config.SweetPrice then
-            Player.Functions.AddItem("ltcookies", 1)
+            exports.ox_inventory:AddItem(src, "ltcookies", 1)
             Player.Functions.RemoveMoney('bank', Config.SweetPrice)
-            TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items["ltcookies"], 'add')
             TriggerClientEvent('QBCore:Notify', src, 'You paid $'..Config.SweetPrice..' for a Cookie.', 'success')
             exports['qb-management']:AddMoney('teapot', math.floor(Config.SweetPrice*0.5)) -- Business gets half the money.
             Wait(1000)
@@ -285,9 +282,8 @@ RegisterNetEvent('randol_littleteapot:server:buyrandomsweet', function(args)
         end
     elseif args == 2 then
         if bank >= Config.SweetPrice then
-            Player.Functions.AddItem("ltdonut", 1)
+            exports.ox_inventory:AddItem(src, "ltdonut", 1)
             Player.Functions.AddMoney('bank', Config.SweetPrice)
-            TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items["ltdonut"], 'add')
             TriggerClientEvent('QBCore:Notify', src, 'You paid $'..Config.SweetPrice..' for a Donut.', 'success')
             exports['qb-management']:AddMoney('teapot', math.floor(Config.SweetPrice*0.5)) -- Business gets half the money.
             Wait(1000)
@@ -298,9 +294,8 @@ RegisterNetEvent('randol_littleteapot:server:buyrandomsweet', function(args)
         end
     elseif args == 3 then
         if bank >= Config.SweetPrice then
-            Player.Functions.AddItem("ltcroissant", 1)
+            exports.ox_inventory:AddItem(src, "ltcroissant", 1)
             Player.Functions.AddMoney('bank', Config.SweetPrice)
-            TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items["ltcroissant"], 'add')
             TriggerClientEvent('QBCore:Notify', src, 'You paid $'..Config.SweetPrice..' for a Croissant.', 'success')
             exports['qb-management']:AddMoney('teapot', math.floor(Config.SweetPrice*0.5)) -- Business gets half the money.
             Wait(1000)

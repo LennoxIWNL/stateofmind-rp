@@ -202,7 +202,7 @@ RegisterNetEvent('razed-cryptomining:server:sendGPUDatabase', function(gpu)
     local id = MySQL.update.await('UPDATE cryptominers SET card = ? WHERE citizenid = ?', {
         gpu, Player.PlayerData.citizenid
     })
-    Player.Functions.RemoveItem(gpu, 1)
+    exports.ox_inventory:RemoveItem(src, gpu, 1)
     TriggerClientEvent('razed-cryptomining:client:sendGPUMail', src)
 end
 end)

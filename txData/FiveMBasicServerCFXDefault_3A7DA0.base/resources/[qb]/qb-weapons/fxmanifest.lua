@@ -6,7 +6,7 @@ description 'Manages all weapon logic for ammo, attachments, and more'
 version '1.2.1'
 
 shared_scripts {
-    '@qb-core/shared/locale.lua',
+    '@qbx_core/shared/locale.lua',
     'locales/en.lua',
     'locales/*.lua',
     'config.lua',

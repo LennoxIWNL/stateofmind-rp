@@ -3,6 +3,12 @@
 local QBCore = exports['qb-core']:GetCoreObject()
 local Accounts = {}
 
+CreateThread(function()
+	for jobName in pairs(QBCore.Shared.Jobs) do
+		exports.ox_inventory:RegisterStash('boss_' .. jobName, 'Boss Stash', 25, 4000000)
+	end
+end)
+
 function ExploitBan(id, reason)
 	TriggerEvent('qb-log:server:CreateLog', 'bossmenu', 'Permission Check Failed', 'orange', string.format('%s failed a boss/gang permission check for %s', GetPlayerName(id), reason), false)
 	print(string.format('[qb-management] Permission check failed: %s (id %s) for %s', GetPlayerName(id), id, reason))

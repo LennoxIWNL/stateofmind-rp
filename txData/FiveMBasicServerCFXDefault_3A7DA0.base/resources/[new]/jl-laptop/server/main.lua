@@ -2,8 +2,7 @@ local QBCore = exports['qb-core']:GetCoreObject()
 
 
 QBCore.Functions.CreateUseableItem(Config.LaptopDevice, function(source, item)
-    local Player = QBCore.Functions.GetPlayer(source)
-    if Player.Functions.GetItemByName(Config.LaptopDevice) then
+    if exports.ox_inventory:GetItem(source, Config.LaptopDevice, nil, false) then
         TriggerClientEvent('jl-laptop:client:openlaptop', source)
     end
 end)
@@ -92,8 +91,7 @@ RegisterNetEvent('jl-laptop:server:RemoveItem', function(item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
     if Player and item then
-        TriggerClientEvent("inventory:client:ItemBox", src, QBCore.Shared.Items[item], "remove")
-        Player.Functions.RemoveItem(item, 1)
+        exports.ox_inventory:RemoveItem(src, item, 1)
     end
 end)
 

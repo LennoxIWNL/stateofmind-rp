@@ -1,7 +1,7 @@
 	
 Config = {}
 
-Config.Inventory = "default" -- ox_inventory, quasar, default, other
+Config.Inventory = "ox_inventory" -- ox_inventory, quasar, default, other
 Config.MaxWeed = 3 -- How many weeds can be grown at the same time?
 Config.Harvest = 0.8 -- Harvest time should give a multiple of the size (for example, a size of 1.2 100% will give 12 weeds for harvest)
 Config.Webhook = "" -- insert your own webhook address

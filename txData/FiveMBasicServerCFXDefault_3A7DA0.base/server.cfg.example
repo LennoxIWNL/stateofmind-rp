@@ -34,7 +34,13 @@ setr voice_enableUi 0
 setr qb_locale "en"
 setr UseTarget true
 
-setr inventory:framework "qb"
+# ox_inventory config (convar based, not a config.lua)
+setr inventory:framework "qbx"
+setr inventory:slots 40
+setr inventory:weight 120000
+setr inventory:target false
+setr inventory:police '["police"]'
+setr inventory:imagepath "nui://ox_inventory/web/images"
 
 # These resources will start by default.
 ensure mapmanager
@@ -47,8 +53,10 @@ ensure baseevents
 
 # QBCore & Extra stuff — load order matters!
 # Core framework + libraries first
-ensure qb-core
 ensure ox_lib
+ensure ox_inventory
+ensure qbx_core
+ensure qbx_vehicles
 ensure jim_bridge
 ensure pa-textui-2
 
@@ -83,7 +91,7 @@ add_principal identifier.steam:YOUR_STEAM_IDENTIFIER group.admin
 add_principal identifier.steam:YOUR_STEAM_IDENTIFIER qbcore.god
 
 # Resources
-add_ace resource.qb-core command allow # Allow qb-core to execute commands
+add_ace resource.qbx_core command allow # Allow qbx_core to execute commands
 
 # Gods
 add_ace qbcore.god command allow # Allow all commands

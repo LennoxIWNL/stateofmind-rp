@@ -13,9 +13,8 @@ else
     QBCore = exports['qb-core']:GetCoreObject()
 
     QBCore.Functions.CreateUseableItem(Config.ItemSelfTreatment, function(source)
-        local xPlayer = QBCore.Functions.GetPlayer(source)
-        if xPlayer.Functions.GetItemByName(Config.ItemSelfTreatment) ~= nil then
-            xPlayer.Functions.RemoveItem(Config.ItemSelfTreatment, 1)
+        if exports.ox_inventory:GetItem(source, Config.ItemSelfTreatment, nil, false) ~= nil then
+            exports.ox_inventory:RemoveItem(source, Config.ItemSelfTreatment, 1)
             TriggerClientEvent("s4-realisticdisease:stopBlooding", source)
         end
     end)
@@ -121,8 +120,7 @@ AddEventHandler("s4-realisticdisease:checkTreatment", function(data)
         end
         TriggerClientEvent("s4-realisticdisease:updateInjures", source, Players[pid])    
     else
-        local xPlayer = QBCore.Functions.GetPlayer(source)
-        if xPlayer.Functions.GetItemByName(data.item) ~= nil then
+        if exports.ox_inventory:GetItem(source, data.item, nil, false) ~= nil then
             if CheckTreatReqItems(data.item, data.area) then 
                 Players[data.cacheid].injures[data.bone] = nil
                 Players[data.cacheid].info[data.bone] = nil
@@ -175,10 +173,9 @@ AddEventHandler("s4-realisticdisease:treatPlayer", function(cachedTreat, bool)
             end
         end
     else
-        xplayer = QBCore.Functions.GetPlayer(source)
         for k,v in pairs(Config.Treatment[cachedTreat.clvl]) do
-            if xplayer.Functions.GetItemByName(v) ~= nil then 
-                xplayer.Functions.RemoveItem(v, 1)
+            if exports.ox_inventory:GetItem(source, v, nil, false) ~= nil then
+                exports.ox_inventory:RemoveItem(source, v, 1)
             end
         end
     end
@@ -196,11 +193,10 @@ if Config.DebguMode == true then
                 xPlayer.addInventoryItem(v, 1)
                 end
             end
-        else 
-            local xPlayer = QBCore.Functions.GetPlayer(src)
+        else
             for k,v in pairs(Config.Treatment["Critical"]) do
-                if xPlayer.Functions.GetItemByName(v) == nil then 
-                xPlayer.Functions.AddItem(v, 1)
+                if exports.ox_inventory:GetItem(src, v, nil, false) == nil then
+                exports.ox_inventory:AddItem(src, v, 1)
                 end
             end
         end
@@ -318,13 +314,11 @@ if Config.Framework == "ESX" then
     end)
 else 
     QBCore.Functions.CreateCallback('s4-realisticdisease:checkItems', function(source, cb, data)
-        local xPlayer = QBCore.Functions.GetPlayer(source)
         local itemlist = {}
         for k,v in pairs(Config.items) do
-            local item = xPlayer.Functions.GetItemByName(k)
-            if item ~= nil then 
-                if item.amount >= 1 then 
-                     item.count = item.amount
+            local item = exports.ox_inventory:GetItem(source, k, nil, false)
+            if item ~= nil then
+                if item.count >= 1 then
                      itemlist[item.name] = item
                 end
             end

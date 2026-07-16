@@ -2,8 +2,7 @@ local QBCore = exports['qb-core']:GetCoreObject()
 
 QBCore.Functions.CreateUseableItem("spray_remover", function(source)
     local source = source
-    local Player = QBCore.Functions.GetPlayer(source)
-    local item = Player.Functions.GetItemByName("spray_remover")
+    local item = exports.ox_inventory:GetItem(source, "spray_remover", nil, false)
     if item then
         TriggerClientEvent('rcore_spray:removeClosestSpray', source)
         TriggerClientEvent('QBCore:Notify', source, 'Stai rimuovendo lo spray!', "success")
@@ -17,11 +16,10 @@ RegisterNetEvent('rcore_spray:remove')
 AddEventHandler('rcore_spray:remove', function(pos)
     local Source = source
 
-    local xPlayer = QBCore.Functions.GetPlayer(Source)
-    local item = xPlayer.Functions.GetItemByName("spray_remover")
-    
+    local item = exports.ox_inventory:GetItem(Source, "spray_remover", nil, false)
+
     if item then
-        xPlayer.Functions.RemoveItem("spray_remover", 1)
+        exports.ox_inventory:RemoveItem(Source, "spray_remover", 1)
         local sprayAtCoords = GetSprayAtCoords(pos)
 
         MySQL.Async.execute([[

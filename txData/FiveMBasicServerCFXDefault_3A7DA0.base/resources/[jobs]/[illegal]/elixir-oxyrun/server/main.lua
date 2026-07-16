@@ -81,10 +81,10 @@ end)
 RegisterNetEvent("elixir-oxyrun:server:deliver")
 AddEventHandler("elixir-oxyrun:server:deliver", function()
 	local Player = QBCore.Functions.GetPlayer(source)
-	local hasPackage = Player.Functions.GetItemByName("package")
-	local hasBags = Player.Functions.GetItemByName("markedbills")
-	local hasBands = Player.Functions.GetItemByName("bands")
-	local hasRolls = Player.Functions.GetItemByName("rolls")
+	local hasPackage = exports.ox_inventory:GetItem(source, "package", nil, false)
+	local hasBags = exports.ox_inventory:GetItem(source, "markedbills", nil, false)
+	local hasBands = exports.ox_inventory:GetItem(source, "bands", nil, false)
+	local hasRolls = exports.ox_inventory:GetItem(source, "rolls", nil, false)
 
 	local chance = math.random(0,100)
 
@@ -97,12 +97,10 @@ AddEventHandler("elixir-oxyrun:server:deliver", function()
 			local itemCount = math.random(Config.MinItemReward, Config.MaxItemReward)
 			local itemCount2 = math.random(Config.MinSpecialReward, Config.MaxSpecialReward)
 
-            Player.Functions.AddItem(Config.ItemReward, itemCount)
-            TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.ItemReward], "add", itemCount)
+            exports.ox_inventory:AddItem(source, Config.ItemReward, itemCount)
 			
 			if chance <= Config.SpecialRewardChance then
-				Player.Functions.AddItem(Config.SpecialItem, itemCount2)
-				TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[Config.SpecialItem], "add", itemCount2)
+				exports.ox_inventory:AddItem(source, Config.SpecialItem, itemCount2)
 			end
 		end
 
@@ -110,38 +108,34 @@ AddEventHandler("elixir-oxyrun:server:deliver", function()
 
 			if chance < Config.BagChance then
 				if hasBags then
-					worth = Player.Functions.GetItemByName('markedbills').info.worth
-					bagAmount = math.random(Player.Functions.GetItemByName("markedbills").amount)
+					worth = exports.ox_inventory:GetItem(source, 'markedbills', nil, false).metadata.worth
+					bagAmount = math.random(exports.ox_inventory:GetItem(source, "markedbills", nil, false).count)
 					Player.Functions.AddMoney('cash', bagAmount*worth)
 
-					Player.Functions.RemoveItem("markedbills", bagAmount)
-					TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["markedbills"], "remove")
+					exports.ox_inventory:RemoveItem(source, "markedbills", bagAmount)
 				end
 			end
 
 			if chance < Config.BandChance then
 				if hasBands then
-					bandAmount = math.random(Player.Functions.GetItemByName("bands").amount)
+					bandAmount = math.random(exports.ox_inventory:GetItem(source, "bands", nil, false).count)
 					Player.Functions.AddMoney('cash', bandAmount*math.random(Config.BandMinPayout, Config.BandMaxPayout))
 
-					Player.Functions.RemoveItem("bands", bandAmount)
-					TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["bands"], "remove")
+					exports.ox_inventory:RemoveItem(source, "bands", bandAmount)
 				end
 			end
 
 			if chance < Config.RollChance then
 				if hasRolls then
-					rollAmount = math.random(Player.Functions.GetItemByName("rolls").amount)
+					rollAmount = math.random(exports.ox_inventory:GetItem(source, "rolls", nil, false).count)
 					Player.Functions.AddMoney('cash', rollAmount*math.random(Config.RollMinPayout, Config.RollMaxPayout))
 
-					Player.Functions.RemoveItem("rolls", rollAmount)
-					TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items["rolls"], "remove")
+					exports.ox_inventory:RemoveItem(source, "rolls", rollAmount)
 				end
 			end
 		end
 	
-		Player.Functions.RemoveItem("package", 1)
-		TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items['package'], "remove")
+		exports.ox_inventory:RemoveItem(source, "package", 1)
 	end
 end)
 
@@ -184,7 +178,7 @@ end)
 QBCore.Functions.CreateCallback('elixir-oxyrun:server:hasPackage', function(source, cb)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-	local hasPackage = Player.Functions.GetItemByName("package")
+	local hasPackage = exports.ox_inventory:GetItem(src, "package", nil, false)
  
 	if hasPackage ~= nil then
         cb(true)
@@ -197,9 +191,8 @@ QBCore.Functions.CreateCallback('elixir-oxyrun:server:canCarry', function(source
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
  
-	if Player.Functions.AddItem("package", 1) then
+	if exports.ox_inventory:AddItem(src, "package", 1) then
 		cb(true)
-		TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items['package'], "add")
 	else
 		cb(false)
 	end

@@ -7,8 +7,7 @@ local RobbedVehicles = {}
 
 QBCore.Functions.CreateUseableItem(Config.BagItemName, function(source, item)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
-    if Player.Functions.GetItemByName(item.name) then
+    if exports.ox_inventory:GetItem(src, item.name, nil, false) then
         print('opening')
     end
 end)

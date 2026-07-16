@@ -10,8 +10,7 @@ RegisterNetEvent('mk-atmRobbery:server:AddMoney', function()
     local Variation = Config.LuckyItemVariation
 
     --if Possibility == Variation then
-        Player.Functions.AddItem(Config.LuckyItem, 1)
-        TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[Config.LuckyItem], 'add', 1)
+        exports.ox_inventory:AddItem(src, Config.LuckyItem, 1)
         Player.Functions.AddMoney('cash', Config.RewardMoney, 'ATM withdrawl')
     --else
         --Player.Functions.AddMoney('cash', Config.RewardMoney, 'ATM withdrawl')
@@ -22,11 +21,10 @@ end)
 QBCore.Functions.CreateCallback('mk-atmRobbery:server:RemoveDisruptor', function(source, cb, item)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local DisruptorScan = Player.Functions.GetItemByName(item)
+    local DisruptorScan = exports.ox_inventory:GetItem(src, item, nil, false)
     if DisruptorScan then
         cb(true)
-        Player.Functions.RemoveItem(Config.ATMRequiredItem, 1)
-        TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[Config.ATMRequiredItem], 'remove', 1)
+        exports.ox_inventory:RemoveItem(src, Config.ATMRequiredItem, 1)
     else
         cb(false)
     end

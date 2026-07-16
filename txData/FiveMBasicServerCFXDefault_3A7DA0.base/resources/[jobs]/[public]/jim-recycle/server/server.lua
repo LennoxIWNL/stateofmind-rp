@@ -30,7 +30,7 @@ end)
 
 RegisterNetEvent("jim-recycle:Selling:Mat", function(data)
     local src = source
-	local amount = Core.Functions.GetPlayer(src).Functions.GetItemByName(data.item).amount
+	local amount = exports.ox_inventory:GetItem(src, data.item, nil, false).count
 	local pay = (amount * Config.Prices[data.item])
 
 	if HasItem(src, data.item, amount) then
@@ -54,14 +54,13 @@ RegisterNetEvent('jim-recycle:server:toggleItem', function(give, item, amount, n
 	local remamount = (amount or 1)
 	if give == 0 or give == false then
 		if HasItem(src, item, amount or 1) then -- check if you still have the item
-			if Config.Inv == "ox" then Player.Functions.RemoveItem(item, amount) else
+			if Config.Inv == "ox" then exports.ox_inventory:RemoveItem(src, item, amount) else
 			while remamount > 0 do if Player.Functions.RemoveItem(item, 1) then end remamount -= 1 end
 			TriggerClientEvent('inventory:client:ItemBox', src, Core.Shared.Items[item], "remove", amount or 1) end
 			if Config.Debug then print("^5Debug^7: ^1Removing ^2from Player^7(^2"..src.."^7) '^6"..Core.Shared.Items[item].label.."^7(^2x^6"..(amount or "1").."^7)'") end
 		else dupeWarn(src, item) end -- if not boot the player
 	else
-		if Player.Functions.AddItem(item, amount or 1) then
-			TriggerClientEvent('inventory:client:ItemBox', src, Core.Shared.Items[item], "add", amount or 1)
+		if exports.ox_inventory:AddItem(src, item, amount or 1) then
 			if Config.Debug then
 				print("^5Debug^7: ^4Giving ^2Player^7(^2"..src.."^7) '^6"..
 				Core.Shared.Items[item].label..

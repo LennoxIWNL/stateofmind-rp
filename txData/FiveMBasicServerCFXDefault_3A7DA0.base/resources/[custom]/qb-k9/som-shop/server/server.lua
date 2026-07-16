@@ -8,7 +8,7 @@ Citizen.CreateThread(function()
             if xPlayer.PlayerData.money[type] >= tonumber(price) then
                 xPlayer.Functions.RemoveMoney(type, tonumber(price))
                 for k, v in pairs(basket) do
-                    xPlayer.Functions.AddItem(v.name, v.amount)
+                    exports.ox_inventory:AddItem(src, v.name, v.amount)
                 end
                 Core.Functions.Notify(src, "Purchase successful, enjoy.", 'success')
             else

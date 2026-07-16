@@ -67,18 +67,16 @@ RegisterNetEvent('luckywheel:give', function(source, price)
 		TriggerClientEvent("chCasinoWall:bigWin", source)
 	elseif price.type == 'item' then
 		TriggerClientEvent("chCasinoWall:bigWin", source)
-		Player.Functions.AddItem(price.name, price.count, slot) 
+		exports.ox_inventory:AddItem(source, price.name, price.count, nil, slot)
 		TriggerClientEvent('QBCore:Notify', source, "Congratulations! You won "..price.count.." "..price.name.."!", 'success')
-		TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[price.name], "add",price.count )
 	elseif price.type == 'money' then
 		TriggerClientEvent("chCasinoWall:bigWin", source)
 		Player.Functions.AddMoney('bank', tonumber(price.count), 'banking-quick-depo')
 		TriggerClientEvent('QBCore:Notify', source, "Congratulations! You won $"..price.count, 'success')
 	elseif price.type == 'weapon' then
 		TriggerClientEvent("chCasinoWall:bigWin", source)
-		Player.Functions.AddItem(price.name, 1, slot)
+		exports.ox_inventory:AddItem(source, price.name, 1, nil, slot)
 		TriggerClientEvent('QBCore:Notify', source, "Congratulations! You won a Pistol!", 'success')
-		TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[price.name], "add",1)
 	end
 	TriggerClientEvent("luckywheel:rollFinished", -1)
 end)

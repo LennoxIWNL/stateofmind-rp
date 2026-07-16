@@ -20,14 +20,11 @@ QBCore.Functions.CreateCallback('weapons:server:GetConfig', function(_, cb)
 end)
 
 QBCore.Functions.CreateCallback('weapon:server:GetWeaponAmmo', function(source, cb, WeaponData)
-    local Player = QBCore.Functions.GetPlayer(source)
     local retval = 0
     if WeaponData then
-        if Player then
-            local ItemData = Player.Functions.GetItemBySlot(WeaponData.slot)
-            if ItemData then
-                retval = ItemData.info.ammo and ItemData.info.ammo or 0
-            end
+        local slotData = exports.ox_inventory:GetSlot(source, WeaponData.slot)
+        if slotData and slotData.metadata then
+            retval = slotData.metadata.ammo or 0
         end
     end
     cb(retval, WeaponData.name)
@@ -40,21 +37,21 @@ QBCore.Functions.CreateCallback('weapons:server:RepairWeapon', function(source, 
     local Timeout = math.random(5 * minute, 10 * minute)
     local WeaponData = QBCore.Shared.Weapons[GetHashKey(data.name)]
     local WeaponClass = (QBCore.Shared.SplitStr(WeaponData.ammotype, '_')[2]):lower()
+    local weaponSlotData = exports.ox_inventory:GetSlot(src, data.slot)
 
-    if Player.PlayerData.items[data.slot] then
-        if Player.PlayerData.items[data.slot].info.quality then
-            if Player.PlayerData.items[data.slot].info.quality ~= 100 then
+    if weaponSlotData then
+        if weaponSlotData.metadata.quality then
+            if weaponSlotData.metadata.quality ~= 100 then
                 if Player.Functions.RemoveMoney('cash', Config.WeaponRepairCosts[WeaponClass]) then
                     Config.WeaponRepairPoints[RepairPoint].IsRepairing = true
                     Config.WeaponRepairPoints[RepairPoint].RepairingData = {
                         CitizenId = Player.PlayerData.citizenid,
-                        WeaponData = Player.PlayerData.items[data.slot],
+                        WeaponData = weaponSlotData,
                         Ready = false,
                     }
-                    if not Player.Functions.RemoveItem(data.name, 1, data.slot) then
+                    if not exports.ox_inventory:RemoveItem(src, data.name, 1, nil, data.slot) then
                         return Player.Functions.AddMoney('cash', Config.WeaponRepairCosts[WeaponClass])
                     end
-                    TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[data.name], 'remove')
                     TriggerClientEvent('inventory:client:CheckWeapon', src, data.name)
                     TriggerClientEvent('weapons:client:SyncRepairShops', -1, Config.WeaponRepairPoints[RepairPoint], RepairPoint)
 
@@ -95,13 +92,10 @@ QBCore.Functions.CreateCallback('weapons:server:RepairWeapon', function(source, 
 end)
 
 QBCore.Functions.CreateCallback('prison:server:checkThrowable', function(source, cb, weapon)
-    local Player = QBCore.Functions.GetPlayer(source)
-
-    if not Player then return cb(false) end
     local throwable = false
     for _, v in pairs(Config.Throwables) do
         if QBCore.Shared.Weapons[weapon].name == 'weapon_' .. v then
-            if not Player.Functions.RemoveItem('weapon_' .. v, 1) then return cb(false) end
+            if not exports.ox_inventory:RemoveItem(source, 'weapon_' .. v, 1) then return cb(false) end
             throwable = true
             break
         end
@@ -113,25 +107,23 @@ end)
 
 RegisterNetEvent('weapons:server:UpdateWeaponAmmo', function(CurrentWeaponData, amount)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
-    if not Player then return end
     amount = tonumber(amount)
     if CurrentWeaponData then
-        if Player.PlayerData.items[CurrentWeaponData.slot] then
-            Player.PlayerData.items[CurrentWeaponData.slot].info.ammo = amount
+        local slotData = exports.ox_inventory:GetSlot(src, CurrentWeaponData.slot)
+        if slotData then
+            local metadata = slotData.metadata or {}
+            metadata.ammo = amount
+            exports.ox_inventory:SetMetadata(src, CurrentWeaponData.slot, metadata)
         end
-        Player.Functions.SetInventory(Player.PlayerData.items, true)
     end
 end)
 
 RegisterNetEvent('weapons:server:TakeBackWeapon', function(k)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
-    if not Player then return end
     local itemdata = Config.WeaponRepairPoints[k].RepairingData.WeaponData
-    itemdata.info.quality = 100
-    Player.Functions.AddItem(itemdata.name, 1, false, itemdata.info)
-    TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[itemdata.name], 'add')
+    local metadata = itemdata.metadata or {}
+    metadata.quality = 100
+    exports.ox_inventory:AddItem(src, itemdata.name, 1, metadata)
     Config.WeaponRepairPoints[k].IsRepairing = false
     Config.WeaponRepairPoints[k].RepairingData = {}
     TriggerClientEvent('weapons:client:SyncRepairShops', -1, Config.WeaponRepairPoints[k], k)
@@ -139,56 +131,42 @@ end)
 
 RegisterNetEvent('weapons:server:SetWeaponQuality', function(data, hp)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
-    if not Player then return end
-    local WeaponSlot = Player.PlayerData.items[data.slot]
-    WeaponSlot.info.quality = hp
-    Player.Functions.SetInventory(Player.PlayerData.items, true)
+    local slotData = exports.ox_inventory:GetSlot(src, data.slot)
+    if not slotData then return end
+    local metadata = slotData.metadata or {}
+    metadata.quality = hp
+    exports.ox_inventory:SetMetadata(src, data.slot, metadata)
 end)
 
 RegisterNetEvent('weapons:server:UpdateWeaponQuality', function(data, RepeatAmount)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
     local WeaponData = QBCore.Shared.Weapons[GetHashKey(data.name)]
-    local WeaponSlot = Player.PlayerData.items[data.slot]
+    local slotData = exports.ox_inventory:GetSlot(src, data.slot)
+    if not slotData then return end
+    local metadata = slotData.metadata or {}
     local DecreaseAmount = Config.DurabilityMultiplier[data.name]
-    if WeaponSlot then
-        if not IsWeaponBlocked(WeaponData.name) then
-            if WeaponSlot.info.quality then
-                for _ = 1, RepeatAmount, 1 do
-                    if WeaponSlot.info.quality - DecreaseAmount > 0 then
-                        WeaponSlot.info.quality = WeaponSlot.info.quality - DecreaseAmount
-                    else
-                        WeaponSlot.info.quality = 0
-                        TriggerClientEvent('inventory:client:UseWeapon', src, data, false)
-                        TriggerClientEvent('QBCore:Notify', src, Lang:t('error.weapon_broken_need_repair'), 'error')
-                        break
-                    end
-                end
+    if not IsWeaponBlocked(WeaponData.name) then
+        metadata.quality = metadata.quality or 100
+        for _ = 1, RepeatAmount, 1 do
+            if metadata.quality - DecreaseAmount > 0 then
+                metadata.quality = metadata.quality - DecreaseAmount
             else
-                WeaponSlot.info.quality = 100
-                for _ = 1, RepeatAmount, 1 do
-                    if WeaponSlot.info.quality - DecreaseAmount > 0 then
-                        WeaponSlot.info.quality = WeaponSlot.info.quality - DecreaseAmount
-                    else
-                        WeaponSlot.info.quality = 0
-                        TriggerClientEvent('inventory:client:UseWeapon', src, data, false)
-                        TriggerClientEvent('QBCore:Notify', src, Lang:t('error.weapon_broken_need_repair'), 'error')
-                        break
-                    end
-                end
+                metadata.quality = 0
+                TriggerClientEvent('inventory:client:UseWeapon', src, data, false)
+                TriggerClientEvent('QBCore:Notify', src, Lang:t('error.weapon_broken_need_repair'), 'error')
+                break
             end
         end
     end
-    Player.Functions.SetInventory(Player.PlayerData.items, true)
+    exports.ox_inventory:SetMetadata(src, data.slot, metadata)
 end)
 
 RegisterNetEvent('weapons:server:removeWeaponAmmoItem', function(item)
-    local Player = QBCore.Functions.GetPlayer(source)
+    local src = source
 
-    if not Player or type(item) ~= 'table' or not item.name or not item.slot then return end
+    if type(item) ~= 'table' or not item.name or not item.slot then return end
 
-    Player.Functions.RemoveItem(item.name, 1, item.slot)
+    exports.ox_inventory:RemoveItem(src, item.name, 1, nil, item.slot)
 end)
 
 -- Commands
@@ -230,13 +208,9 @@ end)
 
 -- TINTS
 
-local function GetWeaponSlotByName(items, weaponName)
-    for index, item in pairs(items) do
-        if item.name == weaponName then
-            return item, index
-        end
-    end
-    return nil, nil
+local function GetWeaponSlotData(source, weaponName)
+    local slots = exports.ox_inventory:Search(source, 'slots', weaponName)
+    return slots and slots[1] or nil
 end
 
 local function IsMK2Weapon(weaponHash)
@@ -245,9 +219,6 @@ local function IsMK2Weapon(weaponHash)
 end
 
 local function EquipWeaponTint(source, tintIndex, item, isMK2)
-    local Player = QBCore.Functions.GetPlayer(source)
-    if not Player then return end
-
     local ped = GetPlayerPed(source)
     local selectedWeaponHash = GetSelectedPedWeapon(ped)
 
@@ -264,19 +235,18 @@ local function EquipWeaponTint(source, tintIndex, item, isMK2)
         return
     end
 
-    local weaponSlot, weaponSlotIndex = GetWeaponSlotByName(Player.PlayerData.items, weaponName)
+    local weaponSlot = GetWeaponSlotData(source, weaponName)
     if not weaponSlot then return end
 
-    if weaponSlot.info.tint == tintIndex then
+    local metadata = weaponSlot.metadata or {}
+    if metadata.tint == tintIndex then
         TriggerClientEvent('QBCore:Notify', source, 'This tint is already applied to your weapon.', 'error')
         return
     end
 
-    weaponSlot.info.tint = tintIndex
-    Player.PlayerData.items[weaponSlotIndex] = weaponSlot
-    Player.Functions.SetInventory(Player.PlayerData.items, true)
-    Player.Functions.RemoveItem(item, 1)
-    TriggerClientEvent('inventory:client:ItemBox', source, QBCore.Shared.Items[item], 'remove')
+    metadata.tint = tintIndex
+    exports.ox_inventory:SetMetadata(source, weaponSlot.slot, metadata)
+    exports.ox_inventory:RemoveItem(source, item, 1)
     TriggerClientEvent('weapons:client:EquipTint', source, selectedWeaponHash, tintIndex)
 end
 
@@ -322,27 +292,24 @@ local function EquipWeaponAttachment(src, item)
         TriggerClientEvent('QBCore:Notify', src, 'This attachment is not valid for the selected weapon.', 'error')
         return
     end
-    local Player = QBCore.Functions.GetPlayer(src)
-    if not Player then return end
-    local weaponSlot, weaponSlotIndex = GetWeaponSlotByName(Player.PlayerData.items, weaponName)
+    local weaponSlot = GetWeaponSlotData(src, weaponName)
     if not weaponSlot then return end
-    weaponSlot.info.attachments = weaponSlot.info.attachments or {}
-    local hasAttach, attachIndex = HasAttachment(attachmentComponent, weaponSlot.info.attachments)
+    local metadata = weaponSlot.metadata or {}
+    metadata.attachments = metadata.attachments or {}
+    local hasAttach, attachIndex = HasAttachment(attachmentComponent, metadata.attachments)
     if hasAttach then
         RemoveWeaponComponentFromPed(ped, selectedWeaponHash, attachmentComponent)
-        table.remove(weaponSlot.info.attachments, attachIndex)
+        table.remove(metadata.attachments, attachIndex)
     else
-        weaponSlot.info.attachments[#weaponSlot.info.attachments + 1] = {
+        metadata.attachments[#metadata.attachments + 1] = {
             component = attachmentComponent,
         }
         GiveWeaponComponentToPed(ped, selectedWeaponHash, attachmentComponent)
         shouldRemove = true
     end
-    Player.PlayerData.items[weaponSlotIndex] = weaponSlot
-    Player.Functions.SetInventory(Player.PlayerData.items, true)
+    exports.ox_inventory:SetMetadata(src, weaponSlot.slot, metadata)
     if shouldRemove then
-        Player.Functions.RemoveItem(item, 1)
-        TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[item], 'remove')
+        exports.ox_inventory:RemoveItem(src, item, 1)
     end
 end
 
@@ -354,21 +321,20 @@ end
 
 QBCore.Functions.CreateCallback('weapons:server:RemoveAttachment', function(source, cb, AttachmentData, WeaponData)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
-    local Inventory = Player.PlayerData.items
     local allAttachments = WeaponAttachments
     local AttachmentComponent = allAttachments[AttachmentData.attachment][WeaponData.name]
+    local slotData = exports.ox_inventory:GetSlot(src, WeaponData.slot)
 
-    if Inventory[WeaponData.slot] then
-        if Inventory[WeaponData.slot].info.attachments and next(Inventory[WeaponData.slot].info.attachments) then
-            local HasAttach, key = HasAttachment(AttachmentComponent, Inventory[WeaponData.slot].info.attachments)
+    if slotData then
+        local metadata = slotData.metadata or {}
+        if metadata.attachments and next(metadata.attachments) then
+            local HasAttach, key = HasAttachment(AttachmentComponent, metadata.attachments)
             if HasAttach then
-                table.remove(Inventory[WeaponData.slot].info.attachments, key)
-                Player.Functions.SetInventory(Player.PlayerData.items, true)
-                Player.Functions.AddItem(AttachmentData.attachment, 1)
-                TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[AttachmentData.attachment], 'add')
+                table.remove(metadata.attachments, key)
+                exports.ox_inventory:SetMetadata(src, WeaponData.slot, metadata)
+                exports.ox_inventory:AddItem(src, AttachmentData.attachment, 1)
                 TriggerClientEvent('QBCore:Notify', src, Lang:t('info.removed_attachment', { value = QBCore.Shared.Items[AttachmentData.attachment].label }), 'error')
-                cb(Inventory[WeaponData.slot].info.attachments)
+                cb(metadata.attachments)
             else
                 cb(false)
             end

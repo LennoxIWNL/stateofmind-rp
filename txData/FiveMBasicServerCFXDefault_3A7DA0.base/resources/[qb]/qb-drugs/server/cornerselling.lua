@@ -7,12 +7,12 @@ local function getAvailableDrugs(source)
     if not Player then return nil end
 
     for k in pairs(Config.DrugsPrice) do
-        local item = Player.Functions.GetItemByName(k)
+        local item = exports.ox_inventory:GetItem(source, k, nil, false)
 
         if item then
             AvailableDrugs[#AvailableDrugs + 1] = {
                 item = item.name,
-                amount = item.amount,
+                amount = item.count,
                 label = QBCore.Shared.Items[item.name]["label"]
             }
         end
@@ -31,7 +31,7 @@ RegisterNetEvent('qb-drugs:server:giveStealItems', function(drugType, amount)
 
     for k,v in pairs(StolenDrugs) do
         if drugType == v.item and amount == v.amount then
-            Player.Functions.AddItem(drugType, amount)
+            exports.ox_inventory:AddItem(source, drugType, amount)
             table.remove(StolenDrugs, k)
         end
     end
@@ -46,12 +46,11 @@ RegisterNetEvent('qb-drugs:server:sellCornerDrugs', function(drugType, amount, p
 
     local item = availableDrugs[drugType].item
 
-    local hasItem = Player.Functions.GetItemByName(item)
-    if hasItem.amount >= amount then
+    local hasItem = exports.ox_inventory:GetItem(src, item, nil, false)
+    if hasItem.count >= amount then
         TriggerClientEvent('QBCore:Notify', src, Lang:t("success.offer_accepted"), 'success')
-        Player.Functions.RemoveItem(item, amount)
+        exports.ox_inventory:RemoveItem(src, item, amount)
         Player.Functions.AddMoney('cash', price, "sold-cornerdrugs")
-        TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[item], "remove")
         TriggerClientEvent('qb-drugs:client:refreshAvailableDrugs', src, getAvailableDrugs(src))
     else
         TriggerClientEvent('qb-drugs:client:cornerselling', src)
@@ -67,8 +66,7 @@ RegisterNetEvent('qb-drugs:server:robCornerDrugs', function(drugType, amount)
 
     local item = availableDrugs[drugType].item
 
-    Player.Functions.RemoveItem(item, amount)
+    exports.ox_inventory:RemoveItem(src, item, amount)
     table.insert(StolenDrugs, {item = item, amount = amount})
-    TriggerClientEvent('inventory:client:ItemBox', src, QBCore.Shared.Items[item], "remove")
     TriggerClientEvent('qb-drugs:client:refreshAvailableDrugs', src, getAvailableDrugs(src))
 end)

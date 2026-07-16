@@ -10,7 +10,7 @@ Config = {
 
 	JimShops = false, 		-- Set this to true if using jim-shops
 
-	Inv = "qb",				--"qb" or "ox"
+	Inv = "ox",				--"qb" or "ox"
 	Menu = "qb",			--"qb" or "ox"
 	ProgressBar = "qb",		--"qb" or "ox"
 	Notify = "qb",			--"qb" or "ox"
