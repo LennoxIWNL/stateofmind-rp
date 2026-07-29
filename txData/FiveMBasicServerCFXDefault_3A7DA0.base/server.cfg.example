@@ -51,6 +51,10 @@ ensure basic-gamemode
 ensure hardcap
 ensure baseevents
 ensure connectqueue
+# qbx_core ships its own connection queue too; connectqueue above is the
+# intentionally-configured one (RequireSteam, JoinDelay). Disable qbx_core's
+# so both don't fight over the same playerConnecting deferral.
+set qbx:enablequeue false
 
 # Anti-cheat (loads before everything else so it monitors from first connect)
 ensure [anticheats]
@@ -60,6 +64,10 @@ ensure [anticheats]
 ensure ox_lib
 ensure ox_inventory
 ensure qbx_core
+# qbx_core's own character-select UI has unresolved bugs; reverted to
+# qb-multicharacter (config/client.lua useExternalCharacters = true). It
+# still resolves qb-core calls through qbx_core's provide shim.
+ensure qb-multicharacter
 ensure qbx_vehicles
 ensure jim_bridge
 ensure pa-textui-2

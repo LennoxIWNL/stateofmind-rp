@@ -24,5 +24,3 @@ files {
 	'html/fonts/*.otf',
 	'html/fonts/*.ttf'
 }
-dependency '/assetpacks'
-dependency '/assetpacks'

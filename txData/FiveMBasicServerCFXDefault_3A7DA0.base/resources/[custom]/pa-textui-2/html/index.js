@@ -6,9 +6,11 @@ window.addEventListener('message', function(event) {
 		if (ed.show) {
 			document.getElementById("TUKeyDivInside").innerHTML=`<span>${ed.key}</span>`;
 			document.getElementById("textUIH4").innerHTML=ed.text;
-			$("#textUI").show().css({bottom: "-10%", position:'absolute', display:'flex'}).animate({bottom: "4%"}, 800, function() {});
+			$("#textUI").stop(true, true).show().css({bottom: "-10%", position:'absolute', display:'flex'}).animate({bottom: "4%"}, 800, function() {});
 		} else {
-			$("#textUI").show().css({bottom: "4%", position:'absolute', display:'flex'}).animate({bottom: "-10%"}, 800, function() {});
+			$("#textUI").stop(true, true).css({bottom: "4%", position:'absolute', display:'flex'}).animate({bottom: "-10%"}, 800, function() {
+				$("#textUI").hide();
+			});
 		}
     } else if (ed.action === "textUIUpdate") {
         document.getElementById("TUKeyDivInside").innerHTML=`<span>${ed.key}</span>`;

@@ -11,6 +11,30 @@ return {
 				duration = 5000,
 				count = 2,
 			},
+			-- Ported from qb-core's old item-combinable system (lockpick +
+			-- screwdriverset -> advancedlockpick), which ox_inventory doesn't
+			-- have a direct equivalent for; reusing this bench's existing
+			-- points/zones rather than inventing a new station location.
+			{
+				name = 'advancedlockpick',
+				ingredients = {
+					lockpick = 1,
+					screwdriverset = 1
+				},
+				duration = 5000,
+				count = 1,
+			},
+			-- Ported from qb-core's old item-combinable system (electronickit +
+			-- gatecrack -> trojan_usb).
+			{
+				name = 'trojan_usb',
+				ingredients = {
+					electronickit = 1,
+					gatecrack = 1
+				},
+				duration = 5000,
+				count = 1,
+			},
 		},
 		points = {
 			vec3(-1147.083008, -2002.662109, 13.180260),

@@ -34,7 +34,10 @@ lib.callback.register('qbx_core:server:getPreviewPedData', function(_, citizenId
     local ped = storage.fetchPlayerSkin(citizenId)
     if not ped then return end
 
-    return ped.skin, ped.model and joaat(ped.model)
+    -- ped.model is already a numeric hash (qb-clothing saves GetEntityModel()'s
+    -- return value as text), not a model name -- joaat()'ing it here double-hashes
+    -- and produces a bogus model that lib.requestModel() then rejects.
+    return ped.skin, ped.model and tonumber(ped.model)
 end)
 
 lib.callback.register('qbx_core:server:loadCharacter', function(source, citizenId)

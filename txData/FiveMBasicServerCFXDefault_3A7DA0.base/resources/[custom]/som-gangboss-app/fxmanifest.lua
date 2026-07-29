@@ -16,8 +16,11 @@ server_scripts {
 
 client_script 'client/main.lua'
 
-ui_page 'html/index.html'
-
+-- No ui_page here on purpose: this resource has no SetNuiFocus/open-close
+-- logic of its own, it's meant to be embedded as an npwd app (see
+-- npwd/config.json's "apps" entry, which loads html/index.html via the
+-- cfx-nui-som-gangboss-app URL below). ui_page would additionally spawn an
+-- independent, always-visible fullscreen browser for it at resource start.
 files {
     'html/index.html',
 }

@@ -5,7 +5,7 @@ return {
     pauseMapText = 'State of Mind RP', -- Text shown above the map when ESC is pressed. If left empty 'FiveM' will appear
 
     characters = {
-        useExternalCharacters = false, -- qbx_core's built-in character management replaces qb-multicharacter
+        useExternalCharacters = true, -- reverted to qb-multicharacter; qbx_core's own character UI had unresolved bugs
         enableDeleteButton = true, -- Whether players should be able to delete characters themselves.
         startingApartment = false, -- ac-spawnselector already handles this, avoid requiring qbx_spawn
 

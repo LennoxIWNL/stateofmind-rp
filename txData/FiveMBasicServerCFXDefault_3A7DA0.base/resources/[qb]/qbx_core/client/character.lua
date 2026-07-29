@@ -356,7 +356,9 @@ local function createCharacter(cid)
     return true
 end
 
-local function chooseCharacter()
+local chooseCharacter
+
+local function chooseCharacterImpl()
     ---@type PlayerEntity[], integer
     local characters, amount = lib.callback.await('qbx_core:server:getCharacters')
     local firstCharacterCitizenId = characters[1] and characters[1].citizenid
@@ -484,6 +486,21 @@ local function chooseCharacter()
 
     SetTimecycleModifier('default')
     lib.showContext('qbx_core_multichar_characters')
+end
+
+-- Wrapped so a server-side error mid character-select (bad query, oxmysql
+-- hiccup, etc.) can't strand the client on the loading screen forever:
+-- ShutdownLoadingScreen/ShutdownLoadingScreenNui are the ONLY way the
+-- manual-shutdown loadingscreen resource ever closes, and chooseCharacterImpl
+-- only reaches those calls after successfully processing the character list.
+chooseCharacter = function()
+    local ok, err = pcall(chooseCharacterImpl)
+    if not ok then
+        print(('^1qbx_core: chooseCharacter failed, forcing loading screen shutdown so the client isn\'t stuck: %s^0'):format(tostring(err)))
+        ShutdownLoadingScreen()
+        ShutdownLoadingScreenNui()
+        Notify('Failed to load your characters. Please rejoin; contact staff if this keeps happening.', 'error', 15000)
+    end
 end
 
 RegisterNetEvent('qbx_core:client:spawnNoApartments', function() -- This event is only for no starting apartments

@@ -4,65 +4,6 @@ local QBCore = exports['qb-core']:GetCoreObject()
 local PlayerData = {}
 local PlayerJob, PlayerGang = {}
 local floorsMenu = {}
-local spawnedDoors = {}
-
-local ElevatorDoors = {
-    {
-        model = 'prop_facgate_04_l',
-        coords = vector3(-1097.37, -849.39, 5.06),
-        heading = 222.0,
-    },
-    {
-        model = 'prop_facgate_04_l',
-        coords = vector3(-1097.30, -849.20, 19.31),
-        heading = 222.0,
-    },
-    {
-        model = 'prop_facgate_04_l',
-        coords = vector3(-1097.26, -849.29, 26.83),
-        heading = 222.0,
-    },
-    {
-        model = 'prop_facgate_04_l',
-        coords = vector3(-1097.29, -849.29, 30.95),
-        heading = 222.0,
-    },
-    {
-        model = 'prop_facgate_04_l',
-        coords = vector3(-1097.31, -849.23, 34.28),
-        heading = 222.0,
-    },
-}
-
-local function spawnElevatorDoors()
-    for _, door in ipairs(ElevatorDoors) do
-        local hash = GetHashKey(door.model)
-        RequestModel(hash)
-        while not HasModelLoaded(hash) do Wait(10) end
-        local obj = CreateObject(hash, door.coords.x, door.coords.y, door.coords.z, false, false, false)
-        SetEntityHeading(obj, door.heading)
-        FreezeEntityPosition(obj, true)
-        SetEntityCollisionState(obj, true, true)
-        spawnedDoors[#spawnedDoors + 1] = obj
-        SetModelAsNoLongerNeeded(hash)
-    end
-end
-
-local function deleteElevatorDoors()
-    for _, obj in ipairs(spawnedDoors) do
-        if DoesEntityExist(obj) then DeleteEntity(obj) end
-    end
-    spawnedDoors = {}
-end
-
-CreateThread(function()
-    Wait(3000)
-    spawnElevatorDoors()
-end)
-
-AddEventHandler('onResourceStop', function(res)
-    if res == GetCurrentResourceName() then deleteElevatorDoors() end
-end)
 
 AddEventHandler('onResourceStart', function(resource)
     PlayerData = QBCore.Functions.GetPlayerData()
