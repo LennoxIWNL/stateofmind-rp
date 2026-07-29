@@ -94,6 +94,14 @@ txData/default/config.json
 skills/
 
 # -------------------------------------------------------------
+#  AI development session reports (audits, fix logs, rundowns) —
+#  useful in the moment, not meant to be permanent repo docs
+# -------------------------------------------------------------
+/rundown.md
+/STARTUP_FIXES.md
+/SECURITY_AUDIT.md
+
+# -------------------------------------------------------------
 #  OS / editor junk
 # -------------------------------------------------------------
 .DS_Store
