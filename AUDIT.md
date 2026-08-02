@@ -702,3 +702,51 @@ Carried forward into the open decisions list:
 this environment, and there is no `.luacheckrc` in the repo, so none of the new
 Lua has been syntax checked or run. The schema has not been imported against a
 live database. Everything in this section is written but untested.
+
+### Phase 1 teardown, partially executed
+
+Authorised by the project owner. Recoverability was verified first, and it
+changes the risk picture recorded in section 11:
+
+- All 11,068 files under `resources/` that are **tracked** are recoverable with
+  `git checkout <commit> -- <path>`.
+- `[assets-streams]` is **gitignored and untracked**, as is every `**/stream/`
+  folder and every loose heavy asset extension. None of that is recoverable
+  from history, so none of it may be deleted. This is why Tier C is a keep.
+- 29 resources outside `[assets-streams]` hold untracked `stream/` content.
+  All are on the keep list. A scan confirmed the delete set contains **zero**
+  unrecoverable files before anything was removed.
+
+**Removed (11 resources, commit `dc537fa2`):** `qbx_core`, `qbx_vehicles`,
+`qb-core`, `qb-inventory`, `qb-multicharacter`, `qb-management`, `qb-menu`,
+`qb-input`, `qb-skillbar`, `interact`, `ps-adminmenu`.
+
+**Not removed (about 145 resources).** The environment's permission layer
+blocks bulk deletion, correctly, since that is exactly the operation worth
+guarding. `tools/phase1-teardown.ps1` carries the full keep/delete manifest and
+the safety gate, defaults to a dry run, and uses `git rm` so every removal stays
+recoverable. It refuses to run if any candidate holds untracked assets.
+
+### Resources added since
+
+| Resource | Why |
+|---|---|
+| `som-ui` | Implements `som:client:notify`, which `som-core` and `som-compat` fire and nothing answered once `som-notify` and `som-lib` were removed. |
+| `som-multichar` | Replaces the deleted `qb-multicharacter`. Without it no player can enter the world. |
+
+`server.cfg.example` now targets the SOM boot order, moves permissions from
+`qbcore.*` to `som.*` ACEs, drops the Qbox branding strings, and comments out
+the emptied folders. The live `server.cfg` is gitignored and must be updated by
+hand on the VM.
+
+### Still required before the server boots
+
+1. Run `tools/phase1-teardown.ps1 -Execute` to finish the teardown.
+2. Import `som-core/sql/som_schema.sql`.
+3. Copy `server.cfg.example` to `server.cfg` and restore the secrets.
+4. Boot and fix what surfaces. None of the new Lua has been executed.
+
+Known functional gaps at this point: no appearance or clothing system
+(`qb-clothing` removed, Phase 7 owns it), no HUD, no inventory bridge yet
+(`inventory:framework` is still `qbx`, see section 6.4), and no job, gang,
+vehicle, or housing content.
