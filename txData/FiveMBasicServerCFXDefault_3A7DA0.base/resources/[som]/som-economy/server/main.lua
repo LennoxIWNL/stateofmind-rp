@@ -52,7 +52,7 @@ CreateThread(function()
     end)
 
     if not ok then
-        print('[som-economy] som_market is missing. Import sql/som_economy.sql before starting.')
+        print('[som-economy] som_market is missing. Import setup.sql before starting.')
         return
     end
 

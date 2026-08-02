@@ -10,6 +10,38 @@ Config.RequireItem = true
 
 Config.OpenKey = 'M'
 
+-- ---------------------------------------------------------------------------
+-- Animation
+--
+-- The phone is visible in the world: the character takes it out to use it and
+-- puts it away when the UI closes, so other players can see who is on their
+-- phone. That readability is the point, not the polish.
+--
+-- Clip names are the two verified against the installed game build (pa-radio
+-- and dpemotes both use them). The cellphone@ dict also has in/out clips, but
+-- they are not used here because they could not be confirmed locally: the
+-- blend in and out already reads as taking it out and putting it away.
+-- ---------------------------------------------------------------------------
+
+Config.Animation = {
+    enabled = true,
+
+    dict = 'cellphone@',
+    hold = 'cellphone_text_read_base',
+    -- Held to the ear. Used by som-phone's call API in 4b-2.
+    call = 'cellphone_call_listen_base',
+
+    prop = 'prop_npc_phone_02',
+    -- PH_R_Hand. The clips are authored around the phone being in the right
+    -- hand, so this is not a preference.
+    bone = 28422,
+    offset = vec3(0.0, 0.0, 0.0),
+    rotation = vec3(0.0, 0.0, 0.0),
+
+    blendIn = 3.0,
+    blendOut = 2.0,
+}
+
 -- Cheap on purpose. Losing your phone should be an inconvenience worth
 -- roleplaying, not a disaster that locks you out of banking for a week.
 Config.Replacement = {

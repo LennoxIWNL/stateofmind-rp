@@ -8,7 +8,8 @@ and Twitter are 4b-2.
 
 ## Setup
 
-Import `sql/som_phone.sql` after `som_schema.sql`.
+Its tables live in `setup.sql` at the repo root, which is the single import
+for the whole server.
 
 Uses ox_inventory's stock `phone` item, so nothing needs adding to
 `data/items.lua`. Set `Config.RequireItem = false` to make the phone always

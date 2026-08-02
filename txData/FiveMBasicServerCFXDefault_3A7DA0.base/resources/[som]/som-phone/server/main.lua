@@ -153,6 +153,6 @@ CreateThread(function()
     end)
 
     if not ok then
-        print('[som-phone] som_phone_* tables are missing. Import sql/som_phone.sql before starting.')
+        print('[som-phone] som_phone_* tables are missing. Import setup.sql before starting.')
     end
 end)

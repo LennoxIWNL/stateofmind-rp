@@ -16,6 +16,10 @@ local function open()
     end
 
     isOpen = true
+    -- Taking the phone out is visible to everyone else, which is the point:
+    -- other players can see who is on their phone.
+    Anim.Play('hold')
+
     SetNuiFocus(true, true)
     SendNUIMessage({ action = 'open', data = result })
 end
@@ -24,6 +28,8 @@ local function close()
     if not isOpen then return end
 
     isOpen = false
+    Anim.Stop()
+
     SetNuiFocus(false, false)
     SendNUIMessage({ action = 'close' })
 end
@@ -71,6 +77,10 @@ AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
     if isOpen then SetNuiFocus(false, false) end
 end)
+
+-- Closing the phone through the pause menu or a death would otherwise leave
+-- the prop in hand, so the animation follows the UI state rather than the key.
+RegisterNetEvent('som-phone:client:close', close)
 
 RegisterCommand('phone', open, false)
 RegisterKeyMapping('phone', 'Open phone', 'keyboard', Config.OpenKey)

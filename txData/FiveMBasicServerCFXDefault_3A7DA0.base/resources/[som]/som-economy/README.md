@@ -7,7 +7,7 @@ ledgered like any other, so nothing this resource does is invisible.
 
 ## Setup
 
-Import `sql/som_economy.sql` after `som_schema.sql`. It is additive and safe to
+Its tables live in `setup.sql` at the repo root. That import is additive and safe to
 re-run: guarded `ALTER`s, `INSERT IGNORE`, and explicit corrections for rows the
 base schema already seeded.
 

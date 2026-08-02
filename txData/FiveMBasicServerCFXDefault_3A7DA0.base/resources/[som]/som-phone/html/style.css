@@ -38,11 +38,9 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     position: absolute;
     inset: 0;
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    justify-content: center;
+    align-items: center;
+    justify-content: flex-end;
     padding-right: 4.5vw;
-    gap: 14px;
     animation: fade 200ms ease both;
 }
 
@@ -606,8 +604,6 @@ select.input {
     transition: background 160ms ease, width 160ms ease;
 }
 .homebar:hover::after { background: #fff; width: 140px; }
-
-.dismiss { font-size: 0.76rem; color: rgba(255, 255, 255, 0.45); }
 
 /* --- Motion ------------------------------------------------------------- */
 

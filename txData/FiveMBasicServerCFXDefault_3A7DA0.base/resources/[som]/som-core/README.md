@@ -6,7 +6,8 @@ The SOM framework core. Owns player identity, characters, money, permissions, an
 
 ## Setup
 
-1. Import `sql/som_schema.sql` into the `stateofmindrp` database.
+1. Import `setup.sql` from the repo root into the `stateofmindrp` database.
+   It is the single import for the whole server; there is no per-resource SQL.
 2. Grant staff ACEs in `server.cfg`:
    ```
    add_ace group.admin som.admin allow

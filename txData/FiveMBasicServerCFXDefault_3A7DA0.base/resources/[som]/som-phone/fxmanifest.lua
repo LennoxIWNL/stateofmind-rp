@@ -13,6 +13,7 @@ shared_scripts {
 }
 
 client_scripts {
+    'client/anim.lua',
     'client/main.lua',
 }
 

@@ -1068,6 +1068,25 @@ a container is a second place cash-adjacent goods can hide; and weight limits
 staying meaningful, or backpacks quietly remove the inventory constraint
 entirely.
 
+#### Item icons
+
+The stock ox_inventory icon set is illustrated, and the server already had a
+partial set of photoreal ones, so the inventory looked like two different games.
+
+133 icons replaced from two public GPL-3.0 sources, `TenTypeeek/OX_inventory-reimagined`
+and `aifazi/items-images`. Matching is by **exact filename**, plus a normalised
+pass (`body_cam` to `bodycam`) that excludes the `vehicles/` folder, since a tool
+called `cutter` matching a car photo named `Cutter` is exactly the failure that
+pass can produce.
+
+**471 items still have no realistic icon** and were left on the stock art rather
+than guessed at, because a wrong icon is worse than an inconsistent one. The list
+is `tools/inventory-icons-unmatched.txt`. Closing it needs either a pack dropped
+in under those exact filenames, or hand mapping.
+
+Not sourced from NoPixel, Prodigy or Echo icon packs: those are redistributed
+private assets, which the sourcing rule in this document excludes.
+
 ### 14.11 Pause menu (owner's direction, Phase 4)
 
 Replace the stock pause menu.
@@ -1112,6 +1131,42 @@ diegetic treatment in 14.3.
 
 Already covered in section 10, and it serves the same goal. Interaction-driven
 play is what separates a serious RP server from a menu simulator.
+
+### 14.13 Feature inventory salvaged from the legacy schema
+
+`origenv2.sql` and `server_setup.sql` were the previous server's database dumps.
+They are deleted now that `setup.sql` exists, but their table list is the most
+complete record of what the old server actually ran, so it is preserved here as
+a candidate backlog. **None of this is committed scope.** It is a menu, and each
+item still has to pass the 14.2 research gate.
+
+Ordered by how strongly the table structure suggests the feature was real and
+in use, rather than installed and abandoned.
+
+| Legacy tables | Feature | Take |
+|---|---|---|
+| `houselocations`, `player_houses`, `apartments`, `house_plants` | Housing with in-house weed growing | Wanted. Housing is already a Phase 7 anchor, and `house_plants` is the diegetic-UI candidate from 14.3. |
+| `player_garages`, `player_vehicles`, `occasion_vehicles` | Garages plus a **player-to-player used car lot** | `occasion_vehicles` is the interesting one: players listing their own cars is a real economy sink and fits the 200K ceiling. |
+| `pa_vehicleshop_showroom_vehicles`, `pa_vehicleshop_stocks` | Dealership with finite stock | Stock limits make a dealership an economy actor rather than an infinite faucet. Strong fit with `som_market`. |
+| `trucker_available_contracts`, `trucker_drivers`, `trucker_loans`, `trucker_trucks` | Trucking job with **vehicle loans** | Loans are a debt mechanic, which the economy currently has none of. Worth designing properly. |
+| `evidence_storage` | Police evidence lockers | Already flagged in the qb-policejob notes. Phase 5. |
+| `management_funds` | Boss/business funds | Superseded by `som_bank_accounts` + `som_businesses`. No work needed. |
+| `crypto`, `crypto_transactions`, `cryptominers` | Crypto with minable rigs | `som_character_money.crypto` already exists as an account. Miners are a physical anchor, so a diegetic candidate. |
+| `fuel_stations` | Player-owned fuel stations | Fits the business register directly. |
+| `sprays` | Graffiti tagging | `som-spray` is already on the keep list. Wire it to turf in Phase 6. |
+| `races`, `race_tracks`, `lapraces`, `gfx_racing` | Racing with saved tracks | Popular, self-contained, no economy risk if payouts stay small. |
+| `player_jobs` | **Multiple jobs per character** | Worth a decision: `som_characters` currently models one job. Changing that later is a migration. |
+| `redeem` | Redeem codes | Useful for the Patreon flow in `patreon.md`. |
+| `vehicle_trackers` | Vehicle trackers | Small, and a good police/crim tension item. |
+| `punchmachine` | Punch machine minigame | Trivial, atmosphere only. The prop is already on the keep list. |
+| `player_notes`, `player_mails`, `player_warns` | Notes, mail, warnings | Warnings belong in `som-admin` (14.8). |
+| `twitter_*`, `instagram_*`, `tinder_*`, `whatsapp_*`, `darkchat_messages`, `yellowpages_posts` | Six separate social apps | **Do not rebuild six.** Twitter and yellowpages are already planned for phone 4b-2; dark chat is a genuine crime-side tool. The rest were bloat. |
+| `phone_invoices` | Phone invoicing | Already built, better: `som_phone_bills` requires acceptance. |
+| `elixir_clothing`, `elixir_outfits`, `playerskins`, `player_outfits` | Clothing and saved outfits | Phase 4a appearance work needs an outfit table. Note the shape when it is designed. |
+| `debux_petshop`, `kloud_delivery`, `randol_cs` | Third-party job scripts | Their features, not their code. Delivery overlaps Post OP. |
+
+Two things the legacy schema had **no** table for, which confirms they are
+greenfield: turf control, and any kind of sink/faucet instrumentation.
 
 ---
 

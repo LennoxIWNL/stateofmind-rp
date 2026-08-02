@@ -257,7 +257,7 @@ CreateThread(function()
     end)
 
     if not ok then
-        print('[som-core] som_* tables are missing. Import sql/som_schema.sql before starting.')
+        print('[som-core] som_* tables are missing. Import setup.sql before starting.')
         return
     end
 

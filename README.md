@@ -86,13 +86,17 @@ tools/
 
 ## Setup
 
-1. **Database.** Create the schema, then import:
+1. **Database.** Create the schema, then import `setup.sql` from the repo root:
    ```
    mysql -u root -e "CREATE DATABASE IF NOT EXISTS stateofmindrp CHARACTER SET utf8mb4;"
-   mysql -u root stateofmindrp < "resources/[som]/som-core/sql/som_schema.sql"
+   mysql -u root stateofmindrp < setup.sql
    ```
-   Do **not** import `server_setup.sql` or `origenv2.sql`. They are the legacy
-   QBCore and Origen schemas for resources that no longer exist.
+   `setup.sql` is the **only** import, and it is safe to re-run: every statement
+   is `IF NOT EXISTS`, `INSERT IGNORE` or a guarded `ALTER`, so running it over a
+   live database adds what is missing and changes nothing else. When a resource
+   needs a new table it is added there rather than to a per-resource `sql/`
+   folder, because two copies of a schema drift and the one you import is never
+   the one you edited.
 
 2. **Config.** Copy `server.cfg.example` to `server.cfg` and fill in the
    licence key, Steam API key, MySQL string and your admin identifiers.
