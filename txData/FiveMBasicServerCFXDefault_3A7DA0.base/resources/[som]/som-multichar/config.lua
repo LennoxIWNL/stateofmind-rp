@@ -67,6 +67,35 @@ Config.Fallback = {
     camLookAtOffset = vec3(0.0, 0.0, 0.05),
 }
 
+-- Scene lighting.
+--
+-- Time and weather are frozen while selecting, so the shot looks the same for
+-- every player at every hour instead of being lit by whatever the server clock
+-- happens to be doing. Restored on spawn.
+Config.Scene = {
+    freezeTimeAndWeather = true,
+    hour = 20,
+    minute = 15,
+    weather = 'EXTRASUNNY',
+}
+
+-- Idle poses for the preview ped, picked at random so the character screen is
+-- not identical every single time. Falls back gracefully if a dict is missing.
+Config.IdleAnims = {
+    { dict = 'anim@heists@heist_corona@team_idles@male_a', clip = 'idle' },
+    { dict = 'amb@world_human_hang_out_street@male_c@idle_a', clip = 'idle_a' },
+    { dict = 'anim@amb@nightclub@peds@', clip = 'rcmme_amanda1_stand_loop_cop' },
+}
+
+-- Cinematic descent on spawn: the camera starts high above the spawn point and
+-- flies down into the player, rather than the world just cutting in.
+Config.SpawnCinematic = {
+    enabled = true,
+    height = 55.0,     -- metres above the spawn point to start from
+    distance = 14.0,   -- horizontal offset, so the move sweeps rather than drops
+    duration = 2600,   -- milliseconds
+}
+
 -- Camera treatment, applied to whichever scene is active.
 Config.Camera = {
     fov = 34.0,

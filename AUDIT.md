@@ -713,7 +713,46 @@ per system **before** writing the UI, not after.
 This raises the cost of every diegetic UI noticeably. That is accepted: the
 whole point of section 14.1 is that the bar is quality, not speed.
 
-### 14.4 Command minimisation
+### 14.4 Research notes: character selection
+
+First application of the 14.2 method. Reviewed on GitHub:
+
+| Script | Notable |
+|---|---|
+| [ak47_multicharacter](https://github.com/MenanAk47/ak47_multicharacter) | React UI, cinematic descent camera, ped lineup with scenario poses, auto mugshots beside stats, time and weather paused during selection, height as a character field |
+| [zx_multicharacter](https://github.com/ZeroX-Project/zx_multicharacter) | React + Vite + Tailwind, spawn at last location, player ped hidden during the menu to avoid clipping |
+| [wtf_characters](https://github.com/wtf-fivem-mods/wtf_characters) | Separates the selection API from the UI, so the two can be replaced independently |
+| [renzu_multicharacter](https://github.com/renzuzu/renzu_multicharacter) | Framework-agnostic adapter layer |
+
+**Adopted:**
+
+- **Freeze time and weather during selection.** The single highest value idea
+  found. Without it the screen is lit by whatever hour the server is at, so it
+  looks great at 20:00 and terrible at 03:00. Now pinned in `Config.Scene`.
+- **Cinematic descent on spawn.** Camera starts high above the spawn point and
+  flies down into the player instead of cutting in. `Config.SpawnCinematic`.
+- **Varied idle poses**, picked at random, so the screen is not identical every
+  session.
+- Hidden player ped during the menu, and spawn at last location, were already
+  in place before the review.
+
+**Deliberately not adopted:**
+
+- **Ped lineup**, all characters on screen at once. It fights the design goal
+  of one character as a clear subject, and it costs a ped and an animation per
+  slot.
+- **Mugshots beside stats.** Worth revisiting: `MugShotBase64` survived the
+  teardown specifically for `ps-mdt`, so the capability exists. Deferred
+  because generating them needs each ped rendered and cached, which is a
+  meaningful amount of work for a second-order gain.
+
+**Layout conclusion.** Most of these centre the slots on screen, over the
+character. SOM puts the UI in a left rail with the camera pushing the character
+right of centre, because the character is the subject and the UI is chrome.
+That is the Prodigy and NoPixel pattern referenced in 14.1, and it is a
+deliberate divergence from the scripts reviewed here.
+
+### 14.5 Command minimisation
 
 Already covered in section 10, and it serves the same goal. Interaction-driven
 play is what separates a serious RP server from a menu simulator.

@@ -185,8 +185,13 @@ local function setPreviewPed(gender)
     SetModelAsNoLongerNeeded(model)
 
     -- Idle animation, so the character reads as a person rather than a mannequin.
-    if requestAnim('anim@heists@heist_corona@team_idles@male_a') then
-        TaskPlayAnim(previewPed, 'anim@heists@heist_corona@team_idles@male_a', 'idle', 8.0, -8.0, -1, 1, 0, false, false, false)
+    -- Picked at random so the screen is not identical every single time.
+    local anims = Config.IdleAnims
+    if anims and #anims > 0 then
+        local pick = anims[math.random(#anims)]
+        if requestAnim(pick.dict) then
+            TaskPlayAnim(previewPed, pick.dict, pick.clip, 8.0, -8.0, -1, 1, 0, false, false, false)
+        end
     end
 end
 
@@ -237,6 +242,14 @@ local function startScene()
     SetEntityInvincible(ped, true)
 
     DisplayRadar(false)
+
+    -- Freeze the clock and weather so the shot is lit identically for every
+    -- player, rather than depending on whatever hour the server is at.
+    if Config.Scene.freezeTimeAndWeather then
+        NetworkOverrideClockTime(Config.Scene.hour, Config.Scene.minute, 0)
+        SetWeatherTypeNowPersist(Config.Scene.weather)
+        SetWeatherTypePersist(Config.Scene.weather)
+    end
 
     local usingShell = createShell()
 
@@ -295,6 +308,13 @@ local function endScene()
     destroyPreviewPed()
     destroyShell()
     DisplayRadar(true)
+
+    -- Hand the clock and weather back to the server.
+    if Config.Scene.freezeTimeAndWeather then
+        ClearOverrideWeather()
+        ClearWeatherTypePersist()
+        NetworkClearClockTimeOverride()
+    end
 
     local ped = PlayerPedId()
     FreezeEntityPosition(ped, false)
@@ -413,6 +433,35 @@ end)
 -- Spawn
 -- ---------------------------------------------------------------------------
 
+---Flies the camera from high above the spawn point down into the player,
+---rather than cutting straight to gameplay. Purely cosmetic: it runs after the
+---ped is already positioned, so nothing depends on it completing.
+---@param spawn table position with x, y, z
+local function playSpawnCinematic(spawn)
+    local cine = Config.SpawnCinematic
+    if not (cine and cine.enabled) then return end
+
+    local from = CreateCam('DEFAULT_SCRIPTED_CAMERA', true)
+    SetCamCoord(from, spawn.x + cine.distance, spawn.y - cine.distance, spawn.z + cine.height)
+    PointCamAtCoord(from, spawn.x, spawn.y, spawn.z)
+    SetCamActive(from, true)
+
+    local to = CreateCam('DEFAULT_SCRIPTED_CAMERA', false)
+    SetCamCoord(to, spawn.x + 1.4, spawn.y - 2.2, spawn.z + 0.9)
+    PointCamAtCoord(to, spawn.x, spawn.y, spawn.z + 0.2)
+
+    RenderScriptCams(true, false, 0, true, true)
+    -- Ease in and out at both ends so the descent settles rather than stopping.
+    SetCamActiveWithInterp(to, from, cine.duration, 1, 1)
+
+    CreateThread(function()
+        Wait(cine.duration + 150)
+        RenderScriptCams(false, true, 600, true, true)
+        DestroyCam(from, true)
+        DestroyCam(to, true)
+    end)
+end
+
 RegisterNetEvent('som:client:playerLoaded', function(data)
     if type(data) ~= 'table' then return end
 
@@ -457,6 +506,8 @@ RegisterNetEvent('som:client:playerLoaded', function(data)
     if Config.UseRoutingBuckets then
         TriggerServerEvent('som-multichar:server:leaveSelection')
     end
+
+    playSpawnCinematic(spawn)
 
     DoScreenFadeIn(1000)
     TriggerEvent('som:client:spawned', data)
