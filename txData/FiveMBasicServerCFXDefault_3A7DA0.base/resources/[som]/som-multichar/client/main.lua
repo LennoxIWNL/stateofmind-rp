@@ -292,10 +292,19 @@ local function startScene()
 
     -- Freeze the clock and weather so the shot is lit identically for every
     -- player, rather than depending on whatever hour the server is at.
+    --
+    -- Re-asserted on a loop: a single call is not enough, because the clock
+    -- keeps advancing underneath and anything else that syncs time will win.
+    -- Sitting on the character screen long enough otherwise drifts into night.
     if Config.Scene.freezeTimeAndWeather then
-        NetworkOverrideClockTime(Config.Scene.hour, Config.Scene.minute, 0)
-        SetWeatherTypeNowPersist(Config.Scene.weather)
-        SetWeatherTypePersist(Config.Scene.weather)
+        CreateThread(function()
+            while inSelection do
+                NetworkOverrideClockTime(Config.Scene.hour, Config.Scene.minute, 0)
+                SetWeatherTypeNowPersist(Config.Scene.weather)
+                SetWeatherTypePersist(Config.Scene.weather)
+                Wait(1000)
+            end
+        end)
     end
 
     local usingShell = createShell()
