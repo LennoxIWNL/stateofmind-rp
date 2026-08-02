@@ -121,9 +121,13 @@ end
 ---@return vector3 camPos, vector3 lookAt
 local function cameraFraming(usingShell)
     if usingShell then
+        -- Both offsets are relative to the SHELL ORIGIN, deliberately. Making
+        -- the aim point relative to pedOffset instead meant moving the
+        -- character also swung the camera, so the two could never be framed
+        -- independently.
         local origin = Config.Shell.coords
         local camPos = origin + Config.Shell.camOffset
-        local lookAt = origin + Config.Shell.pedOffset + Config.Shell.camLookAtOffset
+        local lookAt = origin + Config.Shell.camLookAtOffset
         return camPos, applySubjectShift(camPos, lookAt)
     end
 
@@ -285,9 +289,13 @@ local function startScene()
     -- a player stood in a street.
     local dof = Config.Camera.dof
     if dof and dof.enabled then
+        -- Scale the focal range to the actual camera-to-subject distance, so
+        -- the character stays sharp wherever the scene ends up framed.
+        local subjectDistance = #(camPos - lookAt)
+
         SetCamUseShallowDofMode(cam, true)
-        SetCamNearDof(cam, dof.near)
-        SetCamFarDof(cam, dof.far)
+        SetCamNearDof(cam, subjectDistance * (dof.nearScale or 0.45))
+        SetCamFarDof(cam, subjectDistance * (dof.farScale or 1.7))
         SetCamDofStrength(cam, dof.strength)
 
         -- SetUseHiDof only applies for the frame it is called on, so it has to
@@ -357,6 +365,15 @@ AddEventHandler('som-multichar:client:rebuildScene', function()
 
     SetCamCoord(cam, camPos.x, camPos.y, camPos.z)
     PointCamAtCoord(cam, lookAt.x, lookAt.y, lookAt.z)
+
+    -- Keep the focal range matched to the new distance while tuning, or the
+    -- subject drifts out of focus as the camera is moved.
+    local dof = Config.Camera.dof
+    if dof and dof.enabled then
+        local subjectDistance = #(camPos - lookAt)
+        SetCamNearDof(cam, subjectDistance * (dof.nearScale or 0.45))
+        SetCamFarDof(cam, subjectDistance * (dof.farScale or 1.7))
+    end
 
     if previewPed and DoesEntityExist(previewPed) then
         local pos = pedPosition()

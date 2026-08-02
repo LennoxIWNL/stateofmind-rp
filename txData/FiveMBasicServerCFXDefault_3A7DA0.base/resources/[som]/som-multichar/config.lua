@@ -42,18 +42,17 @@ Config.Shell = {
     -- FiveM shell interiors conventionally occupy.
     coords = vec3(144.58, -1002.36, -100.0),
 
-    -- Where the character stands, relative to the shell origin.
-    -- Moved off the origin because the shell's origin sits in the bedroom.
-    pedOffset = vec3(0.0, -2.2, 0.0),
+    -- Framed in game with the tuning tool rather than guessed. The character
+    -- stands in the living area; the shell origin itself is in the bedroom.
+    pedOffset = vec3(-0.1, -2.4, 0.1),
+    pedHeading = 90.0,
 
-    -- The camera sits at +y from the ped, and GTA heading 0 faces +y, so the
-    -- character must be at 0 to look INTO the lens. 180 faces them away.
-    pedHeading = 0.0,
-
-    -- Camera offset from the SHELL origin. z is chest height, not floor level:
-    -- at 0.4 the shot framed the character's knees.
-    camOffset = vec3(0.0, 0.5, 1.15),
-    camLookAtOffset = vec3(0.0, 0.0, 0.92),
+    -- BOTH are relative to the shell origin, so the character and the camera
+    -- can be moved independently. camLookAtOffset below is the tuned
+    -- ped-relative value (-3.4, -0.8, 0.92) converted to origin-relative by
+    -- folding in pedOffset, so the framing set in game is preserved.
+    camOffset = vec3(-5.4, -3.1, 1.15),
+    camLookAtOffset = vec3(-3.5, -3.2, 1.02),
 }
 
 -- Live tuning. With this on, a staff member can nudge the scene in game and
@@ -127,9 +126,14 @@ Config.Camera = {
     -- them. Positive moves the character right in frame. In metres.
     subjectShift = 0.55,
 
-    -- Shallow depth of field is what sells the shot. It keeps the character
-    -- sharp and reduces the background to colour and shape.
-    dof = { enabled = true, near = 0.4, far = 2.4, strength = 1.0 },
+    -- Depth of field is derived from how far the camera actually is from the
+    -- subject, not from fixed distances. Hardcoding far = 2.4 blurred the
+    -- character too, because the camera ended up further away than that once
+    -- the scene was framed.
+    --
+    -- nearScale and farScale are multiples of the camera-to-subject distance:
+    -- everything closer than near and further than far goes soft.
+    dof = { enabled = true, nearScale = 0.45, farScale = 1.7, strength = 0.75 },
 
     -- Slow drift so the shot is not a dead frame.
     orbit = { enabled = true, degrees = 8.0, seconds = 24.0 },

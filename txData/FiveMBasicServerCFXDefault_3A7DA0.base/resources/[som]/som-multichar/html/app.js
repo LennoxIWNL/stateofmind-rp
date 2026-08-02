@@ -279,6 +279,12 @@ form.querySelector('[data-action="back"]').addEventListener('click', closeCreate
 
 let tuning = false;
 
+// dx is screen-right, dy is away from the camera. Lua converts these into
+// world axes using the camera's facing, so the controls stay intuitive
+// regardless of which way the scene points.
+//
+// Height has letter aliases because PageUp/PageDown are not delivered
+// reliably inside the CEF layer, and plenty of keyboards make them awkward.
 const TUNE_KEYS = {
     ArrowLeft:  { dx: -1, dy: 0, dz: 0 },
     ArrowRight: { dx: 1, dy: 0, dz: 0 },
@@ -286,6 +292,10 @@ const TUNE_KEYS = {
     ArrowDown:  { dx: 0, dy: -1, dz: 0 },
     PageUp:     { dx: 0, dy: 0, dz: 1 },
     PageDown:   { dx: 0, dy: 0, dz: -1 },
+    z:          { dx: 0, dy: 0, dz: 1 },
+    Z:          { dx: 0, dy: 0, dz: 1 },
+    x:          { dx: 0, dy: 0, dz: -1 },
+    X:          { dx: 0, dy: 0, dz: -1 },
 };
 
 async function handleTuningKey(event) {
