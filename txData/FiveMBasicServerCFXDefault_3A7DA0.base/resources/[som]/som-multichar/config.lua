@@ -47,12 +47,17 @@ Config.Shell = {
     pedOffset = vec3(-1.2, -2.33, 0.15),
     pedHeading = 105.0,
 
-    -- BOTH are relative to the shell origin, so the character and the camera
-    -- can be moved independently. camLookAtOffset below is the tuned
-    -- ped-relative value (-3.4, -0.8, 0.92) converted to origin-relative by
-    -- folding in pedOffset, so the framing set in game is preserved.
+    -- Camera position, relative to the shell origin.
     camOffset = vec3(-5.72, -3.61, 1.15),
-    camLookAtOffset = vec3(-5.15, -3.81, 1.02),
+
+    -- There is deliberately no aim point. The camera ALWAYS looks at the
+    -- character, at this height up their body: 0.9 is roughly chest.
+    --
+    -- A separate aim point was tunable into nonsense. It ended up 0.6m from
+    -- the camera while the character stood 4.6m away, so the camera was not
+    -- pointing at the subject at all, depth of field focused on empty space,
+    -- and the movement axes no longer matched what was on screen.
+    lookHeight = 0.9,
 }
 
 -- Live tuning. With this on, a staff member can nudge the scene in game and
@@ -83,10 +88,11 @@ Config.Fallback = {
     interior = vec3(-814.89, 181.95, 76.85),
     ped      = vec4(-813.97, 176.22, 76.74, 175.0),
 
-    -- Camera offset from the ped, and what it aims at. Closer than a full body
-    -- shot on purpose: less background in frame means less to look wrong.
-    camOffset       = vec3(0.0, 1.9, 0.25),
-    camLookAtOffset = vec3(0.0, 0.0, 0.05),
+    -- Camera offset from the ped. Closer than a full body shot on purpose:
+    -- less background in frame means less to look wrong. Like the shell scene,
+    -- the camera always aims at the character, at lookHeight up their body.
+    camOffset  = vec3(0.0, 1.9, 0.25),
+    lookHeight = 0.9,
 }
 
 -- Scene lighting.
@@ -123,8 +129,12 @@ Config.Camera = {
     fov = 34.0,
 
     -- Pushes the character off centre so the UI rail on the left never covers
-    -- them. Positive moves the character right in frame. In metres.
-    subjectShift = 0.55,
+    -- them. Positive moves the character right in frame.
+    --
+    -- A RATIO of the camera-to-subject distance, not metres. A fixed distance
+    -- swings the camera wildly when the subject is close and does nothing when
+    -- it is far, so the composition changed every time the camera moved.
+    subjectShiftRatio = 0.12,
 
     -- Depth of field is derived from how far the camera actually is from the
     -- subject, not from fixed distances. Hardcoding far = 2.4 blurred the

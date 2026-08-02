@@ -38,7 +38,7 @@ Set `Config.UseRoutingBuckets = false` to disable, for example if a later phase 
 | `Config.Shell.model` | Interior shell prop, defaults to a vanilla high-end apartment |
 | `Config.Shell.coords` | Where the shell is spawned, far below the map |
 | `Config.Shell.pedOffset` / `pedHeading` | Character placement inside the shell |
-| `Config.Shell.camOffset` / `camLookAtOffset` | Camera framing |
+| `Config.Shell.camOffset` | Camera position. There is no aim point: the camera always looks at the character, at `lookHeight` up their body |
 | `Config.Camera` | FOV, depth of field and orbit, applied to whichever scene is active |
 | `Config.Fallback` | World scene used when the shell is off or its model fails. **This is the default.** |
 | `Config.HiddenCoords` | Where the real player ped is parked while hidden |

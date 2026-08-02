@@ -106,12 +106,15 @@ end
 ---@param lookAt vector3
 ---@return vector3 adjusted aim point
 local function applySubjectShift(camPos, lookAt)
-    local shift = Config.Camera.subjectShift
-    if not shift or shift == 0.0 then return lookAt end
+    local ratio = Config.Camera.subjectShiftRatio
+    if not ratio or ratio == 0.0 then return lookAt end
 
     local dx, dy = lookAt.x - camPos.x, lookAt.y - camPos.y
     local len = math.sqrt(dx * dx + dy * dy)
     if len == 0 then return lookAt end
+
+    -- Scaled by distance, so the framing holds however far away the camera is.
+    local shift = len * ratio
 
     -- Perpendicular to the view direction, in the ground plane.
     return vec3(lookAt.x + (-dy / len) * shift, lookAt.y + (dx / len) * shift, lookAt.z)
@@ -121,13 +124,11 @@ end
 ---@return vector3 camPos, vector3 lookAt
 local function cameraFraming(usingShell)
     if usingShell then
-        -- Both offsets are relative to the SHELL ORIGIN, deliberately. Making
-        -- the aim point relative to pedOffset instead meant moving the
-        -- character also swung the camera, so the two could never be framed
-        -- independently.
-        local origin = Config.Shell.coords
-        local camPos = origin + Config.Shell.camOffset
-        local lookAt = origin + Config.Shell.camLookAtOffset
+        -- The camera always aims at the character. Only its position is
+        -- tunable, which makes it impossible to frame a shot the subject is
+        -- not in.
+        local camPos = Config.Shell.coords + Config.Shell.camOffset
+        local lookAt = pedPosition() + vec3(0.0, 0.0, Config.Shell.lookHeight or 0.9)
         return camPos, applySubjectShift(camPos, lookAt)
     end
 
@@ -144,7 +145,9 @@ local function cameraFraming(usingShell)
         ped.z + off.z
     )
 
-    return camPos, applySubjectShift(camPos, ped + Config.Fallback.camLookAtOffset)
+    -- Same rule as the shell scene: always aim at the character.
+    local lookAt = ped + vec3(0.0, 0.0, Config.Fallback.lookHeight or 0.9)
+    return camPos, applySubjectShift(camPos, lookAt)
 end
 
 local function destroyShell()
@@ -372,6 +375,36 @@ end
 -- judge whether an offset is right.
 AddEventHandler('som-multichar:client:setOrbit', function(enabled)
     orbitPaused = not enabled
+end)
+
+---Applies a screen-relative nudge to the scene.
+---
+---The conversion lives here rather than in tuning.lua because it reads the
+---camera's REAL rotation. Deriving the axes from config values instead meant
+---they described a camera orientation that was not the one being rendered, so
+---the arrow keys did not match what the screen showed.
+---@param what string 'cam' or 'ped'
+---@param dx number screen right
+---@param dy number screen forward, away from the camera
+---@param dz number up
+AddEventHandler('som-multichar:client:nudgeScene', function(what, dx, dy, dz)
+    if not inSelection or not cam then return end
+
+    local heading = math.rad(GetCamRot(cam, 2).z)
+
+    -- GTA heading 0 faces +y and increases anticlockwise.
+    local fx, fy = -math.sin(heading), math.cos(heading)
+    local rx, ry = fy, -fx
+
+    local delta = vec3(dx * rx + dy * fx, dx * ry + dy * fy, dz)
+
+    if what == 'ped' then
+        Config.Shell.pedOffset = Config.Shell.pedOffset + delta
+    else
+        Config.Shell.camOffset = Config.Shell.camOffset + delta
+    end
+
+    TriggerEvent('som-multichar:client:rebuildScene')
 end)
 
 AddEventHandler('som-multichar:client:rebuildScene', function()

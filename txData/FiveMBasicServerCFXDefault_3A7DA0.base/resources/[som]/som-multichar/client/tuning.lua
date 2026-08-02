@@ -35,8 +35,7 @@ local function dump()
     print(('    pedHeading = %s,'):format(round(shell.pedHeading)))
     print(('    camOffset = vec3(%s, %s, %s),')
         :format(round(shell.camOffset.x), round(shell.camOffset.y), round(shell.camOffset.z)))
-    print(('    camLookAtOffset = vec3(%s, %s, %s),')
-        :format(round(shell.camLookAtOffset.x), round(shell.camLookAtOffset.y), round(shell.camLookAtOffset.z)))
+    print(('    lookHeight = %s,'):format(round(shell.lookHeight or 0.9)))
 
     TriggerEvent('som:client:notify', 'Values printed to the F8 console', 'success')
 end
@@ -51,38 +50,10 @@ local function printCoords()
         ('%.2f, %.2f, %.2f  (printed to F8)'):format(c.x, c.y, c.z), 'success', 8000)
 end
 
----Converts screen-relative input into world axes.
----
----Moving along raw world x and y feels inverted and sideways as soon as the
----camera is not facing north, which it never is. Up should mean away from the
----camera and right should mean screen-right, whatever direction it faces.
----@param dx number screen right
----@param dy number screen forward, away from camera
----@return number worldX, number worldY
-local function cameraRelative(dx, dy)
-    local dir = Config.Shell.camLookAtOffset - Config.Shell.camOffset
-    local len = math.sqrt(dir.x * dir.x + dir.y * dir.y)
-    if len == 0 then return dx, dy end
-
-    local fx, fy = dir.x / len, dir.y / len   -- forward, camera to subject
-    local rx, ry = fy, -fx                    -- right, perpendicular to it
-
-    return dx * rx + dy * fx, dx * ry + dy * fy
-end
-
+---Input is screen-relative. main.lua converts it using the camera's real
+---rotation, since only it holds the camera handle.
 local function nudge(dx, dy, dz)
-    local shell = Config.Shell
-    local wx, wy = cameraRelative(dx, dy)
-
-    if target == 'cam' then
-        shell.camOffset = shell.camOffset + vec3(wx, wy, dz)
-    elseif target == 'look' then
-        shell.camLookAtOffset = shell.camLookAtOffset + vec3(wx, wy, dz)
-    else
-        shell.pedOffset = shell.pedOffset + vec3(wx, wy, dz)
-    end
-
-    TriggerEvent('som-multichar:client:rebuildScene')
+    TriggerEvent('som-multichar:client:nudgeScene', target, dx, dy, dz)
 end
 
 ---@return boolean
@@ -157,7 +128,9 @@ end)
 
 RegisterNUICallback('tuningCycle', function(_, cb)
     if active then
-        target = target == 'cam' and 'look' or (target == 'look' and 'ped' or 'cam')
+        -- Only two things move now. The aim point is gone: the camera always
+        -- looks at the character.
+        target = target == 'cam' and 'ped' or 'cam'
         TriggerEvent('som:client:notify', ('Moving: %s'):format(target), 'info')
     end
     cb({})
