@@ -467,7 +467,19 @@ local function openSelection()
     -- The slot cap is per player and comes from the server. Reading a local
     -- config value would show everyone the same number regardless of what they
     -- are actually entitled to.
-    local entitlements = lib.callback.await('som:server:getEntitlements', false) or {}
+    --
+    -- Guarded: if som-core is restarting or is an older build without this
+    -- callback, ox_lib raises rather than returning nil, which would otherwise
+    -- take the whole character screen down. Falling back to the free tier is
+    -- safe, since the server enforces the real cap on create regardless.
+    local ok, entitlements = pcall(function()
+        return lib.callback.await('som:server:getEntitlements', false)
+    end)
+
+    if not ok or type(entitlements) ~= 'table' then
+        print('^3[som-multichar]^7 entitlements unavailable, defaulting to the free tier. Restart som-core.')
+        entitlements = {}
+    end
 
     SendNUIMessage({
         action = 'open',

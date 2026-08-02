@@ -29,52 +29,86 @@
 Tiers = {}
 
 -- Ordered lowest to highest. A player gets the best tier they hold.
+--
+-- Slots climb 2, 3, 5, 6, 7 and then stop. Seven is the purchasable ceiling
+-- because nobody needs more, so the top tier sells cosmetics rather than yet
+-- another slot. See patreon.md for the full perk rationale.
 Tiers.supporter = {
     {
         name = 'free',
         label = 'Citizen',
         price = nil,
         ace = nil,              -- everyone
-        slots = 3,
+        slots = 2,
         queuePriority = 0,
         perks = {},
     },
     {
-        name = 'supporter',
-        label = 'Supporter',
-        price = 5,
-        ace = 'som.tier.supporter',
-        slots = 5,
-        queuePriority = 10,
-        perks = {
-            -- Deliberately queue only. The cheapest tier buys time, not toys.
-        },
-    },
-    {
         name = 'resident',
         label = 'Resident',
-        price = 10,
+        price = 5,
         ace = 'som.tier.resident',
-        slots = 7,
-        queuePriority = 20,
+        slots = 3,
+        queuePriority = 5,      -- deliberately slight
         perks = {
-            twitterHandle = true,    -- choose a custom handle
-            twitterColour = 1,       -- how many colourways unlocked
-            customPlates = 1,        -- custom plate on this many owned vehicles
+            -- One extra slot and a nudge up the queue. Nothing else: the
+            -- cheapest tier buys a little time, not toys.
         },
     },
     {
         name = 'insider',
         label = 'Insider',
-        price = 20,
+        price = 10,
         ace = 'som.tier.insider',
-        slots = 10,
-        queuePriority = 30,
+        slots = 5,
+        queuePriority = 15,
         perks = {
+            customPhoneNumber = true,   -- the first in-game perk
+        },
+    },
+    {
+        name = 'patron',
+        label = 'Patron',
+        price = 20,
+        ace = 'som.tier.patron',
+        slots = 6,
+        queuePriority = 25,
+        perks = {
+            customPhoneNumber = true,
+            twitterHandle = true,
+            twitterColour = 1,
+            customPlates = 1,
+        },
+    },
+    {
+        name = 'benefactor',
+        label = 'Benefactor',
+        price = 30,
+        ace = 'som.tier.benefactor',
+        slots = 7,
+        queuePriority = 35,
+        perks = {
+            customPhoneNumber = true,
             twitterHandle = true,
             twitterColour = 3,
-            customPlates = 3,
+            customPlates = 2,
+            profileTitle = true,
+        },
+    },
+    {
+        name = 'founder',
+        label = 'Founder',
+        price = 40,
+        ace = 'som.tier.founder',
+        slots = 7,              -- the ceiling: this tier sells cosmetics
+        queuePriority = 45,
+        perks = {
             customPhoneNumber = true,
+            twitterHandle = true,
+            twitterColour = 6,
+            customPlates = 3,
+            profileTitle = true,
+            phoneTheme = true,
         },
     },
 }
@@ -93,8 +127,13 @@ Tiers.staff = {
     { ace = 'som.god',   slots = 10, queuePriority = 50 },
 }
 
-Tiers.defaultSlots = 3
+Tiers.defaultSlots = 2
 
--- Hard ceiling. Nothing may exceed this, whatever combination of ACEs a player
--- somehow accumulates, because som_characters.slot is validated against it.
+-- The most a player can ever reach by paying. Seven is plenty, and stopping
+-- here is what keeps ten feeling like a staff thing rather than a purchase.
+Tiers.maxPurchasableSlots = 7
+
+-- Absolute ceiling across every source, reserved for management. Nothing may
+-- exceed this whatever combination of ACEs a player accumulates, because
+-- som_characters.slot is validated against it.
 Tiers.maxSlots = 10

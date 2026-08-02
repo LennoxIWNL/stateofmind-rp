@@ -856,12 +856,21 @@ does not ship.
 
 Prices are placeholders: Patreon does not exist yet.
 
+**Full detail, including per-system perk ideas and the rejected list, is in
+[patreon.md](patreon.md) at repo root.** Summary:
+
 | Tier | Price | Slots | Queue | Perks |
 |---|---:|---:|---:|---|
-| Citizen (free) | – | 3 | 0 | – |
-| Supporter | €5 | 5 | 10 | Priority queue only. The cheapest tier buys time, not toys. |
-| Resident | €10 | 7 | 20 | Custom Twitter handle, 1 colourway, custom plate on 1 owned vehicle |
-| Insider | €20 | 10 | 30 | 3 colourways, custom plates on 3 vehicles, custom phone number |
+| Citizen (free) | – | 2 | 0 | – |
+| Resident | €5 | 3 | 5 | One extra slot and a slight queue nudge. Nothing else. |
+| Insider | €10 | 5 | 15 | + custom phone number |
+| Patron | €20 | 6 | 25 | + Twitter handle, 1 colourway, 1 custom plate |
+| Benefactor | €30 | 7 | 35 | + 3 colourways, 2 plates, profile title |
+| Founder | €40 | 7 | 45 | + 6 colourways, 3 plates, phone theme |
+
+Slots stop at **7**, the purchasable ceiling. Ten exists only for management,
+which is what keeps it a staff thing rather than a purchase, so the top tier
+sells cosmetics instead of another slot.
 
 Staff are resolved separately and a player receives the **better** of their
 staff and supporter entitlement, so buying a tier never removes something staff
@@ -873,8 +882,7 @@ already had, and staff rank is never a substitute for supporting.
 | Admin | 7 | 40 |
 | Management | 10 | 50 |
 
-Management sits at 10 and other staff at 7 deliberately: keeping the top slot
-count purchasable is the incentive, per the owner.
+Management alone reaches 10. Everyone else, paying or staff, tops out at 7.
 
 #### How a tier is granted
 

@@ -47,7 +47,12 @@ function Entitlements.Get(source)
 
     -- Better of the two, so staff never lose what a purchase would have given
     -- and a purchase never removes a staff entitlement.
-    local slots = math.max(tier.slots or Tiers.defaultSlots, staffSlots)
+    -- A purchase can never exceed the purchasable ceiling, even if the tier
+    -- table is later edited past it by mistake. Staff are exempt: management
+    -- is the only route to the absolute cap.
+    local purchased = math.min(tier.slots or Tiers.defaultSlots, Tiers.maxPurchasableSlots)
+
+    local slots = math.max(purchased, staffSlots)
     local priority = math.max(tier.queuePriority or 0, staffPriority)
 
     if slots > Tiers.maxSlots then slots = Tiers.maxSlots end
