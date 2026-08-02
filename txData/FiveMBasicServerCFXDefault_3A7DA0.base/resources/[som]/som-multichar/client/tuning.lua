@@ -104,6 +104,10 @@ RegisterNUICallback('tuningToggle', function(_, cb)
     end
 
     active = not active
+
+    -- Stop the camera drifting while framing, or judging an offset is guesswork.
+    TriggerEvent('som-multichar:client:setOrbit', not active)
+
     print(('^5[som-multichar]^7 scene tuning %s'):format(active and 'ON' or 'OFF'))
     TriggerEvent('som:client:notify',
         active and 'Tuning ON. Arrows move, PgUp/PgDn height, Q/E rotate, R target, P print.'

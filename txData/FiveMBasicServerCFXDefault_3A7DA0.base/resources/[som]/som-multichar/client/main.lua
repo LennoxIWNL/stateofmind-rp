@@ -9,6 +9,14 @@ local previewPed = nil
 local shellObject = nil
 local inSelection = false
 
+-- Current framing, kept at file level rather than captured by the orbit
+-- thread. The orbit rewrites the camera every frame, so if it held its own
+-- copy of these it would immediately overwrite anything that moved the camera
+-- afterwards, and live tuning would appear to do nothing.
+local sceneCam = nil
+local sceneLookAt = nil
+local orbitPaused = false
+
 -- ---------------------------------------------------------------------------
 -- NUI focus
 --
@@ -196,31 +204,38 @@ local function setPreviewPed(gender)
 end
 
 ---Slow horizontal drift around the subject, so the shot is not a dead frame.
-local function startCameraOrbit(origin, lookAt)
+---Reads sceneCam and sceneLookAt every iteration rather than capturing them,
+---so moving the camera while it runs actually sticks.
+local function startCameraOrbit()
     local orbit = Config.Camera.orbit
     if not (orbit and orbit.enabled) then return end
 
     CreateThread(function()
-        local base = origin
-        local radius = #(vec3(base.x, base.y, 0.0) - vec3(lookAt.x, lookAt.y, 0.0))
-        local baseAngle = math.atan(base.y - lookAt.y, base.x - lookAt.x)
-        local sweep = math.rad(orbit.degrees) * 0.5
         local period = orbit.seconds * 1000.0
+        local sweep = math.rad(orbit.degrees) * 0.5
         local started = GetGameTimer()
 
         while inSelection and cam do
-            local elapsed = (GetGameTimer() - started) % period
-            -- Sine gives an ease at each end of the sweep for free, so the
-            -- camera never snaps direction.
-            local angle = baseAngle + math.sin((elapsed / period) * math.pi * 2.0) * sweep
+            if orbitPaused or not sceneCam or not sceneLookAt then
+                Wait(100)
+            else
+                local base, lookAt = sceneCam, sceneLookAt
+                local radius = #(vec3(base.x, base.y, 0.0) - vec3(lookAt.x, lookAt.y, 0.0))
+                local baseAngle = math.atan(base.y - lookAt.y, base.x - lookAt.x)
 
-            SetCamCoord(cam,
-                lookAt.x + math.cos(angle) * radius,
-                lookAt.y + math.sin(angle) * radius,
-                base.z)
-            PointCamAtCoord(cam, lookAt.x, lookAt.y, lookAt.z)
+                local elapsed = (GetGameTimer() - started) % period
+                -- Sine gives an ease at each end of the sweep for free, so the
+                -- camera never snaps direction.
+                local angle = baseAngle + math.sin((elapsed / period) * math.pi * 2.0) * sweep
 
-            Wait(0)
+                SetCamCoord(cam,
+                    lookAt.x + math.cos(angle) * radius,
+                    lookAt.y + math.sin(angle) * radius,
+                    base.z)
+                PointCamAtCoord(cam, lookAt.x, lookAt.y, lookAt.z)
+
+                Wait(0)
+            end
         end
     end)
 end
@@ -254,6 +269,7 @@ local function startScene()
     local usingShell = createShell()
 
     local camPos, lookAt = cameraFraming(usingShell)
+    sceneCam, sceneLookAt = camPos, lookAt
 
     if cam then DestroyCam(cam, true) end
     cam = CreateCam('DEFAULT_SCRIPTED_CAMERA', true)
@@ -284,7 +300,7 @@ local function startScene()
         end)
     end
 
-    startCameraOrbit(camPos, lookAt)
+    startCameraOrbit()
 
     -- The scene needs a moment to stream in before the fade back up, or the
     -- player sees an empty void for a frame.
@@ -324,10 +340,21 @@ end
 
 -- Rebuilds the camera and preview ped in place, so live tuning can show the
 -- result immediately without tearing the whole selection down.
+-- Holds the shot still while framing. A drifting camera makes it impossible to
+-- judge whether an offset is right.
+AddEventHandler('som-multichar:client:setOrbit', function(enabled)
+    orbitPaused = not enabled
+end)
+
 AddEventHandler('som-multichar:client:rebuildScene', function()
     if not inSelection or not cam then return end
 
     local camPos, lookAt = cameraFraming(Config.Shell.enabled and shellObject ~= nil)
+
+    -- Update the shared framing, not just the camera. The orbit thread reads
+    -- these every frame and would otherwise put the camera straight back.
+    sceneCam, sceneLookAt = camPos, lookAt
+
     SetCamCoord(cam, camPos.x, camPos.y, camPos.z)
     PointCamAtCoord(cam, lookAt.x, lookAt.y, lookAt.z)
 

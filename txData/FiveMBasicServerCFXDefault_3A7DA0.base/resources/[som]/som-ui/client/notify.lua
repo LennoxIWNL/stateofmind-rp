@@ -35,11 +35,12 @@ local function notify(message, notifyType, duration)
     })
 end
 
+-- One handler only. RegisterNetEvent with a function both marks the event as
+-- net-callable AND registers the handler, so adding a second one with
+-- AddEventHandler made every local TriggerEvent fire twice and show duplicate
+-- notifications. This single registration already serves both local
+-- TriggerEvent and server TriggerClientEvent.
 RegisterNetEvent('som:client:notify', function(message, notifyType, duration)
-    notify(message, notifyType, duration)
-end)
-
-AddEventHandler('som:client:notify', function(message, notifyType, duration)
     notify(message, notifyType, duration)
 end)
 
