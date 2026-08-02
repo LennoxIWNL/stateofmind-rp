@@ -1,0 +1,235 @@
+/* Colours come from som-assets/tokens.css. Nothing is redefined here. */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: transparent;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    font-family: var(--som-font);
+    color: var(--som-text);
+}
+
+.hidden { display: none !important; }
+
+.root {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3vh;
+    /* Vignette rather than a flat wash, so the preview ped stays readable. */
+    background: radial-gradient(ellipse at center, transparent 25%, rgba(8, 6, 10, 0.92) 78%);
+    animation: som-fade 400ms ease;
+}
+
+.header { text-align: center; }
+
+.brand {
+    font-size: clamp(1.8rem, 3vw, 2.8rem);
+    font-weight: 800;
+    letter-spacing: 0.22em;
+    text-shadow: var(--som-glow);
+}
+
+.subtitle {
+    color: var(--som-text-dim);
+    font-size: 0.9rem;
+    letter-spacing: 0.18em;
+    margin-top: 6px;
+    text-transform: uppercase;
+}
+
+.view { width: min(1100px, 88vw); }
+
+/* --- Slot grid --- */
+
+.slots {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.slot {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 190px;
+    padding: 18px;
+
+    background: var(--som-card);
+    border: var(--som-border);
+    border-radius: var(--som-radius-lg);
+    box-shadow: var(--som-shadow);
+    cursor: pointer;
+    text-align: left;
+    color: inherit;
+    font-family: inherit;
+    transition: transform var(--som-transition), box-shadow var(--som-transition), background var(--som-transition);
+}
+
+.slot:hover {
+    background: var(--som-card-hover);
+    box-shadow: var(--som-shadow), var(--som-glow);
+    transform: translateY(-3px);
+}
+
+.slot:focus-visible {
+    outline: 2px solid var(--som-pink);
+    outline-offset: 2px;
+}
+
+.slot--empty {
+    align-items: center;
+    justify-content: center;
+    border-style: dashed;
+    color: var(--som-text-dim);
+}
+
+.slot__plus { font-size: 2rem; color: var(--som-pink); line-height: 1; }
+
+.slot__index {
+    color: var(--som-text-mute);
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
+
+.slot__name {
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.25;
+    /* Long names must not blow out the card. */
+    overflow-wrap: anywhere;
+}
+
+.slot__job {
+    color: var(--som-pink-light);
+    font-size: 0.82rem;
+    text-transform: capitalize;
+}
+
+.slot__meta {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    color: var(--som-text-dim);
+    font-size: 0.75rem;
+    font-family: var(--som-font-mono);
+}
+
+.slot__actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.slot__actions .som-btn { flex: 1; padding: 6px 10px; font-size: 0.8rem; }
+
+.som-btn--primary {
+    background: var(--som-pink-a16);
+    border-color: var(--som-pink);
+}
+
+.som-btn--danger { border-color: var(--som-danger); color: var(--som-danger); }
+.som-btn--danger:hover { background: rgba(231, 76, 60, 0.16); box-shadow: 0 0 12px rgba(231, 76, 60, 0.4); }
+
+/* --- Creation form --- */
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin: 0 auto;
+    max-width: 620px;
+    padding: 28px;
+}
+
+.form__title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.form__row { display: flex; gap: 14px; flex-wrap: wrap; }
+.form__row > .field { flex: 1 1 220px; }
+
+.field { display: flex; flex-direction: column; gap: 6px; border: 0; }
+
+.field__label {
+    color: var(--som-text-dim);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.field__input {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--som-pink-a25);
+    border-radius: var(--som-radius);
+    color: var(--som-text);
+    font-family: inherit;
+    font-size: 0.95rem;
+    padding: 10px 12px;
+    transition: border-color var(--som-transition), box-shadow var(--som-transition);
+    width: 100%;
+}
+
+.field__input:focus {
+    border-color: var(--som-pink);
+    box-shadow: var(--som-glow);
+    outline: none;
+}
+
+/* The native date picker renders dark-on-dark without this. */
+.field__input[type="date"] { color-scheme: dark; }
+
+.genders { display: flex; gap: 10px; }
+
+.gender {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--som-pink-a25);
+    border-radius: var(--som-radius);
+    cursor: pointer;
+    transition: background var(--som-transition), border-color var(--som-transition);
+}
+
+.gender:has(input:checked) {
+    background: var(--som-pink-a16);
+    border-color: var(--som-pink);
+}
+
+.gender input { accent-color: var(--som-pink); }
+
+.form__error {
+    color: var(--som-danger);
+    font-size: 0.82rem;
+    min-height: 1.1em;
+}
+
+.form__actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+.footer {
+    color: var(--som-text-mute);
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+}
+
+@keyframes som-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}

@@ -1,0 +1,104 @@
+/* Colours come from som-assets/tokens.css. Nothing is redefined here. */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: transparent;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    user-select: none;
+}
+
+.notifications {
+    position: absolute;
+    top: 2vh;
+    right: 1.5vw;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 22vw;
+    min-width: 260px;
+    max-width: 380px;
+}
+
+.notification {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+
+    background: var(--som-card);
+    border: var(--som-border);
+    border-left: 3px solid var(--som-pink);
+    border-radius: var(--som-radius);
+    box-shadow: var(--som-shadow);
+
+    color: var(--som-text);
+    font-family: var(--som-font);
+    font-size: 0.9rem;
+    line-height: 1.4;
+
+    padding: 12px 14px;
+    /* Animate in, then out. The out timing is set inline per notification so
+       it matches the duration the server asked for. */
+    animation: som-slide-in 220ms ease forwards;
+    overflow: hidden;
+}
+
+.notification.leaving {
+    animation: som-slide-out 220ms ease forwards;
+}
+
+.notification__icon {
+    flex-shrink: 0;
+    font-size: 1rem;
+    line-height: 1.4;
+}
+
+.notification__body {
+    /* Long messages must wrap rather than overflow the panel. */
+    word-break: break-word;
+    min-width: 0;
+}
+
+/* Type variants recolour the left rule and the icon only, so the panel
+   itself stays visually consistent with every other som surface. */
+.notification--success { border-left-color: var(--som-success); }
+.notification--success .notification__icon { color: var(--som-success); }
+
+.notification--error { border-left-color: var(--som-danger); }
+.notification--error .notification__icon { color: var(--som-danger); }
+
+.notification--warning { border-left-color: var(--som-warning); }
+.notification--warning .notification__icon { color: var(--som-warning); }
+
+.notification--info { border-left-color: var(--som-pink); }
+.notification--info .notification__icon { color: var(--som-pink); }
+
+.notification__timer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    background: var(--som-pink-a45);
+    animation: som-timer linear forwards;
+}
+
+@keyframes som-slide-in {
+    from { opacity: 0; transform: translateX(24px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes som-slide-out {
+    from { opacity: 1; transform: translateX(0); max-height: 200px; }
+    to   { opacity: 0; transform: translateX(24px); max-height: 0; padding-top: 0; padding-bottom: 0; }
+}
+
+@keyframes som-timer {
+    from { width: 100%; }
+    to   { width: 0%; }
+}

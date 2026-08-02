@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>som-multichar</title>
+    <link rel="stylesheet" href="https://cfx-nui-som-assets/tokens.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="root" class="root hidden">
+        <header class="header">
+            <h1 class="brand">STATE OF <span class="som-accent">MIND</span></h1>
+            <p id="subtitle" class="subtitle">Select a character</p>
+        </header>
+
+        <!-- Slot grid -->
+        <section id="view-slots" class="view">
+            <div id="slots" class="slots"></div>
+        </section>
+
+        <!-- Creation form -->
+        <section id="view-create" class="view hidden">
+            <form id="create-form" class="som-panel form" autocomplete="off">
+                <h2 class="form__title">New Character</h2>
+
+                <div class="form__row">
+                    <label class="field">
+                        <span class="field__label">First name</span>
+                        <input class="field__input" name="firstname" maxlength="24" required>
+                    </label>
+                    <label class="field">
+                        <span class="field__label">Last name</span>
+                        <input class="field__input" name="lastname" maxlength="24" required>
+                    </label>
+                </div>
+
+                <div class="form__row">
+                    <label class="field">
+                        <span class="field__label">Date of birth</span>
+                        <input class="field__input" name="dob" type="date" required>
+                    </label>
+                    <label class="field">
+                        <span class="field__label">Nationality</span>
+                        <select class="field__input" name="nationality" id="nationality"></select>
+                    </label>
+                </div>
+
+                <fieldset class="field">
+                    <legend class="field__label">Gender</legend>
+                    <div class="genders">
+                        <label class="gender">
+                            <input type="radio" name="gender" value="0" checked>
+                            <span>Male</span>
+                        </label>
+                        <label class="gender">
+                            <input type="radio" name="gender" value="1">
+                            <span>Female</span>
+                        </label>
+                    </div>
+                </fieldset>
+
+                <p id="form-error" class="form__error" role="alert"></p>
+
+                <div class="form__actions">
+                    <button type="button" class="som-btn" data-action="back">Cancel</button>
+                    <button type="submit" class="som-btn som-btn--primary">Create</button>
+                </div>
+            </form>
+        </section>
+
+        <footer class="footer">
+            <span><span class="som-key">Esc</span> Back</span>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

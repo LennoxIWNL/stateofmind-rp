@@ -73,6 +73,10 @@ end)
 exports('getPlayerData', function() return PlayerData end)
 exports('isPlayerLoaded', function() return isLoaded end)
 
+-- som-multichar needs the slot count, and a separate resource cannot read this
+-- resource's Config table, so expose it rather than duplicating the value.
+exports('getMaxCharacterSlots', function() return Config.Characters.maxSlots end)
+
 exports('getJob', function() return PlayerData.job end)
 exports('getGang', function() return PlayerData.gang end)
 exports('getMetadata', function(key)
