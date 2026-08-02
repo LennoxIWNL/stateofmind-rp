@@ -8,7 +8,7 @@ Character selection, creation, and spawn. Replaces `qb-multicharacter`, which wa
 
 1. `playerSpawned` fires. If `som-core:isPlayerLoaded()` is false, selection opens.
 2. Screen fades out, the player is moved into a private routing bucket, hidden, and frozen at `Config.HiddenCoords`.
-3. A scripted camera is placed at `Config.CamCoords` looking at the preview ped position.
+3. The shell interior is spawned and a scripted camera is placed inside it, aimed at the preview ped.
 4. `som:server:getCharacters` returns the slots for this license.
 5. The player picks or creates. Every action relays to som-core, which validates it.
 6. On success som-core fires `som:client:playerLoaded`, this resource spawns the ped, waits for collision, restores the routing bucket, and fades in.
@@ -34,15 +34,34 @@ Set `Config.UseRoutingBuckets = false` to disable, for example if a later phase 
 
 | Key | Purpose |
 |---|---|
-| `Config.Interior` | Preview scene centre |
-| `Config.CamCoords` | Scripted camera position and heading |
-| `Config.PedCoords` | Where the preview ped stands |
+| `Config.Shell.enabled` | Use the shell scene. `false` falls back to a plain world location |
+| `Config.Shell.model` | Interior shell prop, defaults to a vanilla high-end apartment |
+| `Config.Shell.coords` | Where the shell is spawned, far below the map |
+| `Config.Shell.pedOffset` / `pedHeading` | Character placement inside the shell |
+| `Config.Shell.camOffset` / `camLookAtOffset` | Camera framing |
+| `Config.Shell.orbit` | Slow drift, so the shot is not a dead frame |
+| `Config.Fallback` | World scene used when the shell is off or its model fails |
 | `Config.HiddenCoords` | Where the real player ped is parked while hidden |
 | `Config.DefaultSpawn` | Fallback when a character has no stored position |
 | `Config.PedModels` | Freemode model per gender |
 | `Config.Nationalities` | Dropdown options |
 
-The scene coordinates are the long-standing qb-multicharacter defaults, kept because they are a known-good enclosed interior. Phase 7 can replace the scene by editing these five values only.
+## The scene
+
+The character stands in a **shell**: a vanilla interior prop spawned in the empty space far below the map, with the ped and camera inside it. This is the standard approach for character select backdrops and it beats standing in a real world location:
+
+- Nothing of the live world leaks into the shot. No traffic, weather, or other players.
+- **It needs no streamed assets.** The shell models are base-game, so the scene works in dev mode where `[assets-streams]` is not loaded. A custom MLO would simply not exist there.
+- Nothing has to be reserved on the real map.
+
+Two details that are easy to get wrong if you edit this:
+
+- The hidden player ped is parked **next to the shell**, not left elsewhere on the map. Streaming follows the player, so leaving it behind means the shell and preview ped never render.
+- `SetUseHiDof` only applies for the frame it is called on, so the depth-of-field runs on a per-frame thread for as long as the scene is up.
+
+**The offsets will need tuning in game.** Shell models differ in where their floor and walls sit, so nudge `pedOffset` and `camOffset` until the framing looks right. If the model fails to load, the code logs it and falls back to the world scene rather than leaving the player in an empty void.
+
+Alternative shells worth trying: `apa_mp_h_str_int_shell_01` through `_09` for high-end apartments, or the `ex_mp_h_int_office_*` set for executive offices.
 
 ## Known gaps
 

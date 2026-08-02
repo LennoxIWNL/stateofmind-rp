@@ -1,12 +1,65 @@
 Config = {}
 
--- Character preview scene.
--- These are the long-standing qb-multicharacter defaults, kept because they are
--- a known-good enclosed interior with clean sightlines. Phase 7 can replace the
--- scene without touching any logic: only these five values move.
-Config.Interior      = vec3(-814.89, 181.95, 76.85)
-Config.CamCoords     = vec4(-813.46, 178.95, 76.85, 174.5)
-Config.PedCoords     = vec4(-813.97, 176.22, 76.74, -7.5)
+-- ---------------------------------------------------------------------------
+-- Character preview scene
+--
+-- The scene is a SHELL: a vanilla interior prop spawned in the empty space far
+-- below the map, with the ped and camera placed inside it. This is the standard
+-- approach for character select backdrops and it beats standing in a real world
+-- location for three reasons:
+--
+--   1. Nothing of the live world is visible behind it, so no traffic, weather
+--      or other players leak into the shot.
+--   2. It needs no streamed assets. The shell models below ship with the base
+--      game, so the scene works even in dev mode where [assets-streams] is not
+--      loaded. A custom MLO would simply not exist there.
+--   3. Nothing has to be reserved on the real map.
+--
+-- Set Config.Shell.enabled = false to fall back to the plain world location in
+-- Config.Fallback instead.
+--
+-- The offsets below are relative to Config.Shell.coords and WILL need tuning
+-- in game: shell models differ in where their floor and walls sit. Nudge
+-- pedOffset and camOffset until the framing looks right.
+-- ---------------------------------------------------------------------------
+Config.Shell = {
+    enabled = true,
+
+    -- Vanilla high-end apartment shell. Alternatives worth trying:
+    --   apa_mp_h_str_int_shell_01  through  _09   (high end apartments)
+    --   ex_mp_h_int_office_...                    (executive offices)
+    model = 'apa_mp_h_str_int_shell_01',
+
+    -- Deep below the map, well clear of any real geometry. This is the area
+    -- FiveM shell interiors conventionally occupy.
+    coords = vec3(144.58, -1002.36, -100.0),
+
+    -- Where the character stands, relative to the shell origin.
+    pedOffset = vec3(0.0, 0.0, 0.0),
+    pedHeading = 180.0,
+
+    -- Where the camera sits, relative to the shell origin, and what it aims at.
+    camOffset = vec3(0.0, 2.6, 0.4),
+    camLookAtOffset = vec3(0.0, 0.0, 0.15),
+
+    -- Slow drift so the shot is not a dead still frame.
+    orbit = {
+        enabled = true,
+        degrees = 9.0,    -- total sweep, half either side of centre
+        seconds = 26.0,   -- one full there-and-back cycle
+    },
+}
+
+-- Used only when Config.Shell.enabled is false. The long-standing
+-- qb-multicharacter location, kept as a known-good fallback.
+Config.Fallback = {
+    interior = vec3(-814.89, 181.95, 76.85),
+    cam      = vec4(-813.46, 178.95, 76.85, 174.5),
+    ped      = vec4(-813.97, 176.22, 76.74, -7.5),
+}
+
+-- Where the real player ped is parked, hidden, during selection. Kept away
+-- from the shell so it can never appear in shot.
 Config.HiddenCoords  = vec4(-812.23, 182.54, 76.74, 156.5)
 
 -- Fallback spawn when a character has no stored position.
