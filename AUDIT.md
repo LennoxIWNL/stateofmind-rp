@@ -814,7 +814,39 @@ departments work and gives far finer control than a single grade number.
    sourcing a phone is now a required phase, not an optional one, and the
    banking app above is its first real consumer.
 
-### 14.6 Command minimisation
+### 14.6 The three interaction surfaces (owner's direction)
+
+Everything a player does goes through one of three surfaces. This is the
+architecture Phase 8 enforces, and it is what replaces commands.
+
+| Surface | Key | For |
+|---|---|---|
+| **Radial menu** | `F1` | Self and context actions: emotes, vehicle controls, job duty, quick access |
+| **Third eye** | `som-interact` | Anything with a physical target: a player, vehicle, door, prop, zone |
+| **Phone** | phone key | Anything with no physical anchor: banking, jobs, services, messaging (14.5) |
+
+**Contextual keys stay.** Pressing `E` to open a door or pick something up is
+correct and should not be forced into a menu. The rule is about where
+*decisions* live, not about banning every keypress. A radial menu for opening a
+door would be worse design, not better.
+
+**Consequence:** `qb-radialmenu` was removed in the teardown, so **`som-radial`
+has to be built**. It is not optional: it is one of the three surfaces and a
+large share of the commands in section 10.1 are meant to land there rather than
+on the third eye.
+
+Design notes for when it is built:
+
+- It must read live player state (job, duty, vehicle, gang) to decide which
+  entries exist, so it needs the `som:` state bags from `som-core`.
+- Entries are declarative and registered by other resources, in the same spirit
+  as `som-interact`, so `som-jobs` and `som-gangs` can contribute without
+  `som-radial` knowing about them.
+- Same security posture as the third eye: showing an entry is a UI decision, and
+  the server re-validates on use. See the note at the top of
+  `som-interact/client/target.lua`.
+
+### 14.7 Command minimisation
 
 Already covered in section 10, and it serves the same goal. Interaction-driven
 play is what separates a serious RP server from a menu simulator.
