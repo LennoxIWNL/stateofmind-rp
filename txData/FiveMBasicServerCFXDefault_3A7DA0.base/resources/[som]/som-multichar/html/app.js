@@ -199,11 +199,32 @@ function flash(message) {
     setTimeout(() => { slotCountEl.textContent = `${characters.length}/${maxSlots}`; }, 2600);
 }
 
+const MIN_AGE = 18;
+const MAX_AGE = 90;
+
+// Today's date shifted back by N years, as YYYY-MM-DD.
+function dateYearsAgo(years) {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - years);
+    // toISOString would apply the timezone offset and can roll the date back a
+    // day, so build it from the local parts instead.
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 function openCreate(slot) {
     pendingSlot = slot;
     formError.textContent = '';
     form.reset();
     genderGroup.dataset.value = '0';
+
+    // Default to exactly the minimum age rather than today, so the picker
+    // opens on a plausible birth year instead of one that is never valid.
+    // min and max bound it; som-core re-checks the age server side regardless.
+    const dob = form.elements.dob;
+    dob.value = dateYearsAgo(MIN_AGE);
+    dob.max = dateYearsAgo(MIN_AGE);
+    dob.min = dateYearsAgo(MAX_AGE);
     createSlotEl.textContent = `Slot ${String(slot).padStart(2, '0')}`;
 
     viewRoster.classList.add('hidden');
@@ -241,6 +262,10 @@ form.addEventListener('submit', async (event) => {
     }
     if (!payload.dob) {
         formError.textContent = 'Choose a date of birth.';
+        return;
+    }
+    if (payload.dob > dateYearsAgo(MIN_AGE)) {
+        formError.textContent = `Characters must be at least ${MIN_AGE} years old.`;
         return;
     }
 

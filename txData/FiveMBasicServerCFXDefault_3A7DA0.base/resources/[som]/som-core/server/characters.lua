@@ -44,6 +44,23 @@ local function validateName(value)
     return trimmed
 end
 
+---Age on a given date, in whole years.
+---@param year number
+---@param month number
+---@param day number
+---@return number
+local function ageFrom(year, month, day)
+    local now = os.date('*t')
+    local age = now.year - year
+
+    -- Not had their birthday yet this year.
+    if now.month < month or (now.month == month and now.day < day) then
+        age = age - 1
+    end
+
+    return age
+end
+
 ---@param value any
 ---@return string|nil iso date, string|nil err
 local function validateDob(value)
@@ -54,7 +71,25 @@ local function validateDob(value)
 
     year, month, day = tonumber(year), tonumber(month), tonumber(day)
     if month < 1 or month > 12 or day < 1 or day > 31 then return nil, 'invalid date' end
-    if year < 1900 or year > 2010 then return nil, 'invalid birth year' end
+
+    -- Reject impossible dates such as 31 February, which the pattern above
+    -- happily accepts.
+    local stamp = os.time({ year = year, month = month, day = day, hour = 12 })
+    local check = os.date('*t', stamp)
+    if check.year ~= year or check.month ~= month or check.day ~= day then
+        return nil, 'that date does not exist'
+    end
+
+    local age = ageFrom(year, month, day)
+
+    -- Enforced server side, not just in the date picker. The client cannot be
+    -- trusted to police this, and characters under 18 are not permitted.
+    if age < Config.Characters.minimumAge then
+        return nil, ('characters must be at least %d years old'):format(Config.Characters.minimumAge)
+    end
+    if age > Config.Characters.maximumAge then
+        return nil, ('characters must be under %d years old'):format(Config.Characters.maximumAge)
+    end
 
     return ('%04d-%02d-%02d'):format(year, month, day)
 end

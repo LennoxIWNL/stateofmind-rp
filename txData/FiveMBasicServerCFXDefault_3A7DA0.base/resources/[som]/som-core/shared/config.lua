@@ -3,6 +3,11 @@ Config = {}
 Config.Debug = false
 
 Config.Characters = {
+    -- No character may be a minor. Enforced server side in Characters.Create,
+    -- and used by the client to default and bound the date picker.
+    minimumAge = 18,
+    maximumAge = 90,
+
     maxSlots = 5,
     startingCash = 500,
     startingBank = 5000,
