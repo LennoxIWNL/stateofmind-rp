@@ -268,7 +268,85 @@ form.addEventListener('change', (event) => {
 
 form.querySelector('[data-action="back"]').addEventListener('click', closeCreate);
 
+// --- Scene tuning -------------------------------------------------------
+//
+// The character screen holds NUI focus, so the game never sees the keyboard
+// and Lua keybinds cannot fire. The browser DOES receive every keystroke, so
+// tuning input is handled here and forwarded to Lua.
+//
+// Only arrow keys, PageUp/PageDown and a few letters are used: no numpad, since
+// plenty of keyboards do not have one.
+
+let tuning = false;
+
+const TUNE_KEYS = {
+    ArrowLeft:  { dx: -1, dy: 0, dz: 0 },
+    ArrowRight: { dx: 1, dy: 0, dz: 0 },
+    ArrowUp:    { dx: 0, dy: 1, dz: 0 },
+    ArrowDown:  { dx: 0, dy: -1, dz: 0 },
+    PageUp:     { dx: 0, dy: 0, dz: 1 },
+    PageDown:   { dx: 0, dy: 0, dz: -1 },
+};
+
+async function handleTuningKey(event) {
+    const key = event.key;
+
+    if (key === 'F10') {
+        event.preventDefault();
+        const res = await post('tuningToggle');
+        tuning = !!(res && res.active);
+        // Drop focus out of any text field, or nudges would type into it.
+        if (tuning && document.activeElement) document.activeElement.blur();
+        return true;
+    }
+
+    if (key === 'F11') {
+        event.preventDefault();
+        post('tuningCoords');
+        return true;
+    }
+
+    if (!tuning) return false;
+
+    const move = TUNE_KEYS[key];
+    if (move) {
+        event.preventDefault();
+        post('tuningNudge', move);
+        return true;
+    }
+
+    const lower = key.toLowerCase();
+    if (lower === 'q' || lower === 'e') {
+        event.preventDefault();
+        post('tuningRotate', { dir: lower === 'q' ? -1 : 1 });
+        return true;
+    }
+    if (lower === 'r') {
+        event.preventDefault();
+        post('tuningCycle');
+        return true;
+    }
+    if (lower === 'p') {
+        event.preventDefault();
+        post('tuningPrint');
+        return true;
+    }
+
+    return false;
+}
+
 document.addEventListener('keydown', (event) => {
+    // Tuning takes the keyboard first, so roster navigation does not also fire
+    // and drift the camera while moving between characters.
+    handleTuningKey(event).then((handled) => {
+        if (handled) return;
+        handleUiKey(event);
+    });
+});
+
+function handleUiKey(event) {
+    if (tuning) return;
+
     if (event.key === 'Escape') {
         if (!viewCreate.classList.contains('hidden')) closeCreate();
         return;
@@ -299,7 +377,7 @@ document.addEventListener('keydown', (event) => {
         const play = rosterEl.querySelector('.detail__actions .btn--primary');
         if (play) play.click();
     }
-});
+}
 
 window.addEventListener('message', (event) => {
     const data = event.data;
