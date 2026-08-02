@@ -47,8 +47,9 @@ Config.Shell = {
     pedOffset = vec3(-1.2, -2.33, 0.15),
     pedHeading = 105.0,
 
+
     -- Camera position, relative to the shell origin.
-    camOffset = vec3(-5.72, -3.61, 1.15),
+    camOffset = vec3(-6.0, -3.73, 1.15),
 
     -- There is deliberately no aim point. The camera ALWAYS looks at the
     -- character, at this height up their body: 0.9 is roughly chest.
@@ -57,7 +58,10 @@ Config.Shell = {
     -- the camera while the character stood 4.6m away, so the camera was not
     -- pointing at the subject at all, depth of field focused on empty space,
     -- and the movement axes no longer matched what was on screen.
-    lookHeight = 0.9,
+    --
+    -- 0.0 aims at the feet. With the camera at 1.15 that gives a level,
+    -- full-body shot rather than a downward tilt.
+    lookHeight = 0.0,
 }
 
 -- Live tuning. With this on, a staff member can nudge the scene in game and
@@ -126,7 +130,7 @@ Config.SpawnCinematic = {
 
 -- Camera treatment, applied to whichever scene is active.
 Config.Camera = {
-    fov = 34.0,
+    fov = 29.0,
 
     -- Pushes the character off centre so the UI rail on the left never covers
     -- them. Positive moves the character right in frame.

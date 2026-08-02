@@ -650,6 +650,8 @@ The rebuild spec explicitly says not to guess silently on these:
 | **4. Economy** | Business register, transaction ledger, drug market saturation, banking rebuild (replacing `som-banking` and dropping `2na_core`), laundering, sink and faucet instrumentation. | Section 12.2 answered. |
 | **4b. Phone** | `som-phone`, or an adopted open-source phone reskinned. Banking app with transaction history over `som_transactions`, shareable account numbers, share-to-nearby, direct billing, and the police financial audit. See 14.5. **Also needs a Twitter/social app**, since two supporter perks depend on it (14.7). | Phase 4 complete, since the banking app is a view over the economy. |
 | **5. Jobs** | `som-jobs` data format seeded from `qbx_core/shared/jobs.lua` (section 8.3). Police and EMS with the section 8.1 and 8.2 depth. Mechanic plus two civilian templates. Whitelisted application flow at an NPC. **Police use the two-axis rank plus clearance model in 14.5, not a flat grade.** | Phases 2 through 4 complete. |
+| **4c. `som-radial`** | The F1 radial menu, one of the three interaction surfaces (14.6). Declarative registration by other resources, driven by the `som:` state bags. Required, not optional: much of section 10.1 lands here. | `som-core` state bags stable. |
+| **4d. `som-admin`** | Custom admin menu (14.8): inventory search, spectate with voice, disconnect logs, vehicle and job management. Replaces the removed `ps-adminmenu`. Defers to txAdmin for restarts, resources and bans. | Phase 4 ledger exists, so money and item actions can be logged through it. |
 | **6. Gangs and turf** | `som-gangs` from `som-gangboss-app`. Turf system is fully greenfield (section 8.4). Turf HUD. | Section 12.3 answered. Phase 5 interaction patterns established. |
 | **7. NUIs** | `som-assets/tokens.css` shared by every `som-*` NUI. Inventory, banking, job menus, turf HUD, character creation. Load the design skill in `.claude/skills/` before writing UI code. | Runs alongside Phases 3 through 6, not after. |
 | **8. Command minimization** | Execute section 10. Target under 40 player-facing commands. Update section 10 as the living record. | All systems built. |
@@ -921,7 +923,41 @@ Patreon is not set up. Grants are manual until one is wired.
 **Roadmap consequence:** a Twitter or social app is now a required part of the
 phone phase (4b), not optional, because two purchasable perks depend on it.
 
-### 14.8 Command minimisation
+### 14.8 Admin menu (owner's direction)
+
+A fully custom `som-admin`, replacing `ps-adminmenu` which was removed in the
+teardown. The goal is moderating the server entirely from in game, without
+needing txAdmin for day-to-day work.
+
+Required capability:
+
+| Area | Needs |
+|---|---|
+| **Players** | Search and inspect inventories, view and edit jobs, view money and the transaction ledger, teleport, freeze, kick, ban |
+| **Spectate** | Watch a player, with voice: staff hear in-game speech while spectating |
+| **Logs** | Disconnect log, connection history, and eventually item and money movement drawn from `som_transactions` |
+| **Vehicles** | List a player's vehicles, spawn, delete, repair, edit plates |
+| **Phone** | Manage numbers, later. Depends on the phone existing |
+| **Twitter** | Reassign or reset handles. Note players change their own handle **only if their tier grants it**, so this is moderation and appeals rather than routine |
+| **Jobs** | Set job, rank and clearance, matching the two-axis model in 14.5 |
+
+Design constraints, consistent with the rest of the framework:
+
+- **Every action is server validated and ACE gated.** The menu is a request
+  form, never an authority. Showing a button grants nothing.
+- **Everything is logged**, including who did it and to whom. An admin viewing
+  a player's inventory or finances is exactly what an audit trail is for, and
+  it is what makes the 14.5 police financial audit defensible too.
+- **Money and item actions go through the transaction bus**, so staff grants
+  appear in `som_transactions` like any other movement and cannot be laundered
+  past the sink/faucet figures.
+- It is a `som-radial` entry or its own key, not a chat command, per 14.6.
+
+**Deliberately out of scope:** anything txAdmin already does better, such as
+server restarts, resource management, and the ban database itself. `som-admin`
+should read from and defer to txAdmin rather than duplicating it.
+
+### 14.9 Command minimisation
 
 Already covered in section 10, and it serves the same goal. Interaction-driven
 play is what separates a serious RP server from a menu simulator.
