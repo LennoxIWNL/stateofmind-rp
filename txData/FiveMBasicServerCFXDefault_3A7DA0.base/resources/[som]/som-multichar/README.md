@@ -39,8 +39,8 @@ Set `Config.UseRoutingBuckets = false` to disable, for example if a later phase 
 | `Config.Shell.coords` | Where the shell is spawned, far below the map |
 | `Config.Shell.pedOffset` / `pedHeading` | Character placement inside the shell |
 | `Config.Shell.camOffset` / `camLookAtOffset` | Camera framing |
-| `Config.Shell.orbit` | Slow drift, so the shot is not a dead frame |
-| `Config.Fallback` | World scene used when the shell is off or its model fails |
+| `Config.Camera` | FOV, depth of field and orbit, applied to whichever scene is active |
+| `Config.Fallback` | World scene used when the shell is off or its model fails. **This is the default.** |
 | `Config.HiddenCoords` | Where the real player ped is parked while hidden |
 | `Config.DefaultSpawn` | Fallback when a character has no stored position |
 | `Config.PedModels` | Freemode model per gender |
@@ -48,20 +48,28 @@ Set `Config.UseRoutingBuckets = false` to disable, for example if a later phase 
 
 ## The scene
 
-The character stands in a **shell**: a vanilla interior prop spawned in the empty space far below the map, with the ped and camera inside it. This is the standard approach for character select backdrops and it beats standing in a real world location:
+**Default: the fallback world scene, with cinematic framing.** The camera sits close to the character with a 34 degree FOV and shallow depth of field, so the city behind reduces to soft colour. That reads as a deliberate portrait rather than a player stood in a street. A slow sine-eased orbit keeps it from being a dead frame.
 
-- Nothing of the live world leaks into the shot. No traffic, weather, or other players.
-- **It needs no streamed assets.** The shell models are base-game, so the scene works in dev mode where `[assets-streams]` is not loaded. A custom MLO would simply not exist there.
-- Nothing has to be reserved on the real map.
+### About shells
 
-Two details that are easy to get wrong if you edit this:
+A **shell** is an interior box the character stands inside, so none of the live world is visible behind them. It is the nicer look and `Config.Shell` supports it, but it is **off by default because it requires a streamed asset**.
 
-- The hidden player ped is parked **next to the shell**, not left elsewhere on the map. Streaming follows the player, so leaving it behind means the shell and preview ped never render.
-- `SetUseHiDof` only applies for the frame it is called on, so the depth-of-field runs on a per-frame thread for as long as the scene is up.
+Base-game GTA has no spawnable interior shell. The `apa_mp_h_*` models are apartment *furniture* (bathtub, table, lamp), not rooms. Every shell used by character screens and housing scripts is a downloadable asset pack.
 
-**The offsets will need tuning in game.** Shell models differ in where their floor and walls sit, so nudge `pedOffset` and `camOffset` until the framing looks right. If the model fails to load, the code logs it and falls back to the world scene rather than leaving the player in an empty void.
+To enable one:
 
-Alternative shells worth trying: `apa_mp_h_str_int_shell_01` through `_09` for high-end apartments, or the `ex_mp_h_int_office_*` set for executive offices.
+1. Put a shell resource in `[assets-streams]` and make sure it starts. Note that dev mode does not ensure `[assets-streams]`, so it must be started explicitly while iterating.
+2. Set `Config.Shell.model` to the shell's model name.
+3. Set `Config.Shell.enabled = true`.
+4. Tune `pedOffset` and `camOffset` in game. Shell models differ in where their floor sits, so the first attempt will almost certainly be misframed.
+
+If the model fails to load, the code logs it and falls back to the world scene rather than stranding the player in an empty void.
+
+### Two details that are easy to get wrong
+
+- The hidden player ped is parked **next to the scene**, not left elsewhere on the map. Streaming follows the player, so leaving it behind means the shell and preview ped never render.
+- `SetUseHiDof` only applies for the frame it is called on, so depth of field runs on a per-frame thread for as long as the scene is up.
+- The native is `SetNuiFocus`, **not** `SetNUIFocus`. The capitalised spelling is nil and throws, leaving a UI with no cursor.
 
 ## Known gaps
 

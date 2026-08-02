@@ -12,20 +12,21 @@ local inSelection = false
 -- ---------------------------------------------------------------------------
 -- NUI focus
 --
--- spawnmanager fires playerSpawned and then keeps working for a few frames,
--- and it can clear NUI focus out from under us. A single SetNUIFocus call
--- immediately after playerSpawned therefore gets silently dropped and the
--- player is left looking at a UI with no cursor.
+-- The native is SetNuiFocus, not SetNUIFocus. The capitalised spelling is nil,
+-- so calling it throws and the player is left with a UI and no cursor. Every
+-- other resource in the tree uses the correct casing; check against one of
+-- those before trusting a remembered native name.
 --
--- Re-assert until it sticks rather than assuming the first call won.
+-- The watchdog re-asserts focus because it is cheap insurance: other resources
+-- and spawnmanager can clear NUI focus during the spawn sequence.
 -- ---------------------------------------------------------------------------
 
 local function startFocusWatchdog()
     CreateThread(function()
         while inSelection do
             if not IsNuiFocused() then
-                SetNUIFocus(true, true)
-                SetNUIFocusKeepInput(false)
+                SetNuiFocus(true, true)
+                SetNuiFocusKeepInput(false)
             end
             Wait(200)
         end
@@ -91,6 +92,29 @@ local function pedHeading()
     return Config.Shell.enabled and Config.Shell.pedHeading or Config.Fallback.ped.w
 end
 
+---Camera position and aim point for whichever scene is active.
+---@return vector3 camPos, vector3 lookAt
+local function cameraFraming(usingShell)
+    if usingShell then
+        local origin = Config.Shell.coords
+        return origin + Config.Shell.camOffset,
+               origin + Config.Shell.pedOffset + Config.Shell.camLookAtOffset
+    end
+
+    -- Offsets are relative to the ped and rotated by its heading, so the camera
+    -- always ends up in front of the character rather than at a fixed compass
+    -- position that only works for one heading.
+    local ped = pedPosition()
+    local rad = math.rad(pedHeading())
+    local off = Config.Fallback.camOffset
+
+    return vec3(
+        ped.x + math.sin(-rad) * off.y,
+        ped.y + math.cos(-rad) * off.y,
+        ped.z + off.z
+    ), ped + Config.Fallback.camLookAtOffset
+end
+
 local function destroyShell()
     if shellObject and DoesEntityExist(shellObject) then
         DeleteEntity(shellObject)
@@ -148,8 +172,8 @@ end
 
 ---Slow horizontal drift around the subject, so the shot is not a dead frame.
 local function startCameraOrbit(origin, lookAt)
-    local orbit = Config.Shell.orbit
-    if not (Config.Shell.enabled and orbit and orbit.enabled) then return end
+    local orbit = Config.Camera.orbit
+    if not (orbit and orbit.enabled) then return end
 
     CreateThread(function()
         local base = origin
@@ -196,39 +220,36 @@ local function startScene()
 
     local usingShell = createShell()
 
-    local camPos, lookAt
-    if usingShell then
-        local origin = Config.Shell.coords
-        camPos = origin + Config.Shell.camOffset
-        lookAt = origin + Config.Shell.pedOffset + Config.Shell.camLookAtOffset
-    else
-        -- Shell disabled or its model failed to load: use the flat world scene.
-        camPos = vec3(Config.Fallback.cam.x, Config.Fallback.cam.y, Config.Fallback.cam.z)
-        lookAt = vec3(Config.Fallback.ped.x, Config.Fallback.ped.y, Config.Fallback.ped.z + 0.2)
-    end
+    local camPos, lookAt = cameraFraming(usingShell)
 
     if cam then DestroyCam(cam, true) end
     cam = CreateCam('DEFAULT_SCRIPTED_CAMERA', true)
     SetCamCoord(cam, camPos.x, camPos.y, camPos.z)
     PointCamAtCoord(cam, lookAt.x, lookAt.y, lookAt.z)
+    SetCamFov(cam, Config.Camera.fov)
     SetCamActive(cam, true)
     RenderScriptCams(true, false, 0, true, true)
 
-    -- Depth of field keeps attention on the character and softens the shell
-    -- behind it, which is what makes the shot read as deliberate.
-    SetCamUseShallowDofMode(cam, true)
-    SetCamNearDof(cam, 0.6)
-    SetCamFarDof(cam, 3.2)
-    SetCamDofStrength(cam, 0.8)
+    -- Shallow depth of field is what sells the shot: the character stays sharp
+    -- while everything behind reduces to colour and shape. It matters most in
+    -- the fallback scene, which is outdoors and would otherwise just look like
+    -- a player stood in a street.
+    local dof = Config.Camera.dof
+    if dof and dof.enabled then
+        SetCamUseShallowDofMode(cam, true)
+        SetCamNearDof(cam, dof.near)
+        SetCamFarDof(cam, dof.far)
+        SetCamDofStrength(cam, dof.strength)
 
-    -- SetUseHiDof only applies for the frame it is called on, so it has to run
-    -- every frame for the whole time the scene is up.
-    CreateThread(function()
-        while inSelection and cam do
-            SetUseHiDof()
-            Wait(0)
-        end
-    end)
+        -- SetUseHiDof only applies for the frame it is called on, so it has to
+        -- run every frame for the whole time the scene is up.
+        CreateThread(function()
+            while inSelection and cam do
+                SetUseHiDof()
+                Wait(0)
+            end
+        end)
+    end
 
     startCameraOrbit(camPos, lookAt)
 
@@ -288,8 +309,8 @@ local function openSelection()
         maxSlots = exports['som-core']:getMaxCharacterSlots(),
         nationalities = Config.Nationalities,
     })
-    SetNUIFocus(true, true)
-    SetNUIFocusKeepInput(false)
+    SetNuiFocus(true, true)
+    SetNuiFocusKeepInput(false)
     startFocusWatchdog()
 
     DoScreenFadeIn(800)
@@ -299,7 +320,7 @@ local function closeSelection()
     if not inSelection then return end
 
     SendNUIMessage({ action = 'close' })
-    SetNUIFocus(false, false)
+    SetNuiFocus(false, false)
     endScene()
 
     inSelection = false
@@ -433,7 +454,7 @@ end)
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
     if inSelection then
-        SetNUIFocus(false, false)
+        SetNuiFocus(false, false)
         endScene()
     end
 end)
