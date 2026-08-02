@@ -45,6 +45,10 @@ CREATE TABLE IF NOT EXISTS `som_characters` (
   `position`    JSON         DEFAULT NULL,
   `metadata`    JSON         DEFAULT NULL,
   `appearance`  JSON         DEFAULT NULL,
+  -- Owned and written by ox_inventory, not by som-core. Its som bridge points
+  -- {user_table} at this table and {user_column} at citizenid, so the column
+  -- has to exist here or every player load fails.
+  `inventory`   LONGTEXT     DEFAULT NULL,
   `created_at`  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `last_played` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted`     TINYINT(1)   NOT NULL DEFAULT 0,

@@ -37,6 +37,16 @@ Citizen.CreateThreadNow(function()
         playerColumn = 'citizenid'
         vehicleTable = 'player_vehicles'
         vehicleColumn = 'id'
+    -- SOM patch. This list is a second hardcoded framework switch, separate
+    -- from modules/bridge, so adding a bridge folder alone is not enough:
+    -- without a branch here the placeholders never resolve and every player
+    -- load fails with "Table {user_table} doesn't exist".
+    -- Re-apply after any ox_inventory upgrade.
+    elseif shared.framework == 'som' then
+        playerTable = 'som_characters'
+        playerColumn = 'citizenid'
+        vehicleTable = 'som_vehicles'
+        vehicleColumn = 'id'
     else
         return
     end

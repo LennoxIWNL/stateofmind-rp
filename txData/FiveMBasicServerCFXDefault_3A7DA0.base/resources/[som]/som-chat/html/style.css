@@ -12,17 +12,15 @@ body {
 
 .hidden { display: none !important; }
 
-/* Bottom left, out of the way of the character and any HUD. Nothing else in
-   this resource is ever drawn. */
+/* Top left. Nothing else in this resource is ever drawn. */
 .entry {
     position: absolute;
     left: 1.6vw;
-    bottom: 4vh;
+    top: 2.5vh;
     width: min(460px, 32vw);
 
     display: flex;
     align-items: center;
-    gap: 9px;
 
     background: var(--som-card);
     border: var(--som-border);
@@ -30,14 +28,7 @@ body {
     box-shadow: var(--som-shadow), var(--som-glow);
     padding: 10px 14px;
 
-    animation: rise 160ms cubic-bezier(.2,.7,.3,1) both;
-}
-
-.entry__prefix {
-    color: var(--som-pink);
-    font-family: var(--som-font-mono);
-    font-size: 1rem;
-    font-weight: 700;
+    animation: drop 160ms cubic-bezier(.2,.7,.3,1) both;
 }
 
 .entry__input {
@@ -55,7 +46,8 @@ body {
     font-family: var(--som-font);
 }
 
-@keyframes rise {
-    from { opacity: 0; transform: translateY(8px); }
+/* Drops in from above, since it now sits at the top of the screen. */
+@keyframes drop {
+    from { opacity: 0; transform: translateY(-8px); }
     to   { opacity: 1; transform: translateY(0); }
 }

@@ -8,11 +8,13 @@
 </head>
 <body>
     <!-- Input only. There is deliberately no message log: nothing is ever on
-         screen unless the player is typing. -->
+         screen unless the player is typing.
+
+         No slash is printed as a prefix: the player types it themselves, so
+         what is on screen is exactly what will be run. -->
     <div id="entry" class="entry hidden">
-        <span class="entry__prefix">/</span>
         <input id="input" class="entry__input" maxlength="256"
-               autocomplete="off" spellcheck="false" placeholder="command">
+               autocomplete="off" spellcheck="false" placeholder="/command">
     </div>
     <script src="app.js"></script>
 </body>
