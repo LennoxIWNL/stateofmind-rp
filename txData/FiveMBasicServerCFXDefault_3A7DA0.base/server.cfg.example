@@ -66,7 +66,21 @@ ensure sessionmanager
 ensure basic-gamemode
 ensure hardcap
 ensure baseevents
-ensure connectqueue
+
+# connectqueue is NOT started in dev mode.
+#
+# Its Config.JoinDelay is 120000ms, so it holds every connection for two
+# minutes after a restart while other resources settle. That used to be hidden
+# by the long boot caused by [assets-streams]; now that dev mode boots in
+# seconds, it is simply two minutes of waiting per restart.
+#
+# Re-enable it for the full boot. To keep it while iterating, lower JoinDelay
+# in connectqueue/server/sv_queue_config.lua instead.
+#
+# Note it sets Config.DisableHardCap = true, so with it off, hardcap enforces
+# sv_maxclients normally.
+#
+# ensure connectqueue
 
 # Anti-cheat first so it monitors from the first connect
 ensure [anticheats]
