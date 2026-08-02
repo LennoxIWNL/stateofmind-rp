@@ -1,0 +1,93 @@
+/* Colours come from som-assets/tokens.css. Nothing is redefined here. */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    background: transparent;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    font-family: var(--som-font);
+}
+
+.hidden { display: none !important; }
+
+.chat {
+    position: absolute;
+    left: 1.6vw;
+    top: 2.5vh;
+    width: min(520px, 34vw);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.log {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-height: 34vh;
+    overflow: hidden;
+}
+
+.line {
+    /* Text sits over the world, so it needs its own contrast rather than
+       relying on a panel behind it. */
+    background: rgba(6, 5, 9, 0.55);
+    border-left: 2px solid var(--som-pink-a45);
+    border-radius: 3px;
+    color: var(--som-text);
+    font-size: 0.86rem;
+    line-height: 1.4;
+    padding: 4px 9px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    overflow-wrap: anywhere;
+    animation: rise 200ms ease both;
+    transition: opacity 600ms ease;
+}
+
+.line--system { border-left-color: var(--som-text-mute); }
+.line--say    { border-left-color: var(--som-pink); }
+
+.line.is-faded { opacity: 0; }
+.chat.is-open .line.is-faded { opacity: 1; }
+
+.line__author {
+    color: var(--som-pink-light);
+    font-weight: 600;
+    margin-right: 6px;
+}
+
+.entry {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--som-card);
+    border: var(--som-border);
+    border-radius: var(--som-radius);
+    box-shadow: var(--som-shadow), var(--som-glow);
+    padding: 9px 12px;
+}
+
+.entry__prefix {
+    color: var(--som-pink);
+    font-family: var(--som-font-mono);
+    font-weight: 700;
+}
+
+.entry__input {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    outline: none;
+    color: var(--som-text);
+    font-family: inherit;
+    font-size: 0.92rem;
+}
+
+.entry__input::placeholder { color: var(--som-text-mute); }
+
+@keyframes rise {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
