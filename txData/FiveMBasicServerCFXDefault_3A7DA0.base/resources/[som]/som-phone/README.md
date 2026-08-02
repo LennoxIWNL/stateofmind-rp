@@ -26,6 +26,20 @@ taken directly; the rest was not adopted because:
 - lb-phone and qs-smartphone are escrowed: unreadable, unextendable, and never
   matching the palette.
 
+## Visuals
+
+Everything is CSS or inline SVG. NUI has no network access, so there are no
+webfonts, no icon packs and no wallpaper images to ship: the wallpaper is four
+offset radial gradients and the icons are drawn paths.
+
+`icon` on a registered app is now a **name** from the `ICONS` table in
+`html/app.js`, not a glyph. Letter glyphs in coloured squares were what made the
+home screen read as a placeholder. Unrecognised names still render as text, so
+a third-party app passing an emoji keeps working.
+
+The phone opens **locked**. One click, and it is the difference between a menu
+and something that reads as a phone.
+
 ## The app registry
 
 Other resources ship their own apps rather than this resource knowing about

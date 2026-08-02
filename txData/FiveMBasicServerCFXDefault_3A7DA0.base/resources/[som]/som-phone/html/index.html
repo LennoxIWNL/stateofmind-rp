@@ -2,90 +2,170 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>som-phone</title>
     <link rel="stylesheet" href="https://cfx-nui-som-assets/tokens.css">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cfx-nui-som-phone/html/style.css">
 </head>
 <body>
     <div id="root" class="root hidden">
         <div class="phone">
-            <div class="phone__notch" aria-hidden="true"></div>
+            <div class="screen">
+                <div class="island" aria-hidden="true"></div>
 
-            <header class="status">
-                <span id="status-time" class="status__time">--:--</span>
-                <span class="status__right">
-                    <span id="status-owner" class="status__owner"></span>
-                </span>
-            </header>
+                <header class="statusbar">
+                    <span id="status-time">--:--</span>
+                    <span class="statusbar__icons" aria-hidden="true">
+                        <!-- Signal -->
+                        <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor">
+                            <rect x="0" y="7.5" width="3" height="3.5" rx="1"/>
+                            <rect x="4.6" y="5.2" width="3" height="5.8" rx="1"/>
+                            <rect x="9.2" y="2.6" width="3" height="8.4" rx="1"/>
+                            <rect x="13.8" y="0" width="3" height="11" rx="1" opacity="0.35"/>
+                        </svg>
+                        <!-- Wifi -->
+                        <svg width="15" height="11" viewBox="0 0 15 11" fill="none" stroke="currentColor"
+                             stroke-width="1.6" stroke-linecap="round">
+                            <path d="M1 3.4a9.4 9.4 0 0 1 13 0"/>
+                            <path d="M3.5 6a5.8 5.8 0 0 1 8 0"/>
+                            <path d="M6 8.6a2.2 2.2 0 0 1 3 0"/>
+                        </svg>
+                        <!-- Battery -->
+                        <svg width="25" height="12" viewBox="0 0 25 12" fill="none">
+                            <rect x="0.6" y="0.6" width="20" height="10.8" rx="3.2"
+                                  stroke="currentColor" stroke-opacity="0.45" stroke-width="1.2"/>
+                            <rect x="2.4" y="2.4" width="14.4" height="7.2" rx="1.8" fill="currentColor"/>
+                            <path d="M22.4 4.2v3.6a2 2 0 0 0 0-3.6z" fill="currentColor" fill-opacity="0.45"/>
+                        </svg>
+                    </span>
+                </header>
 
-            <main id="screen" class="screen">
-                <!-- HOME -->
-                <section id="view-home" class="view">
-                    <div id="apps" class="apps"></div>
-                </section>
+                <main class="stage">
+                    <!-- LOCK -->
+                    <section id="view-lock" class="view lock">
+                        <div id="lock-time" class="lock__time">--:--</div>
+                        <div id="lock-date" class="lock__date"></div>
+                        <div class="lock__spacer"></div>
+                        <div class="lock__card">
+                            <div id="lock-owner" class="lock__owner"></div>
+                            <div id="lock-number" class="lock__number"></div>
+                        </div>
+                        <p class="lock__hint">Click or press Enter to unlock</p>
+                    </section>
 
-                <!-- BANK -->
-                <section id="view-bank" class="view hidden">
-                    <div class="app-head">
-                        <button class="back" data-back aria-label="Back">&lsaquo;</button>
-                        <h2 class="app-head__title">Bank</h2>
-                    </div>
+                    <!-- HOME -->
+                    <section id="view-home" class="view home hidden">
+                        <div id="apps" class="apps"></div>
+                    </section>
 
-                    <div class="balance">
-                        <span class="balance__label">Balance</span>
-                        <span id="bank-balance" class="balance__value">$0</span>
-                        <button id="bank-account" class="account" title="Tap to share with people nearby">
-                            <span id="bank-account-no">---</span>
-                            <span class="account__hint">tap to share</span>
-                        </button>
-                    </div>
+                    <!-- BANK -->
+                    <section id="view-bank" class="view app-view hidden">
+                        <div class="app-view__head">
+                            <button class="back" data-back type="button">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                                     stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                                Home
+                            </button>
+                            <h2 class="app-view__title">Bank</h2>
+                        </div>
 
-                    <nav class="tabs">
-                        <button class="tab is-active" data-tab="history">History</button>
-                        <button class="tab" data-tab="bills">Bills <span id="bill-count" class="pill hidden">0</span></button>
-                        <button class="tab" data-tab="send">Send</button>
-                    </nav>
+                        <div class="app-view__body">
+                            <div class="balance">
+                                <span class="balance__label">Available</span>
+                                <div id="bank-balance" class="balance__value">$0</div>
+                                <div id="bank-cash" class="balance__cash"></div>
 
-                    <div id="tab-history" class="tabpane"></div>
+                                <button id="bank-account" class="account" type="button">
+                                    <span id="bank-account-no" class="account__no">--------</span>
+                                    <span class="account__hint">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                             stroke-linecap="round" stroke-linejoin="round">
+                                            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/>
+                                            <circle cx="18" cy="19" r="3"/>
+                                            <path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>
+                                        </svg>
+                                        Share nearby
+                                    </span>
+                                </button>
+                            </div>
 
-                    <div id="tab-bills" class="tabpane hidden">
-                        <div id="bills-list"></div>
-                        <h3 class="section">Bill someone</h3>
-                        <form id="bill-form" class="form">
-                            <select id="bill-account" class="input"></select>
-                            <input id="bill-amount" class="input" type="number" min="1" placeholder="Amount">
-                            <input id="bill-reason" class="input" maxlength="128" placeholder="Reason">
-                            <button class="btn btn--primary" type="submit">Send bill</button>
-                        </form>
-                    </div>
+                            <nav class="segment">
+                                <button class="segment__item is-active" data-tab="history" type="button">Activity</button>
+                                <button class="segment__item" data-tab="bills" type="button">
+                                    Bills <span id="bill-count" class="pill hidden">0</span>
+                                </button>
+                                <button class="segment__item" data-tab="send" type="button">Send</button>
+                            </nav>
 
-                    <div id="tab-send" class="tabpane hidden">
-                        <form id="send-form" class="form">
-                            <select id="send-account" class="input"></select>
-                            <input id="send-amount" class="input" type="number" min="1" placeholder="Amount">
-                            <button class="btn btn--primary" type="submit">Transfer</button>
-                        </form>
-                        <p class="hint">Transfers are instant and cannot be reversed. A bill has to be accepted, which is safer for both sides.</p>
-                    </div>
-                </section>
+                            <div id="tab-history" class="tabpane"></div>
 
-                <!-- SETTINGS -->
-                <section id="view-settings" class="view hidden">
-                    <div class="app-head">
-                        <button class="back" data-back aria-label="Back">&lsaquo;</button>
-                        <h2 class="app-head__title">Settings</h2>
-                    </div>
-                    <h3 class="section">Theme</h3>
-                    <div id="themes" class="themes"></div>
-                </section>
-            </main>
+                            <div id="tab-bills" class="tabpane hidden">
+                                <div id="bills-list"></div>
 
-            <button id="home-btn" class="home" aria-label="Home"></button>
+                                <h3 class="section">Bill someone</h3>
+                                <form id="bill-form" class="form">
+                                    <div class="field">
+                                        <label class="field__label" for="bill-account">Account</label>
+                                        <select id="bill-account" class="input"></select>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field__label" for="bill-amount">Amount</label>
+                                        <input id="bill-amount" class="input" type="number" min="1" placeholder="0">
+                                    </div>
+                                    <div class="field">
+                                        <label class="field__label" for="bill-reason">Reason</label>
+                                        <input id="bill-reason" class="input" maxlength="128" placeholder="What is this for?">
+                                    </div>
+                                    <button class="btn btn--primary" type="submit">Send bill</button>
+                                </form>
+                            </div>
+
+                            <div id="tab-send" class="tabpane hidden">
+                                <form id="send-form" class="form">
+                                    <div class="field">
+                                        <label class="field__label" for="send-account">Account</label>
+                                        <select id="send-account" class="input"></select>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field__label" for="send-amount">Amount</label>
+                                        <input id="send-amount" class="input" type="number" min="1" placeholder="0">
+                                    </div>
+                                    <button class="btn btn--primary" type="submit">Transfer</button>
+                                </form>
+                                <p class="hint">
+                                    Transfers are instant and cannot be reversed. A bill has to be accepted,
+                                    which is safer for both sides.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- SETTINGS -->
+                    <section id="view-settings" class="view app-view hidden">
+                        <div class="app-view__head">
+                            <button class="back" data-back type="button">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                                     stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                                Home
+                            </button>
+                            <h2 class="app-view__title">Settings</h2>
+                        </div>
+
+                        <div class="app-view__body">
+                            <h3 class="section">Appearance</h3>
+                            <div id="themes" class="list"></div>
+                            <p class="hint">Supporter themes unlock with a Patreon tier. Everyone keeps State of Mind.</p>
+                        </div>
+                    </section>
+                </main>
+
+                <button id="home-btn" class="homebar" type="button" aria-label="Home"></button>
+            </div>
         </div>
 
         <p class="dismiss">Press <span class="som-key">Esc</span> to close</p>
     </div>
 
-    <script src="app.js"></script>
+    <script src="https://cfx-nui-som-phone/html/app.js"></script>
 </body>
 </html>

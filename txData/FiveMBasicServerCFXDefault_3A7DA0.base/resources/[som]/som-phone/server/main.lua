@@ -70,6 +70,12 @@ lib.callback.register('som-phone:server:open', function(source)
         end
     end
 
+    -- Home screen badges. One scalar per app rather than loading the app
+    -- itself, so an unread count is visible without opening anything.
+    local pendingBills = MySQL.scalar.await(
+        'SELECT COUNT(*) FROM som_phone_bills WHERE to_citizenid = ? AND status = ?',
+        { player.citizenid, 'pending' }) or 0
+
     return {
         success = true,
         apps = appsFor(source),
@@ -77,6 +83,7 @@ lib.callback.register('som-phone:server:open', function(source)
         themes = Config.Themes,
         owner = ('%s %s'):format(player.charinfo.firstname, player.charinfo.lastname),
         number = player.charinfo.phone,
+        badges = { bank = pendingBills },
     }
 end)
 

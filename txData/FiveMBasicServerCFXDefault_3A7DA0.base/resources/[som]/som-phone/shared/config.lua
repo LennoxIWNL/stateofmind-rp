@@ -61,20 +61,25 @@ Config.Bank = {
 -- som-gangs will use it, and it is how the Twitter app arrives in 4b-2.
 --
 -- `perk` gates an app behind a supporter entitlement, checked server side.
+--
+-- `icon` is a name from the ICONS table in html/app.js, not a glyph. Names
+-- already drawn: bank, settings, message, phone, contacts, camera, twitter,
+-- dispatch, briefcase. Anything unrecognised falls back to rendering the
+-- string itself, so a third-party app passing an emoji still works.
 -- ---------------------------------------------------------------------------
 
 Config.Apps = {
     {
         id = 'bank',
         label = 'Bank',
-        icon = '$',
+        icon = 'bank',
         colour = '#2ecc71',
         order = 10,
     },
     {
         id = 'settings',
         label = 'Settings',
-        icon = '*',
+        icon = 'settings',
         colour = '#8e8e93',
         order = 90,
     },

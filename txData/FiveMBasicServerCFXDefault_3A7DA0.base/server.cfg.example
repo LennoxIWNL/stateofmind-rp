@@ -59,8 +59,10 @@ setr inventory:imagepath "nui://ox_inventory/web/images"
 # ---------------------------------------------------------------------------
 
 # Cfx stock managers
+#
+# Stock `chat` is NOT started: som-chat replaces it. It is a command line only,
+# hidden unless typing, and starting both would put two input boxes on screen.
 ensure mapmanager
-ensure chat
 ensure spawnmanager
 ensure sessionmanager
 ensure basic-gamemode
@@ -96,6 +98,7 @@ ensure screenshot-basic
 ensure som-assets
 ensure som-core
 ensure som-ui
+ensure som-chat
 ensure qb-target
 ensure som-interact
 ensure ox_inventory
@@ -103,6 +106,20 @@ ensure ox_inventory
 # nobody gets past the loading screen.
 ensure som-multichar
 ensure som-theft
+ensure som-economy
+ensure som-phone
+ensure som-pause
+
+# Interior shells for the character select scene. Started by name because dev
+# mode does not ensure [assets-streams], and without it the shell model does
+# not exist and som-multichar falls back to the plain world scene.
+ensure jordqn_free_shells
+
+# Coloured map with no street names, replacing minimap_main_map.gfx and the
+# minimap tiles. som-pause shows the real game map through a hole in its NUI,
+# so this is what that map looks like. 19MB, named explicitly because dev mode
+# skips the rest of [assets-streams].
+ensure karma-minimap
 
 # som-compat answers exports['qb-core']:GetCoreObject() for preserved
 # third-party resources (ps-mdt). It declares provide 'qb-core', so it must

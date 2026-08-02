@@ -1087,6 +1087,27 @@ Worth noting: the pause menu is one of the few places a **screen-space** UI is
 correct, since pausing is inherently out-of-world. It is not a candidate for the
 diegetic treatment in 14.3.
 
+**Built as `som-pause`.** Resolved during the build:
+
+- The beige wash is drawn by the native frontend and no native recolours it, so
+  the native menu is suppressed outright rather than skinned. The world blur is
+  re-applied with `TriggerScreenblurFadeIn` and the tint lives in CSS.
+- The map tab shows the **live game map** through a hole in the NUI via
+  `SetBigmapActive`, so blips and the player marker stay real. No map image is
+  shipped or kept in sync.
+- The coloured map was already in the repo: `[assets-streams]/[graphics]/karma-minimap`
+  replaces `minimap_main_map.gfx`. It was simply never ensured, which is why the
+  vanilla map was showing. Now named explicitly in the dev boot list (19MB).
+- Street and area names are HUD components, not part of the map texture, so
+  `HideHudComponentThisFrame(9)` and `(7)` handle them independently of which
+  map is streamed.
+- **Cost accepted: click-to-waypoint is lost.** NUI owns the cursor so the game
+  never sees the click, and no native converts a screen point on the expanded
+  radar back to world coordinates. `Config.Waypoints` replaces it with a
+  searchable destination list calling `SetNewWaypoint`.
+- The settings tab is **not** built. There are no settings to put in one yet; it
+  arrives with the HUD and keybind work rather than shipping empty.
+
 ### 14.12 Command minimisation
 
 Already covered in section 10, and it serves the same goal. Interaction-driven
