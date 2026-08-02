@@ -1,6 +1,12 @@
-## State of Mind RP — server.cfg EXAMPLE
+## State of Mind RP - server.cfg EXAMPLE
 ## Copy this file to `server.cfg` and fill in the real secrets.
 ## `server.cfg` itself is gitignored so secrets never get committed.
+##
+## SOM FRAMEWORK REBUILD IN PROGRESS.
+## The QBox framework layer has been removed. som-core is not finished, so
+## this config will NOT produce a playable server yet. The ensure list below
+## reflects the target state; lines that depend on unfinished work are
+## commented out and marked TODO.
 
 ## You CAN edit the following:
 endpoint_add_tcp "0.0.0.0:30120"
@@ -8,14 +14,14 @@ endpoint_add_udp "0.0.0.0:30120"
 sv_maxclients 6
 # Get a Steam Web API key from https://steamcommunity.com/dev/apikey
 set steam_webApiKey "YOUR_STEAM_WEB_API_KEY"
-sets tags "default, deployer, qbox, ox_inventory"
+sets tags "roleplay, som, custom framework"
 
 ## You MAY edit the following:
 # Get a license key from https://keymaster.fivem.net
 sv_licenseKey "YOUR_CFX_LICENSE_KEY"
-sv_hostname "State of MindRP By Lennox!"
-sets sv_projectName "[Qbox Framework] State of MindRP"
-sets sv_projectDesc "An advanced FiveM RP framework including jobs, gangs, housing & more!"
+sv_hostname "State of Mind RP"
+sets sv_projectName "State of Mind RP"
+sets sv_projectDesc "Deep, interaction-driven roleplay on the custom SOM framework."
 sets locale "en-US"
 load_server_icon server-icon.png
 set sv_enforceGameBuild 2944
@@ -30,11 +36,11 @@ setr voice_enableRadioAnim 1
 setr voice_syncData 1
 setr voice_enableUi 0
 
-# QBCore locale config
-setr qb_locale "en"
 setr UseTarget true
 
 # ox_inventory config (convar based, not a config.lua)
+# TODO Phase 3: switch framework to "som" once modules/bridge/som/ exists.
+# See som-core/README.md and AUDIT.md section 6.4.
 setr inventory:framework "qbx"
 setr inventory:slots 40
 setr inventory:weight 120000
@@ -42,7 +48,11 @@ setr inventory:target false
 setr inventory:police '["police"]'
 setr inventory:imagepath "nui://ox_inventory/web/images"
 
-# These resources will start by default.
+# ---------------------------------------------------------------------------
+# Boot order
+# ---------------------------------------------------------------------------
+
+# Cfx stock managers
 ensure mapmanager
 ensure chat
 ensure spawnmanager
@@ -51,64 +61,76 @@ ensure basic-gamemode
 ensure hardcap
 ensure baseevents
 ensure connectqueue
-# qbx_core ships its own connection queue too; connectqueue above is the
-# intentionally-configured one (RequireSteam, JoinDelay). Disable qbx_core's
-# so both don't fight over the same playerConnecting deferral.
-set qbx:enablequeue false
 
-# Anti-cheat (loads before everything else so it monitors from first connect)
+# Anti-cheat first so it monitors from the first connect
 ensure [anticheats]
 
-# QBCore & Extra stuff — load order matters!
-# Core framework + libraries first
+# Libraries
 ensure ox_lib
-ensure ox_inventory
-ensure qbx_core
-# qbx_core's own character-select UI has unresolved bugs; reverted to
-# qb-multicharacter (config/client.lua useExternalCharacters = true). It
-# still resolves qb-core calls through qbx_core's provide shim.
-ensure qb-multicharacter
-ensure qbx_vehicles
-ensure jim_bridge
-ensure pa-textui-2
+ensure oxmysql
+ensure PolyZone
+ensure screenshot-basic
 
-# Voice before phone (npwd depends on pma-voice)
+# SOM framework
+# som-core must start before anything that reads player state.
+ensure som-assets
+ensure som-core
+ensure qb-target
+ensure som-interact
+ensure ox_inventory
+
+# som-compat answers exports['qb-core']:GetCoreObject() for preserved
+# third-party resources (ps-mdt). It declares provide 'qb-core', so it must
+# never run alongside qbx_core. qbx_core is now removed, so this is safe.
+ensure som-compat
+
+# Voice
 ensure [voice]
 
-# Phone stack: screenshot-basic → qb-npwd → npwd → compat bridge
-ensure screenshot-basic
-ensure qb-npwd
-ensure npwd
-ensure qb-phone-compat
+# Preserved resources
+ensure ps-mdt
 
-# Resource folders (resources already ensured above are skipped by FiveM)
-ensure [qb]
+# Remaining resource folders. Anything already ensured above is skipped.
 ensure [standalone]
 ensure [custom]
-ensure [new]
-ensure [jobs]
-ensure [robberies]
+ensure [som]
+
+# TODO: these folders are emptied or pending rebuild.
+# ensure [qb]
+# ensure [new]
+# ensure [jobs]
+# ensure [robberies]
 
 # Heavy streaming assets load LAST so the framework is up and the server is
 # responsive (heartbeat OK) before the ~5GB of ped/vehicle streams mount.
 ensure [assets-streams]
 
 ## Permissions ##
-add_ace group.admin command allow # allow all commands
-# Owner (Lennox) — license identifier is reliable (works without Steam)
+# SOM uses som.* ACEs, checked with IsPlayerAceAllowed in som-core.
+# See som-core/server/permissions.lua and shared/config.lua.
+add_ace group.admin command allow
+
+# Owner - license identifier is reliable (works without Steam)
 add_principal identifier.license:YOUR_LICENSE_IDENTIFIER group.admin
-add_principal identifier.license:YOUR_LICENSE_IDENTIFIER qbcore.god
+add_principal identifier.license:YOUR_LICENSE_IDENTIFIER group.god
 # Steam identifier (requires steam_webApiKey to resolve)
 add_principal identifier.steam:YOUR_STEAM_IDENTIFIER group.admin
-add_principal identifier.steam:YOUR_STEAM_IDENTIFIER qbcore.god
+add_principal identifier.steam:YOUR_STEAM_IDENTIFIER group.god
 
-# Resources
-add_ace resource.qbx_core command allow # Allow qbx_core to execute commands
+# SOM permission tiers
+add_ace group.god som.god allow
+add_ace group.god som.admin allow
+add_ace group.god som.mod allow
+add_ace group.admin som.admin allow
+add_ace group.admin som.mod allow
+add_ace group.mod som.mod allow
 
-# Gods
-add_ace qbcore.god command allow # Allow all commands
+# Gods may run any command
+add_ace group.god command allow
 
 # Inheritance
-add_principal qbcore.god group.admin # Allow gods access to the main admin group used to get all default permissions
-add_principal qbcore.god qbcore.admin # Allow gods access to admin commands
-add_principal qbcore.admin qbcore.mod # Allow admins access to mod commands
+add_principal group.god group.admin
+add_principal group.admin group.mod
+
+# Resources
+add_ace resource.som-core command allow
