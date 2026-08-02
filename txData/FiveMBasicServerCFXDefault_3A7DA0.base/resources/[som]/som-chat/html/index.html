@@ -7,12 +7,12 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="chat" class="chat">
-        <div id="log" class="log" aria-live="polite"></div>
-        <div id="entry" class="entry hidden">
-            <span class="entry__prefix">&rsaquo;</span>
-            <input id="input" class="entry__input" maxlength="256" autocomplete="off" spellcheck="false">
-        </div>
+    <!-- Input only. There is deliberately no message log: nothing is ever on
+         screen unless the player is typing. -->
+    <div id="entry" class="entry hidden">
+        <span class="entry__prefix">/</span>
+        <input id="input" class="entry__input" maxlength="256"
+               autocomplete="off" spellcheck="false" placeholder="command">
     </div>
     <script src="app.js"></script>
 </body>

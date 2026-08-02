@@ -1,23 +1,25 @@
--- Chat.
+-- Command line.
 --
--- The stock cfx `chat` resource is absent from this server, so no typed
--- command has been reachable at all. Rather than restore it and have an
--- unstyled box clash with everything else, this is a minimal replacement in
--- the SOM palette.
+-- Deliberately NOT a chat. The stock cfx `chat` resource is absent from this
+-- server, so no typed command was reachable at all; this restores that and
+-- nothing more.
 --
--- Scope is deliberately small. SOM is phone and interaction driven, so chat
--- exists for commands, staff work, and the roleplay verbs that genuinely have
--- no physical anchor. It is not meant to become the main way players talk.
+-- There is no message log and nothing is drawn unless the player is typing.
+-- Players communicate through voice, the phone and interactions. A visible
+-- text chat would compete with all three and pull roleplay out of the world
+-- and into a text box.
+--
+-- Script output goes to som-ui as a notification instead, so there is exactly
+-- one place feedback appears.
 
 local isOpen = false
-local history = {}
 
 local function open()
     if isOpen then return end
     isOpen = true
 
     SetNuiFocus(true, true)
-    SendNUIMessage({ action = 'open', history = history })
+    SendNUIMessage({ action = 'open' })
 end
 
 local function close()
@@ -26,17 +28,6 @@ local function close()
 
     SetNuiFocus(false, false)
     SendNUIMessage({ action = 'close' })
-end
-
----@param message table { author, text, colour, type }
-local function addMessage(message)
-    history[#history + 1] = message
-    -- Bounded, or a long session grows this forever.
-    if #history > Config.MaxHistory then
-        table.remove(history, 1)
-    end
-
-    SendNUIMessage({ action = 'message', message = message })
 end
 
 RegisterNUICallback('send', function(data, cb)
@@ -48,14 +39,17 @@ RegisterNUICallback('send', function(data, cb)
     text = text:gsub('^%s+', ''):gsub('%s+$', '')
     if text == '' then return end
 
-    if text:sub(1, 1) == '/' then
-        -- ExecuteCommand handles both client and server commands, and strips
-        -- the slash itself.
-        ExecuteCommand(text:sub(2))
+    if text:sub(1, 1) ~= '/' then
+        if Config.CommandsOnly then
+            TriggerEvent('som:client:notify',
+                'Commands only. Use voice, your phone, or an interaction to talk.', 'info')
+            return
+        end
         return
     end
 
-    TriggerServerEvent('som-chat:server:message', text)
+    -- ExecuteCommand handles client and server commands, and strips the slash.
+    ExecuteCommand(text:sub(2))
 end)
 
 RegisterNUICallback('close', function(_, cb)
@@ -63,24 +57,22 @@ RegisterNUICallback('close', function(_, cb)
     close()
 end)
 
-RegisterNetEvent('som-chat:client:message', function(message)
-    if type(message) ~= 'table' then return end
-    addMessage(message)
-end)
-
--- Compatibility with the stock chat API, so preserved third-party resources
--- that post through chat:addMessage still appear rather than silently failing.
+-- Compatibility with the stock chat API.
+--
+-- Preserved third-party resources post through chat:addMessage. With no log to
+-- put it in, route it to som-ui so the player still sees it rather than the
+-- message vanishing.
 RegisterNetEvent('chat:addMessage', function(data)
     if type(data) ~= 'table' then return end
 
-    local text = data.args and table.concat(data.args, ' ') or data.text or ''
-    addMessage({
-        author = data.args and data.args[1] or nil,
-        text = tostring(text),
-        colour = data.color and ('rgb(%d,%d,%d)'):format(
-            data.color[1] or 255, data.color[2] or 255, data.color[3] or 255) or nil,
-        kind = 'system',
-    })
+    local text = data.args and table.concat(data.args, ' ') or data.text
+    if type(text) ~= 'string' or text == '' then return end
+
+    -- Strip the colour and formatting codes the old chat understood, since a
+    -- notification renders them literally.
+    text = text:gsub('%^%d', ''):gsub('<[^>]->', '')
+
+    TriggerEvent('som:client:notify', text, 'info', 7000)
 end)
 
 AddEventHandler('onResourceStop', function(resource)
@@ -89,8 +81,4 @@ AddEventHandler('onResourceStop', function(resource)
 end)
 
 RegisterCommand('somchat', open, false)
-RegisterKeyMapping('somchat', 'Open chat', 'keyboard', Config.OpenKey)
-
--- The stock chat bound T, and muscle memory is worth respecting.
-RegisterCommand('+somchatAlt', open, false)
-RegisterKeyMapping('+somchatAlt', 'Open chat (alternate)', 'keyboard', Config.AltKey)
+RegisterKeyMapping('somchat', 'Open command line', 'keyboard', Config.OpenKey)
