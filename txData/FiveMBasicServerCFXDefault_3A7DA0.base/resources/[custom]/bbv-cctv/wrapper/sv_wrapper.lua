@@ -1,4 +1,0 @@
-Wrapper = {
-    resname = GetCurrentResourceName(),
-    ServerCallbacks = {}
-}

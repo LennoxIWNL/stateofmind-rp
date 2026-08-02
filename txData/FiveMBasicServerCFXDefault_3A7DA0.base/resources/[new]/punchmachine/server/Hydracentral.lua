@@ -1,2 +1,0 @@
----- by NivK and SorenGaming#4840 World Center Fivem
----- https://discord.gg/CnzaGbDjXz
