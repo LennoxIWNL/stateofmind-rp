@@ -8,69 +8,90 @@
 </head>
 <body>
     <div id="root" class="root hidden">
-        <header class="header">
-            <h1 class="brand">STATE OF <span class="som-accent">MIND</span></h1>
-            <p id="subtitle" class="subtitle">Select a character</p>
-        </header>
+        <!-- Scrim only behind the rail, so the character stays clean -->
+        <div class="scrim" aria-hidden="true"></div>
 
-        <!-- Slot grid -->
-        <section id="view-slots" class="view">
-            <div id="slots" class="slots"></div>
-        </section>
+        <aside class="rail">
+            <header class="brand">
+                <div class="brand__mark">
+                    <span class="brand__line">STATE OF</span>
+                    <span class="brand__word">MIND</span>
+                </div>
+                <div class="brand__rule" aria-hidden="true"></div>
+            </header>
 
-        <!-- Creation form -->
-        <section id="view-create" class="view hidden">
-            <form id="create-form" class="som-panel form" autocomplete="off">
-                <h2 class="form__title">New Character</h2>
-
-                <div class="form__row">
-                    <label class="field">
-                        <span class="field__label">First name</span>
-                        <input class="field__input" name="firstname" maxlength="24" required>
-                    </label>
-                    <label class="field">
-                        <span class="field__label">Last name</span>
-                        <input class="field__input" name="lastname" maxlength="24" required>
-                    </label>
+            <!-- ROSTER -->
+            <section id="view-roster" class="view view--roster">
+                <div class="view__head">
+                    <h2 class="view__title">Characters</h2>
+                    <span id="slot-count" class="view__count"></span>
                 </div>
 
-                <div class="form__row">
+                <div id="roster" class="roster" role="list"></div>
+
+                <footer class="hints">
+                    <span><kbd class="som-key">↑↓</kbd> Navigate</span>
+                    <span><kbd class="som-key">↵</kbd> Play</span>
+                </footer>
+            </section>
+
+            <!-- CREATE -->
+            <section id="view-create" class="view view--create hidden">
+                <div class="view__head">
+                    <h2 class="view__title">New Character</h2>
+                    <span id="create-slot" class="view__count"></span>
+                </div>
+
+                <form id="create-form" class="form" autocomplete="off" novalidate>
+                    <div class="field-row">
+                        <label class="field">
+                            <span class="field__label">First name</span>
+                            <input class="field__input" name="firstname" maxlength="24" spellcheck="false" required>
+                        </label>
+                        <label class="field">
+                            <span class="field__label">Last name</span>
+                            <input class="field__input" name="lastname" maxlength="24" spellcheck="false" required>
+                        </label>
+                    </div>
+
                     <label class="field">
                         <span class="field__label">Date of birth</span>
                         <input class="field__input" name="dob" type="date" required>
                     </label>
+
                     <label class="field">
                         <span class="field__label">Nationality</span>
-                        <select class="field__input" name="nationality" id="nationality"></select>
+                        <div class="select">
+                            <select class="field__input" name="nationality" id="nationality"></select>
+                        </div>
                     </label>
-                </div>
 
-                <fieldset class="field">
-                    <legend class="field__label">Gender</legend>
-                    <div class="genders">
-                        <label class="gender">
-                            <input type="radio" name="gender" value="0" checked>
-                            <span>Male</span>
-                        </label>
-                        <label class="gender">
-                            <input type="radio" name="gender" value="1">
-                            <span>Female</span>
-                        </label>
+                    <fieldset class="field">
+                        <legend class="field__label">Gender</legend>
+                        <div class="segmented" id="gender-group">
+                            <label class="segmented__opt">
+                                <input type="radio" name="gender" value="0" checked>
+                                <span>Male</span>
+                            </label>
+                            <label class="segmented__opt">
+                                <input type="radio" name="gender" value="1">
+                                <span>Female</span>
+                            </label>
+                            <span class="segmented__thumb" aria-hidden="true"></span>
+                        </div>
+                    </fieldset>
+
+                    <p id="form-error" class="form__error" role="alert"></p>
+
+                    <div class="form__actions">
+                        <button type="button" class="btn" data-action="back">Cancel</button>
+                        <button type="submit" class="btn btn--primary" id="create-submit">
+                            <span>Create</span>
+                        </button>
                     </div>
-                </fieldset>
-
-                <p id="form-error" class="form__error" role="alert"></p>
-
-                <div class="form__actions">
-                    <button type="button" class="som-btn" data-action="back">Cancel</button>
-                    <button type="submit" class="som-btn som-btn--primary">Create</button>
-                </div>
-            </form>
-        </section>
-
-        <footer class="footer">
-            <span><span class="som-key">Esc</span> Back</span>
-        </footer>
+                </form>
+            </section>
+        </aside>
     </div>
 
     <script src="app.js"></script>

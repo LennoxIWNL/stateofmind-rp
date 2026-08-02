@@ -1,16 +1,20 @@
 const RESOURCE = window.location.hostname.replace('cfx-nui-', '');
 
 const root = document.getElementById('root');
-const slotsEl = document.getElementById('slots');
-const subtitle = document.getElementById('subtitle');
-const viewSlots = document.getElementById('view-slots');
+const rosterEl = document.getElementById('roster');
+const slotCountEl = document.getElementById('slot-count');
+const viewRoster = document.getElementById('view-roster');
 const viewCreate = document.getElementById('view-create');
+const createSlotEl = document.getElementById('create-slot');
 const form = document.getElementById('create-form');
 const formError = document.getElementById('form-error');
+const submitBtn = document.getElementById('create-submit');
 const nationalitySelect = document.getElementById('nationality');
+const genderGroup = document.getElementById('gender-group');
 
 let maxSlots = 5;
 let characters = [];
+let activeSlot = null;
 let pendingSlot = null;
 let busy = false;
 
@@ -29,119 +33,145 @@ async function post(endpoint, body) {
     }
 }
 
-function money(n) {
-    return typeof n === 'number' ? `$${n.toLocaleString('en-US')}` : '$0';
-}
+const money = (n) =>
+    typeof n === 'number' ? `$${n.toLocaleString('en-US')}` : '$0';
 
 function lastPlayed(value) {
-    if (!value) return 'Never played';
+    if (!value) return 'Never';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? 'Never played' : `Last played ${d.toLocaleDateString('en-GB')}`;
+    if (Number.isNaN(d.getTime())) return 'Never';
+
+    const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+    if (days <= 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    if (days < 30) return `${days}d ago`;
+    return d.toLocaleDateString('en-GB');
 }
 
-function renderSlots() {
+function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    // textContent throughout: names are player-supplied and must never be able
+    // to inject markup into this screen.
+    if (text !== undefined) node.textContent = text;
+    return node;
+}
+
+function buildDetail(character) {
+    const detail = el('div', 'detail');
+    detail.appendChild(el('div'));
+
+    const body = el('div', 'detail__body');
+
+    const stats = el('div', 'detail__stats');
+    for (const [label, value] of [
+        ['Cash', money(character.cash)],
+        ['Bank', money(character.bank)],
+        ['Played', lastPlayed(character.last_played)],
+    ]) {
+        const stat = el('div', 'detail__stat');
+        stat.appendChild(el('b', null, value));
+        stat.appendChild(document.createTextNode(label));
+        stats.appendChild(stat);
+    }
+
+    const actions = el('div', 'detail__actions');
+
+    const play = el('button', 'btn btn--primary', 'Play');
+    play.type = 'button';
+    play.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectCharacter(character.citizenid, play);
+    });
+
+    const del = el('button', 'btn btn--danger', 'Delete');
+    del.type = 'button';
+    del.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteCharacter(character, del);
+    });
+
+    actions.append(play, del);
+    body.append(stats, actions);
+    detail.appendChild(body);
+    return detail;
+}
+
+function renderRoster() {
     const frag = document.createDocumentFragment();
     const bySlot = new Map(characters.map((c) => [Number(c.slot), c]));
 
+    slotCountEl.textContent = `${characters.length}/${maxSlots}`;
+
     for (let i = 1; i <= maxSlots; i++) {
         const character = bySlot.get(i);
-        const card = document.createElement('div');
-        card.className = 'slot';
 
-        if (!character) {
-            card.classList.add('slot--empty');
-            card.tabIndex = 0;
-            card.setAttribute('role', 'button');
+        const row = el('button', 'slot');
+        row.type = 'button';
+        row.setAttribute('role', 'listitem');
+        row.dataset.slot = String(i);
 
-            const plus = document.createElement('span');
-            plus.className = 'slot__plus';
-            plus.textContent = '+';
+        row.appendChild(el('span', 'slot__index', String(i).padStart(2, '0')));
 
-            const label = document.createElement('span');
-            label.textContent = 'Create character';
+        const body = el('div', 'slot__body');
+        if (character) {
+            body.appendChild(el('div', 'slot__name', `${character.firstname} ${character.lastname}`));
+            body.appendChild(el('div', 'slot__sub', character.job || 'unemployed'));
+        } else {
+            row.classList.add('slot--empty');
+            body.appendChild(el('div', 'slot__name', 'Empty slot'));
+            body.appendChild(el('div', 'slot__sub', 'Create a character'));
+        }
+        row.appendChild(body);
 
-            card.append(plus, label);
-            const open = () => openCreate(i);
-            card.addEventListener('click', open);
-            card.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+        if (character) {
+            if (activeSlot === i) row.classList.add('is-active');
+            row.addEventListener('click', () => {
+                activeSlot = activeSlot === i ? null : i;
+                renderRoster();
             });
-            frag.appendChild(card);
-            continue;
+        } else {
+            row.addEventListener('click', () => openCreate(i));
         }
 
-        const index = document.createElement('span');
-        index.className = 'slot__index';
-        index.textContent = `Slot ${i}`;
+        frag.appendChild(row);
 
-        const name = document.createElement('span');
-        name.className = 'slot__name';
-        // textContent throughout: names are player-supplied and must never
-        // be able to inject markup into this screen.
-        name.textContent = `${character.firstname} ${character.lastname}`;
-
-        const job = document.createElement('span');
-        job.className = 'slot__job';
-        job.textContent = character.job || 'unemployed';
-
-        const meta = document.createElement('div');
-        meta.className = 'slot__meta';
-        const cash = document.createElement('span');
-        cash.textContent = `Cash ${money(character.cash)}`;
-        const bank = document.createElement('span');
-        bank.textContent = `Bank ${money(character.bank)}`;
-        const played = document.createElement('span');
-        played.textContent = lastPlayed(character.last_played);
-        meta.append(cash, bank, played);
-
-        const actions = document.createElement('div');
-        actions.className = 'slot__actions';
-
-        const play = document.createElement('button');
-        play.type = 'button';
-        play.className = 'som-btn som-btn--primary';
-        play.textContent = 'Play';
-        play.addEventListener('click', () => selectCharacter(character.citizenid, play));
-
-        const del = document.createElement('button');
-        del.type = 'button';
-        del.className = 'som-btn som-btn--danger';
-        del.textContent = 'Delete';
-        del.addEventListener('click', () => deleteCharacter(character, del));
-
-        actions.append(play, del);
-        card.append(index, name, job, meta, actions);
-        frag.appendChild(card);
+        if (character && activeSlot === i) frag.appendChild(buildDetail(character));
     }
 
-    slotsEl.replaceChildren(frag);
+    rosterEl.replaceChildren(frag);
 }
 
 async function selectCharacter(citizenid, button) {
     if (busy) return;
     busy = true;
-    button.textContent = 'Loading...';
+    button.disabled = true;
+    button.textContent = 'Loading';
 
     const result = await post('selectCharacter', { citizenid });
     if (!result.success) {
         busy = false;
+        button.disabled = false;
         button.textContent = 'Play';
-        subtitle.textContent = result.error || 'Could not load that character';
+        formError.textContent = '';
+        flash(result.error || 'Could not load that character');
     }
-    // On success the game fades out and the UI is closed from Lua, so there is
+    // On success the game fades out and Lua closes the UI, so there is
     // deliberately nothing to do here.
 }
 
 async function deleteCharacter(character, button) {
     if (busy) return;
 
-    // Two-step confirm rather than a modal: the second click is the commit.
+    // Two-step confirm rather than a modal. The second click commits.
     if (button.dataset.confirm !== '1') {
         button.dataset.confirm = '1';
-        button.textContent = 'Sure?';
+        button.classList.add('is-confirming');
+        button.textContent = 'Confirm';
         setTimeout(() => {
             if (button.isConnected && button.dataset.confirm === '1') {
                 button.dataset.confirm = '0';
+                button.classList.remove('is-confirming');
                 button.textContent = 'Delete';
             }
         }, 3000);
@@ -149,24 +179,35 @@ async function deleteCharacter(character, button) {
     }
 
     busy = true;
-    button.textContent = '...';
+    button.disabled = true;
     const result = await post('deleteCharacter', { citizenid: character.citizenid });
     busy = false;
 
     if (!result.success) {
-        subtitle.textContent = result.error || 'Could not delete that character';
+        button.disabled = false;
         button.dataset.confirm = '0';
+        button.classList.remove('is-confirming');
         button.textContent = 'Delete';
+        flash(result.error || 'Could not delete that character');
+    } else {
+        activeSlot = null;
     }
+}
+
+function flash(message) {
+    slotCountEl.textContent = message;
+    setTimeout(() => { slotCountEl.textContent = `${characters.length}/${maxSlots}`; }, 2600);
 }
 
 function openCreate(slot) {
     pendingSlot = slot;
     formError.textContent = '';
     form.reset();
-    viewSlots.classList.add('hidden');
+    genderGroup.dataset.value = '0';
+    createSlotEl.textContent = `Slot ${String(slot).padStart(2, '0')}`;
+
+    viewRoster.classList.add('hidden');
     viewCreate.classList.remove('hidden');
-    subtitle.textContent = `Creating character in slot ${slot}`;
     form.elements.firstname.focus();
     post('previewGender', { gender: 0 });
 }
@@ -174,8 +215,8 @@ function openCreate(slot) {
 function closeCreate() {
     pendingSlot = null;
     viewCreate.classList.add('hidden');
-    viewSlots.classList.remove('hidden');
-    subtitle.textContent = 'Select a character';
+    viewRoster.classList.remove('hidden');
+    renderRoster();
 }
 
 form.addEventListener('submit', async (event) => {
@@ -199,14 +240,18 @@ form.addEventListener('submit', async (event) => {
         return;
     }
     if (!payload.dob) {
-        formError.textContent = 'Please choose a date of birth.';
+        formError.textContent = 'Choose a date of birth.';
         return;
     }
 
     busy = true;
+    submitBtn.disabled = true;
     formError.textContent = '';
+
     const result = await post('createCharacter', payload);
+
     busy = false;
+    submitBtn.disabled = false;
 
     if (result.success) {
         closeCreate();
@@ -216,16 +261,44 @@ form.addEventListener('submit', async (event) => {
 });
 
 form.addEventListener('change', (event) => {
-    if (event.target.name === 'gender') {
-        post('previewGender', { gender: Number(event.target.value) });
-    }
+    if (event.target.name !== 'gender') return;
+    genderGroup.dataset.value = event.target.value;
+    post('previewGender', { gender: Number(event.target.value) });
 });
 
 form.querySelector('[data-action="back"]').addEventListener('click', closeCreate);
 
 document.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape') return;
-    if (!viewCreate.classList.contains('hidden')) closeCreate();
+    if (event.key === 'Escape') {
+        if (!viewCreate.classList.contains('hidden')) closeCreate();
+        return;
+    }
+
+    if (!viewCreate.classList.contains('hidden')) return;
+
+    const rows = [...rosterEl.querySelectorAll('.slot')];
+    if (!rows.length) return;
+
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const current = rows.findIndex((r) => Number(r.dataset.slot) === activeSlot);
+        const step = event.key === 'ArrowDown' ? 1 : -1;
+        const next = current === -1
+            ? (step === 1 ? 0 : rows.length - 1)
+            : (current + step + rows.length) % rows.length;
+
+        const slot = Number(rows[next].dataset.slot);
+        const hasCharacter = characters.some((c) => Number(c.slot) === slot);
+        activeSlot = hasCharacter ? slot : null;
+        if (!hasCharacter) rows[next].focus();
+        renderRoster();
+        return;
+    }
+
+    if (event.key === 'Enter' && activeSlot !== null) {
+        const play = rosterEl.querySelector('.detail__actions .btn--primary');
+        if (play) play.click();
+    }
 });
 
 window.addEventListener('message', (event) => {
@@ -235,6 +308,8 @@ window.addEventListener('message', (event) => {
     if (data.action === 'open') {
         characters = Array.isArray(data.characters) ? data.characters : [];
         maxSlots = Number(data.maxSlots) || 5;
+        activeSlot = characters.length ? Number(characters[0].slot) : null;
+        busy = false;
 
         const options = Array.isArray(data.nationalities) ? data.nationalities : ['American'];
         nationalitySelect.replaceChildren(
@@ -246,17 +321,16 @@ window.addEventListener('message', (event) => {
             })
         );
 
-        busy = false;
-        subtitle.textContent = 'Select a character';
-        closeCreate();
-        renderSlots();
+        viewCreate.classList.add('hidden');
+        viewRoster.classList.remove('hidden');
+        renderRoster();
         root.classList.remove('hidden');
         return;
     }
 
     if (data.action === 'refresh') {
         characters = Array.isArray(data.characters) ? data.characters : [];
-        renderSlots();
+        renderRoster();
         return;
     }
 

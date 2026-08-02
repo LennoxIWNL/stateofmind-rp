@@ -30,12 +30,13 @@ Config.Shell = {
     -- for character screens and housing scripts is a downloadable asset pack
     -- that has to be streamed.
     --
-    -- To enable: drop a shell resource into [assets-streams], make sure it is
-    -- started, set the model name below, then set enabled = true and tune the
-    -- offsets in game.
-    enabled = false,
+    -- Provided by jordqn_free_shells in [assets-streams]/[extras]. That
+    -- resource must be started or the model will not exist: dev mode does not
+    -- ensure [assets-streams], so server.cfg starts it by name.
+    enabled = true,
 
-    model = 'set_a_shell_model_here',
+    -- Others in the same pack: motel_low, warehouse_small, coke_business_empty.
+    model = 'apart_luxe_1',
 
     -- Deep below the map, well clear of any real geometry. This is the area
     -- FiveM shell interiors conventionally occupy.
@@ -69,6 +70,10 @@ Config.Fallback = {
 -- Camera treatment, applied to whichever scene is active.
 Config.Camera = {
     fov = 34.0,
+
+    -- Pushes the character off centre so the UI rail on the left never covers
+    -- them. Positive moves the character right in frame. In metres.
+    subjectShift = 0.55,
 
     -- Shallow depth of field is what sells the shot. It keeps the character
     -- sharp and reduces the background to colour and shape.

@@ -92,13 +92,31 @@ local function pedHeading()
     return Config.Shell.enabled and Config.Shell.pedHeading or Config.Fallback.ped.w
 end
 
+---Shifts the aim point sideways so the subject sits off centre in frame.
+---Aiming left of the character makes the character appear to the right.
+---@param camPos vector3
+---@param lookAt vector3
+---@return vector3 adjusted aim point
+local function applySubjectShift(camPos, lookAt)
+    local shift = Config.Camera.subjectShift
+    if not shift or shift == 0.0 then return lookAt end
+
+    local dx, dy = lookAt.x - camPos.x, lookAt.y - camPos.y
+    local len = math.sqrt(dx * dx + dy * dy)
+    if len == 0 then return lookAt end
+
+    -- Perpendicular to the view direction, in the ground plane.
+    return vec3(lookAt.x + (-dy / len) * shift, lookAt.y + (dx / len) * shift, lookAt.z)
+end
+
 ---Camera position and aim point for whichever scene is active.
 ---@return vector3 camPos, vector3 lookAt
 local function cameraFraming(usingShell)
     if usingShell then
         local origin = Config.Shell.coords
-        return origin + Config.Shell.camOffset,
-               origin + Config.Shell.pedOffset + Config.Shell.camLookAtOffset
+        local camPos = origin + Config.Shell.camOffset
+        local lookAt = origin + Config.Shell.pedOffset + Config.Shell.camLookAtOffset
+        return camPos, applySubjectShift(camPos, lookAt)
     end
 
     -- Offsets are relative to the ped and rotated by its heading, so the camera
@@ -108,11 +126,13 @@ local function cameraFraming(usingShell)
     local rad = math.rad(pedHeading())
     local off = Config.Fallback.camOffset
 
-    return vec3(
+    local camPos = vec3(
         ped.x + math.sin(-rad) * off.y,
         ped.y + math.cos(-rad) * off.y,
         ped.z + off.z
-    ), ped + Config.Fallback.camLookAtOffset
+    )
+
+    return camPos, applySubjectShift(camPos, ped + Config.Fallback.camLookAtOffset)
 end
 
 local function destroyShell()
