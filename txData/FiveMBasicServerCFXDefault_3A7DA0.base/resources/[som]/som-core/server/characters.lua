@@ -85,8 +85,12 @@ function Characters.Create(source, data)
     local license = getLicense(source)
     if not license then return false, 'could not identify player' end
 
+    -- The cap is per player and resolved server side. A client deciding its
+    -- own limit could create characters in slots it has not earned.
+    local maxSlots = Entitlements.GetSlots(source)
+
     local slot = tonumber(data.slot)
-    if not slot or slot % 1 ~= 0 or slot < 1 or slot > Config.Characters.maxSlots then
+    if not slot or slot % 1 ~= 0 or slot < 1 or slot > maxSlots then
         return false, 'invalid slot'
     end
 

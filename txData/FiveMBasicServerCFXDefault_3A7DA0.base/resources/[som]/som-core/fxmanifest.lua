@@ -10,6 +10,7 @@ version '0.1.0'
 shared_scripts {
     '@ox_lib/init.lua',
     'shared/config.lua',
+    'shared/tiers.lua',
     'shared/jobs.lua',
     'shared/gangs.lua',
 }
@@ -21,6 +22,7 @@ client_scripts {
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/permissions.lua',
+    'server/entitlements.lua',
     'server/player.lua',
     'server/money.lua',
     'server/characters.lua',

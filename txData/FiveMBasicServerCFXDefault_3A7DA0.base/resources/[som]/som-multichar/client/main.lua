@@ -402,6 +402,15 @@ AddEventHandler('som-multichar:client:nudgeScene', function(what, dx, dy, dz)
         Config.Shell.pedOffset = Config.Shell.pedOffset + delta
     else
         Config.Shell.camOffset = Config.Shell.camOffset + delta
+
+        -- A pedestal move, not a tilt. The camera always aims at the
+        -- character, so raising or lowering it alone would only re-angle the
+        -- shot around the same point. Moving the aim height by the same amount
+        -- keeps the view level and slides the whole framing up or down, which
+        -- is what actually brings more of the body into shot.
+        if dz ~= 0 then
+            Config.Shell.lookHeight = (Config.Shell.lookHeight or 0.9) + dz
+        end
     end
 
     TriggerEvent('som-multichar:client:rebuildScene')
@@ -455,10 +464,16 @@ local function openSelection()
 
     local characters = lib.callback.await('som:server:getCharacters', false) or {}
 
+    -- The slot cap is per player and comes from the server. Reading a local
+    -- config value would show everyone the same number regardless of what they
+    -- are actually entitled to.
+    local entitlements = lib.callback.await('som:server:getEntitlements', false) or {}
+
     SendNUIMessage({
         action = 'open',
         characters = characters,
-        maxSlots = exports['som-core']:getMaxCharacterSlots(),
+        maxSlots = entitlements.slots or 3,
+        tier = entitlements.label,
         nationalities = Config.Nationalities,
     })
     SetNuiFocus(true, true)
