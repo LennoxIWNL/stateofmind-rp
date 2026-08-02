@@ -88,5 +88,16 @@ exports('getCharacterSlots', Entitlements.GetSlots)
 exports('hasPerk', Entitlements.HasPerk)
 
 lib.callback.register('som:server:getEntitlements', function(source)
-    return Entitlements.Get(source)
+    local result = Entitlements.Get(source)
+
+    -- Resolving to the bare minimum is usually a misconfiguration rather than
+    -- a genuine free-tier player, and a silent 2 slots looks identical to a
+    -- broken ACE lookup. Report what the server actually believes.
+    if result.slots <= Tiers.defaultSlots then
+        print(('[som-core] %s resolved to %s, %d slots. If that is wrong, the ACE below is why:')
+            :format(GetPlayerName(source) or '?', result.label or '?', result.slots))
+        Permissions.Debug(source)
+    end
+
+    return result
 end)
