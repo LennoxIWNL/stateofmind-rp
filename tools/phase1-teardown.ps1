@@ -99,6 +99,8 @@ $Keep = @{
     '[jobs]/[public]/[doj-casino]'        = 'STREAM container of two donors below'
     '[jobs]/[public]/[doj-casino]/casino-luckywheel' = 'STREAM 1 file'
     '[jobs]/[public]/[doj-casino]/DLCiplLoader'      = 'STREAM 92 files'
+    '[new]/punchmachine_prop'             = 'STREAM 7 files, plus 6 loose assets'
+    '[new]/RollerSkating'                 = 'STREAM 23 files, plus 22 loose assets'
 }
 
 # ---------------------------------------------------------------------------
