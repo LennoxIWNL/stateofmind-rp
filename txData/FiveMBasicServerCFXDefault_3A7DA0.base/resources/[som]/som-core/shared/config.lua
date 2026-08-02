@@ -35,6 +35,10 @@ Config.DefaultMetadata = {
     armor = 0,
     isdead = false,
     inlaststand = false,
+    -- Restraint state. som-theft gates cash robbery on these, so they are
+    -- framework state rather than something a job script keeps to itself.
+    cuffed = false,
+    handsup = false,
     injuries = {},
     bleeding = 0,
     fingerprint = nil,

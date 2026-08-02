@@ -39,9 +39,15 @@ setr voice_enableUi 0
 setr UseTarget true
 
 # ox_inventory config (convar based, not a config.lua)
-# TODO Phase 3: switch framework to "som" once modules/bridge/som/ exists.
-# See som-core/README.md and AUDIT.md section 6.4.
-setr inventory:framework "qbx"
+# The som bridge lives at ox_inventory/modules/bridge/som/. It is a patch to a
+# third-party resource and must be re-applied on every ox_inventory upgrade.
+# See som-core/README.md.
+setr inventory:framework "som"
+# Money is NOT an inventory item in SOM. som-core owns cash, bank, crypto and
+# dirty outright. Leaving this empty stops ox registering a 'money' account
+# item, which would otherwise hold the authoritative cash count and drift from
+# som_character_money. Cash is still robbable, via som-theft.
+setr inventory:accounts "[]"
 setr inventory:slots 40
 setr inventory:weight 120000
 setr inventory:target false
@@ -82,6 +88,7 @@ ensure ox_inventory
 # som-multichar is what lets a player enter the world at all. Without it
 # nobody gets past the loading screen.
 ensure som-multichar
+ensure som-theft
 
 # som-compat answers exports['qb-core']:GetCoreObject() for preserved
 # third-party resources (ps-mdt). It declares provide 'qb-core', so it must

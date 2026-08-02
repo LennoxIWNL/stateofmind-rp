@@ -92,6 +92,52 @@ CreateThread(function()
 end)
 
 -- ---------------------------------------------------------------------------
+-- Status adjustment from item use
+--
+-- TRUST BOUNDARY. ox_inventory applies item status effects on the client
+-- (modules/bridge/som/client.lua -> client.setPlayerStatus), so this is a
+-- client-reachable event. The server has already validated that the item was
+-- consumed via ox's usingItem state machine, but the delta itself arrives from
+-- the client, so it is treated as hostile:
+--   only three keys are accepted, the delta is clamped, and calls are rate
+--   limited per player. setMetadata then clamps the result to 0-100.
+--
+-- Nothing here touches money, items, jobs, or permissions, so the worst a
+-- spoofed call achieves is refilling the caller's own hunger bar.
+-- ---------------------------------------------------------------------------
+
+local STATUS_KEYS = { hunger = true, thirst = true, stress = true }
+local MAX_STATUS_DELTA = 50
+local STATUS_COOLDOWN = 500
+
+local lastStatusCall = {}
+
+RegisterNetEvent('som:server:adjustStatus', function(key, delta)
+    local source = source
+
+    if not STATUS_KEYS[key] then return end
+
+    local value = tonumber(delta)
+    if not value or value ~= value then return end
+
+    local now = GetGameTimer()
+    if lastStatusCall[source] and now - lastStatusCall[source] < STATUS_COOLDOWN then return end
+    lastStatusCall[source] = now
+
+    if value > MAX_STATUS_DELTA then value = MAX_STATUS_DELTA end
+    if value < -MAX_STATUS_DELTA then value = -MAX_STATUS_DELTA end
+
+    local player = Players.Get(source)
+    if not player then return end
+
+    player:setMetadata(key, (player.metadata[key] or 0) + value)
+end)
+
+AddEventHandler('playerDropped', function()
+    lastStatusCall[source] = nil
+end)
+
+-- ---------------------------------------------------------------------------
 -- Exports
 --
 -- Consumed as: exports['som-core']:getPlayer(source)

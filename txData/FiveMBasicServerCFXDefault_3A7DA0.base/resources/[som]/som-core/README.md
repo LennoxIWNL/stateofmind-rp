@@ -63,6 +63,28 @@ core:getTreasury()
 
 `reason` is required and lands in the ledger. Amounts must be positive whole numbers; negatives, fractions, NaN, and infinities are rejected. The `dirty` account is protected and only Phase 4 laundering may touch it.
 
+### Money is not an inventory item
+
+**som-core owns every account outright**: `cash`, `bank`, `crypto`, `dirty`. None of them is an ox_inventory item, and `inventory:accounts` is set to `[]` so ox never registers one.
+
+The alternative, cash as a `money` item, is what ESX and QBox do, and it hands the authoritative cash count to ox_inventory. Ownership of the economy then straddles two systems, the two records drift, and drift is indistinguishable from a dupe. Every balance change goes through this bus and lands in `som_transactions`, with no second writer.
+
+Cash is still robbable. `som-theft` performs a validated server-side transfer, so a thief cannot simply drag a stack out of a victim's bag:
+
+```lua
+core:stealCash(victimSource, thiefSource, amount)  -- returns ok, stolen
+```
+
+That function guarantees the money maths and the audit trail only. The caller must have already checked proximity and victim state; `som-theft` does both server side.
+
+## The ox_inventory bridge
+
+`ox_inventory/modules/bridge/som/{client,server}.lua` is **a patch to a third-party resource**, and the only SOM code outside a `som-*` folder. ox resolves its bridge by folder name from the `inventory:framework` convar, so there is no way to supply it externally.
+
+Set `setr inventory:framework "som"` in `server.cfg`. **Re-apply the patch on every ox_inventory upgrade.**
+
+The bridge maps SOM job and gang into ox's `groups` table (`{ police = 2, ballas = 0 }`), which drives stash access rules and the police evidence-grade check.
+
 ## Client exports
 
 ```lua

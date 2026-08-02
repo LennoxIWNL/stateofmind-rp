@@ -46,6 +46,14 @@ local function callerResource()
     return GetInvokingResource() or 'som-core'
 end
 
+-- Cash is deliberately NOT an inventory item. It is a balance som-core owns
+-- outright, like bank and crypto. Making it an item would mean ox_inventory
+-- held the authoritative count, splitting ownership of the economy across two
+-- systems and creating drift that is indistinguishable from a dupe.
+--
+-- Cash is still stealable, but through a validated server action rather than
+-- by dragging a stack out of somebody's bag. See som-theft.
+
 ---The single auditable mutation. Not exported: callers use Add/Remove/Transfer.
 ---@param player table
 ---@param account string
@@ -194,6 +202,52 @@ function Money.Transfer(fromRef, toRef, account, amount, reason)
     return true
 end
 
+---Takes cash from one player and gives it to another.
+---
+---This is how cash gets robbed. Cash is not an item, so it cannot be dragged
+---out of somebody's bag: a thief performs a validated action instead, and the
+---server decides whether it is allowed and how much moves.
+---
+---Callers MUST have already checked proximity and that the victim is in a
+---state that permits it. som-theft does both. This function only guarantees
+---the money maths and the audit trail.
+---@param fromRef number|string victim
+---@param toRef number|string thief
+---@param amount number|nil defaults to the victim's whole cash balance
+---@return boolean success, number|string stolen amount, or an error
+function Money.StealCash(fromRef, toRef, amount)
+    local victim = resolve(fromRef)
+    local thief = resolve(toRef)
+    if not victim or not thief then return false, 'player not found' end
+    if victim.citizenid == thief.citizenid then return false, 'cannot rob yourself' end
+
+    local available = victim.money.cash
+    if available <= 0 then return false, 'victim has no cash' end
+
+    local value = amount and sanitiseAmount(amount) or available
+    if not value then return false, 'invalid amount' end
+    if value > available then value = available end
+
+    local resource = callerResource()
+
+    local ok = transact(victim, 'cash', -value, 'robbed', {
+        counterparty = thief.citizenid, flow = 'transfer', resource = resource,
+    })
+    if not ok then return false, 'debit failed' end
+
+    local credited = transact(thief, 'cash', value, 'robbery-proceeds', {
+        counterparty = victim.citizenid, flow = 'transfer', resource = resource,
+    })
+    if not credited then
+        transact(victim, 'cash', value, 'robbery-reversal', {
+            counterparty = thief.citizenid, flow = 'transfer', resource = resource,
+        })
+        return false, 'credit failed, reversed'
+    end
+
+    return true, value
+end
+
 ---@param ref number|string
 ---@param account string
 ---@param amount number
@@ -287,6 +341,7 @@ end
 exports('addMoney', Money.Add)
 exports('removeMoney', Money.Remove)
 exports('getMoney', Money.Get)
+exports('stealCash', Money.StealCash)
 exports('hasMoney', Money.Has)
 exports('transferMoney', Money.Transfer)
 exports('businessTransact', Money.BusinessTransact)
