@@ -152,7 +152,11 @@ function Business.IssueEquipment(source, department, item)
     if not player then return false, 'player not found' end
 
     local row = cache[department]
-    if not row or row.active ~= 1 then return false, 'department not active' end
+    -- oxmysql returns TINYINT(1) as a boolean rather than 1, so an equality
+    -- check against the number rejects every active department.
+    if not row or not (row.active == true or row.active == 1) then
+        return false, 'department not active'
+    end
 
     -- Server side job check. The armoury UI showing an item grants nothing.
     if row.job and player.job.name ~= row.job then

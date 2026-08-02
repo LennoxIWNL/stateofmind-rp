@@ -655,7 +655,7 @@ The rebuild spec explicitly says not to guess silently on these:
 | **4d. `som-admin`** | Custom admin menu (14.8): inventory search, spectate with voice, disconnect logs, vehicle and job management. Replaces the removed `ps-adminmenu`. Defers to txAdmin for restarts, resources and bans. | Phase 4 ledger exists, so money and item actions can be logged through it. |
 | **6. Gangs and turf** | `som-gangs` from `som-gangboss-app`. Turf system is fully greenfield (section 8.4). Turf HUD. | Section 12.3 answered. Phase 5 interaction patterns established. |
 | **Future: elections** | Players elect a mayor. The mayor sets tax rates per category and allocates budgets to departments (LSPD, BCSO, SASP, EMS). **Tax may never be set to zero**: `Config.Tax.minimum` is a hard floor enforced server side, so an elected official cannot abolish the thing that funds the city. Campaigns, terms and recall are the roleplay layer on top. | Phase 4 economy and Phase 4b phone both live, since voting and budgets need a UI. |
-| **7. NUIs** | `som-assets/tokens.css` shared by every `som-*` NUI. Inventory, banking, job menus, turf HUD, character creation. Load the design skill in `.claude/skills/` before writing UI code. | Runs alongside Phases 3 through 6, not after. |
+| **7. NUIs** | `som-assets/tokens.css` shared by every `som-*` NUI. Includes the inventory visual rework (14.10) and the custom pause menu (14.11). Inventory, banking, job menus, turf HUD, character creation. Load the design skill in `.claude/skills/` before writing UI code. | Runs alongside Phases 3 through 6, not after. |
 | **8. Command minimization** | Execute section 10. Target under 40 player-facing commands. Update section 10 as the living record. | All systems built. |
 | **9. Production readiness** | No hardcoded test data, all server events validate input, no unvalidated money or item exports, correct ensure order, top-level `README.md` plus a `README.md` per `som-*` resource. Fix the branding string inconsistency and rich presence (section 5.4). | Phase 8 complete. |
 
@@ -1045,7 +1045,49 @@ than new logic.
 **Unpaid fines currently do nothing.** Warrants, impound and licence suspension
 hang off `Config.Fines.lateAfterHours` and are Phase 5 work.
 
-### 14.10 Command minimisation
+### 14.10 Inventory visual rework (owner's direction, later stage)
+
+The current inventory is ox_inventory with a light reskin and reads as cheap.
+It needs a full visual rebuild so it feels custom, not themed.
+
+**Explicitly not a logic rewrite.** The locked decision in section 1 stands:
+ox_inventory keeps the anti-dupe machinery catalogued in 6.5, and only its web
+UI is replaced. That UI lives in `ox_inventory/web/`, so this becomes a **third
+patched area** in that resource alongside the som bridge and the scrollbar fix,
+and must be re-applied on upgrade.
+
+| Change | Notes |
+|---|---|
+| **Full visual rebuild** | Take inspiration from other inventories rather than reskinning this one. Must feel bespoke. |
+| **Drop the Give button** | Replaced by right-click. |
+| **Right-click context menu** | Use, Give, Throw at minimum. ox already has a `buttons` concept per item that this can build on. |
+| **Backpacks** | Increase carrying capacity. ox supports containers already (6.3), so this is a container item plus UI, not new inventory logic. |
+
+Watch out for: backpacks interacting with `som-theft` and police searches, since
+a container is a second place cash-adjacent goods can hide; and weight limits
+staying meaningful, or backpacks quietly remove the inventory constraint
+entirely.
+
+### 14.11 Pause menu (owner's direction, Phase 4)
+
+Replace the stock pause menu.
+
+| Element | Requirement |
+|---|---|
+| **Map first** | Opening pause shows the map, as every server does. Do not bury it behind a menu. |
+| **Custom map** | Street names and colours. **No postal codes.** |
+| **Settings NUI** | Settings, keybinds and the rest get their own SOM-styled interface rather than the GTA menu. |
+| **Overlay** | Light pink tint over the existing blur. |
+
+The map itself is a streamed asset (a minimap replacement), so it belongs in
+`[assets-streams]` and is sourced rather than authored. The overlay and settings
+UI are SOM code.
+
+Worth noting: the pause menu is one of the few places a **screen-space** UI is
+correct, since pausing is inherently out-of-world. It is not a candidate for the
+diegetic treatment in 14.3.
+
+### 14.12 Command minimisation
 
 Already covered in section 10, and it serves the same goal. Interaction-driven
 play is what separates a serious RP server from a menu simulator.

@@ -215,6 +215,16 @@ function Characters.Select(source, citizenid)
         GetPlayerEndpoint(source), license,
     })
 
+    -- Welcome gift, once per character.
+    --
+    -- Given on first load rather than at creation, because ox_inventory only
+    -- has an inventory to write into once the player is actually loaded.
+    -- Flagged in metadata so it cannot be farmed by relogging.
+    if not player.metadata.welcomed then
+        player:setMetadata('welcomed', true)
+        Characters.GiveWelcomeGift(source)
+    end
+
     TriggerEvent('som:server:playerLoaded', source, player.citizenid)
     TriggerClientEvent('som:client:playerLoaded', source, {
         citizenid = player.citizenid,
@@ -227,6 +237,40 @@ function Characters.Select(source, citizenid)
     })
 
     return true
+end
+
+---Hands a new character their starter items.
+---
+---Missing items are skipped with a warning rather than aborting: an item name
+---that does not exist in ox_inventory should not stop the rest of the gift, or
+---one typo leaves new players with nothing.
+---@param source number
+function Characters.GiveWelcomeGift(source)
+    local gift = Config.Characters.welcomeGift
+    if not gift or #gift == 0 then return end
+
+    if GetResourceState('ox_inventory') ~= 'started' then
+        print('[som-core] ox_inventory is not running, welcome gift skipped')
+        return
+    end
+
+    local given = 0
+    for _, entry in ipairs(gift) do
+        local ok = pcall(function()
+            return exports.ox_inventory:AddItem(source, entry.item, entry.count)
+        end)
+
+        if ok then
+            given = given + 1
+        else
+            print(('[som-core] welcome gift: item %s could not be given'):format(entry.item))
+        end
+    end
+
+    if given > 0 then
+        TriggerClientEvent('som:client:notify', source,
+            'You have received a gift', 'success', 8000)
+    end
 end
 
 ---Soft delete. The row is kept so the ledger keeps referential integrity.

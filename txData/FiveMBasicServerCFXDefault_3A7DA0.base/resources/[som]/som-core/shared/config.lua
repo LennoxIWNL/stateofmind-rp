@@ -11,6 +11,22 @@ Config.Characters = {
     maxSlots = 5,
     startingCash = 500,
     startingBank = 5000,
+    -- Given once, on character creation only. Enough to not be stranded:
+    -- a phone, ID, and basic food and water.
+    --
+    -- Deliberately the cheap consumables, not restaurant food. Player-run
+    -- restaurants need to be worth visiting, so the starter items should keep
+    -- someone alive without competing with them.
+    -- `sandwich` rather than bread: ox_inventory has no bread item, and
+    -- sandwich is the plain consumable. The burgershot_* items belong to the
+    -- player-run restaurant and should stay worth buying.
+    welcomeGift = {
+        { item = 'phone',    count = 1 },
+        { item = 'id_card',  count = 1 },
+        { item = 'water',    count = 10 },
+        { item = 'sandwich', count = 10 },
+    },
+
     -- Where a brand new character spawns before housing exists.
     -- LSIA upper deck. Mirrored in som-multichar Config.DefaultSpawn: the two
     -- must be changed together. The z is an estimate, see the note there.
@@ -49,6 +65,9 @@ Config.DefaultMetadata = {
     armor = 0,
     isdead = false,
     inlaststand = false,
+    -- Set once the welcome gift has been handed over, so it cannot be farmed
+    -- by relogging. Metadata keys not listed here are rejected by setMetadata.
+    welcomed = false,
     -- Restraint state. som-theft gates cash robbery on these, so they are
     -- framework state rather than something a job script keeps to itself.
     cuffed = false,

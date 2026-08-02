@@ -87,9 +87,12 @@ lib.addCommand('economy', {
     print(('treasury: %d'):format(exports['som-core']:getTreasury()))
 
     for _, b in ipairs(Business.GetAll()) do
+        -- oxmysql returns TINYINT(1) as a boolean, not 1, so comparing against
+        -- the number marked every business inactive including LSPD.
+        local active = b.active == true or b.active == 1
         print(('  %-14s %-10s %12d  %s'):format(
             b.name, b.funding, Business.GetBalance(b.name),
-            b.active == 1 and '' or '(inactive)'))
+            active and '' or '(inactive)'))
     end
 
     for _, m in ipairs(Market.GetAll()) do
