@@ -50,8 +50,13 @@ let the client decide what it is entitled to.
 **Full history, own account only.** The citizenid comes from `source`, never
 from the request, so a player cannot read anyone else's ledger.
 
-Every character gets a shareable account number (`SOM-0000-0000`) created lazily
-on first open. Collisions are retried, not assumed away.
+Every character gets a shareable account number created lazily on first open.
+Collisions are retried, not assumed away.
+
+**Identifiers are digits only.** Account numbers (`48271930`) and phone numbers
+(`555-1234`) carry no branded prefix. They get read aloud over voice, printed on
+yellowpages adverts and saved as contacts, and a `SOM-` in front reads as a
+script artefact rather than a number. This applies to every app added later.
 
 ### Sharing
 

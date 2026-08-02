@@ -21,6 +21,19 @@ Config.Replacement = {
 -- Bank app
 -- ---------------------------------------------------------------------------
 
+-- ---------------------------------------------------------------------------
+-- IDENTIFIER FORMATTING
+--
+-- Numbers players see and share, account numbers, phone numbers, anything read
+-- aloud or typed into an app, are DIGITS ONLY. No branded prefix.
+--
+-- In game these appear on yellowpages adverts, get read out over voice and get
+-- saved as contacts. A "SOM-" in front reads as a script artefact rather than a
+-- number, and breaks the illusion the rest of the phone is trying to build.
+--
+-- Applies to every app added later: contacts, calls, yellowpages, Twitter.
+-- ---------------------------------------------------------------------------
+
 Config.Bank = {
     -- How many ledger rows the app pulls. Full history, own account only.
     historyLimit = 100,

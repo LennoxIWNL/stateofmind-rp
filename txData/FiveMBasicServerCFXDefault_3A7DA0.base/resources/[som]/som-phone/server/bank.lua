@@ -20,10 +20,13 @@ local function ensureAccount(player)
 
     if existing then return existing.account_no end
 
-    -- Short, readable, and shareable out loud over voice. Collisions are
-    -- retried rather than assumed away.
+    -- Digits only, no prefix. In game these are read aloud, written on
+    -- yellowpages adverts and typed into the phone, and a branded prefix reads
+    -- as a script artefact rather than an account number.
+    --
+    -- Collisions are retried rather than assumed away.
     for _ = 1, 20 do
-        local candidate = ('SOM-%04d-%04d'):format(math.random(0, 9999), math.random(0, 9999))
+        local candidate = ('%08d'):format(math.random(10000000, 99999999))
 
         local taken = MySQL.scalar.await(
             'SELECT 1 FROM som_bank_accounts WHERE account_no = ?', { candidate })
