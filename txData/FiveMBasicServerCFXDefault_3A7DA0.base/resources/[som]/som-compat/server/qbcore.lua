@@ -72,6 +72,28 @@ function QBCore.Functions.GetIdentifier(source, idType)
     return nil
 end
 
+-- Useable items.
+--
+-- Legacy resources register item behaviour with CreateUseableItem. ox_inventory
+-- has no equivalent registry: it expects each item to declare a client.export
+-- or server.export in data/items.lua. Rather than force every preserved
+-- resource to be rewritten, keep the registry here and let the ox bridge look
+-- items up in it (see ox_inventory/modules/bridge/som/server.lua).
+local useableItems = {}
+
+function QBCore.Functions.CreateUseableItem(name, cb)
+    if type(name) ~= 'string' or type(cb) ~= 'function' then return end
+    useableItems[name] = cb
+end
+
+function QBCore.Functions.CanUseItem(name)
+    return useableItems[name]
+end
+
+exports('getUseableItem', function(name)
+    return useableItems[name]
+end)
+
 function QBCore.Functions.CreateCallback(name, cb)
     lib.callback.register(name, function(source, ...)
         -- QBCore callbacks take (source, cb, ...) and return by CALLING cb,

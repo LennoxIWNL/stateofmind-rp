@@ -85,10 +85,16 @@ SetTimeout(500, function()
 end)
 
 function server.UseItem(source, itemName, data)
-    -- som-core has no central item-use registry yet; item effects are declared
-    -- per item in data/items.lua via client.export / server.export. Returning
-    -- nil lets ox fall through to those.
-    return nil
+    -- New SOM code declares item behaviour per item in data/items.lua via
+    -- client.export / server.export, which ox handles itself.
+    --
+    -- Preserved third-party resources instead register through
+    -- QBCore.Functions.CreateUseableItem, so check som-compat's registry and
+    -- fall through to ox when there is no legacy handler.
+    if GetResourceState('som-compat') ~= 'started' then return nil end
+
+    local cb = exports['som-compat']:getUseableItem(itemName)
+    return cb and cb(source, data) or nil
 end
 
 ---@diagnostic disable-next-line: duplicate-set-field

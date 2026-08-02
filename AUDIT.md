@@ -651,7 +651,76 @@ The rebuild spec explicitly says not to guess silently on these:
 
 ---
 
-## 14. Build log
+## 14. Design principles (owner's direction, binding on all later phases)
+
+Recorded from the project owner. These are not suggestions to weigh later, they
+are the quality bar every phase is measured against.
+
+### 14.1 Quality target
+
+**NoPixel and Prodigy tier.** Professional, serious roleplay. If a system feels
+like a stock free script with a reskin, it is not done. This is the standard the
+rebuild exists to reach, and it outranks shipping speed.
+
+### 14.2 Research before building
+
+For every significant system, **study the best existing implementations first**,
+then write our own against som-core. Explicitly requested for police, and to be
+applied to most systems.
+
+The method is the one used in section 8 of this document: read 3 to 4
+implementations, write down what each does well and what it gets wrong, then
+author one clean resource. Do **not** merge several third-party scripts
+together. They are built against different frameworks with different state
+models and anti-exploit assumptions, and every seam becomes an inherited bug
+nobody understands.
+
+Sourcing rules:
+- Public repositories are readable. Most of the FiveM ecosystem is GPL-3, which
+  is fine to learn from and adapt for this server; keep attribution.
+- **Never** use escrowed or leaked paid scripts. Paid assets the owner has
+  actually purchased are fair game to study, since that is inside the licence.
+- Resources deleted in Phase 1 remain in git history and are free reference:
+  `git show <commit>:<path>`. For drugs alone that is `qb-weed`, `qb-drugs`,
+  `elixir-weedrun`, `BakiTelli_weed` and `qb-traphouse`, already reviewed in
+  section 8.8.
+
+### 14.3 Diegetic UI, the Prodigy feel
+
+Some interfaces should feel like they exist **inside the 3D world** rather than
+floating over the screen. The owner specifically cites Prodigy's casino: screens
+that read as physical objects in the scene.
+
+Apply this **only where it makes sense**, where the UI has a real physical
+anchor. Good candidates:
+
+| System | Diegetic treatment |
+|---|---|
+| Weed and drug growing | Plant status rendered at the plant, not a menu |
+| Casino | Table and machine displays as world screens |
+| Shops and vending | Screen on the actual machine |
+| Police MDT in a vehicle | Mounted laptop display |
+| ATMs and banking terminals | Screen on the prop |
+
+Keep conventional screen-space UI for things with no physical anchor: the
+inventory, the phone, character creation, notifications, the HUD.
+
+Implementation note for Phase 7: this means world-space rendering
+(`SetDrawOrigin`, scaleform, or a NUI surface projected onto the prop) rather
+than a fullscreen `ui_page`. It changes how those resources are built, so decide
+per system **before** writing the UI, not after.
+
+This raises the cost of every diegetic UI noticeably. That is accepted: the
+whole point of section 14.1 is that the bar is quality, not speed.
+
+### 14.4 Command minimisation
+
+Already covered in section 10, and it serves the same goal. Interaction-driven
+play is what separates a serious RP server from a menu simulator.
+
+---
+
+## 15. Build log
 
 ### Phase 2 started ahead of Phase 1 (additive, nothing deleted)
 
