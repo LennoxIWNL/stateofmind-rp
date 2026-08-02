@@ -131,8 +131,12 @@ Config.Camera = {
 Config.HiddenCoords  = vec4(-812.23, 182.54, 76.74, 156.5)
 
 -- Fallback spawn when a character has no stored position.
--- Mirrors som-core Config.Characters.defaultSpawn.
-Config.DefaultSpawn  = vec4(-1035.71, -2731.87, 12.86, 328.0)
+-- Mirrors som-core Config.Characters.defaultSpawn: change both together.
+--
+-- LSIA upper deck (departures). The z is an ESTIMATE, roughly 7m above the
+-- arrivals road the old default sat on. Stand where you actually want the
+-- spawn and press F11 to print exact coordinates, then paste them here.
+Config.DefaultSpawn  = vec4(-1035.71, -2731.87, 20.17, 328.0)
 
 -- Isolate each player into their own routing bucket during selection so nobody
 -- sees preview peds standing in the interior. Reset to 0 once loaded.

@@ -127,7 +127,11 @@ CreateThread(function()
 					usingRadio = lastRadioStatus,
 					talking = lastTalkingStatus
 				})
-				exports['elixir-hud']:talking(lastTalkingStatus, radioPressed)
+				-- SOM patch: was a hard export call into elixir-hud, which no
+				-- longer exists and threw on every voice state change. Emit an
+				-- event instead so any HUD can subscribe without pma-voice
+				-- depending on one by name.
+				TriggerEvent('som:client:voiceState', lastTalkingStatus, radioPressed)
 			end
 		end
 

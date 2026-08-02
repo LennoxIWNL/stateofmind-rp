@@ -115,9 +115,9 @@ function setRadioChannel(channel)
 	if GetConvarInt('voice_enableRadios', 1) ~= 1 then return end
 	type_check({ channel, "number" })
 	if channel ~= 0 then 
-		exports['elixir-hud']:radioenter(true)
+		TriggerEvent('som:client:radioState', true)
 	else 
-		exports['elixir-hud']:radioenter(false)
+		TriggerEvent('som:client:radioState', false)
 	end 
 	TriggerServerEvent('pma-voice:setPlayerRadio', channel)
 	radioChannel = channel
@@ -212,7 +212,7 @@ RegisterCommand('+radiotalk', function()
 						break
 					end
 					if shouldPlayAnimation and HasAnimDictLoaded("random@arrests") then
-						exports["elixir-hud"]:talking(true, true)
+						TriggerEvent('som:client:voiceState', true, true)
 						if not IsEntityPlayingAnim(PlayerPedId(), "random@arrests", "generic_radio_enter", 3) then
 							TaskPlayAnim(PlayerPedId(), "random@arrests", "generic_radio_enter", 8.0, 2.0, -1, 50, 2.0, false,
 								false,

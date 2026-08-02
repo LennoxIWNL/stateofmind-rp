@@ -413,18 +413,6 @@ body {
 
 .form__actions { display: flex; gap: 10px; margin-top: auto; padding-top: 6px; }
 
-/* --- Hints ------------------------------------------------------------- */
-
-.hints {
-    display: flex;
-    gap: 18px;
-    padding: 18px 3.2vw 0 0;
-    font-size: 0.7rem;
-    color: var(--som-text-mute);
-}
-
-.hints kbd { font-size: 0.64rem; padding: 2px 6px; }
-
 /* --- Motion ------------------------------------------------------------ */
 
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }

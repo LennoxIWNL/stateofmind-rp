@@ -66,6 +66,26 @@ RegisterCommand('somscene', function()
                 or 'Scene tuning OFF', active and 'success' or 'info')
 end, false)
 
+-- There is no `chat` resource in this server (only chat-theme-gtao, which is
+-- just a theme), so typed commands are unreachable. Bind to a key instead.
+-- Rebindable in FiveM settings under Key Bindings > FiveM.
+RegisterKeyMapping('somscene', 'SOM: toggle scene tuning', 'keyboard', 'F10')
+
+-- Prints the player's exact position, formatted to paste into a config. Saves
+-- guessing coordinates from the outside, which has a poor track record.
+RegisterCommand('somhere', function()
+    local ped = PlayerPedId()
+    local c = GetEntityCoords(ped)
+    local h = GetEntityHeading(ped)
+
+    print(('^5[som-multichar]^7 vec4(%.2f, %.2f, %.2f, %.2f)')
+        :format(c.x, c.y, c.z, h))
+    TriggerEvent('som:client:notify',
+        ('%.2f, %.2f, %.2f, %.2f  (printed to F8)'):format(c.x, c.y, c.z, h), 'success', 8000)
+end, false)
+
+RegisterKeyMapping('somhere', 'SOM: print my coordinates', 'keyboard', 'F11')
+
 CreateThread(function()
     while true do
         if not active then

@@ -7,7 +7,9 @@ Config.Characters = {
     startingCash = 500,
     startingBank = 5000,
     -- Where a brand new character spawns before housing exists.
-    defaultSpawn = vec4(-1035.71, -2731.87, 12.86, 328.0),
+    -- LSIA upper deck. Mirrored in som-multichar Config.DefaultSpawn: the two
+    -- must be changed together. The z is an estimate, see the note there.
+    defaultSpawn = vec4(-1035.71, -2731.87, 20.17, 328.0),
 }
 
 Config.Money = {
