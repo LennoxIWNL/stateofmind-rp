@@ -61,6 +61,11 @@ CreateThread(function()
             local jobDef = Jobs[job.name]
             local payment = job.payment or 0
 
+            -- Hard ceiling, applied here rather than trusted from config, so a
+            -- mistake in a job definition cannot flood the economy.
+            local ceiling = Config.Money.maxHourlyPaycheck
+            if ceiling and payment > ceiling then payment = ceiling end
+
             if payment > 0 and jobDef then
                 local eligible = job.onduty
                     or jobDef.offDutyPay

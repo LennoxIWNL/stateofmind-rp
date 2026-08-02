@@ -17,9 +17,16 @@ Config.Money = {
     -- Accounts a player may never move money into or out of directly.
     -- 'dirty' only changes through laundering in Phase 4.
     protected = { dirty = true },
-    -- Paycheck cadence in minutes. Payroll always debits a business account,
-    -- it never mints money. See som-core/server/money.lua.
-    paycheckInterval = 10,
+    -- Paychecks are HOURLY. Job `payment` values are therefore per hour, not
+    -- per tick, which makes them directly comparable to prices.
+    paycheckInterval = 60,
+
+    -- Absolute ceiling on paycheck income, enforced in payroll regardless of
+    -- what any job config claims. Nobody earns more than this per hour from
+    -- wages, ever. Commission and business profit sit outside it, but a salary
+    -- alone can never exceed this.
+    maxHourlyPaycheck = 5000,
+
     payOffDutyByDefault = false,
 }
 

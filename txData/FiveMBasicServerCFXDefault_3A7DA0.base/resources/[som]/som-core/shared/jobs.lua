@@ -7,8 +7,22 @@
 --   whitelisted job requires an approved application, no /setjob
 --   armoryGrade minimum grade for armoury access
 --   radio       radio channel assigned on duty
+--   commission  share of a sale the employee keeps, see below
 --
--- payment is per paycheck interval (Config.Money.paycheckInterval), not per hour.
+-- PAYMENT IS PER HOUR. Paychecks run hourly (Config.Money.paycheckInterval),
+-- and som-core caps every payout at Config.Money.maxHourlyPaycheck regardless
+-- of what is written here.
+--
+-- TWO KINDS OF JOB
+--
+-- Government work (police, EMS) pays a real salary, because there is nothing
+-- to sell and the city funds it.
+--
+-- Player-owned businesses pay a deliberately low base and make their money
+-- through `commission`: a share of each sale that employee personally makes.
+-- Standing around on the clock earns almost nothing; actually serving
+-- customers earns well. That is the incentive worth having, and it is why a
+-- burger flipper is on 300 an hour rather than a salary.
 
 Jobs = {
     unemployed = {
@@ -16,87 +30,92 @@ Jobs = {
         defaultDuty = true,
         offDutyPay = true,
         grades = {
-            [0] = { name = 'Unemployed', payment = 10 },
+            -- A floor, not a living. Enough to not be stranded.
+            [0] = { name = 'Unemployed', payment = 150 },
         },
     },
 
     police = {
-        label = 'Law Enforcement',
+        label = 'Los Santos Police Department',
         type = 'leo',
         business = 'lspd',
         whitelisted = true,
         defaultDuty = false,
         offDutyPay = false,
-        armoryGrade = 1,
+        armoryGrade = 0,
         radio = 1,
         grades = {
-            [0] = { name = 'Cadet', payment = 75 },
-            [1] = { name = 'Officer', payment = 100 },
-            [2] = { name = 'Sergeant', payment = 125 },
-            [3] = { name = 'Lieutenant', payment = 150 },
-            [4] = { name = 'Chief', payment = 200, isboss = true },
+            [0] = { name = 'Cadet', payment = 1200 },
+            [1] = { name = 'Officer', payment = 1800 },
+            [2] = { name = 'Sergeant', payment = 2400 },
+            [3] = { name = 'Lieutenant', payment = 3200 },
+            [4] = { name = 'Chief', payment = 4200, isboss = true },
         },
     },
 
     ambulance = {
-        label = 'Emergency Medical Services',
+        label = 'San Andreas Medical Services',
         type = 'ems',
-        business = 'pillbox',
+        business = 'ems',
         whitelisted = true,
         defaultDuty = false,
         offDutyPay = false,
         armoryGrade = 0,
         radio = 2,
         grades = {
-            [0] = { name = 'Trainee', payment = 75 },
-            [1] = { name = 'Paramedic', payment = 100 },
-            [2] = { name = 'Doctor', payment = 140 },
-            [3] = { name = 'Surgeon', payment = 170 },
-            [4] = { name = 'Chief of Medicine', payment = 200, isboss = true },
+            [0] = { name = 'Trainee', payment = 1200 },
+            [1] = { name = 'Paramedic', payment = 1800 },
+            [2] = { name = 'Doctor', payment = 2400 },
+            [3] = { name = 'Surgeon', payment = 3200 },
+            [4] = { name = 'Chief of Medicine', payment = 4200, isboss = true },
         },
     },
 
+    -- Player-owned from here down: low base, real money from commission.
     mechanic = {
-        label = 'Mechanic',
+        label = 'Los Santos Customs',
         business = 'lscustoms',
         whitelisted = true,
         defaultDuty = true,
         offDutyPay = false,
         radio = 3,
+        commission = 0.12,
         grades = {
-            [0] = { name = 'Apprentice', payment = 50 },
-            [1] = { name = 'Mechanic', payment = 80 },
-            [2] = { name = 'Lead Mechanic', payment = 110 },
-            [3] = { name = 'Owner', payment = 150, isboss = true },
+            [0] = { name = 'Apprentice', payment = 250 },
+            [1] = { name = 'Mechanic', payment = 300 },
+            [2] = { name = 'Lead Mechanic', payment = 380 },
+            [3] = { name = 'Owner', payment = 450, isboss = true },
         },
     },
 
-    -- Template civilian jobs. Copy either one to add a new civilian job:
-    -- no new resource is needed, only a new entry here plus locations in
-    -- som-jobs once Phase 5 lands.
+    -- Template civilian jobs. Copy either one to add a new civilian job: no
+    -- new resource is needed, only a new entry here plus locations in som-jobs
+    -- once Phase 5 lands.
     taxi = {
         label = 'Downtown Cab Co.',
         business = 'downtowncab',
         whitelisted = false,
         defaultDuty = true,
         offDutyPay = false,
+        commission = 0.20,
         grades = {
-            [0] = { name = 'Driver', payment = 40 },
-            [1] = { name = 'Dispatcher', payment = 60 },
-            [2] = { name = 'Manager', payment = 90, isboss = true },
+            [0] = { name = 'Driver', payment = 250 },
+            [1] = { name = 'Dispatcher', payment = 300 },
+            [2] = { name = 'Manager', payment = 400, isboss = true },
         },
     },
 
     delivery = {
-        label = 'Postal Delivery',
+        label = 'Post OP',
         business = 'postop',
         whitelisted = false,
         defaultDuty = true,
         offDutyPay = false,
+        commission = 0.18,
         grades = {
-            [0] = { name = 'Courier', payment = 40 },
-            [1] = { name = 'Driver', payment = 60 },
-            [2] = { name = 'Depot Manager', payment = 90, isboss = true },
+            [0] = { name = 'Courier', payment = 250 },
+            [1] = { name = 'Driver', payment = 300 },
+            [2] = { name = 'Depot Manager', payment = 400, isboss = true },
         },
     },
 }

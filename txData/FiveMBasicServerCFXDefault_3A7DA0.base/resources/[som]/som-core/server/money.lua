@@ -334,6 +334,37 @@ function Money.GetTreasury()
     return MySQL.scalar.await('SELECT balance FROM som_treasury WHERE id = 1') or 0
 end
 
+---Signed treasury movement, for spending as well as collecting.
+---
+---TaxToTreasury only accepts positive amounts, so paying a city budget out
+---needs its own path rather than a negative tax, which would silently fail.
+---@param delta number signed, negative to spend
+---@param reason string
+---@return boolean success, string|nil err
+function Money.TreasuryTransact(delta, reason)
+    local value = tonumber(delta)
+    if not value or value ~= value or value % 1 ~= 0 or value == 0 then
+        return false, 'invalid amount'
+    end
+
+    local balance = Money.GetTreasury() + value
+    if balance < 0 then return false, 'insufficient treasury funds' end
+
+    MySQL.update.await('UPDATE som_treasury SET balance = ? WHERE id = 1', { balance })
+    MySQL.insert.await([[
+        INSERT INTO som_transactions
+            (citizenid, account, amount, balance, direction, flow, reason, resource)
+        VALUES (NULL, 'bank', ?, ?, ?, ?, ?, ?)
+    ]], {
+        math.abs(value), balance,
+        value > 0 and 'credit' or 'debit',
+        value > 0 and 'sink' or 'faucet',
+        reason or 'treasury', callerResource(),
+    })
+
+    return true
+end
+
 -- ---------------------------------------------------------------------------
 -- Exports. Server side only: a client cannot invoke a server export.
 -- ---------------------------------------------------------------------------
@@ -347,3 +378,4 @@ exports('transferMoney', Money.Transfer)
 exports('businessTransact', Money.BusinessTransact)
 exports('taxToTreasury', Money.TaxToTreasury)
 exports('getTreasury', Money.GetTreasury)
+exports('treasuryTransact', Money.TreasuryTransact)
