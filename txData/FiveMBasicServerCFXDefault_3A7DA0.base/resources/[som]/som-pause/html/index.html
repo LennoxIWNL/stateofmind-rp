@@ -9,152 +9,48 @@
 </head>
 <body>
     <div id="root" class="root hidden">
-        <!-- Pink wash over the blurred world. On the map tab this collapses to
-             a cutout so the map itself stays untinted. -->
+        <!-- Pink wash over the blurred world. The only colour layer: the native
+             beige one is avoided by suppressing the native menu entirely. -->
         <div id="tint" class="tint"></div>
 
-        <header class="topbar">
-            <div class="brand">
-                <span class="brand__mark">SOM</span>
-                <span class="brand__name" id="server-name">State of Mind RP</span>
+        <header class="bar">
+            <div class="bar__brand">
+                <img id="logo" class="bar__logo"
+                     src="https://cfx-nui-som-assets/img/som-logo.png" alt="">
+                <span id="server-name" class="bar__name">State of Mind RP</span>
             </div>
 
-            <div class="meta">
-                <div class="meta__item">
+            <div class="bar__meta">
+                <div class="meta">
                     <span class="meta__label">Playing as</span>
                     <span class="meta__value" id="meta-name">-</span>
                 </div>
-                <div class="meta__sep"></div>
-                <div class="meta__item">
+                <span class="meta__sep"></span>
+                <div class="meta">
+                    <span class="meta__label">Employment</span>
+                    <span class="meta__value">
+                        <span id="meta-job">-</span>
+                        <span id="meta-duty" class="badge hidden">On duty</span>
+                    </span>
+                </div>
+                <span class="meta__sep"></span>
+                <div class="meta">
                     <span class="meta__label">Online</span>
                     <span class="meta__value" id="meta-players">-</span>
                 </div>
-                <div class="meta__sep"></div>
-                <div class="meta__item">
+                <span class="meta__sep"></span>
+                <div class="meta">
                     <span class="meta__label">Local time</span>
                     <span class="meta__value" id="meta-clock">--:--</span>
                 </div>
             </div>
+
+            <nav class="bar__actions" id="actions"></nav>
         </header>
 
-        <div class="body">
-            <nav class="rail" id="rail"></nav>
-
-            <main class="panels">
-                <!-- MAP: the game map renders behind this panel through the
-                     cutout, so the only markup here is the frame and the
-                     destination list. -->
-                <section id="panel-map" class="panel panel--map hidden">
-                    <div class="map-window" id="map-window">
-                        <span class="map-window__corner map-window__corner--tl"></span>
-                        <span class="map-window__corner map-window__corner--tr"></span>
-                        <span class="map-window__corner map-window__corner--bl"></span>
-                        <span class="map-window__corner map-window__corner--br"></span>
-                    </div>
-
-                    <aside class="dest">
-                        <h2 class="dest__title">Set a waypoint</h2>
-                        <input id="dest-search" class="dest__search" type="text"
-                               placeholder="Search destinations" autocomplete="off">
-                        <div id="dest-list" class="dest__list"></div>
-                        <button id="dest-clear" class="btn btn--ghost btn--block" type="button">
-                            Clear waypoint
-                        </button>
-                    </aside>
-                </section>
-
-                <!-- CHARACTER -->
-                <section id="panel-character" class="panel hidden">
-                    <h1 class="panel__title">Character</h1>
-
-                    <div class="grid">
-                        <div class="card card--wide">
-                            <span class="card__label">Identity</span>
-                            <div class="identity">
-                                <span class="identity__name" id="char-name">-</span>
-                                <span class="identity__sub" id="char-sub">-</span>
-                            </div>
-                            <dl class="kv" id="char-kv"></dl>
-                        </div>
-
-                        <div class="card">
-                            <span class="card__label">Cash</span>
-                            <span class="card__value" id="char-cash">$0</span>
-                        </div>
-
-                        <div class="card">
-                            <span class="card__label">Bank</span>
-                            <span class="card__value" id="char-bank">$0</span>
-                        </div>
-
-                        <div class="card card--wide">
-                            <span class="card__label">Employment</span>
-                            <div class="job">
-                                <span class="job__title" id="char-job">Unemployed</span>
-                                <span class="badge hidden" id="char-duty">On duty</span>
-                            </div>
-                            <div class="chips" id="char-licences"></div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- SERVER -->
-                <section id="panel-server" class="panel hidden">
-                    <h1 class="panel__title">Server</h1>
-
-                    <div class="grid">
-                        <div class="card card--wide">
-                            <span class="card__label">Connected</span>
-                            <span class="card__value" id="server-players">-</span>
-                            <div class="bar"><span class="bar__fill" id="server-bar"></span></div>
-                        </div>
-
-                        <div class="card card--wide">
-                            <span class="card__label">Community</span>
-                            <span class="card__value card__value--sm" id="server-discord">-</span>
-                            <p class="card__note" id="server-tagline"></p>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- STAFF -->
-                <section id="panel-staff" class="panel hidden">
-                    <h1 class="panel__title">Staff</h1>
-                    <div class="grid">
-                        <div class="card card--wide">
-                            <span class="card__label">Permission tier</span>
-                            <span class="card__value" id="staff-tier">-</span>
-                            <p class="card__note">
-                                The full admin menu, inventory search, disconnect log and
-                                spectating arrive in som-admin.
-                            </p>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- DISCONNECT -->
-                <section id="panel-disconnect" class="panel hidden">
-                    <h1 class="panel__title">Disconnect</h1>
-
-                    <div class="confirm">
-                        <p class="confirm__lead">Leave the city?</p>
-                        <p class="confirm__note">
-                            Your character is saved on disconnect. Anything you are carrying
-                            stays with you, and any vehicle left out stays where you parked it.
-                        </p>
-                        <div class="confirm__actions">
-                            <button class="btn btn--danger" id="quit-btn" type="button">Disconnect</button>
-                            <button class="btn" data-tab-jump="map" type="button">Stay</button>
-                        </div>
-                    </div>
-                </section>
-            </main>
-        </div>
-
-        <footer class="footer">
-            <span class="hintkey"><span class="som-key">Esc</span> Resume</span>
-            <span class="hintkey"><span class="som-key">1</span>&ndash;<span class="som-key">5</span> Switch tab</span>
-            <span id="toast" class="footer__toast"></span>
+        <footer class="hints">
+            <span class="hint"><span class="som-key">Esc</span> Resume</span>
+            <span class="hint"><span class="som-key">1</span>&ndash;<span class="som-key">3</span> Actions</span>
         </footer>
     </div>
 

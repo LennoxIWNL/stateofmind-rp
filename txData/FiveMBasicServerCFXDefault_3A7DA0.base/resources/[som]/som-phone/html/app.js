@@ -24,6 +24,45 @@ function post(endpoint, body) {
 
 const money = (n) => `$${Number(n || 0).toLocaleString('en-US')}`;
 
+/* Colour maths in JS rather than color-mix() in CSS. FiveM's CEF predates
+ * color-mix, and a rejected background declaration falls back to nothing, which
+ * is what turned the wallpaper and every app tile black. */
+function parseHex(hex) {
+    const h = String(hex || '').replace('#', '').trim();
+    const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+    const n = parseInt(full, 16);
+    return Number.isNaN(n) || full.length !== 6
+        ? { r: 255, g: 20, b: 147 }
+        : { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+const rgba = (c, a) => `rgba(${c.r}, ${c.g}, ${c.b}, ${a})`;
+
+/**
+ * @param {{r:number,g:number,b:number}} c
+ * @param {number} amount -1 fully dark, 1 fully light
+ */
+function shade(c, amount) {
+    const t = amount < 0 ? 0 : 255;
+    const p = Math.abs(amount);
+    const mix = (v) => Math.round((t - v) * p + v);
+    return `rgb(${mix(c.r)}, ${mix(c.g)}, ${mix(c.b)})`;
+}
+
+const digits = (s) => String(s || '').replace(/\D/g, '');
+
+/** Keeps a text field to digits without the spinner arrows type=number draws. */
+function numericOnly(input) {
+    input.addEventListener('input', () => {
+        const clean = digits(input.value);
+        if (clean !== input.value) {
+            const at = input.selectionStart - (input.value.length - clean.length);
+            input.value = clean;
+            input.setSelectionRange(Math.max(0, at), Math.max(0, at));
+        }
+    });
+}
+
 function el(tag, cls, text) {
     const node = document.createElement(tag);
     if (cls) node.className = cls;
@@ -55,10 +94,14 @@ const ICONS = {
 
 /**
  * @param {string} name icon key, or any string to fall back to a glyph
- * @param {string} cls
+ * @param {string} [cls]
+ * @param {string} [stroke] explicit colour; defaults to inheriting. App tiles
+ *   pass one because an inherited colour depends on a cascade that a single
+ *   rejected declaration elsewhere can quietly break, which is how they ended
+ *   up invisible. Row and theme icons want the inherited colour.
  * @returns {SVGElement|HTMLElement}
  */
-function icon(name, cls) {
+function icon(name, cls, stroke) {
     const path = ICONS[name];
     if (!path) {
         // Third-party apps registering an emoji or letter still render.
@@ -68,7 +111,7 @@ function icon(name, cls) {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 24 24');
     svg.setAttribute('fill', 'none');
-    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke', stroke || 'currentColor');
     svg.setAttribute('stroke-width', '1.9');
     svg.setAttribute('stroke-linecap', 'round');
     svg.setAttribute('stroke-linejoin', 'round');
@@ -84,7 +127,13 @@ function showView(id) {
 
 function applyTheme(name) {
     const theme = themes[name] || themes.default;
-    root.style.setProperty('--accent', theme ? theme.accent : '#ff1493');
+    const hex = (theme && theme.accent) || '#ff1493';
+    const c = parseHex(hex);
+
+    root.style.setProperty('--accent', hex);
+    root.style.setProperty('--accent-soft', rgba(c, 0.55));
+    root.style.setProperty('--accent-wash', rgba(c, 0.32));
+    root.style.setProperty('--accent-deep', rgba(c, 0.46));
 }
 
 function toast(text, isError) {
@@ -119,13 +168,13 @@ function renderApps(apps) {
         btn.style.animationDelay = `${35 * i}ms`;
 
         const tile = el('span', 'app__icon');
-        const c = app.colour || '#ff1493';
-        // Two-stop gradient off the registered colour, so an app only has to
+        const c = parseHex(app.colour || '#ff1493');
+        // Three-stop gradient off the registered colour, so an app only has to
         // declare one value but still gets a lit tile rather than a flat swatch.
         tile.style.background =
-            `linear-gradient(155deg, color-mix(in srgb, ${c} 62%, #fff) 0%, ${c} 52%, ` +
-            `color-mix(in srgb, ${c} 72%, #000) 100%)`;
-        tile.appendChild(icon(app.icon, 'app__icon--glyph'));
+            `linear-gradient(155deg, ${shade(c, 0.38)} 0%, rgb(${c.r}, ${c.g}, ${c.b}) 52%, ` +
+            `${shade(c, -0.28)} 100%)`;
+        tile.appendChild(icon(app.icon, 'app__icon--glyph', '#fff'));
 
         const count = badges[app.id];
         if (count) tile.appendChild(el('span', 'app__badge', count > 99 ? '99+' : String(count)));
@@ -262,22 +311,44 @@ function renderBills() {
     wrap.replaceChildren(list);
 }
 
-function renderAccountOptions() {
+/**
+ * Saved accounts as chips beside a free-text field, not a dropdown. The number
+ * is always typeable: billing needs a recently shared account, but sending does
+ * not, and a select would have made both look like the same locked list.
+ */
+function renderAccountPicks(wrapId, inputId, emptyText) {
+    const wrap = document.getElementById(wrapId);
+    const input = document.getElementById(inputId);
     const saved = bank.saved || [];
-    const build = () =>
-        saved.length
-            ? saved.map((s) => {
-                  const o = document.createElement('option');
-                  o.value = s.account_no;
-                  o.textContent = `${s.label} (${s.account_no})`;
-                  return o;
-              })
-            : [Object.assign(document.createElement('option'), {
-                  value: '', textContent: 'Nobody has shared their account with you',
-              })];
 
-    document.getElementById('bill-account').replaceChildren(...build());
-    document.getElementById('send-account').replaceChildren(...build());
+    if (!saved.length) {
+        wrap.replaceChildren(el('div', 'picks__empty', emptyText));
+        return;
+    }
+
+    const frag = document.createDocumentFragment();
+    saved.forEach((s) => {
+        const btn = el('button', 'pick');
+        btn.type = 'button';
+        btn.append(el('span', null, s.label), el('span', 'pick__no', s.account_no));
+
+        btn.addEventListener('click', () => {
+            input.value = s.account_no;
+            wrap.querySelectorAll('.pick').forEach((p) => p.classList.remove('is-active'));
+            btn.classList.add('is-active');
+        });
+
+        frag.appendChild(btn);
+    });
+
+    wrap.replaceChildren(frag);
+}
+
+function renderAccountOptions() {
+    renderAccountPicks('bill-picks', 'bill-account',
+        'Nobody has shared their account with you recently');
+    renderAccountPicks('send-picks', 'send-account',
+        'No saved accounts. Type any number to send.');
 }
 
 // --- Settings -----------------------------------------------------------
@@ -350,25 +421,35 @@ document.getElementById('bank-account').addEventListener('click', async () => {
     toast(res.success ? `Shared with ${res.shared} nearby` : (res.error || 'Could not share'), !res.success);
 });
 
+['bill-account', 'bill-amount', 'send-account', 'send-amount']
+    .forEach((id) => numericOnly(document.getElementById(id)));
+
 document.getElementById('bill-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const res = await post('createBill', {
-        accountNo: document.getElementById('bill-account').value,
-        amount: Number(document.getElementById('bill-amount').value),
+        accountNo: digits(document.getElementById('bill-account').value),
+        amount: Number(digits(document.getElementById('bill-amount').value)),
         reason: document.getElementById('bill-reason').value,
     });
     toast(res.success ? 'Bill sent' : (res.error || 'Could not send'), !res.success);
-    if (res.success) e.target.reset();
+    if (res.success) {
+        e.target.reset();
+        document.querySelectorAll('#bill-picks .pick').forEach((p) => p.classList.remove('is-active'));
+    }
 });
 
 document.getElementById('send-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const res = await post('transfer', {
-        accountNo: document.getElementById('send-account').value,
-        amount: Number(document.getElementById('send-amount').value),
+        accountNo: digits(document.getElementById('send-account').value),
+        amount: Number(digits(document.getElementById('send-amount').value)),
     });
     toast(res.success ? 'Transfer sent' : (res.error || 'Could not transfer'), !res.success);
-    if (res.success) { e.target.reset(); await loadBank(); }
+    if (res.success) {
+        e.target.reset();
+        document.querySelectorAll('#send-picks .pick').forEach((p) => p.classList.remove('is-active'));
+        await loadBank();
+    }
 });
 
 document.addEventListener('keydown', (e) => {

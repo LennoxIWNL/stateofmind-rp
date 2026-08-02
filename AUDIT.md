@@ -1073,16 +1073,25 @@ entirely.
 The stock ox_inventory icon set is illustrated, and the server already had a
 partial set of photoreal ones, so the inventory looked like two different games.
 
-133 icons replaced from two public GPL-3.0 sources, `TenTypeeek/OX_inventory-reimagined`
-and `aifazi/items-images`. Matching is by **exact filename**, plus a normalised
-pass (`body_cam` to `bodycam`) that excludes the `vehicles/` folder, since a tool
-called `cutter` matching a car photo named `Cutter` is exactly the failure that
-pass can produce.
+152 icons replaced from two public GPL-3.0 sources, `TenTypeeek/OX_inventory-reimagined`
+and `aifazi/items-images`, taking coverage to **205 of 605 declared items**.
+Matching is by exact filename, then normalised, then token containment, always
+excluding the `vehicles/` folder: a tool called `cutter` matching a car photo
+named `Cutter` is exactly the failure those passes produce.
 
-**471 items still have no realistic icon** and were left on the stock art rather
-than guessed at, because a wrong icon is worse than an inconsistent one. The list
-is `tools/inventory-icons-unmatched.txt`. Closing it needs either a pack dropped
-in under those exact filenames, or hand mapping.
+The remaining **250 on stock art and 150 with no image at all** could not be
+matched, and the grouping in `tools/inventory-icons-unmatched.txt` shows why:
+what is left is script-specific rather than generic. 44 burgershot menu items,
+38 weapon tint swatches, 35 attachments, 27 gem tiers, 23 tuning parts, 10 GPU
+models. No general-purpose pack carries those names.
+
+The near-misses were reviewed by hand and rejected: `stone` matched a stone
+hatchet, `diamond` a diamond-shaped key, and all three `weapontint_*` matched
+the same army tint. Those are different objects, not variants, so they stay on
+stock art. A wrong icon is worse than an inconsistent one.
+
+**150 items render blank** because no file exists for them at all. Most belong
+to resources not currently ensured, so nothing in game is affected yet.
 
 Not sourced from NoPixel, Prodigy or Echo icon packs: those are redistributed
 private assets, which the sourcing rule in this document excludes.
@@ -1106,7 +1115,21 @@ Worth noting: the pause menu is one of the few places a **screen-space** UI is
 correct, since pausing is inherently out-of-world. It is not a candidate for the
 diegetic treatment in 14.3.
 
-**Built as `som-pause`.** Resolved during the build:
+**Built as `som-pause`, then cut back to a bar.** The full custom menu was
+rejected on sight: too much chrome around things the game already does better,
+and it left the minimap expanded and repositioned with no restore, which put a
+large translucent map permanently on the HUD.
+
+What ships is a slim branded bar over the blurred, pink-tinted world. Map and
+Settings hand back to the native frontend with
+`ActivateFrontendMenu(FE_MENU_VERSION_MP_PAUSE, false, -1 | 6)`. **This resource
+no longer touches the minimap at all.**
+
+Two things that changes from the notes below: click-to-waypoint is back, because
+the native map is back, so `Config.Waypoints` and its destination list are gone.
+And the map is no longer drawn through a hole in the NUI.
+
+The original build notes, kept because the reasoning still applies:
 
 - The beige wash is drawn by the native frontend and no native recolours it, so
   the native menu is suppressed outright rather than skinned. The world blur is

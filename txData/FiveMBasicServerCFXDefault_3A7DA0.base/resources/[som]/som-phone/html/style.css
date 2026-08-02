@@ -10,6 +10,11 @@
  *
  * No external fonts, images or icon packs: NUI has no network access, so
  * every visual here is CSS or inline SVG.
+ *
+ * NO color-mix(). FiveM's CEF predates it, and a rejected background
+ * declaration falls back to nothing rather than to something duller, which is
+ * what turned the wallpaper and every app tile black. Tints are derived from
+ * the accent in JS and handed over as --accent-soft and --accent-deep.
  */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -30,6 +35,11 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 .root {
     --accent: var(--som-pink);
+    /* Overwritten by applyTheme with rgba derived from the accent. The
+     * fallbacks keep the phone readable if that ever fails to run. */
+    --accent-soft: rgba(255, 20, 147, 0.55);
+    --accent-wash: rgba(255, 20, 147, 0.32);
+    --accent-deep: rgba(255, 20, 147, 0.46);
     --glass: rgba(255, 255, 255, 0.08);
     --glass-line: rgba(255, 255, 255, 0.12);
     --ink-2: rgba(255, 255, 255, 0.62);
@@ -85,9 +95,9 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     inset: 0;
     z-index: 0;
     background:
-        radial-gradient(120% 80% at 12% 4%, color-mix(in srgb, var(--accent) 55%, transparent) 0%, transparent 58%),
+        radial-gradient(120% 80% at 12% 4%, var(--accent-soft) 0%, transparent 58%),
         radial-gradient(90% 70% at 96% 22%, rgba(140, 60, 220, 0.45) 0%, transparent 60%),
-        radial-gradient(120% 90% at 50% 108%, color-mix(in srgb, var(--accent) 32%, transparent) 0%, transparent 62%),
+        radial-gradient(120% 90% at 50% 108%, var(--accent-wash) 0%, transparent 62%),
         linear-gradient(175deg, #14101d 0%, #07060c 62%);
 }
 
@@ -228,6 +238,10 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     height: 62px;
     border-radius: 34%;
     color: #fff;
+    /* Solid fallback under the gradient JS sets inline. Without it, a rejected
+     * background leaves a transparent tile and the icon disappears into the
+     * wallpaper, which is exactly what color-mix did here. */
+    background: #2b2540;
     box-shadow:
         0 8px 18px -4px rgba(0, 0, 0, 0.65),
         inset 0 1px 0 rgba(255, 255, 255, 0.35),
@@ -235,8 +249,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     transition: transform 220ms cubic-bezier(.16, 1, .3, 1);
 }
 
-.app__icon svg { width: 30px; height: 30px; }
-.app__icon--glyph { font-size: 1.5rem; font-weight: 700; }
+.app__icon svg { width: 30px; height: 30px; color: #fff; stroke: #fff; }
+.app__icon--glyph { font-size: 1.5rem; font-weight: 700; color: #fff; }
 
 .app:hover .app__icon { transform: translateY(-4px) scale(1.05); }
 .app:active .app__icon { transform: scale(0.93); transition-duration: 90ms; }
@@ -307,7 +321,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     border-radius: 22px;
     background:
         linear-gradient(140deg,
-            color-mix(in srgb, var(--accent) 46%, transparent) 0%,
+            var(--accent-deep) 0%,
             rgba(90, 40, 140, 0.34) 48%,
             rgba(255, 255, 255, 0.05) 100%);
     border: 1px solid rgba(255, 255, 255, 0.14);
@@ -502,18 +516,54 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     border-color: var(--accent);
     background: rgba(255, 255, 255, 0.09);
 }
-.input option { background: #16121f; color: #fff; }
-
-select.input {
-    appearance: none;
-    background-image:
-        linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.5) 50%),
-        linear-gradient(135deg, rgba(255, 255, 255, 0.5) 50%, transparent 50%);
-    background-position: calc(100% - 19px) 55%, calc(100% - 13px) 55%;
-    background-size: 6px 6px;
-    background-repeat: no-repeat;
-    padding-right: 36px;
+.input--mono {
+    font-family: var(--som-font-mono);
+    font-size: 1rem;
+    letter-spacing: 0.12em;
 }
+
+/* Amount is typed, not stepped. type=number draws spinner arrows that no
+ * phone has, so these are text fields filtered to digits in JS. */
+.amount { position: relative; display: flex; align-items: center; }
+
+.amount__sign {
+    position: absolute;
+    left: 14px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--som-text-mute);
+    pointer-events: none;
+}
+
+.input--amount {
+    padding-left: 30px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Saved accounts, offered as chips rather than a native dropdown. A select
+ * renders as the operating system's own control and reads as a form, not a
+ * phone. */
+.picks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+.pick {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    padding: 6px 11px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--som-text);
+    font-size: 0.76rem;
+    transition: background 140ms ease, border-color 140ms ease;
+}
+.pick:hover { background: rgba(255, 255, 255, 0.12); }
+.pick.is-active { background: var(--accent); border-color: var(--accent); color: #0b0810; }
+.pick__no { font-family: var(--som-font-mono); font-size: 0.7rem; opacity: 0.75; }
+
+.picks__empty { font-size: 0.72rem; color: var(--som-text-mute); padding: 2px 2px; }
 
 .btn {
     padding: 13px 16px;

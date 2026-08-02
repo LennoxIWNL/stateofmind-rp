@@ -105,12 +105,18 @@
                                 <h3 class="section">Bill someone</h3>
                                 <form id="bill-form" class="form">
                                     <div class="field">
-                                        <label class="field__label" for="bill-account">Account</label>
-                                        <select id="bill-account" class="input"></select>
+                                        <label class="field__label" for="bill-account">Account number</label>
+                                        <input id="bill-account" class="input input--mono" inputmode="numeric"
+                                               maxlength="24" autocomplete="off" placeholder="00000000">
+                                        <div id="bill-picks" class="picks"></div>
                                     </div>
                                     <div class="field">
                                         <label class="field__label" for="bill-amount">Amount</label>
-                                        <input id="bill-amount" class="input" type="number" min="1" placeholder="0">
+                                        <div class="amount">
+                                            <span class="amount__sign">$</span>
+                                            <input id="bill-amount" class="input input--amount" inputmode="numeric"
+                                                   autocomplete="off" placeholder="0">
+                                        </div>
                                     </div>
                                     <div class="field">
                                         <label class="field__label" for="bill-reason">Reason</label>
@@ -123,18 +129,24 @@
                             <div id="tab-send" class="tabpane hidden">
                                 <form id="send-form" class="form">
                                     <div class="field">
-                                        <label class="field__label" for="send-account">Account</label>
-                                        <select id="send-account" class="input"></select>
+                                        <label class="field__label" for="send-account">Account number</label>
+                                        <input id="send-account" class="input input--mono" inputmode="numeric"
+                                               maxlength="24" autocomplete="off" placeholder="00000000">
+                                        <div id="send-picks" class="picks"></div>
                                     </div>
                                     <div class="field">
                                         <label class="field__label" for="send-amount">Amount</label>
-                                        <input id="send-amount" class="input" type="number" min="1" placeholder="0">
+                                        <div class="amount">
+                                            <span class="amount__sign">$</span>
+                                            <input id="send-amount" class="input input--amount" inputmode="numeric"
+                                                   autocomplete="off" placeholder="0">
+                                        </div>
                                     </div>
                                     <button class="btn btn--primary" type="submit">Transfer</button>
                                 </form>
                                 <p class="hint">
-                                    Transfers are instant and cannot be reversed. A bill has to be accepted,
-                                    which is safer for both sides.
+                                    Send to any account number. Transfers are instant and cannot be reversed,
+                                    so a bill is safer for both sides when you are owed money.
                                 </p>
                             </div>
                         </div>

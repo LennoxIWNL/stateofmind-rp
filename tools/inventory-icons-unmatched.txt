@@ -1,56 +1,26 @@
-# Items still on a stock illustrated icon
+# Items with a poor or missing inventory icon
 #
-# These declare an item in ox_inventory/data/items.lua but no same-named image
-# exists in either public realistic pack, so they were left alone rather than
-# guessed at. A wrong icon is worse than an inconsistent one.
+# 205 of 605 declared items now carry a photoreal icon.
+# This file is the remainder: 250 on stock illustrated art and
+# 150 with no image file at all, marked (m), which render blank.
 #
-# To close the gap, either drop a pack into ox_inventory/web/images/ using these
-# exact filenames, or map them by hand to a source path.
+# None of these could be matched against the public GPL packs already used:
+#   TenTypeeek/OX_inventory-reimagined   (168 images)
+#   aifazi/items-images                  (3,476 images)
 #
-# Sources already used, both public and GPL-3.0:
-#   TenTypeeek/OX_inventory-reimagined   web/images/
-#   aifazi/items-images                  categorised folders
+# The grouping below shows why. What is left is script-specific rather than
+# generic: a particular restaurant's menu, weapon tint swatches, tuning parts,
+# gem tiers, GPU models. No general-purpose pack carries those names, and
+# checked by hand, the near-misses were different objects (a stone hatchet for
+# `stone`, a diamond-shaped key for `diamond`), not variants.
 #
-1050gpu.png
-1060gpu.png
-1080gpu.png
-2080gpu.png
-3060gpu.png
-4090gpu.png
-accesstool.png
-advancedlockpick.png
-advancedrepairkit.png
-advscope_attachment.png
-anchor.png
-apple.png
-applecocktail.png
-armour.png
-arms.png
-axleparts.png
-baconegg.png
-bananacocktail.png
-bandageg.png
-bands.png
-bank_card.png
-bar.png
-barra-chocolate.png
-barra-manteiga.png
-barrel_attachment.png
-bass.png
-bellend_muzzle_brake.png
-bltsandwich.png
-boomcamo_attachment.png
-bottle.png
-bprooftires.png
-brakes1.png
-brakes2.png
-brakes3.png
-breathalyzer.png
-brushcamo_attachment.png
-bubble-amora.png
-bubble-menta.png
-bubble-morango.png
-bumper.png
+# To close it: drop a pack into ox_inventory/web/images/ using these exact
+# filenames. Items left alone stay on stock art deliberately, because a wrong
+# icon is worse than an inconsistent one.
+
+
+## burgershot (44)
+
 burgershot_bagbig.png
 burgershot_bagcoffe.png
 burgershot_baggoat.png
@@ -58,7 +28,6 @@ burgershot_bagsmall.png
 burgershot_bigcardboard.png
 burgershot_bigemptyglass.png
 burgershot_bigfrozenpotato.png
-burgershot_bigking.png
 burgershot_bleeder.png
 burgershot_bread.png
 burgershot_cheddar.png
@@ -77,8 +46,6 @@ burgershot_lavash.png
 burgershot_macaroon.png
 burgershot_matchaicecream.png
 burgershot_meat.png
-burgershot_patatob.png
-burgershot_patatos.png
 burgershot_sauce.png
 burgershot_shotnuggets.png
 burgershot_shotrings.png
@@ -98,308 +65,107 @@ burgershot_toy6.png
 burgershot_ubeicecream.png
 burgershot_unicornicecream.png
 burgershot_vanillaicecream.png
-c4_bomb.png
-cafe-uwu.png
-caixa-amoras.png
-caixa-morangos.png
-can.png
-car_armor.png
-car_door.png
-car_wheel.png
-carbon.png
-cash_bag.png
-casino_member.png
-casino_vip.png
-casinochips.png
-cctv_tablet.png
-cherry.png
-cherrycocktail.png
-cherrydrink.png
-cleanershovel.png
+
+## weapon tints (41)
+
+weapontint_0.png   (m)
+weapontint_1.png   (m)
+weapontint_2.png   (m)
+weapontint_3.png   (m)
+weapontint_4.png   (m)
+weapontint_5.png   (m)
+weapontint_6.png   (m)
+weapontint_7.png   (m)
+weapontint_mk2_0.png   (m)
+weapontint_mk2_1.png   (m)
+weapontint_mk2_10.png   (m)
+weapontint_mk2_11.png   (m)
+weapontint_mk2_12.png   (m)
+weapontint_mk2_13.png   (m)
+weapontint_mk2_14.png   (m)
+weapontint_mk2_15.png   (m)
+weapontint_mk2_16.png   (m)
+weapontint_mk2_17.png   (m)
+weapontint_mk2_18.png   (m)
+weapontint_mk2_19.png   (m)
+weapontint_mk2_2.png   (m)
+weapontint_mk2_20.png   (m)
+weapontint_mk2_21.png   (m)
+weapontint_mk2_22.png   (m)
+weapontint_mk2_23.png   (m)
+weapontint_mk2_24.png   (m)
+weapontint_mk2_25.png   (m)
+weapontint_mk2_26.png   (m)
+weapontint_mk2_27.png   (m)
+weapontint_mk2_28.png   (m)
+weapontint_mk2_29.png   (m)
+weapontint_mk2_3.png   (m)
+weapontint_mk2_30.png   (m)
+weapontint_mk2_31.png   (m)
+weapontint_mk2_32.png   (m)
+weapontint_mk2_4.png   (m)
+weapontint_mk2_5.png   (m)
+weapontint_mk2_6.png   (m)
+weapontint_mk2_7.png   (m)
+weapontint_mk2_8.png   (m)
+weapontint_mk2_9.png   (m)
+
+## attachments (35)
+
+advscope_attachment.png
+barrel_attachment.png
+bellend_muzzle_brake.png
+boomcamo_attachment.png
+brushcamo_attachment.png
 clip_attachment.png
-clothing.png
-codfish.png
-coffee_beans.png
-coffeebeans.png
-coke_small_brick.png
-cokebaggy.png
 comp_attachment.png
-copperore.png
-cupcake-chocolate.png
-cupcake-limao.png
-cupcake-morango.png
-customplate.png
-delivery_food.png
-diamond.png
-diamond_earring.png
-diamond_earring_silver.png
-diamond_necklace.png
-diamond_necklace_silver.png
-diamond_ring_silver.png
 digicamo_attachment.png
-dirty_cabbage.png
-dirty_coffee_beans.png
-dirty_orange.png
-dirty_potato.png
-dirty_tomato.png
-diving_fill.png
-dnatestkit.png
-dolphin.png
-drifttires.png
-drill.png
-drillbit.png
-drink-glass.png
-drugtestkit.png
 drum_attachment.png
-dust.png
-ears.png
-eblower.png
-electronickit.png
-emerald.png
-emerald_earring.png
-emerald_earring_silver.png
-emerald_necklace.png
-emerald_necklace_silver.png
-emerald_ring.png
-emerald_ring_silver.png
-emp_ammo.png
-empty_evidence_bag.png
-empty_weed_bag.png
-engine1.png
-engine2.png
-engine3.png
-engine4.png
-engine5.png
-exhaust.png
-externals.png
-extrato-baunilha.png
-extrato-menta.png
 fat_end_muzzle_brake.png
-filled_evidence_bag.png
-finger_scanner.png
-fingerprintreader.png
-fishicebox.png
-fishingboot.png
-fishingkey.png
-fishingloot.png
-fishinglootbig.png
-fishingtin.png
-fishtacklebox.png
 flashlight_attachment.png
 flat_muzzle_brake.png
-flounder.png
-forceps.png
-frango.png
-frasco-nutela.png
-garbage.png
-gatecrack.png
-gauze.png
-gelado-baunilha.png
-gelado-chocolate.png
-gelado-morango.png
 geocamo_attachment.png
-glasses.png
-gold_ring.png
-goldbar.png
-goldearring.png
-goldore.png
-goldpan.png
-graos-cafe.png
-green_phone.png
 grip_attachment.png
-gsrtestkit.png
-guide.png
-harness.png
-headlights.png
 heavy_duty_muzzle_brake.png
-heist_papers.png
-helmet.png
 holoscope_attachment.png
-hood.png
-horn.png
-ifaks.png
-inked_cash_bag.png
-internals.png
-iodine.png
-jeans.png
-killerwhale.png
-kiwi.png
-kiwicocktail.png
-kurkakola.png
 largescope_attachment.png
-latte-uwu.png
-leite-condensado.png
-lemondrink.png
 leopardcamo_attachment.png
-lighter.png
-limao.png
-limedrink.png
-limeyschocolate.png
-limeyschocolate2.png
-limeysdonut.png
-limeysdonut2.png
-limeysgum.png
-livery.png
-ltbacon.png
-ltbox.png
-ltbuns.png
-ltcheese.png
-ltcookies.png
-ltcroissant.png
-ltdonut.png
-lteggs.png
-ltlettuce.png
-ltmango.png
-ltmuffin.png
-ltraspberry.png
-ltstrawberry.png
-ltteabags.png
-lttomato.png
-luxuryfinish_attachment.png
-mackerel.png
-maplesyrup.png
-mask.png
-mastercard.png
-mdtcitation.png
-mechanic_tools.png
-mechboard.png
+luxuryfinish_attachment.png   (m)
 medscope_attachment.png
-meth.png
-milkshake-chocolate.png
-milkshake-morango.png
-miningdrill.png
-mininglaser.png
-muffin-chocolate.png
-newoil.png
-newsbmic.png
-newscam.png
-nikon.png
-nos.png
-noscan.png
-noscolour.png
-notepad.png
 nvscope_attachment.png
-orangedrink.png
-oranges.png
-package.png
-pacote-acucar.png
-pacote-farinha.png
-pacote-leite.png
-pacote-natas.png
-pacote-oreo.png
-paintcan.png
-paintingf.png
-paintingg.png
-pancakemix.png
-pancakesbb.png
-pancakesmaple.png
-panqueca-nutela.png
-panqueca-oreo.png
-paradisecocktail.png
-pastel-frango.png
 patriotcamo_attachment.png
-pearlscard.png
 perseuscamo_attachment.png
-phone_module.png
-pill.png
-police_guide.png
-powerbank.png
 precision_muzzle_brake.png
-radiator.png
-recyclablematerial.png
-rfid_disruptor.png
-rims.png
-rollcage.png
-rolls.png
-roof.png
-ruby.png
-ruby_earring.png
-ruby_earring_silver.png
-ruby_necklace.png
-ruby_necklace_silver.png
-ruby_ring.png
-ruby_ring_silver.png
-sapphire.png
-sapphire_earring.png
-sapphire_earring_silver.png
-sapphire_necklace.png
-sapphire_necklace_silver.png
-sapphire_ring.png
-sapphire_ring_silver.png
-screwdriverset.png
-sdcard.png
-sealedpackage.png
-seat.png
-security_card_01.png
-security_card_02.png
 sessantacamo_attachment.png
-sharkhammer.png
-sharktiger.png
-shitgpu.png
-shoes.png
-shovel.png
-silver_ring.png
-silverchain.png
-silverearring.png
-skirts.png
 skullcamo_attachment.png
 slanted_muzzle_brake.png
 smallscope_attachment.png
-smoothiema.png
-smoothieor.png
-smoothiera.png
-smoothiest.png
-snp_ammo.png
-sparetire.png
-sparkplugs.png
-spikespack.png
 split_end_muzzle_brake.png
-spoiler.png
-spray.png
-spray_remover.png
 squared_muzzle_brake.png
-stone.png
 suppressor_attachment.png
-surgical_gloves.png
-surgical_staple.png
-surgical_tray.png
-syphoningkit.png
-syringe.png
 tactical_muzzle_brake.png
-tape.png
-teapotcoffee.png
-teapotorange.png
-teapottea.png
-testburger.png
-thermalpast.png
 thermalscope_attachment.png
-thermite_bomb.png
-tint_supplies.png
-tirerepairkit.png
-tires.png
-toolbox.png
-torso.png
-transmission1.png
-transmission2.png
-transmission3.png
-transmission4.png
-trojan_usb.png
-trowel.png
-trunk.png
-tshirt.png
-tunerlaptop.png
-turbo.png
-uncut_diamond.png
-uncut_emerald.png
-uncut_ruby.png
-uncut_sapphire.png
+woodcamo_attachment.png
+zebracamo_attachment.png
+
+## vehicle parts (26)
+
+arms.png   (m)
+axleparts.png
+bprooftires.png
+brakes1.png
+brakes2.png
+brakes3.png
+bumper.png
+externals.png   (m)
+newoil.png   (m)
+radiator.png   (m)
+spoiler.png
 veh_armor.png
 veh_brakes.png
 veh_engine.png
 veh_exterior.png
 veh_interior.png
-veh_neons.png
-veh_plates.png
 veh_suspension.png
 veh_tint.png
 veh_toolbox.png
@@ -410,65 +176,258 @@ veh_xenons.png
 vehicletracker.png
 vehicletrackerscanner.png
 vehicletrackertablet.png
+
+## gems / ore (28)
+
+diamond.png
+diamond_earring.png
+diamond_earring_silver.png
+diamond_necklace.png
+diamond_necklace_silver.png
+diamond_ring_silver.png
+emerald.png
+emerald_earring.png
+emerald_earring_silver.png
+emerald_necklace.png
+emerald_necklace_silver.png
+emerald_ring_silver.png
+goldpan.png
+ruby.png
+ruby_earring.png
+ruby_earring_silver.png
+ruby_necklace.png
+ruby_necklace_silver.png
+ruby_ring_silver.png
+sapphire.png
+sapphire_earring.png
+sapphire_earring_silver.png
+sapphire_necklace_silver.png
+sapphire_ring_silver.png
+uncut_diamond.png
+uncut_emerald.png
+uncut_ruby.png
+uncut_sapphire.png
+
+## gpu / tech (10)
+
+1050gpu.png   (m)
+1060gpu.png   (m)
+1080gpu.png   (m)
+2080gpu.png   (m)
+3060gpu.png   (m)
+4090gpu.png   (m)
+accesstool.png   (m)
+powerbank.png
+shitgpu.png
+thermalpast.png
+
+## other (216)
+
+advancedrepairkit.png   (m)
+anchor.png
+bandageg.png   (m)
+bands.png   (m)
+bank_card.png
+bar.png   (m)
+barra-chocolate.png   (m)
+barra-manteiga.png   (m)
+bass.png
+breathalyzer.png   (m)
+bubble-amora.png   (m)
+bubble-menta.png   (m)
+bubble-morango.png   (m)
+c4_bomb.png   (m)
+cafe-uwu.png   (m)
+caixa-amoras.png   (m)
+caixa-morangos.png   (m)
+car_armor.png   (m)
+car_door.png
+car_wheel.png
+carbon.png
+cash_bag.png   (m)
+casino_member.png
+casino_vip.png
+cctv_tablet.png
+clothing.png   (m)
+codfish.png
+coffee_beans.png
+coffeebeans.png
+coke_small_brick.png
+cokebaggy.png   (m)
+copperore.png
+cupcake-chocolate.png   (m)
+cupcake-limao.png   (m)
+cupcake-morango.png   (m)
+customplate.png   (m)
+cutter.png   (m)
+delivery_food.png   (m)
+dirty_cabbage.png
+dirty_coffee_beans.png
+dirty_orange.png   (m)
+dirty_potato.png
+dirty_tomato.png
+diving_fill.png   (m)
+dnatestkit.png   (m)
+drifttires.png
+drillbit.png
+drugtestkit.png   (m)
+dust.png   (m)
+ears.png   (m)
+electronickit.png
+emp_ammo.png   (m)
+empty_evidence_bag.png
+empty_weed_bag.png   (m)
+engine1.png
+engine2.png
+engine3.png
+engine4.png
+engine5.png
+exhaust.png
+extrato-baunilha.png   (m)
+extrato-menta.png   (m)
+filled_evidence_bag.png   (m)
+fingerprintreader.png   (m)
+fishicebox.png
+fishingboot.png
+fishingkey.png
+fishingloot.png
+fishinglootbig.png
+fishingtin.png
+fishtacklebox.png
+flounder.png
+forceps.png   (m)
+frasco-nutela.png   (m)
+gatecrack.png   (m)
+gauze.png   (m)
+gelado-baunilha.png   (m)
+gelado-chocolate.png   (m)
+gelado-morango.png   (m)
+glasses.png   (m)
+gold_ring.png
+goldbar.png
+goldearring.png   (m)
+graos-cafe.png   (m)
+green_phone.png
+gsrtestkit.png   (m)
+guide.png   (m)
+headlights.png
+heist_papers.png
+horn.png
+ifaks.png   (m)
+inked_cash_bag.png   (m)
+internals.png
+iodine.png
+jeans.png   (m)
+killerwhale.png
+kurkakola.png   (m)
+latte-uwu.png   (m)
+leite-condensado.png   (m)
+limeysdonut.png   (m)
+livery.png
+ltbacon.png
+ltbuns.png
+ltcheese.png
+ltcookies.png
+ltdonut.png
+lteggs.png
+ltlettuce.png
+ltmuffin.png
+ltraspberry.png
+ltstrawberry.png
+ltteabags.png
+mackerel.png
+maplesyrup.png
+mastercard.png   (m)
+mdtcitation.png   (m)
+mechanic_tools.png
+mechboard.png
+milkshake-chocolate.png   (m)
+milkshake-morango.png   (m)
+miningdrill.png
+mininglaser.png
+muffin-chocolate.png   (m)
+newsbmic.png
+newscam.png
+nikon.png   (m)
+nos.png
+noscan.png
+noscolour.png
+notepad.png
+package.png
+pacote-acucar.png   (m)
+pacote-farinha.png   (m)
+pacote-leite.png   (m)
+pacote-natas.png   (m)
+pacote-oreo.png   (m)
+paintcan.png   (m)
+pancakesmaple.png
+panqueca-nutela.png   (m)
+panqueca-oreo.png   (m)
+pastel-frango.png   (m)
+pearlscard.png
+phone_module.png
+police_guide.png   (m)
+recyclablematerial.png
+rfid_disruptor.png
+rims.png
+rollcage.png
+rolls.png   (m)
+roof.png
+sdcard.png
+sealedpackage.png
+seat.png
+security_card_01.png
+security_card_02.png
+sharkhammer.png
+sharktiger.png
+shovel.png
+silver_ring.png
+silverchain.png
+silverearring.png   (m)
+skirts.png
+smoothiema.png
+smoothieor.png
+smoothiera.png
+smoothiest.png
+snp_ammo.png   (m)
+sparetire.png
+sparkplugs.png
+spikespack.png   (m)
+spray_remover.png
+stone.png
+surgical_gloves.png   (m)
+surgical_staple.png   (m)
+surgical_tray.png   (m)
+syphoningkit.png
+syringe.png   (m)
+teapotcoffee.png
+teapotorange.png
+teapottea.png
+testburger.png   (m)
+thermite_bomb.png   (m)
+tint_supplies.png
+tires.png
+torso.png   (m)
+transmission1.png
+transmission2.png
+transmission3.png
+transmission4.png
+trojan_usb.png   (m)
+trunk.png   (m)
+tshirt.png   (m)
+tunerlaptop.png   (m)
+turbo.png
 vpn.png
-waffle-nutela.png
-watermelon.png
-watermelondrink.png
-watermelonslice.png
-weapontint_0.png
-weapontint_1.png
-weapontint_2.png
-weapontint_3.png
-weapontint_4.png
-weapontint_5.png
-weapontint_6.png
-weapontint_7.png
-weapontint_mk2_0.png
-weapontint_mk2_1.png
-weapontint_mk2_10.png
-weapontint_mk2_11.png
-weapontint_mk2_12.png
-weapontint_mk2_13.png
-weapontint_mk2_14.png
-weapontint_mk2_15.png
-weapontint_mk2_16.png
-weapontint_mk2_17.png
-weapontint_mk2_18.png
-weapontint_mk2_19.png
-weapontint_mk2_2.png
-weapontint_mk2_20.png
-weapontint_mk2_21.png
-weapontint_mk2_22.png
-weapontint_mk2_23.png
-weapontint_mk2_24.png
-weapontint_mk2_25.png
-weapontint_mk2_26.png
-weapontint_mk2_27.png
-weapontint_mk2_28.png
-weapontint_mk2_29.png
-weapontint_mk2_3.png
-weapontint_mk2_30.png
-weapontint_mk2_31.png
-weapontint_mk2_32.png
-weapontint_mk2_4.png
-weapontint_mk2_5.png
-weapontint_mk2_6.png
-weapontint_mk2_7.png
-weapontint_mk2_8.png
-weapontint_mk2_9.png
-weed_ak47.png
-weed_ak47_seed.png
-weed_amnesia.png
-weed_amnesia_seed.png
-weed_ogkush.png
-weed_ogkush_seed.png
-weed_purplehaze.png
-weed_purplehaze_seed.png
-weed_skunk.png
-weed_skunk_seed.png
-weed_whitewidow.png
-weed_whitewidow_seed.png
-weedbud.png
+waffle-nutela.png   (m)
+weed_ak47_seed.png   (m)
+weed_amnesia_seed.png   (m)
+weed_ogkush.png   (m)
+weed_ogkush_seed.png   (m)
+weed_purplehaze.png   (m)
+weed_purplehaze_seed.png   (m)
+weed_skunk_seed.png   (m)
+weed_whitewidow.png   (m)
+weed_whitewidow_seed.png   (m)
 weedpackage.png
 wet_black_phone.png
 wet_blue_phone.png
@@ -476,9 +435,7 @@ wet_classic_phone.png
 wet_gold_phone.png
 wet_green_phone.png
 wet_greenlight_phone.png
-wet_phone.png
+wet_phone.png   (m)
 wet_pink_phone.png
 wet_red_phone.png
 wet_white_phone.png
-woodcamo_attachment.png
-zebracamo_attachment.png

@@ -82,6 +82,24 @@ Config.Bank = {
         -- A player may not have more than this many bills outstanding against
         -- them from one sender, which stops bill spam being used as harassment.
         maxPendingPerSender = 3,
+
+        -- Billing needs the target's account to have been shared with you, and
+        -- recently. Transfers deliberately do NOT: you can send money to any
+        -- number, but you cannot demand it from a stranger whose number you
+        -- happened to overhear a week ago.
+        requireShared = true,
+        sharedWindowHours = 24,
+
+        -- Billing yourself. Off in a normal economy, on here so a single player
+        -- can exercise the whole flow without a second character online.
+        allowSelf = true,
+
+        -- Bills raised with auto collection settle themselves if ignored. This
+        -- exists for police fines: refusing to open your phone should not be a
+        -- way to dodge one. Nothing sets it yet, som-police will.
+        autoCollectDays = 7,
+        -- How often the collector sweeps, in minutes.
+        autoCollectInterval = 15,
     },
 }
 

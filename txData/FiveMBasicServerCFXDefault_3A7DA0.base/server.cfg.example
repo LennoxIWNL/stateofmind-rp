@@ -109,16 +109,17 @@ ensure som-theft
 ensure som-economy
 ensure som-phone
 ensure som-pause
+ensure som-id
 
 # Interior shells for the character select scene. Started by name because dev
 # mode does not ensure [assets-streams], and without it the shell model does
 # not exist and som-multichar falls back to the plain world scene.
 ensure jordqn_free_shells
 
-# Coloured map with no street names, replacing minimap_main_map.gfx and the
-# minimap tiles. som-pause shows the real game map through a hole in its NUI,
-# so this is what that map looks like. 19MB, named explicitly because dev mode
-# skips the rest of [assets-streams].
+# Coloured map, replacing minimap_main_map.gfx and the minimap tiles. That is
+# both the minimap and the pause menu map, which som-pause now hands off to
+# rather than drawing itself. 19MB, named explicitly because dev mode skips the
+# rest of [assets-streams].
 ensure karma-minimap
 
 # som-compat answers exports['qb-core']:GetCoreObject() for preserved

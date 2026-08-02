@@ -72,9 +72,13 @@ function Bank.GetOverview(source)
         ORDER BY id DESC
     ]], { player.citizenid }) or {}
 
-    local saved = MySQL.query.await(
-        'SELECT account_no, label FROM som_phone_accounts WHERE citizenid = ? ORDER BY label',
-        { player.citizenid }) or {}
+    -- Only accounts still inside the billing window are offered as chips, so
+    -- the list matches what CreateBill will actually accept.
+    local saved = MySQL.query.await([[
+        SELECT account_no, label FROM som_phone_accounts
+        WHERE citizenid = ? AND saved_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)
+        ORDER BY label
+    ]], { player.citizenid, Config.Bank.bill.sharedWindowHours }) or {}
 
     return {
         accountNo = accountNo,
@@ -162,7 +166,28 @@ function Bank.CreateBill(source, accountNo, amount, reason)
         { accountNo, 'personal' })
 
     if not target or not target.owner then return false, 'no such account' end
-    if target.owner == player.citizenid then return false, 'cannot bill yourself' end
+
+    local isSelf = target.owner == player.citizenid
+    if isSelf and not Config.Bank.bill.allowSelf then
+        return false, 'cannot bill yourself'
+    end
+
+    -- Billing needs the number to have been shared with you, and recently.
+    -- Transfers deliberately do not: sending money to a stranger is generous,
+    -- demanding it from one whose number you overheard is not.
+    --
+    -- Self-billing skips the check because you cannot share with yourself.
+    if Config.Bank.bill.requireShared and not isSelf then
+        local shared = MySQL.scalar.await([[
+            SELECT 1 FROM som_phone_accounts
+            WHERE citizenid = ? AND account_no = ?
+              AND saved_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)
+        ]], { player.citizenid, accountNo, Config.Bank.bill.sharedWindowHours })
+
+        if not shared then
+            return false, 'they have not shared that account with you recently'
+        end
+    end
 
     -- Cap outstanding bills from one sender, so billing cannot be used as
     -- harassment by flooding somebody's phone.
@@ -222,19 +247,27 @@ function Bank.PayBill(source, billId)
         if not paid then return false, 'insufficient funds' end
 
         exports['som-economy']:recordBusinessRevenue(bill.business, bill.amount)
-    else
-        local recipient = exports['som-core']:getPlayerByCitizenId(bill.from_citizenid)
-        if not recipient then
-            return false, 'the sender is not online to receive payment'
-        end
 
-        local ok, err = exports['som-core']:transferMoney(
-            source, recipient.source, 'bank', bill.amount, ('bill:%d'):format(bill.id))
+    elseif bill.from_citizenid == bill.to_citizenid then
+        -- Self-billing exists so one person can exercise the whole flow. No
+        -- money moves, because debiting and crediting the same account is a
+        -- no-op that would only add two confusing ledger rows.
+        TriggerClientEvent('som:client:notify', source,
+            'Bill settled against your own account', 'success')
+
+    else
+        -- Paid by citizenid, so the sender does not have to be online to be
+        -- owed money. som-core credits an offline character directly.
+        local ok, err = exports['som-core']:transferToCitizen(
+            source, bill.from_citizenid, 'bank', bill.amount, ('bill:%d'):format(bill.id))
         if not ok then return false, err or 'transfer failed' end
 
-        TriggerClientEvent('som:client:notify', recipient.source,
-            ('Bill paid: $%s'):format(bill.amount), 'success')
-        TriggerClientEvent('som-phone:client:refresh', recipient.source)
+        local recipient = exports['som-core']:getPlayerByCitizenId(bill.from_citizenid)
+        if recipient then
+            TriggerClientEvent('som:client:notify', recipient.source,
+                ('Bill paid: $%s'):format(bill.amount), 'success')
+            TriggerClientEvent('som-phone:client:refresh', recipient.source)
+        end
     end
 
     MySQL.update.await(
@@ -242,6 +275,56 @@ function Bank.PayBill(source, billId)
         { 'paid', bill.id })
 
     return true
+end
+
+---Settles overdue bills that were raised with auto collection.
+---
+---This exists for police fines. A fine is not an offer, so refusing to open
+---your phone cannot be a way to dodge one. Ordinary player-to-player bills
+---never set auto_collect and are unaffected: they stay pending forever until
+---accepted or declined.
+---
+---Balances may go negative here. That is intentional and is the debt, not a
+---bug: som-core's transaction bus refuses to overdraw, so anything it rejects
+---is left pending and retried on the next sweep.
+function Bank.CollectOverdue()
+    local due = MySQL.query.await([[
+        SELECT id, to_citizenid, from_citizenid, business, amount
+        FROM som_phone_bills
+        WHERE status = 'pending' AND auto_collect = 1
+          AND due_at IS NOT NULL AND due_at <= NOW()
+        ORDER BY id
+        LIMIT 100
+    ]]) or {}
+
+    for _, bill in ipairs(due) do
+        local ok
+
+        if bill.business then
+            ok = exports['som-core']:removeMoney(bill.to_citizenid, 'bank', bill.amount,
+                ('bill-auto:%d'):format(bill.id))
+
+            if ok then exports['som-economy']:recordBusinessRevenue(bill.business, bill.amount) end
+        else
+            ok = exports['som-core']:transferToCitizen(bill.to_citizenid, bill.from_citizenid,
+                'bank', bill.amount, ('bill-auto:%d'):format(bill.id))
+        end
+
+        if ok then
+            MySQL.update.await([[
+                UPDATE som_phone_bills
+                SET status = 'paid', settled_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ]], { bill.id })
+
+            local debtor = exports['som-core']:getPlayerByCitizenId(bill.to_citizenid)
+            if debtor then
+                TriggerClientEvent('som:client:notify', debtor.source,
+                    ('$%s was collected for an unpaid bill'):format(bill.amount), 'error', 10000)
+                TriggerClientEvent('som-phone:client:refresh', debtor.source)
+            end
+        end
+    end
 end
 
 ---@param source number
@@ -260,6 +343,11 @@ function Bank.DeclineBill(source, billId)
     return true
 end
 
+---Sends money to any account number.
+---
+---Deliberately NOT gated on the account having been shared with you. Knowing
+---somebody's number is enough to pay them, the same way it is in real life;
+---the restriction belongs on billing, which takes money rather than giving it.
 ---@param source number
 ---@param accountNo string
 ---@param amount number
@@ -267,6 +355,8 @@ end
 function Bank.Transfer(source, accountNo, amount)
     local player = exports['som-core']:getPlayer(source)
     if not player then return false, 'not loaded' end
+
+    if type(accountNo) ~= 'string' or accountNo == '' then return false, 'invalid account' end
 
     amount = math.floor(tonumber(amount) or 0)
     if amount < 1 then return false, 'invalid amount' end
@@ -278,17 +368,19 @@ function Bank.Transfer(source, accountNo, amount)
     if not target or not target.owner then return false, 'no such account' end
     if target.owner == player.citizenid then return false, 'cannot transfer to yourself' end
 
-    local recipient = exports['som-core']:getPlayerByCitizenId(target.owner)
-    if not recipient then return false, 'they are not online' end
-
-    local ok, err = exports['som-core']:transferMoney(
-        source, recipient.source, 'bank', amount, 'phone-transfer')
+    -- By citizenid, so the recipient does not have to be in the city to be
+    -- paid. som-core writes the balance and ledger row directly when offline.
+    local ok, err = exports['som-core']:transferToCitizen(
+        source, target.owner, 'bank', amount, 'phone-transfer')
     if not ok then return false, err or 'transfer failed' end
 
-    TriggerClientEvent('som:client:notify', recipient.source,
-        ('Received $%s from %s %s'):format(amount, player.charinfo.firstname, player.charinfo.lastname),
-        'success')
-    TriggerClientEvent('som-phone:client:refresh', recipient.source)
+    local recipient = exports['som-core']:getPlayerByCitizenId(target.owner)
+    if recipient then
+        TriggerClientEvent('som:client:notify', recipient.source,
+            ('Received $%s from %s %s'):format(amount, player.charinfo.firstname, player.charinfo.lastname),
+            'success')
+        TriggerClientEvent('som-phone:client:refresh', recipient.source)
+    end
 
     return true
 end

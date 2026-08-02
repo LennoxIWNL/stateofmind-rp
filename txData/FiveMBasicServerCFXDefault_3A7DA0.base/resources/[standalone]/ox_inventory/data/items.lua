@@ -919,12 +919,17 @@ return {
 		description = 'Ammo for EMP Launcher',
 	},
 
+	-- SOM PATCH: identity documents are shown to players nearby by som-id.
+	-- Re-apply these three client.export lines after an ox_inventory upgrade.
 	['id_card'] = {
 		label = 'ID Card',
 		weight = 0,
 		stack = false,
 		close = false,
 		description = 'A card containing all your information to identify yourself',
+		client = {
+			export = 'som-id.useIdCard',
+		},
 	},
 
 	['idcard'] = {
@@ -944,6 +949,9 @@ return {
 		stack = false,
 		close = false,
 		description = 'Permit to show you can drive a vehicle',
+		client = {
+			export = 'som-id.useDriverLicense',
+		},
 	},
 
 	['lawyerpass'] = {
@@ -960,7 +968,8 @@ return {
 		stack = false,
 		description = 'Weapon License',
 		client = {
-			image = 'weapon_license.png'
+			image = 'weapon_license.png',
+			export = 'som-id.useWeaponLicense',
 		},
 	},
 

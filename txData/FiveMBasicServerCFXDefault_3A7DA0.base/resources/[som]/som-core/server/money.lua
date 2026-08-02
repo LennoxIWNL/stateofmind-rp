@@ -202,6 +202,108 @@ function Money.Transfer(fromRef, toRef, account, amount, reason)
     return true
 end
 
+---Credits a character who is not online, writing balance and ledger together.
+---
+---Offline characters have no in-memory money table, so transact() cannot serve
+---them. The database is the only state that exists for them, which makes this
+---the one place a balance is written without a loaded player.
+---@param citizenid string
+---@param account string
+---@param value number positive, already sanitised
+---@param reason string
+---@param opts table|nil
+---@return boolean success, string|nil err
+local function creditOffline(citizenid, account, value, reason, opts)
+    opts = opts or {}
+
+    local current = MySQL.scalar.await(
+        ('SELECT `%s` FROM som_character_money WHERE citizenid = ?'):format(account),
+        { citizenid })
+
+    if not current then return false, 'no such character' end
+
+    local balance = current + value
+
+    local ok, err = pcall(function()
+        MySQL.transaction.await({
+            {
+                query = ('UPDATE som_character_money SET `%s` = ? WHERE citizenid = ?'):format(account),
+                values = { balance, citizenid },
+            },
+            {
+                query = [[
+                    INSERT INTO som_transactions
+                        (citizenid, account, amount, balance, direction, flow, reason, resource, counterparty, business_id)
+                    VALUES (?, ?, ?, ?, 'credit', ?, ?, ?, ?, ?)
+                ]],
+                values = {
+                    citizenid, account, value, balance,
+                    opts.flow or 'transfer', reason,
+                    opts.resource or callerResource(), opts.counterparty, opts.businessId,
+                },
+            },
+        })
+    end)
+
+    if not ok then
+        print(('[som-core] offline credit failed for %s: %s'):format(citizenid, err))
+        return false, 'database error'
+    end
+
+    return true
+end
+
+---Transfers to a character by citizenid, online or not.
+---
+---Money.Transfer needs both sides loaded. Being paid should not depend on the
+---recipient happening to be in the city, so this falls through to a direct
+---database credit when they are away.
+---@param fromRef number|string sender
+---@param toCitizenId string
+---@param account string
+---@param amount number
+---@param reason string
+---@return boolean success, string|nil err
+function Money.TransferToCitizen(fromRef, toCitizenId, account, amount, reason)
+    if type(toCitizenId) ~= 'string' then return false, 'invalid recipient' end
+
+    local online = Players.GetByCitizenId(toCitizenId)
+    if online then
+        return Money.Transfer(fromRef, online.source, account, amount, reason)
+    end
+
+    local from = resolve(fromRef)
+    if not from then return false, 'player not found' end
+    if from.citizenid == toCitizenId then return false, 'cannot transfer to self' end
+    if not validAccount[account] then return false, 'invalid account' end
+    if Config.Money.protected[account] then return false, 'protected account' end
+
+    local value = sanitiseAmount(amount)
+    if not value then return false, 'invalid amount' end
+    if from.money[account] < value then return false, 'insufficient funds' end
+
+    local resource = callerResource()
+
+    local ok = transact(from, account, -value, reason, {
+        counterparty = toCitizenId, flow = 'transfer', resource = resource,
+    })
+    if not ok then return false, 'debit failed' end
+
+    local credited, err = creditOffline(toCitizenId, account, value, reason, {
+        counterparty = from.citizenid, resource = resource,
+    })
+
+    if not credited then
+        -- Put it back. The reversal is itself ledgered, so the failure is visible.
+        transact(from, account, value, 'transfer-reversal', {
+            counterparty = toCitizenId, flow = 'transfer', resource = resource,
+        })
+        return false, err or 'credit failed, reversed'
+    end
+
+    return true
+end
+
 ---Takes cash from one player and gives it to another.
 ---
 ---This is how cash gets robbed. Cash is not an item, so it cannot be dragged
@@ -375,6 +477,7 @@ exports('getMoney', Money.Get)
 exports('stealCash', Money.StealCash)
 exports('hasMoney', Money.Has)
 exports('transferMoney', Money.Transfer)
+exports('transferToCitizen', Money.TransferToCitizen)
 exports('businessTransact', Money.BusinessTransact)
 exports('taxToTreasury', Money.TaxToTreasury)
 exports('getTreasury', Money.GetTreasury)

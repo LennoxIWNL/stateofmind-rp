@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>som-id</title>
+    <link rel="stylesheet" href="https://cfx-nui-som-assets/tokens.css">
+    <link rel="stylesheet" href="https://cfx-nui-som-id/html/style.css">
+</head>
+<body>
+    <div id="root" class="root hidden">
+        <article class="card" id="card">
+            <header class="card__head">
+                <div>
+                    <h1 class="card__title" id="card-title">Identity Card</h1>
+                    <p class="card__issuer" id="card-issuer"></p>
+                </div>
+                <span class="card__seal" aria-hidden="true">SA</span>
+            </header>
+
+            <div class="card__body">
+                <div class="photo" id="photo">
+                    <!-- Silhouette. NUI cannot read the game's ped headshot
+                         texture, so a real photo has to come from a stored
+                         URL rather than from the client. -->
+                    <svg class="photo__mark" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <circle cx="12" cy="8" r="4"/>
+                        <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7z"/>
+                    </svg>
+                </div>
+
+                <dl class="fields" id="fields"></dl>
+            </div>
+
+            <footer class="card__foot">
+                <span class="card__strip" aria-hidden="true"></span>
+                <span class="card__status hidden" id="card-status"></span>
+            </footer>
+        </article>
+    </div>
+
+    <script src="https://cfx-nui-som-id/html/app.js"></script>
+</body>
+</html>

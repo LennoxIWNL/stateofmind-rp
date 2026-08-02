@@ -1,13 +1,12 @@
 /*
- * Pause menu.
+ * Pause bar.
  *
- * The native GTA pause menu is suppressed by the client, so nothing here sits
- * on top of it. That is deliberate: the beige frontend wash is part of the
- * native render and can only be removed by replacing the menu, not recoloured.
+ * The native pause menu is suppressed by the client, so nothing here sits on
+ * top of it. That is deliberate: the beige frontend wash is part of the native
+ * render and can only be removed by not drawing it, not recoloured.
  *
- * The world blur comes from TriggerScreenblurFadeIn. The tint below is the
- * only colour layer, and on the map tab it becomes a cutout so the map stays
- * readable.
+ * No color-mix() anywhere. FiveM's CEF predates it, and a rejected background
+ * declaration falls back to nothing rather than to something duller.
  */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,390 +27,151 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .root {
     --tint: rgba(255, 20, 147, 0.13);
     --line: rgba(255, 255, 255, 0.10);
-    --glass: rgba(16, 12, 22, 0.72);
     --ink-2: rgba(255, 255, 255, 0.66);
     --ink-3: rgba(255, 255, 255, 0.4);
 
     position: fixed;
     inset: 0;
-    display: flex;
-    flex-direction: column;
     animation: fade 180ms ease both;
 }
 
-/* Full-bleed wash. Hidden on the map tab, where .map-window paints the same
- * colour as a surround instead. */
 .tint { position: absolute; inset: 0; background: var(--tint); pointer-events: none; }
-.root.is-map .tint { background: transparent; }
 
-/* --- Top bar ------------------------------------------------------------ */
+/* --- Bar ---------------------------------------------------------------- */
 
-.topbar {
+.bar {
     position: relative;
-    z-index: 3;
-    flex: 0 0 auto;
-    height: 72px;
+    z-index: 2;
+    height: 78px;
     padding: 0 34px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    background: var(--glass);
+    gap: 34px;
+    background: rgba(14, 10, 20, 0.78);
     border-bottom: 1px solid var(--line);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
     backdrop-filter: blur(22px);
     animation: dropIn 320ms cubic-bezier(.16, 1, .3, 1) both;
 }
 
-.brand { display: flex; align-items: baseline; gap: 14px; }
+.bar__brand { display: flex; align-items: center; gap: 14px; flex: 0 0 auto; }
 
-.brand__mark {
-    font-size: 1.5rem;
-    font-weight: 800;
-    letter-spacing: 0.14em;
-    color: var(--som-pink);
-    text-shadow: 0 0 22px var(--som-pink-a61);
+.bar__logo {
+    height: 42px;
+    width: auto;
+    max-width: 150px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 14px var(--som-pink-a45));
 }
 
-.brand__name {
-    font-size: 0.86rem;
-    font-weight: 500;
+.bar__name {
+    font-size: 0.78rem;
+    font-weight: 600;
     letter-spacing: 0.2em;
     text-transform: uppercase;
     color: var(--ink-3);
+    white-space: nowrap;
 }
 
-.meta { display: flex; align-items: center; gap: 22px; }
-.meta__item { display: flex; flex-direction: column; gap: 2px; text-align: right; }
-.meta__sep { width: 1px; height: 26px; background: var(--line); }
-
-.meta__label {
-    font-size: 0.62rem;
-    font-weight: 600;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--ink-3);
-}
-.meta__value { font-size: 0.93rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-
-/* --- Body --------------------------------------------------------------- */
-
-.body { position: relative; z-index: 2; flex: 1; min-height: 0; display: flex; }
-
-/* --- Rail --------------------------------------------------------------- */
-
-.rail {
-    flex: 0 0 244px;
-    padding: 26px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    background: var(--glass);
-    border-right: 1px solid var(--line);
-    backdrop-filter: blur(22px);
-    animation: slideIn 340ms cubic-bezier(.16, 1, .3, 1) both;
-}
-
-.tab {
-    position: relative;
+.bar__meta {
+    flex: 1;
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 13px 16px;
-    border-radius: 12px;
-    color: var(--ink-2);
-    font-size: 0.95rem;
-    font-weight: 500;
-    text-align: left;
-    transition: background 160ms ease, color 160ms ease;
+    justify-content: flex-end;
+    gap: 22px;
+    min-width: 0;
 }
 
-.tab svg { width: 20px; height: 20px; flex: 0 0 auto; }
-.tab:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.meta { display: flex; flex-direction: column; gap: 2px; text-align: right; min-width: 0; }
+.meta__sep { width: 1px; height: 28px; background: var(--line); flex: 0 0 auto; }
 
-.tab.is-active {
-    background: linear-gradient(90deg, var(--som-pink-a25), rgba(255, 255, 255, 0.03));
-    color: #fff;
+.meta__label {
+    font-size: 0.6rem;
     font-weight: 600;
-}
-
-.tab.is-active::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 3px;
-    height: 22px;
-    border-radius: 0 3px 3px 0;
-    background: var(--som-pink);
-    box-shadow: 0 0 12px var(--som-pink);
-}
-
-.tab--danger.is-active { background: linear-gradient(90deg, rgba(255, 69, 58, 0.24), transparent); }
-.tab--danger.is-active::before { background: #ff453a; box-shadow: 0 0 12px #ff453a; }
-
-/* --- Panels ------------------------------------------------------------- */
-
-.panels { position: relative; flex: 1; min-width: 0; }
-
-.panel {
-    position: absolute;
-    inset: 0;
-    padding: 34px 40px;
-    overflow-y: auto;
-    animation: rise 260ms cubic-bezier(.16, 1, .3, 1) both;
-}
-.panel::-webkit-scrollbar { width: 6px; }
-.panel::-webkit-scrollbar-thumb { background: var(--som-pink-a45); border-radius: 3px; }
-
-.panel__title {
-    margin-bottom: 26px;
-    font-size: 1.9rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-}
-
-/* --- Map ---------------------------------------------------------------- */
-
-/* The map panel must not paint over the game map, so it has no padding and no
- * background of its own. */
-.panel--map { padding: 0; overflow: visible; pointer-events: none; }
-
-/* Position is written from Config.Map at runtime so the frame lines up with
- * wherever the expanded radar actually sits. The huge spread shadow is what
- * tints everything outside the frame without covering the map itself. */
-.map-window {
-    position: fixed;
-    border: 1px solid var(--som-pink-a45);
-    border-radius: 4px;
-    box-shadow:
-        0 0 0 100vmax var(--tint),
-        inset 0 0 40px rgba(0, 0, 0, 0.35);
-    pointer-events: none;
-}
-
-.map-window__corner {
-    position: absolute;
-    width: 18px;
-    height: 18px;
-    border: 2px solid var(--som-pink);
-}
-.map-window__corner--tl { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
-.map-window__corner--tr { top: -1px; right: -1px; border-left: 0; border-bottom: 0; }
-.map-window__corner--bl { bottom: -1px; left: -1px; border-right: 0; border-top: 0; }
-.map-window__corner--br { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
-
-.dest {
-    position: absolute;
-    top: 26px;
-    right: 32px;
-    z-index: 4;
-    width: 296px;
-    max-height: calc(100% - 52px);
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 20px;
-    border-radius: 16px;
-    background: rgba(14, 10, 20, 0.88);
-    border: 1px solid var(--line);
-    backdrop-filter: blur(24px);
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
-    pointer-events: auto;
-}
-
-.dest__title { font-size: 1rem; font-weight: 650; }
-
-.dest__search {
-    padding: 11px 13px;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid var(--line);
-    color: #fff;
-    font: inherit;
-    font-size: 0.87rem;
-}
-.dest__search::placeholder { color: var(--ink-3); }
-.dest__search:focus { outline: none; border-color: var(--som-pink); }
-
-.dest__list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
-.dest__list::-webkit-scrollbar { width: 4px; }
-.dest__list::-webkit-scrollbar-thumb { background: var(--som-pink-a45); border-radius: 2px; }
-
-.dest__group {
-    padding: 12px 4px 5px;
-    font-size: 0.63rem;
-    font-weight: 700;
     letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--ink-3);
 }
 
-.dest__item {
-    padding: 9px 12px;
-    border-radius: 9px;
-    font-size: 0.88rem;
-    text-align: left;
-    transition: background 140ms ease;
-}
-.dest__item:hover { background: var(--som-pink-a25); }
-.dest__item.is-set { color: var(--som-pink); font-weight: 600; }
-
-/* --- Cards -------------------------------------------------------------- */
-
-.grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-    max-width: 880px;
-}
-
-.card {
+.meta__value {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 22px 24px;
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.045);
-    border: 1px solid var(--line);
-    backdrop-filter: blur(14px);
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
-.card--wide { grid-column: 1 / -1; }
-
-.card__label {
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.17em;
-    text-transform: uppercase;
-    color: var(--ink-3);
-}
-
-.card__value { font-size: 1.8rem; font-weight: 650; font-variant-numeric: tabular-nums; }
-.card__value--sm { font-size: 1.05rem; font-weight: 600; }
-.card__note { font-size: 0.83rem; line-height: 1.6; color: var(--ink-3); }
-
-.identity { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
-.identity__name { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; }
-.identity__sub { font-size: 0.83rem; color: var(--ink-3); font-family: var(--som-font-mono); }
-
-.kv { display: grid; grid-template-columns: auto 1fr; gap: 8px 26px; font-size: 0.88rem; }
-.kv dt { color: var(--ink-3); }
-.kv dd { font-variant-numeric: tabular-nums; }
-
-.job { display: flex; align-items: center; gap: 12px; }
-.job__title { font-size: 1.25rem; font-weight: 650; }
 
 .badge {
-    padding: 3px 10px;
+    padding: 2px 8px;
     border-radius: 20px;
     background: rgba(48, 209, 88, 0.18);
     color: #30d158;
-    font-size: 0.7rem;
+    font-size: 0.62rem;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
 }
 
-.chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 6px; }
+/* --- Actions ------------------------------------------------------------ */
 
-.chip {
-    padding: 5px 12px;
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.07);
-    border: 1px solid var(--line);
-    font-size: 0.78rem;
-    text-transform: capitalize;
-}
-.chip--empty { color: var(--ink-3); background: none; border-style: dashed; }
+.bar__actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 
-.bar {
-    margin-top: 8px;
-    height: 6px;
-    border-radius: 3px;
-    background: rgba(255, 255, 255, 0.08);
-    overflow: hidden;
-}
-.bar__fill {
-    display: block;
-    height: 100%;
-    border-radius: 3px;
-    background: linear-gradient(90deg, var(--som-pink), var(--som-violet));
-    transition: width 400ms cubic-bezier(.16, 1, .3, 1);
-}
-
-/* --- Disconnect --------------------------------------------------------- */
-
-.confirm {
-    max-width: 520px;
-    padding: 30px 32px;
-    border-radius: 18px;
-    background: rgba(255, 69, 58, 0.07);
-    border: 1px solid rgba(255, 69, 58, 0.28);
-}
-.confirm__lead { font-size: 1.3rem; font-weight: 650; margin-bottom: 10px; }
-.confirm__note { font-size: 0.88rem; line-height: 1.65; color: var(--ink-2); }
-.confirm__actions { display: flex; gap: 10px; margin-top: 24px; }
-
-/* --- Buttons ------------------------------------------------------------ */
-
-.btn {
-    padding: 12px 22px;
-    border-radius: 11px;
-    background: rgba(255, 255, 255, 0.09);
-    border: 1px solid var(--line);
-    font-size: 0.9rem;
-    font-weight: 600;
-    transition: transform 120ms ease, background 140ms ease;
-}
-.btn:hover { background: rgba(255, 255, 255, 0.15); }
-.btn:active { transform: scale(0.98); }
-.btn--block { width: 100%; }
-.btn--ghost { font-size: 0.83rem; padding: 10px 14px; }
-.btn--danger {
-    background: #ff453a;
-    border-color: #ff453a;
-    box-shadow: 0 8px 22px -8px #ff453a;
-}
-.btn--danger:hover { background: #ff5b51; }
-
-/* --- Footer ------------------------------------------------------------- */
-
-.footer {
+.action {
     position: relative;
-    z-index: 3;
-    flex: 0 0 auto;
-    height: 52px;
-    padding: 0 34px;
     display: flex;
     align-items: center;
-    gap: 26px;
-    background: var(--glass);
-    border-top: 1px solid var(--line);
-    backdrop-filter: blur(22px);
+    gap: 9px;
+    padding: 11px 18px;
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--line);
+    font-size: 0.88rem;
+    font-weight: 600;
+    transition: background 150ms ease, border-color 150ms ease, transform 120ms ease;
 }
 
-.hintkey { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--ink-3); }
+.action svg { width: 18px; height: 18px; }
+.action:hover { background: var(--som-pink-a25); border-color: var(--som-pink-a45); }
+.action:active { transform: scale(0.97); }
 
-.footer__toast {
-    margin-left: auto;
-    font-size: 0.84rem;
-    color: var(--som-pink);
-    opacity: 0;
-    transition: opacity 200ms ease;
+.action--danger:hover {
+    background: rgba(255, 69, 58, 0.22);
+    border-color: rgba(255, 69, 58, 0.5);
+    color: #ff8078;
 }
-.footer__toast.is-shown { opacity: 1; }
+
+.action__key {
+    margin-left: 2px;
+    padding: 1px 6px;
+    border-radius: 5px;
+    background: rgba(0, 0, 0, 0.35);
+    font-family: var(--som-font-mono);
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--ink-3);
+}
+
+/* --- Hints -------------------------------------------------------------- */
+
+.hints {
+    position: absolute;
+    left: 34px;
+    bottom: 26px;
+    z-index: 2;
+    display: flex;
+    gap: 22px;
+    animation: fade 400ms 120ms ease both;
+}
+
+.hint { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--ink-3); }
 
 /* --- Motion ------------------------------------------------------------- */
 
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes dropIn {
     from { opacity: 0; transform: translateY(-100%); }
-    to   { opacity: 1; transform: none; }
-}
-@keyframes slideIn {
-    from { opacity: 0; transform: translateX(-30px); }
-    to   { opacity: 1; transform: none; }
-}
-@keyframes rise {
-    from { opacity: 0; transform: translateY(14px); }
     to   { opacity: 1; transform: none; }
 }

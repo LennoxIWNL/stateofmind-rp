@@ -1,82 +1,64 @@
 # som-pause
 
-Replaces the GTA pause menu. Opens on the map, per `AUDIT.md` 14.11.
+A slim branded bar over the paused world. Not a pause menu.
 
-## Why the native menu is replaced rather than skinned
+## What this is, and what it used to be
 
-The beige wash behind the pause menu is drawn by the native frontend. There is
-no native that recolours it, so the only way to get a pink overlay is to stop
-the native menu rendering at all.
+A full custom pause menu was built first and thrown away. It was a lot of chrome
+around things the game already does better, and replacing the native menu cost
+click-to-waypoint for nothing in return. It also left the minimap expanded and
+repositioned with no restore, which put a large translucent map permanently on
+the HUD.
 
-`client/main.lua` closes it the frame it opens, calls `TriggerScreenblurFadeIn`
-itself for the world blur, and puts the tint in CSS. Change it in one place:
+What survived is the part worth keeping: Escape blurs the world, tints it pink,
+and shows one bar with the logo, who you are, and three actions. Map and
+Settings hand straight back to the native frontend.
+
+**This resource never touches the minimap.** That is the fix, not an oversight.
+
+## Why the native menu is suppressed at all
+
+The beige wash behind the pause menu is drawn by the native frontend and no
+native recolours it. Suppressing the menu is the only way to get a different
+overlay colour, so the client closes it the frame it opens, calls
+`TriggerScreenblurFadeIn` itself, and puts the tint in CSS:
 
 ```lua
 Config.Overlay.tint = 'rgba(255, 20, 147, 0.13)'
 ```
 
-## The map
-
-The map tab is **the real game map**, not an image. `SetBigmapActive` expands
-the radar and the NUI leaves a hole for it, so blips, the player marker and the
-streamed map textures are all live and nothing has to be kept in sync.
-
-The coloured map with no street names comes from `karma-minimap` in
-`[assets-streams]/[graphics]`, which replaces `minimap_main_map.gfx` and the
-minimap tiles. It was already in the repo but unensured, which is why the
-vanilla map was showing. Street and area names are HUD components rather than
-part of the texture, so they are hidden separately via
-`Config.Map.hideStreetNames`.
-
-### Lining the frame up
-
-`Config.Map` positions the expanded radar; the NUI reads the same four numbers
-to draw its frame. If the frame and the map disagree, edit the config and
-restart the resource:
+## Handing off to the native frontend
 
 ```lua
-Config.Map = { posX = 0.150, posY = 0.075, sizeX = 0.820, sizeY = 0.780 }
+ActivateFrontendMenu(GetHashKey('FE_MENU_VERSION_MP_PAUSE'), false, frontend)
 ```
 
-Aspect ratios vary and no native reports where the expanded radar actually
-landed, so these are config rather than computed. Set `reposition = false` to
-leave the radar wherever the game puts it.
+`frontend` is `-1` for the map and `6` for settings, set per action in
+`Config.Actions`.
 
-## Waypoints
+The suppression loop closes any pause menu it sees, so it would instantly close
+the map it was just asked to open. `handedOff` guards that: suppression pauses
+from the hand-off until `IsPauseMenuActive()` goes false again.
 
-**Click-to-waypoint is gone, and cannot be recreated.** NUI holds the cursor
-while the menu is open so the game never sees the click, and there is no native
-that converts a screen point on the expanded radar back to world coordinates.
+Because the native map is back, **waypoints work by clicking the map** as
+normal. The destination list the previous version needed is gone.
 
-`Config.Waypoints` is the replacement: a searchable destination list that calls
-`SetNewWaypoint`. For the places people actually pick it is faster than hunting
-across a map, but it only covers what is in the list, so extend it as the map
-fills out.
+## Branding
 
-The NUI never holds coordinates. It sends an index and the client resolves it
-against config, so the list is the only thing that can be waypointed.
+The logo is `som-assets/img/som-logo.png`, referenced as
+`https://cfx-nui-som-assets/img/som-logo.png`. If it fails to load the bar falls
+back to a `SOM` wordmark, since a broken image icon looks worse than the text it
+replaced.
 
-## Tabs
+## Disconnecting
 
-| Tab | Contents |
-|---|---|
-| Map | Expanded radar plus the destination list |
-| Character | Identity, cash and bank, employment, licences |
-| Server | Player count, Discord, tagline |
-| Staff | Permission tier. Gated on `som.mod` |
-| Disconnect | Confirmation, then a server-side `DropPlayer` |
-
-The staff tab is filtered **server side** in `tabsFor`. Sending it and hiding
-it in CSS would let the client decide what it is allowed to see.
-
-Disconnecting routes through the server so som-core's save-on-drop path runs
-exactly as it would for any other disconnect.
+Routes through the server so som-core's save-on-drop path runs exactly as it
+would for any other disconnect.
 
 ## Known gaps
 
-- **No settings tab.** There is nothing to put in one yet. It arrives with the
-  HUD and keybind work rather than shipping as an empty panel.
-- Staff tab shows the permission tier and nothing else until `som-admin`
-  (roadmapped, 14.8) brings inventory search, disconnect logs and spectating.
-- The destination list is static config, not discovered from live blips.
+- No settings of our own. Settings opens the native page. A SOM settings UI
+  arrives with the HUD and keybind work rather than shipping empty.
+- The bar shows job and duty but has no interactions; anything actionable
+  belongs on the radial or the phone.
 - Not verified against a live server.

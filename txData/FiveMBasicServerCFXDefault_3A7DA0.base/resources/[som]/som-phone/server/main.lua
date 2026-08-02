@@ -154,5 +154,13 @@ CreateThread(function()
 
     if not ok then
         print('[som-phone] som_phone_* tables are missing. Import setup.sql before starting.')
+        return
+    end
+
+    -- Auto collection sweep. Nothing sets auto_collect yet; som-police will,
+    -- for fines. Harmless until then.
+    while true do
+        Wait(Config.Bank.bill.autoCollectInterval * 60000)
+        pcall(Bank.CollectOverdue)
     end
 end)

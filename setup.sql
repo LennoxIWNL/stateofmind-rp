@@ -73,6 +73,10 @@ CREATE TABLE IF NOT EXISTS `som_characters` (
   `position`    JSON         DEFAULT NULL,
   `metadata`    JSON         DEFAULT NULL,
   `appearance`  JSON         DEFAULT NULL,
+  -- Shown on the ID card. Null renders a silhouette. NUI cannot read the
+  -- game's ped headshot texture, so this has to be a URL something else fills
+  -- in rather than anything the client can produce on its own.
+  `photo`       VARCHAR(255) DEFAULT NULL,
   -- Owned and written by ox_inventory, not by som-core. Its som bridge points
   -- {user_table} at this table and {user_column} at citizenid, so the column
   -- has to exist here or every player load fails.
@@ -221,7 +225,8 @@ CALL som_add_column('som_businesses', 'category',
 CALL som_add_column('som_businesses', 'active', 'TINYINT(1) NOT NULL DEFAULT 1');
 CALL som_add_column('som_businesses', 'treasury_cut', 'DECIMAL(5,4) NOT NULL DEFAULT 0.0000');
 
-DROP PROCEDURE IF EXISTS som_add_column;
+-- som_add_column stays defined until section 8b, where the rest of the
+-- upgrade ALTERs run. It is dropped there.
 
 -- Applying happens at an NPC, not through a /job command. This is that queue.
 CREATE TABLE IF NOT EXISTS `som_job_applications` (
@@ -414,11 +419,18 @@ CREATE TABLE IF NOT EXISTS `som_phone_bills` (
   `amount`      BIGINT       NOT NULL,
   `reason`      VARCHAR(128) NOT NULL,
   `status`      ENUM('pending','paid','declined','cancelled') NOT NULL DEFAULT 'pending',
+  -- Auto collection. A police fine is not an offer, so ignoring your phone
+  -- cannot be a way to dodge one: som-phone sweeps overdue rows and settles
+  -- them. Player-to-player bills leave auto_collect at 0 and stay pending
+  -- until accepted or declined, however long that takes.
+  `auto_collect` TINYINT(1)  NOT NULL DEFAULT 0,
+  `due_at`      DATETIME     NULL DEFAULT NULL,
   `created_at`  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `settled_at`  TIMESTAMP    NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_to_status` (`to_citizenid`, `status`),
-  KEY `idx_from` (`from_citizenid`)
+  KEY `idx_from` (`from_citizenid`),
+  KEY `idx_due` (`status`, `auto_collect`, `due_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- What a player keeps after somebody shares their number with them.
@@ -595,6 +607,20 @@ CREATE TABLE IF NOT EXISTS `ox_doorlock` (
   `data` longtext NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
+--  8b. UPGRADES
+--
+--  Columns added after the tables above first shipped. Fresh installs already
+--  have them from the CREATE statements; these exist so importing over a live
+--  database catches up without a separate migration file.
+-- ===========================================================================
+
+CALL som_add_column('som_characters', 'photo', 'VARCHAR(255) DEFAULT NULL');
+CALL som_add_column('som_phone_bills', 'auto_collect', 'TINYINT(1) NOT NULL DEFAULT 0');
+CALL som_add_column('som_phone_bills', 'due_at', 'DATETIME NULL DEFAULT NULL');
+
+DROP PROCEDURE IF EXISTS som_add_column;
 
 -- ===========================================================================
 --  9. SEED DATA
