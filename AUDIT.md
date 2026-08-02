@@ -648,7 +648,7 @@ The rebuild spec explicitly says not to guess silently on these:
 | **2. `som-core`** | Player object (identifiers, character, job, gang, money, metadata for hunger/thirst/stress/armor/injuries), character creation and multi-character, server-authoritative transaction bus, ACE permissions, state bag event bridge, `som_*` schema on oxmysql. Plus `som-compat` (section 7.3) and `som-interact` (section 7.2, grown from `som-zones`). **Started ahead of Phase 1, see section 14.** | Phase 1 complete. Multi-character slot count answered. |
 | **3. Inventory** | `ox_inventory` bridge at `modules/bridge/som/`, `setr inventory:framework "som"`, NUI reskin against `som-assets/tokens.css`. Documented as a pinned patch. | `som-core` player object stable. |
 | **4. Economy** | Business register, transaction ledger, drug market saturation, banking rebuild (replacing `som-banking` and dropping `2na_core`), laundering, sink and faucet instrumentation. | Section 12.2 answered. |
-| **4b. Phone** | `som-phone`, or an adopted open-source phone reskinned. Banking app with transaction history over `som_transactions`, shareable account numbers, share-to-nearby, direct billing, and the police financial audit. See 14.5. | Phase 4 complete, since the banking app is a view over the economy. |
+| **4b. Phone** | `som-phone`, or an adopted open-source phone reskinned. Banking app with transaction history over `som_transactions`, shareable account numbers, share-to-nearby, direct billing, and the police financial audit. See 14.5. **Also needs a Twitter/social app**, since two supporter perks depend on it (14.7). | Phase 4 complete, since the banking app is a view over the economy. |
 | **5. Jobs** | `som-jobs` data format seeded from `qbx_core/shared/jobs.lua` (section 8.3). Police and EMS with the section 8.1 and 8.2 depth. Mechanic plus two civilian templates. Whitelisted application flow at an NPC. **Police use the two-axis rank plus clearance model in 14.5, not a flat grade.** | Phases 2 through 4 complete. |
 | **6. Gangs and turf** | `som-gangs` from `som-gangboss-app`. Turf system is fully greenfield (section 8.4). Turf HUD. | Section 12.3 answered. Phase 5 interaction patterns established. |
 | **7. NUIs** | `som-assets/tokens.css` shared by every `som-*` NUI. Inventory, banking, job menus, turf HUD, character creation. Load the design skill in `.claude/skills/` before writing UI code. | Runs alongside Phases 3 through 6, not after. |
@@ -846,7 +846,74 @@ Design notes for when it is built:
   the server re-validates on use. See the note at the top of
   `som-interact/client/target.lua`.
 
-### 14.7 Command minimisation
+### 14.7 Supporter tiers (owner's direction)
+
+**Hard rule: nothing purchasable may be pay to win.** No money, vehicles, items,
+stats or gameplay advantage. Entitlements are limited to convenience (queue
+priority, character slots) and cosmetics (names, colours, plates). If a perk
+would make a paying player stronger in an interaction with a non-paying one, it
+does not ship.
+
+Prices are placeholders: Patreon does not exist yet.
+
+| Tier | Price | Slots | Queue | Perks |
+|---|---:|---:|---:|---|
+| Citizen (free) | – | 3 | 0 | – |
+| Supporter | €5 | 5 | 10 | Priority queue only. The cheapest tier buys time, not toys. |
+| Resident | €10 | 7 | 20 | Custom Twitter handle, 1 colourway, custom plate on 1 owned vehicle |
+| Insider | €20 | 10 | 30 | 3 colourways, custom plates on 3 vehicles, custom phone number |
+
+Staff are resolved separately and a player receives the **better** of their
+staff and supporter entitlement, so buying a tier never removes something staff
+already had, and staff rank is never a substitute for supporting.
+
+| Staff | Slots | Queue |
+|---|---:|---:|
+| Mod | 3 | 25 |
+| Admin | 7 | 40 |
+| Management | 10 | 50 |
+
+Management sits at 10 and other staff at 7 deliberately: keeping the top slot
+count purchasable is the incentive, per the owner.
+
+#### How a tier is granted
+
+Tiers resolve through **ACE**, not by reading Patreon directly. The same
+mechanism works whether the grant comes from a manual `server.cfg` line, a
+Discord bot mapping roles to principals, or a future Patreon webhook, and no
+consumer changes when the source does.
+
+```
+add_principal identifier.license:<license> group.supporter
+add_ace group.supporter som.tier.supporter allow
+```
+
+**Neither automated route exists yet.** The txAdmin Discord bot is currently
+disabled (section 5.4 notes the rich presence is still on Qbox defaults), and
+Patreon is not set up. Grants are manual until one is wired.
+
+#### Built
+
+- `som-core/shared/tiers.lua`, the tier table above.
+- `som-core/server/entitlements.lua`, resolving slots, queue priority and perks.
+- Character slots are **server enforced** in `Characters.Create`. This is a
+  security boundary, not a display value: a client deciding its own cap could
+  create characters in slots it had not earned. The client export was removed
+  and `som:server:getEntitlements` replaces it.
+
+#### Not built, and what each needs
+
+| Perk | Blocked on |
+|---|---|
+| Queue priority | `connectqueue` is disabled in dev mode (its 2 minute `JoinDelay`). Its `Config.Priority` table takes identifiers, so wiring `queuePriority` to it is small once re-enabled. |
+| Custom Twitter handle and colourways | **There is no Twitter app.** `npwd` was removed in the teardown. Needs the phone (14.5) first. |
+| Custom licence plates | Needs vehicle ownership, which is Phase 5 or later. `som_vehicles.plate` exists and is unique, so the validation hook has somewhere to live. Must reject duplicates and reserved formats such as police plates. |
+| Custom phone number | Needs the phone. `som_characters.phone` exists and is currently auto-generated. |
+
+**Roadmap consequence:** a Twitter or social app is now a required part of the
+phone phase (4b), not optional, because two purchasable perks depend on it.
+
+### 14.8 Command minimisation
 
 Already covered in section 10, and it serves the same goal. Interaction-driven
 play is what separates a serious RP server from a menu simulator.
