@@ -1,0 +1,218 @@
+-- Bootstrap, lifecycle, periodic loops, and the public export surface.
+
+local saveInterval = Config.Save.intervalMinutes * 60000
+local paycheckInterval = Config.Money.paycheckInterval * 60000
+
+-- ---------------------------------------------------------------------------
+-- Lifecycle
+-- ---------------------------------------------------------------------------
+
+AddEventHandler('playerDropped', function()
+    local source = source
+    local player = Players.Get(source)
+    if not player then return end
+
+    player:save()
+    TriggerEvent('som:server:playerUnloaded', source, player.citizenid)
+    Players.Remove(source)
+end)
+
+AddEventHandler('onResourceStop', function(resource)
+    if resource ~= GetCurrentResourceName() then return end
+
+    for _, player in ipairs(Players.GetAll()) do
+        player:save()
+    end
+end)
+
+-- ---------------------------------------------------------------------------
+-- Periodic save
+-- ---------------------------------------------------------------------------
+
+CreateThread(function()
+    while true do
+        Wait(saveInterval)
+
+        local players = Players.GetAll()
+        for i = 1, #players do
+            players[i]:save()
+        end
+
+        if Config.Debug and #players > 0 then
+            print(('[som-core] saved %s characters'):format(#players))
+        end
+    end
+end)
+
+-- ---------------------------------------------------------------------------
+-- Payroll
+--
+-- Pay is drawn from the job's business account, never minted. If the business
+-- cannot cover it, nobody is paid and the shortfall is logged. That is the
+-- mechanism that makes the Phase 4 faucet side of the economy bounded.
+-- ---------------------------------------------------------------------------
+
+CreateThread(function()
+    while true do
+        Wait(paycheckInterval)
+
+        for _, player in ipairs(Players.GetAll()) do
+            local job = player.job
+            local jobDef = Jobs[job.name]
+            local payment = job.payment or 0
+
+            if payment > 0 and jobDef then
+                local eligible = job.onduty
+                    or jobDef.offDutyPay
+                    or Config.Money.payOffDutyByDefault
+
+                if eligible then
+                    if jobDef.business then
+                        local paid = Money.BusinessTransact(
+                            jobDef.business, -payment, ('payroll:%s'):format(job.name)
+                        )
+                        if paid then
+                            Money.Add(player.source, 'bank', payment, ('paycheck:%s'):format(job.name), {
+                                counterparty = jobDef.business,
+                                flow = 'transfer',
+                            })
+                        elseif Config.Debug then
+                            print(('[som-core] %s could not cover payroll for %s')
+                                :format(jobDef.business, player.citizenid))
+                        end
+                    else
+                        -- Jobs with no business register entry are a faucet.
+                        -- Only 'unemployed' should reach this branch.
+                        Money.Add(player.source, 'bank', payment, ('paycheck:%s'):format(job.name))
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- ---------------------------------------------------------------------------
+-- Exports
+--
+-- Consumed as: exports['som-core']:getPlayer(source)
+-- Money exports live in money.lua, permission exports in permissions.lua.
+-- ---------------------------------------------------------------------------
+
+exports('getPlayer', function(source) return Players.Get(source) end)
+exports('getPlayerByCitizenId', function(citizenid) return Players.GetByCitizenId(citizenid) end)
+exports('getPlayerByLicense', function(license) return Players.GetByLicense(license) end)
+exports('getPlayers', function() return Players.GetAll() end)
+exports('getPlayersByJob', function(job, onDuty) return Players.GetByJob(job, onDuty) end)
+exports('getPlayersByGang', function(gang) return Players.GetByGang(gang) end)
+
+exports('setJob', function(source, job, grade)
+    local player = Players.Get(source)
+    if not player then return false, 'player not found' end
+    return player:setJob(job, grade)
+end)
+
+exports('setGang', function(source, gang, grade)
+    local player = Players.Get(source)
+    if not player then return false, 'player not found' end
+    return player:setGang(gang, grade)
+end)
+
+exports('setDuty', function(source, onduty)
+    local player = Players.Get(source)
+    if not player then return false, 'player not found' end
+    return player:setDuty(onduty)
+end)
+
+exports('setMetadata', function(source, key, value)
+    local player = Players.Get(source)
+    if not player then return false, 'player not found' end
+    return player:setMetadata(key, value)
+end)
+
+exports('getMetadata', function(source, key)
+    local player = Players.Get(source)
+    if not player then return nil end
+    return player:getMetadata(key)
+end)
+
+exports('getJobs', function() return Jobs end)
+exports('getGangs', function() return Gangs end)
+
+-- ---------------------------------------------------------------------------
+-- Staff commands
+--
+-- These are the only commands som-core registers. Everything else in the
+-- framework is an interaction, per Phase 8. Each one is ACE gated and each
+-- money path lands in the ledger like any other.
+-- ---------------------------------------------------------------------------
+
+lib.addCommand('setjob', {
+    help = 'Set a player job',
+    params = {
+        { name = 'id', type = 'playerId', help = 'Target player' },
+        { name = 'job', type = 'string', help = 'Job name' },
+        { name = 'grade', type = 'number', help = 'Job grade', optional = true },
+    },
+    restricted = Config.Permissions.admin,
+}, function(source, args)
+    local player = Players.Get(args.id)
+    if not player then return end
+
+    local ok, err = player:setJob(args.job, args.grade or 0)
+    if not ok then
+        TriggerClientEvent('som:client:notify', source, err, 'error')
+    end
+end)
+
+lib.addCommand('setgang', {
+    help = 'Set a player gang',
+    params = {
+        { name = 'id', type = 'playerId', help = 'Target player' },
+        { name = 'gang', type = 'string', help = 'Gang name' },
+        { name = 'grade', type = 'number', help = 'Gang grade', optional = true },
+    },
+    restricted = Config.Permissions.admin,
+}, function(source, args)
+    local player = Players.Get(args.id)
+    if not player then return end
+
+    local ok, err = player:setGang(args.gang, args.grade or 0)
+    if not ok then
+        TriggerClientEvent('som:client:notify', source, err, 'error')
+    end
+end)
+
+lib.addCommand('givemoney', {
+    help = 'Give money to a player',
+    params = {
+        { name = 'id', type = 'playerId', help = 'Target player' },
+        { name = 'account', type = 'string', help = 'cash, bank or crypto' },
+        { name = 'amount', type = 'number', help = 'Amount' },
+    },
+    restricted = Config.Permissions.god,
+}, function(source, args)
+    local ok, err = Money.Add(args.id, args.account, args.amount, ('admin:%s'):format(GetPlayerName(source)))
+    TriggerClientEvent('som:client:notify', source, ok and 'Money added' or err, ok and 'success' or 'error')
+end)
+
+-- ---------------------------------------------------------------------------
+-- Startup
+-- ---------------------------------------------------------------------------
+
+CreateThread(function()
+    -- Fail loudly at boot rather than on the first character load.
+    local ok = pcall(function()
+        MySQL.scalar.await('SELECT 1 FROM som_characters LIMIT 1')
+    end)
+
+    if not ok then
+        print('[som-core] som_* tables are missing. Import sql/som_schema.sql before starting.')
+        return
+    end
+
+    local jobCount, gangCount = 0, 0
+    for _ in pairs(Jobs) do jobCount = jobCount + 1 end
+    for _ in pairs(Gangs) do gangCount = gangCount + 1 end
+
+    print(('[som-core] ready. %d jobs, %d gangs.'):format(jobCount, gangCount))
+end)

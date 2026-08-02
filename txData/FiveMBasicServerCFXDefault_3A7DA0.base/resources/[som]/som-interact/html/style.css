@@ -1,0 +1,51 @@
+/* Colours come from som-assets/tokens.css. Nothing is redefined here. */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: transparent;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    user-select: none;
+}
+
+.textui {
+    position: absolute;
+    right: 3vw;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 24vw;
+
+    background: var(--som-card);
+    border: var(--som-border);
+    border-left: 3px solid var(--som-pink);
+    border-radius: var(--som-radius);
+    box-shadow: var(--som-shadow), var(--som-glow);
+
+    color: var(--som-text);
+    font-family: var(--som-font);
+    font-size: 0.95rem;
+    line-height: 1.35;
+
+    padding: 12px 16px;
+    opacity: 1;
+    transition: opacity var(--som-transition), transform var(--som-transition);
+}
+
+.textui.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%) translateX(12px);
+}
+
+#textui-key:empty {
+    display: none;
+}

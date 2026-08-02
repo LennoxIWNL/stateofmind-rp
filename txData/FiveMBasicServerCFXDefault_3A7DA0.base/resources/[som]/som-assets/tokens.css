@@ -1,0 +1,103 @@
+/*
+ * SOM design tokens. The single source of truth for every som-* NUI.
+ *
+ * Import from another resource's NUI with:
+ *   <link rel="stylesheet" href="https://cfx-nui-som-assets/tokens.css">
+ *
+ * Do not redefine these values locally. The two drifting copies in
+ * som-gangboss-app and som-jobsetup are what this file exists to replace.
+ * Values are extracted from the server logo and the existing UI set,
+ * see AUDIT.md section 5.
+ */
+
+:root {
+    /* Brand */
+    --som-pink: #ff1493;
+    --som-pink-light: #ff69b4;
+    --som-pink-dark: #c2185b;
+    --som-magenta-deep: #b10f7c;
+    --som-violet: #e566e8;
+
+    /* Brand alpha ramp, the established glow convention */
+    --som-pink-a16: rgba(255, 20, 147, 0.16);
+    --som-pink-a25: rgba(255, 20, 147, 0.25);
+    --som-pink-a30: rgba(255, 20, 147, 0.30);
+    --som-pink-a45: rgba(255, 20, 147, 0.45);
+    --som-pink-a61: rgba(255, 20, 147, 0.61);
+    --som-pink-a80: rgba(255, 20, 147, 0.80);
+
+    /* Surfaces */
+    --som-bg: #0a0a12;
+    --som-bg-deep: #08060a;
+    --som-surface: #3d1735;
+    --som-card: rgba(25, 25, 35, 0.95);
+    --som-card-hover: rgba(35, 35, 50, 0.95);
+
+    /* Text */
+    --som-text: #e0e0e0;
+    --som-text-dim: #777;
+    --som-text-mute: #555;
+
+    /* Status */
+    --som-danger: #e74c3c;
+    --som-success: #2ecc71;
+    --som-warning: #f0932b;
+
+    /* Shape and motion */
+    --som-radius: 8px;
+    --som-radius-lg: 12px;
+    --som-border: 1px solid var(--som-pink-a30);
+    --som-glow: 0 0 12px var(--som-pink-a45);
+    --som-glow-strong: 0 0 20px var(--som-pink-a61);
+    --som-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+    --som-transition: 160ms ease;
+
+    /* Type */
+    --som-font: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    --som-font-mono: 'JetBrains Mono', 'Consolas', monospace;
+}
+
+/* Shared primitives every som-* NUI can rely on. */
+
+.som-panel {
+    background: var(--som-card);
+    border: var(--som-border);
+    border-radius: var(--som-radius);
+    box-shadow: var(--som-shadow);
+    color: var(--som-text);
+    font-family: var(--som-font);
+}
+
+.som-accent {
+    color: var(--som-pink);
+}
+
+.som-btn {
+    background: transparent;
+    border: var(--som-border);
+    border-radius: var(--som-radius);
+    color: var(--som-text);
+    cursor: pointer;
+    font-family: var(--som-font);
+    padding: 8px 16px;
+    transition: background var(--som-transition), box-shadow var(--som-transition);
+}
+
+.som-btn:hover {
+    background: var(--som-pink-a16);
+    box-shadow: var(--som-glow);
+}
+
+.som-btn:active {
+    background: var(--som-pink-a25);
+    border-color: var(--som-pink-dark);
+}
+
+.som-key {
+    background: var(--som-pink);
+    border-radius: 4px;
+    color: var(--som-bg-deep);
+    font-family: var(--som-font-mono);
+    font-weight: 700;
+    padding: 2px 7px;
+}
