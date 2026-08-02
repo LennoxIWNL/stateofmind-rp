@@ -77,6 +77,21 @@ function QBCore.Functions.SetVehicleProperties(vehicle, props)
     lib.setVehicleProperties(vehicle, props)
 end
 
+-- See the note in server/qbcore.lua: `provide` does not forward exports, the
+-- __cfx_export_<resource>_<name> event is what actually publishes under
+-- another resource's name.
+---@param name string
+---@param fn function
+local function qbExport(name, fn)
+    AddEventHandler(('__cfx_export_qb-core_%s'):format(name), function(setCB)
+        setCB(fn)
+    end)
+end
+
+qbExport('GetCoreObject', function()
+    return QBCore
+end)
+
 exports('GetCoreObject', function()
     return QBCore
 end)

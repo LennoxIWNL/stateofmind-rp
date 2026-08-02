@@ -103,6 +103,28 @@ function QBCore.Commands.Add(name, help, arguments, argsrequired, callback, perm
     end)
 end
 
+-- Registering an export under ANOTHER resource's name.
+--
+-- `provide 'qb-core'` in the manifest only satisfies dependency checks. It does
+-- not forward exports, so exports('GetCoreObject', ...) would publish under
+-- som-compat and exports['qb-core']:GetCoreObject() would still fail.
+--
+-- The actual mechanism is the __cfx_export_<resource>_<name> event: the export
+-- caller raises it and takes whatever the handler passes to setCB. This is how
+-- qbx_core served qb-core, and how qb-target serves the ox_target names.
+---@param name string
+---@param fn function
+local function qbExport(name, fn)
+    AddEventHandler(('__cfx_export_qb-core_%s'):format(name), function(setCB)
+        setCB(fn)
+    end)
+end
+
+qbExport('GetCoreObject', function()
+    return QBCore
+end)
+
+-- Also publish under our own name, for anything addressing som-compat directly.
 exports('GetCoreObject', function()
     return QBCore
 end)

@@ -98,23 +98,41 @@ ensure som-compat
 # Voice
 ensure [voice]
 
-# Preserved resources
+# ===========================================================================
+# DEV MODE (currently active)
+#
+# Framework only. Boots in seconds because it skips the ~5GB of streamed
+# assets and every leftover QBCore-dependent resource.
+#
+# Folder-wide ensures are deliberately NOT used. `ensure [custom]` and
+# `ensure [standalone]` would start elixir-base, elixir-hud, elixir-petshop,
+# r14-evidence, som-spray, ox_doorlock and Lennox-DoorCreator, all of which
+# still call QBCore members som-compat does not implement. They are kept on
+# disk only for the streamed props inside them.
+#
+# To go back to a full boot, comment this block out and uncomment FULL BOOT.
+# ===========================================================================
+
 ensure ps-mdt
 
-# Remaining resource folders. Anything already ensured above is skipped.
-ensure [standalone]
-ensure [custom]
-ensure [som]
-
-# TODO: these folders are emptied or pending rebuild.
+# ===========================================================================
+# FULL BOOT (inactive)
+#
+# Uncomment once the leftover resources have had their stream/ folders
+# salvaged into [assets-streams] and their QBCore-dependent Lua removed.
+# ===========================================================================
+#
+# ensure [standalone]
+# ensure [custom]
+# ensure [som]
+#
+# Heavy streaming assets load LAST so the framework is up and the server is
+# responsive (heartbeat OK) before the ~5GB of ped/vehicle streams mount.
+# ensure [assets-streams]
+#
 # ensure [qb]
 # ensure [new]
 # ensure [jobs]
-# ensure [robberies]
-
-# Heavy streaming assets load LAST so the framework is up and the server is
-# responsive (heartbeat OK) before the ~5GB of ped/vehicle streams mount.
-ensure [assets-streams]
 
 ## Permissions ##
 # SOM uses som.* ACEs, checked with IsPlayerAceAllowed in som-core.
