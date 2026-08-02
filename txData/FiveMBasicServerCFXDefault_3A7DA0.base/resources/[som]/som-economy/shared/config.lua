@@ -152,11 +152,45 @@ Config.Fines = {
 -- needing a migration and a code change later.
 -- ---------------------------------------------------------------------------
 
+-- The three police departments are FUNCTIONALLY IDENTICAL by design. They
+-- differ only in identity: name, blip colour, livery. Anything that behaves
+-- differently between them is a bug, not a feature, because it would mean
+-- writing the police script three times.
+--
+-- blip is a GTA blip colour index, used by Phase 5.
 Config.Departments = {
-    lspd = { label = 'Los Santos Police Department', job = 'police',    active = true },
-    bcso = { label = 'Blaine County Sheriff Office', job = nil,         active = false },
-    sasp = { label = 'San Andreas State Police',     job = nil,         active = false },
-    ems  = { label = 'San Andreas Medical Services', job = 'ambulance', active = true },
+    lspd = {
+        label = 'Los Santos Police Department',
+        short = 'LSPD',
+        job = 'police',
+        active = true,
+        blip = 38,          -- blue
+        canFine = true,
+    },
+    bcso = {
+        label = 'Blaine County Sheriff Office',
+        short = 'BCSO',
+        job = nil,          -- set when the job is created in Phase 5
+        active = false,
+        blip = 46,          -- orange
+        canFine = true,
+    },
+    sasp = {
+        label = 'San Andreas State Police',
+        short = 'SASP',
+        job = nil,
+        active = false,
+        blip = 5,           -- yellow
+        canFine = true,
+    },
+    ems = {
+        label = 'San Andreas Medical Services',
+        short = 'EMS',
+        job = 'ambulance',
+        active = true,
+        blip = 1,           -- red
+        canFine = false,    -- medics do not write tickets
+    },
 }
 
 -- ---------------------------------------------------------------------------

@@ -649,7 +649,7 @@ The rebuild spec explicitly says not to guess silently on these:
 | **3. Inventory** | `ox_inventory` bridge at `modules/bridge/som/`, `setr inventory:framework "som"`, NUI reskin against `som-assets/tokens.css`. Documented as a pinned patch. | `som-core` player object stable. |
 | **4. Economy** | Business register, transaction ledger, drug market saturation, banking rebuild (replacing `som-banking` and dropping `2na_core`), laundering, sink and faucet instrumentation. | Section 12.2 answered. |
 | **4b. Phone** | `som-phone`, or an adopted open-source phone reskinned. Banking app with transaction history over `som_transactions`, shareable account numbers, share-to-nearby, direct billing, and the police financial audit. See 14.5. **Also needs a Twitter/social app**, since two supporter perks depend on it (14.7). | Phase 4 complete, since the banking app is a view over the economy. |
-| **5. Jobs** | `som-jobs` data format seeded from `qbx_core/shared/jobs.lua` (section 8.3). Police and EMS with the section 8.1 and 8.2 depth. Mechanic plus two civilian templates. Whitelisted application flow at an NPC. **Police use the two-axis rank plus clearance model in 14.5, not a flat grade.** | Phases 2 through 4 complete. |
+| **5. Jobs** | `som-jobs` data format seeded from `qbx_core/shared/jobs.lua` (section 8.3). Police and EMS with the section 8.1 and 8.2 depth. Mechanic plus two civilian templates. Whitelisted application flow at an NPC. **Police use the two-axis rank plus clearance model in 14.5**, are built by the merged-review method in **14.9**, and LSPD, BCSO and SASP differ only in blip colour and identity. Fines, armoury split and department accounts already exist from Phase 4. | Phases 2 through 4 complete. Owner available to answer the per-feature questions 14.9 requires. |
 | **4c. `som-radial`** | The F1 radial menu, one of the three interaction surfaces (14.6). Declarative registration by other resources, driven by the `som:` state bags. Required, not optional: much of section 10.1 lands here. | `som-core` state bags stable. |
 | **4d. `som-admin`** | Custom admin menu (14.8): inventory search, spectate with voice, disconnect logs, vehicle and job management. Replaces the removed `ps-adminmenu`. Defers to txAdmin for restarts, resources and bans. | Phase 4 ledger exists, so money and item actions can be logged through it. |
 | **6. Gangs and turf** | `som-gangs` from `som-gangboss-app`. Turf system is fully greenfield (section 8.4). Turf HUD. | Section 12.3 answered. Phase 5 interaction patterns established. |
@@ -958,7 +958,71 @@ Design constraints, consistent with the rest of the framework:
 server restarts, resource management, and the ban database itself. `som-admin`
 should read from and defer to txAdmin rather than duplicating it.
 
-### 14.9 Command minimisation
+### 14.9 Police, Phase 5 approach (owner's direction)
+
+#### Build method
+
+Review **7 to 8 police scripts**, take what each does well, and author one
+merged custom script. This is the 14.2 method at a larger scale, and the owner
+has accepted that it means **being asked about nearly every feature** rather
+than having defaults chosen silently.
+
+The questions look like: *do you want map blips for shots fired?* Each is a
+design decision with a real effect on how policing feels, and answering them
+one at a time is the point, not overhead to be optimised away.
+
+**Sourcing rule still applies (14.2).** Public repositories are fine to read
+and learn from. Escrowed or leaked paid scripts are not, whatever channel they
+are shared through. If the owner has purchased a script, studying it is inside
+the licence and fair game.
+
+Practical sequence:
+1. Shortlist candidates, note what each does well and badly.
+2. Bring the owner a feature list grouped by area (patrol, evidence, custody,
+   equipment, dispatch), with a recommendation per item.
+3. Work through it, then build once against `som-core` and `som-interact`.
+
+#### Departments are identical except identity
+
+LSPD, BCSO and SASP must behave **exactly the same**. They differ only in name,
+blip colour and livery. Anything that behaves differently between them is a
+bug, because it would mean maintaining the police script three times.
+
+Encoded in `som-economy/shared/config.lua` `Config.Departments`, which already
+carries `short`, `blip` and `canFine` alongside the funding model. Phase 5 reads
+those rather than hardcoding a department anywhere.
+
+Only LSPD is active. BCSO and SASP have `active = false` and no `job` assigned
+until their jobs exist.
+
+#### What the police script inherits from Phase 4
+
+Fines are already built and are designed to be driven by a police script rather
+than replaced by one:
+
+```lua
+exports['som-economy']:issueFine(officerSource, targetSource, amount, reason)
+exports['som-economy']:payFine(source, fineId)
+exports['som-economy']:voidFine(source, fineId)        -- boss or admin
+exports['som-economy']:getUnpaidFines(citizenid)
+```
+
+Plus the event `som:server:fineIssued(id, citizenid, officerCitizenid, amount)`
+for dispatch, the MDT, or a phone notification to hook.
+
+The department is derived from the officer's job, so a police script never
+passes one and cannot fine on behalf of a department the officer does not work
+for. `Config.Fines.officerShare` stays at zero: the officer must never earn from
+writing tickets.
+
+Equipment is already split between department issue and personal purchase
+(`issueEquipment`), so an armoury UI is a front end over an existing rule rather
+than new logic.
+
+**Unpaid fines currently do nothing.** Warrants, impound and licence suspension
+hang off `Config.Fines.lateAfterHours` and are Phase 5 work.
+
+### 14.10 Command minimisation
 
 Already covered in section 10, and it serves the same goal. Interaction-driven
 play is what separates a serious RP server from a menu simulator.
