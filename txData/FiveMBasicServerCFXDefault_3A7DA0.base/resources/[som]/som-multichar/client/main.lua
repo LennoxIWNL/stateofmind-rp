@@ -190,6 +190,14 @@ local function setPreviewPed(gender)
     local pos = pedPosition()
     previewPed = CreatePed(2, model, pos.x, pos.y, pos.z, pedHeading(), false, true)
 
+    -- CreatePed applies an internal vertical offset, SetEntityCoordsNoOffset
+    -- does not. Left alone, the ped spawns floating and then snaps to the
+    -- right height the first time tuning moves it, so the tuned value never
+    -- matches what appears on a fresh load. Re-apply the position through the
+    -- same call the rebuild path uses, so both agree.
+    SetEntityCoordsNoOffset(previewPed, pos.x, pos.y, pos.z, false, false, false)
+    SetEntityHeading(previewPed, pedHeading())
+
     SetEntityInvincible(previewPed, true)
     FreezeEntityPosition(previewPed, true)
     SetBlockingOfNonTemporaryEvents(previewPed, true)
@@ -205,6 +213,23 @@ local function setPreviewPed(gender)
             TaskPlayAnim(previewPed, pick.dict, pick.clip, 8.0, -8.0, -1, 1, 0, false, false, false)
         end
     end
+end
+
+---Sets the focal range from the camera's distance to the CHARACTER.
+---
+---Focusing on the aim point instead looks correct until the aim point is moved
+---away from the character, which tuning encourages: the focal plane then sits
+---in empty space and the character blurs. The subject is always the ped.
+---@param camPos vector3
+local function applyDof(camPos)
+    local dof = Config.Camera.dof
+    if not (cam and dof and dof.enabled) then return end
+
+    local distance = #(camPos - pedPosition())
+    if distance < 0.5 then distance = 0.5 end
+
+    SetCamNearDof(cam, distance * (dof.nearScale or 0.45))
+    SetCamFarDof(cam, distance * (dof.farScale or 1.7))
 end
 
 ---Slow horizontal drift around the subject, so the shot is not a dead frame.
@@ -289,13 +314,8 @@ local function startScene()
     -- a player stood in a street.
     local dof = Config.Camera.dof
     if dof and dof.enabled then
-        -- Scale the focal range to the actual camera-to-subject distance, so
-        -- the character stays sharp wherever the scene ends up framed.
-        local subjectDistance = #(camPos - lookAt)
-
         SetCamUseShallowDofMode(cam, true)
-        SetCamNearDof(cam, subjectDistance * (dof.nearScale or 0.45))
-        SetCamFarDof(cam, subjectDistance * (dof.farScale or 1.7))
+        applyDof(camPos)
         SetCamDofStrength(cam, dof.strength)
 
         -- SetUseHiDof only applies for the frame it is called on, so it has to
@@ -366,14 +386,9 @@ AddEventHandler('som-multichar:client:rebuildScene', function()
     SetCamCoord(cam, camPos.x, camPos.y, camPos.z)
     PointCamAtCoord(cam, lookAt.x, lookAt.y, lookAt.z)
 
-    -- Keep the focal range matched to the new distance while tuning, or the
-    -- subject drifts out of focus as the camera is moved.
-    local dof = Config.Camera.dof
-    if dof and dof.enabled then
-        local subjectDistance = #(camPos - lookAt)
-        SetCamNearDof(cam, subjectDistance * (dof.nearScale or 0.45))
-        SetCamFarDof(cam, subjectDistance * (dof.farScale or 1.7))
-    end
+    -- Keep the focal range matched while tuning, or the character drifts out
+    -- of focus as the camera or the character is moved.
+    applyDof(camPos)
 
     if previewPed and DoesEntityExist(previewPed) then
         local pos = pedPosition()

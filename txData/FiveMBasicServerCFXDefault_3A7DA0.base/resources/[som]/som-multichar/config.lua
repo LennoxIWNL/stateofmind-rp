@@ -44,15 +44,15 @@ Config.Shell = {
 
     -- Framed in game with the tuning tool rather than guessed. The character
     -- stands in the living area; the shell origin itself is in the bedroom.
-    pedOffset = vec3(-0.1, -2.4, 0.1),
-    pedHeading = 90.0,
+    pedOffset = vec3(-1.2, -2.33, 0.15),
+    pedHeading = 105.0,
 
     -- BOTH are relative to the shell origin, so the character and the camera
     -- can be moved independently. camLookAtOffset below is the tuned
     -- ped-relative value (-3.4, -0.8, 0.92) converted to origin-relative by
     -- folding in pedOffset, so the framing set in game is preserved.
-    camOffset = vec3(-5.4, -3.1, 1.15),
-    camLookAtOffset = vec3(-3.5, -3.2, 1.02),
+    camOffset = vec3(-5.72, -3.61, 1.15),
+    camLookAtOffset = vec3(-5.15, -3.81, 1.02),
 }
 
 -- Live tuning. With this on, a staff member can nudge the scene in game and
