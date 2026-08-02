@@ -75,9 +75,13 @@ ensure screenshot-basic
 # som-core must start before anything that reads player state.
 ensure som-assets
 ensure som-core
+ensure som-ui
 ensure qb-target
 ensure som-interact
 ensure ox_inventory
+# som-multichar is what lets a player enter the world at all. Without it
+# nobody gets past the loading screen.
+ensure som-multichar
 
 # som-compat answers exports['qb-core']:GetCoreObject() for preserved
 # third-party resources (ps-mdt). It declares provide 'qb-core', so it must
