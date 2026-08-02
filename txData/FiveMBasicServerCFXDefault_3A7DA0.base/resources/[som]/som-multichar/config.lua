@@ -60,8 +60,17 @@ Config.Shell = {
 -- print values to paste back here, instead of guessing offsets blind and
 -- restarting for every attempt. Turn off for production.
 Config.SceneTuning = {
+    -- This flag IS the gate. Tuning only moves a preview ped and a camera that
+    -- exist on one client, so it cannot reach player state, money or anything
+    -- server owned. Set false for production and the whole thing is inert.
     enabled = true,
+
+    -- Additionally require an ACE. Off by default: with `enabled` already
+    -- controlling it, an ACE check mostly just locks the developer out of their
+    -- own tool when server.cfg permissions have not been reloaded.
+    requireAce = false,
     ace = 'som.admin',
+
     step = 0.1,
 }
 

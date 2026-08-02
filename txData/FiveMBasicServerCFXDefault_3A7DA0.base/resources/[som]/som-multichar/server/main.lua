@@ -44,8 +44,20 @@ end)
 -- Scene tuning is client-side cosmetic only, but the keybinds should not be in
 -- players' hands. The client cannot read ACE, so it asks here.
 lib.callback.register('som-multichar:server:canTuneScene', function(source)
-    if not Config.SceneTuning or not Config.SceneTuning.enabled then return false end
-    return exports['som-core']:hasPermission(source, Config.SceneTuning.ace or 'som.admin')
+    local cfg = Config.SceneTuning
+    if not cfg or not cfg.enabled then return false end
+
+    -- `enabled` is the real gate, see config.lua. The ACE check is opt-in.
+    if not cfg.requireAce then return true end
+
+    local ok = exports['som-core']:hasPermission(source, cfg.ace or 'som.admin')
+    if not ok then
+        -- Report what the server actually believes, so a denial is not
+        -- indistinguishable from the feature being broken.
+        exports['som-core']:debugPermissions(source)
+    end
+
+    return ok
 end)
 
 AddEventHandler('onResourceStart', function(resource)
