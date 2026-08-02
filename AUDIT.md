@@ -627,7 +627,12 @@ The rebuild spec explicitly says not to guess silently on these:
 
 ### 12.4 Scope questions
 
-1. **Is the phone in scope?** `npwd` plus `qb-npwd` plus `qb-phone-compat` are installed, and the database has roughly 30 `npwd_*` and `phone_*` tables. If out of scope, `/911` and `/report` stay commands (section 10.2). If in scope, it is effectively another full phase.
+1. ~~**Is the phone in scope?**~~ **Answered: yes, and it is central.** See
+   section 14.5. The phone is the primary interface for anything without a
+   physical anchor, and the banking app is its first major consumer. `npwd` and
+   `qb-npwd` were removed in the teardown, so a phone must be built or sourced.
+   Open sub-question: build `som-phone` from scratch, or adopt an existing
+   open-source phone and skin it? Research per 14.2 before deciding.
 2. **Housing.** Not named in any phase, but `qb-houses` is substantial and the spec's teardown removes it. Confirm whether SOM ships without housing initially.
 3. **Multi-character slot count** for Phase 2.
 4. **Does `ps-mdt` stay permanently, or is a `som-mdt` planned later?** This changes how much `som-compat` is worth investing in.
@@ -752,7 +757,63 @@ right of centre, because the character is the subject and the UI is chrome.
 That is the Prodigy and NoPixel pattern referenced in 14.1, and it is a
 deliberate divergence from the scripts reviewed here.
 
-### 14.5 Command minimisation
+### 14.5 Phone-centric play (owner's direction)
+
+**The phone is the primary interface for anything without a physical anchor.**
+Jobs, money and services are checked on the phone; the world is interacted with
+through `som-interact`. Between them they replace commands almost entirely.
+
+This settles the open question in 12.4: **the phone is in scope, and it is
+central rather than optional.** It is not a late nice-to-have, and later phases
+should assume it exists.
+
+#### Banking app
+
+| Feature | Notes |
+|---|---|
+| Transaction history | `som_transactions` already records every movement with reason, counterparty and resource. The app is a view over it. This is why the ledger was built as rows rather than a JSON blob. |
+| Shareable account numbers | `som_bank_accounts.account_no` already exists for this. |
+| Share to nearby players | A button broadcasts the account number to players in range, who receive it as a phone notification. Server validates distance, as always. |
+| Direct billing | A player who has your account number can raise a bill against it through the app. |
+
+Depth is the point here, not a minimal transfer screen.
+
+#### Police financial audit
+
+Officers of sufficient rank and clearance can inspect another player's accounts,
+for audit roleplay. Server-side permission check, and **the audit itself must be
+logged**: someone looking at a player's finances is exactly the kind of action
+that needs a trail, both for RP and for catching staff abuse.
+
+#### Two-axis police permissions
+
+Replaces the flat grade ladder with **rank** and **clearance**, which are
+independent:
+
+- **Rank 1 to 7**: position in the department. Cadet, officer, and upward.
+  Governs seniority, pay and command.
+- **Clearance 1 to 5**: certifications held. Interceptor cert, helicopter cert,
+  bank audit cert, and so on. Governs what equipment and powers are unlocked.
+
+A senior officer without the helicopter cert cannot fly; a mid-rank officer with
+the audit cert can run financial checks. That separation is closer to how real
+departments work and gives far finer control than a single grade number.
+
+**Consequences to handle when Phase 5 starts:**
+
+1. `som-core/shared/jobs.lua` currently gives police five grades (0 to 4) with a
+   single `isboss` flag. That needs restructuring to 7 ranks plus a separate
+   certification set.
+2. The schema needs a certifications table (`som_certifications`, keyed by
+   citizenid and cert name, with issuer and timestamp), since a cert is granted
+   to a person and audited, not derived from rank.
+3. `som-jobs` permission checks become two-dimensional. Any helper written
+   before this lands should not assume a single grade integer.
+4. The phone replaced by the teardown was `npwd` plus `qb-npwd`. Building or
+   sourcing a phone is now a required phase, not an optional one, and the
+   banking app above is its first real consumer.
+
+### 14.6 Command minimisation
 
 Already covered in section 10, and it serves the same goal. Interaction-driven
 play is what separates a serious RP server from a menu simulator.
