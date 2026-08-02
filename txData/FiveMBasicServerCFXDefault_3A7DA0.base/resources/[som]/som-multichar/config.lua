@@ -43,12 +43,26 @@ Config.Shell = {
     coords = vec3(144.58, -1002.36, -100.0),
 
     -- Where the character stands, relative to the shell origin.
-    pedOffset = vec3(0.0, 0.0, 0.0),
-    pedHeading = 180.0,
+    -- Moved off the origin because the shell's origin sits in the bedroom.
+    pedOffset = vec3(0.0, -2.2, 0.0),
 
-    -- Where the camera sits, relative to the shell origin, and what it aims at.
-    camOffset = vec3(0.0, 2.6, 0.4),
-    camLookAtOffset = vec3(0.0, 0.0, 0.15),
+    -- The camera sits at +y from the ped, and GTA heading 0 faces +y, so the
+    -- character must be at 0 to look INTO the lens. 180 faces them away.
+    pedHeading = 0.0,
+
+    -- Camera offset from the SHELL origin. z is chest height, not floor level:
+    -- at 0.4 the shot framed the character's knees.
+    camOffset = vec3(0.0, 0.5, 1.15),
+    camLookAtOffset = vec3(0.0, 0.0, 0.92),
+}
+
+-- Live tuning. With this on, a staff member can nudge the scene in game and
+-- print values to paste back here, instead of guessing offsets blind and
+-- restarting for every attempt. Turn off for production.
+Config.SceneTuning = {
+    enabled = true,
+    ace = 'som.admin',
+    step = 0.1,
 }
 
 -- The scene used when Config.Shell.enabled is false, which is the default.

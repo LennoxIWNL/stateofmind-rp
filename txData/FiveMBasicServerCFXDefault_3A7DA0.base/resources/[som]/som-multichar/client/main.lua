@@ -322,6 +322,22 @@ local function endScene()
     SetEntityInvincible(ped, false)
 end
 
+-- Rebuilds the camera and preview ped in place, so live tuning can show the
+-- result immediately without tearing the whole selection down.
+AddEventHandler('som-multichar:client:rebuildScene', function()
+    if not inSelection or not cam then return end
+
+    local camPos, lookAt = cameraFraming(Config.Shell.enabled and shellObject ~= nil)
+    SetCamCoord(cam, camPos.x, camPos.y, camPos.z)
+    PointCamAtCoord(cam, lookAt.x, lookAt.y, lookAt.z)
+
+    if previewPed and DoesEntityExist(previewPed) then
+        local pos = pedPosition()
+        SetEntityCoordsNoOffset(previewPed, pos.x, pos.y, pos.z, false, false, false)
+        SetEntityHeading(previewPed, pedHeading())
+    end
+end)
+
 -- ---------------------------------------------------------------------------
 -- Selection flow
 -- ---------------------------------------------------------------------------

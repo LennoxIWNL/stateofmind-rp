@@ -41,6 +41,13 @@ AddEventHandler('som:server:playerLoaded', function(source)
     leaveSelection(source)
 end)
 
+-- Scene tuning is client-side cosmetic only, but the keybinds should not be in
+-- players' hands. The client cannot read ACE, so it asks here.
+lib.callback.register('som-multichar:server:canTuneScene', function(source)
+    if not Config.SceneTuning or not Config.SceneTuning.enabled then return false end
+    return exports['som-core']:hasPermission(source, Config.SceneTuning.ace or 'som.admin')
+end)
+
 AddEventHandler('onResourceStart', function(resource)
     if resource ~= GetCurrentResourceName() then return end
 
