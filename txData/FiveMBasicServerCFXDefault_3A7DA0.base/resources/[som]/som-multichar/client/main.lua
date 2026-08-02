@@ -419,6 +419,10 @@ AddEventHandler('som-multichar:client:rebuildScene', function()
     SetCamCoord(cam, camPos.x, camPos.y, camPos.z)
     PointCamAtCoord(cam, lookAt.x, lookAt.y, lookAt.z)
 
+    -- FOV is tunable, so it has to be re-applied here and not only at scene
+    -- creation, or zooming would do nothing until the next reload.
+    SetCamFov(cam, Config.Camera.fov)
+
     -- Keep the focal range matched while tuning, or the character drifts out
     -- of focus as the camera or the character is moved.
     applyDof(camPos)

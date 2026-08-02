@@ -325,6 +325,32 @@ async function handleTuningKey(event) {
         return true;
     }
 
+    // Zoom. '=' and '+' narrow the field of view, which reads as moving closer;
+    // '-' widens it. Clamped in Lua.
+    if (key === '=' || key === '+') {
+        event.preventDefault();
+        post('tuningFov', { dir: -1 });
+        return true;
+    }
+    if (key === '-' || key === '_') {
+        event.preventDefault();
+        post('tuningFov', { dir: 1 });
+        return true;
+    }
+
+    // Aim height on the character. Lowering it tilts the shot down and brings
+    // more of the body into frame.
+    if (key === ',' || key === '<') {
+        event.preventDefault();
+        post('tuningLook', { dir: -1 });
+        return true;
+    }
+    if (key === '.' || key === '>') {
+        event.preventDefault();
+        post('tuningLook', { dir: 1 });
+        return true;
+    }
+
     const lower = key.toLowerCase();
     if (lower === 'q' || lower === 'e') {
         event.preventDefault();

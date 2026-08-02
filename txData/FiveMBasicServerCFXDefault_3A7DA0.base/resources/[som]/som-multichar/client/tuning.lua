@@ -36,6 +36,8 @@ local function dump()
     print(('    camOffset = vec3(%s, %s, %s),')
         :format(round(shell.camOffset.x), round(shell.camOffset.y), round(shell.camOffset.z)))
     print(('    lookHeight = %s,'):format(round(shell.lookHeight or 0.9)))
+    print('^5[som-multichar]^7 and into Config.Camera:')
+    print(('    fov = %s,'):format(round(Config.Camera.fov)))
 
     TriggerEvent('som:client:notify', 'Values printed to the F8 console', 'success')
 end
@@ -101,9 +103,9 @@ RegisterNUICallback('tuningToggle', function(_, cb)
 
     print(('^5[som-multichar]^7 scene tuning %s'):format(active and 'ON' or 'OFF'))
     TriggerEvent('som:client:notify',
-        active and 'Tuning ON. Arrows move, PgUp/PgDn height, Q/E rotate, R target, P print.'
+        active and 'Tuning ON. Arrows move, Z/X height, +/- zoom, ,/. aim height, Q/E rotate, R target, P print.'
                 or 'Tuning OFF',
-        active and 'success' or 'info')
+        active and 'success' or 'info', active and 9000 or 3000)
 
     cb({ active = active })
 end)
@@ -113,6 +115,38 @@ RegisterNUICallback('tuningNudge', function(data, cb)
         nudge((tonumber(data.dx) or 0) * step,
               (tonumber(data.dy) or 0) * step,
               (tonumber(data.dz) or 0) * step)
+    end
+    cb({})
+end)
+
+RegisterNUICallback('tuningFov', function(data, cb)
+    if active then
+        local dir = tonumber(data and data.dir) or 1
+        local fov = (Config.Camera.fov or 34.0) + dir
+
+        -- Below about 10 the perspective goes flat and telephoto, above 70 it
+        -- distorts badly at this range.
+        if fov < 10.0 then fov = 10.0 end
+        if fov > 70.0 then fov = 70.0 end
+
+        Config.Camera.fov = fov
+        TriggerEvent('som-multichar:client:rebuildScene')
+        TriggerEvent('som:client:notify', ('FOV %.0f'):format(fov), 'info', 1200)
+    end
+    cb({})
+end)
+
+RegisterNUICallback('tuningLook', function(data, cb)
+    if active then
+        local dir = tonumber(data and data.dir) or 1
+        local h = (Config.Shell.lookHeight or 0.9) + (dir * 0.05)
+
+        if h < 0.0 then h = 0.0 end
+        if h > 2.0 then h = 2.0 end
+
+        Config.Shell.lookHeight = h
+        TriggerEvent('som-multichar:client:rebuildScene')
+        TriggerEvent('som:client:notify', ('Aim height %.2f'):format(h), 'info', 1200)
     end
     cb({})
 end)

@@ -71,6 +71,30 @@ If the model fails to load, the code logs it and falls back to the world scene r
 - `SetUseHiDof` only applies for the frame it is called on, so depth of field runs on a per-frame thread for as long as the scene is up.
 - The native is `SetNuiFocus`, **not** `SetNUIFocus`. The capitalised spelling is nil and throws, leaving a UI with no cursor.
 
+## Live scene tuning
+
+Shell models differ in where their floor and furniture sit, so these offsets are always wrong on the first attempt and guessing them from screenshots costs a restart per try. `Config.SceneTuning.enabled` turns on an in-game tuner.
+
+| Key | Action |
+|---|---|
+| **F10** | Toggle tuning |
+| Arrows | Move, relative to the screen: up is away from the camera |
+| **Z** / **X** | Height, up and down |
+| **+** / **-** | Zoom, narrows and widens the field of view |
+| **,** / **.** | Aim height on the character, lower brings more of the body into frame |
+| **Q** / **E** | Rotate the character |
+| **R** | Cycle target: camera ↔ character |
+| **P** | Print current values to F8, ready to paste into `config.lua` |
+| **F11** | Print your own coordinates. In-world only, after spawning |
+
+Input is handled in `html/app.js` and forwarded over NUI callbacks. The character screen holds NUI focus with keep-input disabled, so the game receives no keyboard at all while it is open and neither `RegisterKeyMapping` nor raw key polling works there.
+
+Movement is screen-relative and derived from the camera's real rotation via `GetCamRot`, not from config values, since config can describe an orientation that is not the one being rendered.
+
+The orbit pauses while tuning, because a drifting shot makes it impossible to judge an offset.
+
+**Set `Config.SceneTuning.enabled = false` for production.**
+
 ## Known gaps
 
 - **No appearance customisation.** `qb-clothing` was removed in the teardown and Phase 7 owns the replacement, so characters render as the default freemode ped for their gender. Creation collects gender but no facial features.
