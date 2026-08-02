@@ -672,7 +672,29 @@ are the quality bar every phase is measured against.
 like a stock free script with a reskin, it is not done. This is the standard the
 rebuild exists to reach, and it outranks shipping speed.
 
-### 14.2 Research before building
+### 14.2 Research before building, then STOP for approval
+
+**This is a hard gate, not a suggestion.** For every new script:
+
+1. **Review real implementations first.** Several of them, not one.
+2. **Report back** with: what was reviewed, the feature list, what each does
+   well, what each does badly, and a recommendation per feature.
+3. **Wait for explicit confirmation.** Do not write any code until the owner
+   has approved the feature list.
+
+The reason is that a script's feature set is a design decision that belongs to
+the owner, not a detail to be inferred. Building first and asking afterwards
+produces work that has to be argued about or thrown away, and it hides the
+choices inside code where they are expensive to change.
+
+Expect the approval step to involve many small questions (*do you want map
+blips for shots fired?*). That is the point of it, not overhead.
+
+**Exception, narrowly:** something that unblocks testing and would otherwise
+leave the server unusable may be built immediately, and then revisited properly.
+`som-chat` was built this way, because no typed command was reachable at all
+without it. Anything built under this exception must be flagged as owing a
+review.
 
 For every significant system, **study the best existing implementations first**,
 then write our own against som-core. Explicitly requested for police, and to be
