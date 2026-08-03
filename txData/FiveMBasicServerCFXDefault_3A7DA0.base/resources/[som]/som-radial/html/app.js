@@ -133,6 +133,13 @@ function render(items) {
             group.appendChild(chevron);
         }
 
+        // Clicking is supported as well as releasing the key. Holding a key and
+        // releasing is the fast path, but a click is what everyone tries first.
+        group.addEventListener('click', () => {
+            activeIndex = i;
+            confirm();
+        });
+
         svg.appendChild(group);
     });
 
@@ -223,6 +230,22 @@ function confirm() {
 
     post('select', { id: item.id, export: item.export, door: item.door, seat: item.seat });
 }
+
+// Escape and right click both close without picking anything, which is what
+// people expect from a radial even when it is normally a hold-and-release.
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !root.classList.contains('hidden')) {
+        root.classList.add('hidden');
+        post('close');
+    }
+});
+
+document.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (root.classList.contains('hidden')) return;
+    root.classList.add('hidden');
+    post('close');
+});
 
 window.addEventListener('message', (event) => {
     const msg = event.data;

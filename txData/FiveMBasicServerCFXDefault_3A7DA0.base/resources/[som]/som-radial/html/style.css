@@ -20,7 +20,9 @@ body {
     font-family: var(--som-font);
     color: #fff;
     -webkit-font-smoothing: antialiased;
-    cursor: none;
+    /* The cursor stays visible. It was hidden in favour of a drawn dot that
+     * nothing ever created, which left the wheel with no pointer at all. */
+    cursor: default;
 }
 
 .hidden { display: none !important; }
@@ -45,6 +47,8 @@ body {
 .wheel__svg { width: 100%; height: 100%; overflow: visible; }
 
 /* --- Slices ------------------------------------------------------------- */
+
+.slice { cursor: pointer; }
 
 .slice__path {
     fill: rgba(18, 14, 26, 0.86);
@@ -114,26 +118,6 @@ body {
     text-transform: uppercase;
     color: rgba(255, 255, 255, 0.38);
 }
-
-/* --- Cursor -------------------------------------------------------------
- *
- * Drawn rather than using the system cursor: the wheel is picked by direction
- * from centre, so a pointer that shows the angle reads better than an arrow.
- */
-
-.dot {
-    position: absolute;
-    width: 10px;
-    height: 10px;
-    margin: -5px 0 0 -5px;
-    border-radius: 50%;
-    background: var(--som-pink);
-    box-shadow: 0 0 12px var(--som-pink);
-    pointer-events: none;
-    transition: opacity 120ms ease;
-}
-
-.dot.is-dead { opacity: 0.25; }
 
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pop {

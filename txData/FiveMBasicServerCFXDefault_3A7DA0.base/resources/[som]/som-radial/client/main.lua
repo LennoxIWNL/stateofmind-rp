@@ -260,8 +260,15 @@ end)
 -- Input
 -- ---------------------------------------------------------------------------
 
+-- open() may call lib.callback.await, which yields. A command handler is not a
+-- coroutine, so awaiting inside one throws and takes the whole keypress with
+-- it. Every entry point therefore goes through a thread.
+local function openThreaded()
+    CreateThread(open)
+end
+
 if Config.HoldToOpen then
-    RegisterCommand('+somradial', open, false)
+    RegisterCommand('+somradial', openThreaded, false)
     RegisterCommand('-somradial', function()
         if not isOpen then return end
         -- Release picks whatever the cursor is over. The NUI answers with a
@@ -272,17 +279,28 @@ if Config.HoldToOpen then
     RegisterKeyMapping('+somradial', 'Open radial menu', 'keyboard', Config.OpenKey)
 else
     RegisterCommand('somradial', function()
-        if isOpen then close() else open() end
+        if isOpen then close() else openThreaded() end
     end, false)
 
     RegisterKeyMapping('somradial', 'Open radial menu', 'keyboard', Config.OpenKey)
 end
 
 -- Entitlement changes, so the cached list has to change with them.
-RegisterNetEvent('som:client:playerLoaded', refresh)
-RegisterNetEvent('som:client:onJobChanged', refresh)
-RegisterNetEvent('som:client:onGangChanged', refresh)
-RegisterNetEvent('som-radial:client:refresh', refresh)
+local function refreshThreaded()
+    CreateThread(refresh)
+end
+
+RegisterNetEvent('som:client:playerLoaded', refreshThreaded)
+RegisterNetEvent('som:client:onJobChanged', refreshThreaded)
+RegisterNetEvent('som:client:onGangChanged', refreshThreaded)
+RegisterNetEvent('som-radial:client:refresh', refreshThreaded)
+
+-- Restarting this resource while already in the world means playerLoaded has
+-- long since fired, so the cache would stay empty until a job change.
+CreateThread(function()
+    Wait(1000)
+    if exports['som-core']:isPlayerLoaded() then refresh() end
+end)
 
 AddEventHandler('onResourceStop', function(resource)
     if resource == GetCurrentResourceName() and isOpen then SetNuiFocus(false, false) end
