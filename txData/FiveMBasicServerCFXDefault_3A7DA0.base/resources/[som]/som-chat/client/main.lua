@@ -14,15 +14,38 @@
 
 local isOpen = false
 
+-- Declared ahead of open() so the escape watcher inside it can call the real
+-- implementation below rather than capturing a stale local.
+local close
+
 local function open()
     if isOpen then return end
     isOpen = true
 
     SetNuiFocus(true, true)
     SendNUIMessage({ action = 'open' })
+
+    -- Escape safety net.
+    --
+    -- The NUI listens for Escape itself, but the game can consume the key
+    -- before CEF ever sees it, in which case it registers as the pause menu
+    -- opening. Watching for that and closing here means Escape always works,
+    -- whichever layer receives it. som-pause ignores the same press while any
+    -- NUI holds focus, so the two do not fight over it.
+    CreateThread(function()
+        while isOpen do
+            if IsPauseMenuActive() then
+                SetPauseMenuActive(false)
+                close()
+                break
+            end
+
+            Wait(0)
+        end
+    end)
 end
 
-local function close()
+close = function()
     if not isOpen then return end
     isOpen = false
 

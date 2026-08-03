@@ -41,17 +41,22 @@ function submit() {
     close();
 }
 
+// Escape is handled on the document rather than the input. If focus has
+// drifted off the field for any reason the input never sees the key, and the
+// only way to close would be to submit an empty line.
+document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    post('close');
+    close();
+});
+
 input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
         event.preventDefault();
         submit();
-        return;
-    }
-
-    if (event.key === 'Escape') {
-        event.preventDefault();
-        post('close');
-        close();
         return;
     }
 

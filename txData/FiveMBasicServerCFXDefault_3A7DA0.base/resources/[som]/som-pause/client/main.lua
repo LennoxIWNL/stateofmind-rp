@@ -72,7 +72,13 @@ CreateThread(function()
     while true do
         if not handedOff and IsPauseMenuActive() then
             SetPauseMenuActive(false)
-            if not isOpen then open() end
+
+            -- Escape belongs to whatever already has the screen. Chat, the
+            -- phone and the inventory all close on it, and opening this bar
+            -- underneath them meant Escape appeared to do nothing at all.
+            -- IsNuiFocused is false once they release focus, so the next press
+            -- opens the bar normally.
+            if not isOpen and not IsNuiFocused() then open() end
         end
 
         -- Nothing should reach the world while the bar is up.
