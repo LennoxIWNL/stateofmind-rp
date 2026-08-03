@@ -207,32 +207,71 @@ function renderOverlays(frag) {
     }
 }
 
-function renderApparel(frag) {
-    const byId = new Map(state.appearance.components.map((c, i) => [Number(c.component_id), i]));
+/**
+ * Stepper for a component or prop, addressed by its GAME id.
+ *
+ * Not by array position: Lua counts from one, JavaScript from zero, and a JSON
+ * round trip turns one into the other. An id is the same number on both sides.
+ */
+function slotStepper(label, kind, id, max, min = 0) {
+    const list = kind === 'prop' ? state.appearance.props : state.appearance.components;
+    const key = kind === 'prop' ? 'prop_id' : 'component_id';
 
+    let entry = list.find((e) => Number(e[key]) === id);
+    if (!entry) {
+        // -1 is the game's "nothing", so an unworn prop starts bare.
+        entry = { [key]: id, drawable: kind === 'prop' ? -1 : 0, texture: 0 };
+        list.push(entry);
+    }
+
+    const wrap = el('div', 'control');
+
+    const head = el('div', 'control__head');
+    head.append(el('span', 'control__label', label),
+        el('span', 'control__value', `${max - min} options`));
+    wrap.appendChild(head);
+
+    const row = el('div', 'stepper');
+    const value = el('div', 'stepper__value', String(entry.drawable));
+
+    const step = (dir) => {
+        const count = max - min;
+        if (count <= 0) return;
+
+        const next = (Number(entry.drawable) - min + dir + count) % count + min;
+        entry.drawable = next;
+        value.textContent = String(next);
+
+        post('slot', { kind, id, field: 'drawable', value: next });
+        renderPrice();
+    };
+
+    const left = el('button', 'stepper__btn');
+    left.type = 'button';
+    left.innerHTML = ARROW_L;
+    left.addEventListener('click', () => step(-1));
+
+    const right = el('button', 'stepper__btn');
+    right.type = 'button';
+    right.innerHTML = ARROW_R;
+    right.addEventListener('click', () => step(1));
+
+    row.append(left, value, right);
+    wrap.appendChild(row);
+    return wrap;
+}
+
+function renderApparel(frag) {
     frag.appendChild(el('div', 'group', 'Clothing'));
     for (const c of state.definitions.components) {
-        const index = byId.get(c.id);
-        if (index === undefined) continue;
-
         const limit = state.limits.components[String(c.id)] || { drawables: 1 };
-        frag.appendChild(stepper(c.label, ['components', String(index), 'drawable'], limit.drawables || 1));
+        frag.appendChild(slotStepper(c.label, 'component', c.id, limit.drawables || 1));
     }
 
     frag.appendChild(el('div', 'group', 'Accessories'));
-    const propIndex = new Map(state.appearance.props.map((p, i) => [Number(p.prop_id), i]));
-
     for (const p of state.definitions.props) {
-        let index = propIndex.get(p.id);
-        if (index === undefined) {
-            // A prop the character has never worn has no row yet; -1 is the
-            // game's "nothing", so the stepper starts from bare.
-            state.appearance.props.push({ prop_id: p.id, drawable: -1, texture: 0 });
-            index = state.appearance.props.length - 1;
-        }
-
         const limit = state.limits.props[String(p.id)] || { drawables: 1 };
-        frag.appendChild(stepper(p.label, ['props', String(index), 'drawable'], limit.drawables || 1, -1));
+        frag.appendChild(slotStepper(p.label, 'prop', p.id, limit.drawables || 1, -1));
     }
 }
 

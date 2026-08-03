@@ -143,6 +143,11 @@ RegisterNUICallback('update', function(data, cb)
 
     -- Walk the path and set the leaf, so the NUI can address anything in the
     -- appearance table without this file knowing its shape.
+    --
+    -- This only works for the parts of the table keyed by NAME. Arrays are
+    -- addressed by `slot` below instead: components and props are Lua arrays
+    -- indexed from one, the NUI counts from zero, and the mismatch meant every
+    -- clothing change silently hit a nil key and stopped here.
     local node = working
     for i = 1, #data.path - 1 do
         local key = data.path[i]
@@ -152,6 +157,39 @@ RegisterNUICallback('update', function(data, cb)
 
     node[data.path[#data.path]] = data.value
     applyWorking()
+end)
+
+---Sets a component or prop by its GAME id rather than its position.
+---
+---Array indices cross the NUI boundary badly: Lua counts from one, JavaScript
+---from zero, and JSON round trips turn one into the other depending on whether
+---the table looked like an array when it was encoded. A component id is the
+---same number on both sides whatever happens in between.
+RegisterNUICallback('slot', function(data, cb)
+    cb({})
+    if not isOpen or type(data) ~= 'table' then return end
+
+    local id = tonumber(data.id)
+    local field = data.field
+    if not id or (field ~= 'drawable' and field ~= 'texture') then return end
+
+    local list = data.kind == 'prop' and working.props or working.components
+    local key = data.kind == 'prop' and 'prop_id' or 'component_id'
+    if type(list) ~= 'table' then return end
+
+    for _, entry in pairs(list) do
+        if tonumber(entry[key]) == id then
+            entry[field] = data.value
+            applyWorking()
+            return
+        end
+    end
+
+    -- A prop the character has never worn has no entry yet.
+    if data.kind == 'prop' then
+        list[#list + 1] = { prop_id = id, drawable = data.value, texture = 0 }
+        applyWorking()
+    end
 end)
 
 RegisterNUICallback('view', function(data, cb)
