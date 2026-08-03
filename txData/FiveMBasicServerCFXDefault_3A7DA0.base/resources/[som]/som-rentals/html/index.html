@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>som-rentals</title>
+    <link rel="stylesheet" href="https://cfx-nui-som-assets/tokens.css">
+    <link rel="stylesheet" href="https://cfx-nui-som-rentals/html/style.css">
+</head>
+<body>
+    <div id="root" class="root hidden">
+        <section class="panel">
+            <header class="panel__head">
+                <div>
+                    <h1 class="panel__title" id="title">Vehicle Rental</h1>
+                    <p class="panel__sub">Deposit refunded on return</p>
+                </div>
+                <div class="wallet">
+                    <span class="wallet__label">Cash</span>
+                    <span class="wallet__value" id="balance">$0</span>
+                </div>
+            </header>
+
+            <div class="list" id="list"></div>
+
+            <footer class="panel__foot">
+                <span class="note" id="deposit-note"></span>
+                <button class="btn" id="close" type="button">Close</button>
+            </footer>
+        </section>
+    </div>
+
+    <script src="https://cfx-nui-som-rentals/html/app.js"></script>
+</body>
+</html>

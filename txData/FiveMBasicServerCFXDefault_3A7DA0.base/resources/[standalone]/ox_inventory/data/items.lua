@@ -919,6 +919,17 @@ return {
 		description = 'Ammo for EMP Launcher',
 	},
 
+	-- SOM PATCH: rental agreement issued by som-rentals. The metadata is the
+	-- point: ox renders `description` in the tooltip, so hovering the papers
+	-- shows the plate, the renter and the time it was taken out.
+	['rental_papers'] = {
+		label = 'Rental Agreement',
+		weight = 10,
+		stack = false,
+		close = true,
+		description = 'A vehicle rental agreement',
+	},
+
 	-- SOM PATCH: identity documents are shown to players nearby by som-id.
 	-- Re-apply these three client.export lines after an ox_inventory upgrade.
 	['id_card'] = {
