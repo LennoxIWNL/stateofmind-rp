@@ -94,3 +94,25 @@ exports('hasJob', function(jobName, minGrade, requireDuty)
     if requireDuty and not job.onduty then return false end
     return true
 end)
+
+-- ---------------------------------------------------------------------------
+-- Idle camera
+--
+-- Standing still long enough makes the game swing into its cinematic idle
+-- shot, which in an RP server means the camera wanders off mid-conversation.
+-- Invalidating it resets the timer, so it never reaches the threshold.
+--
+-- Both variants are needed: the on-foot one and the in-vehicle one are
+-- separate timers and killing only the first still leaves it happening in a
+-- parked car.
+-- ---------------------------------------------------------------------------
+
+CreateThread(function()
+    while true do
+        -- Every few seconds is enough. The timer is measured in tens of
+        -- seconds, so a per-frame call would be pure waste.
+        InvalidateIdleCam()
+        InvalidateVehicleIdleCam()
+        Wait(5000)
+    end
+end)

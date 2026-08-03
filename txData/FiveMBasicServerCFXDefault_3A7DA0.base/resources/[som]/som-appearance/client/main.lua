@@ -123,8 +123,14 @@ local function close()
     SendNUIMessage({ action = 'close' })
 
     stopCamera()
-    FreezeEntityPosition(cache.ped, false)
-    SetEntityInvincible(cache.ped, false)
+
+    -- Creation runs inside som-multichar's shell, which owns the ped's frozen
+    -- state and unfreezes it when it moves the player to the world. Unfreezing
+    -- here would drop them through the shell floor before that happens.
+    if scope ~= 'creator' then
+        FreezeEntityPosition(cache.ped, false)
+        SetEntityInvincible(cache.ped, false)
+    end
 end
 
 -- ---------------------------------------------------------------------------
@@ -207,25 +213,25 @@ exports('refresh', function()
     if data and data.appearance then Appearance.Apply(cache.ped, data.appearance) end
 end)
 
--- Every new character customises before they play.
---
--- Opened on load rather than inside som-multichar's scene: the creator edits
--- the player's own ped, and during character selection that ped is not yet in
--- the world. Waiting until the character is live means one code path serves
--- creation and the barber instead of two.
+---Whether this character has never been through the creator.
+---
+---som-multichar asks this so it can run the creator INSIDE the shell, before
+---the player is ever moved to the world. This resource deliberately does not
+---open it itself: doing both would race, and the shell has the interior, the
+---lighting and a camera already tuned for it.
+exports('needsCreation', function()
+    local data = lib.callback.await('som-appearance:server:get', false)
+    return data ~= nil and data.appearance == nil
+end)
+
+-- Existing characters get their appearance put back on. Creation is driven by
+-- som-multichar; see needsCreation.
 RegisterNetEvent('som:client:playerLoaded', function()
     CreateThread(function()
-        Wait(2500)
+        Wait(1500)
 
         local data = lib.callback.await('som-appearance:server:get', false)
-        if not data then return end
-
-        if data.appearance then
-            Appearance.Apply(cache.ped, data.appearance)
-            return
-        end
-
-        Editor.Open('creator')
+        if data and data.appearance then Appearance.Apply(cache.ped, data.appearance) end
     end)
 end)
 

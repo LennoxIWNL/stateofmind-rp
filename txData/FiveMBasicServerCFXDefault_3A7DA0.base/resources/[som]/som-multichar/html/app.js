@@ -278,6 +278,14 @@ form.addEventListener('submit', async (event) => {
 
     const result = await post('createCharacter', payload);
 
+    // Straight into the character. Creating one and then having to find it in
+    // the list and press Play is a step that exists only because the two calls
+    // were written separately.
+    if (result && result.success && result.citizenid) {
+        await post('selectCharacter', { citizenid: result.citizenid });
+        return;
+    }
+
     busy = false;
     submitBtn.disabled = false;
 

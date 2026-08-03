@@ -623,8 +623,77 @@ local function playSpawnCinematic(spawn)
     end)
 end
 
+---Runs the appearance creator IN THE SHELL, before the player ever reaches the
+---world.
+---
+---The alternative was opening it after spawning at the airport, which worked
+---but put character creation in a car park. The shell already has the
+---interior, the lighting and a camera position that was tuned for exactly this,
+---so the creator belongs in it.
+---
+---The PLAYER's ped is moved into the shell and the preview ped is removed, so
+---the editor works on the real thing rather than a stand-in that would then
+---have to be copied across.
+---@param data table the playerLoaded payload
+---@return boolean ran
+local function runCreatorInShell(data)
+    if GetResourceState('som-appearance') ~= 'started' then return false end
+
+    local ok, needs = pcall(function()
+        return exports['som-appearance']:needsCreation()
+    end)
+
+    if not ok or not needs then return false end
+
+    -- The selection UI goes, the scene stays.
+    SendNUIMessage({ action = 'close' })
+    SetNuiFocus(false, false)
+
+    destroyPreviewPed()
+
+    local gender = data.charinfo and data.charinfo.gender or 0
+    local modelName = Config.PedModels[gender] or Config.PedModels[0]
+    local model = joaat(modelName)
+
+    RequestModel(model)
+    local timeout = GetGameTimer() + 10000
+    while not HasModelLoaded(model) and GetGameTimer() < timeout do Wait(10) end
+
+    if HasModelLoaded(model) then
+        SetPlayerModel(PlayerId(), model)
+        SetModelAsNoLongerNeeded(model)
+        SetPedDefaultComponentVariation(PlayerPedId())
+    end
+
+    local ped = PlayerPedId()
+    local pos = pedPosition()
+
+    SetEntityCoordsNoOffset(ped, pos.x, pos.y, pos.z, false, false, false)
+    SetEntityHeading(ped, pedHeading())
+    FreezeEntityPosition(ped, true)
+    SetEntityVisible(ped, true, false)
+
+    DoScreenFadeIn(600)
+    exports['som-appearance']:openEditor('creator')
+
+    -- The spawn waits for the creator to be confirmed rather than racing it.
+    local finished = false
+    local handler = AddEventHandler('som-appearance:client:finished', function()
+        finished = true
+    end)
+
+    while not finished do Wait(100) end
+    RemoveEventHandler(handler)
+
+    return true
+end
+
 RegisterNetEvent('som:client:playerLoaded', function(data)
     if type(data) ~= 'table' then return end
+
+    -- New characters are built in the shell first. Only once that is confirmed
+    -- does the fade to the world happen.
+    runCreatorInShell(data)
 
     DoScreenFadeOut(500)
     while not IsScreenFadedOut() do Wait(10) end
