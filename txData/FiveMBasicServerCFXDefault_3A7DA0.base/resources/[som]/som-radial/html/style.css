@@ -1,0 +1,142 @@
+/*
+ * Radial menu.
+ *
+ * Screen-space and centred, because it is attached to the player rather than
+ * to anything in the world.
+ *
+ * No color-mix() and no external assets. FiveM's CEF predates color-mix, and a
+ * rejected background declaration falls back to nothing rather than to
+ * something duller. Icons are inline SVG for the same reason NUI cannot fetch
+ * an icon font: there is no network.
+ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    background: transparent;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    font-family: var(--som-font);
+    color: #fff;
+    -webkit-font-smoothing: antialiased;
+    cursor: none;
+}
+
+.hidden { display: none !important; }
+
+.root {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(circle at 50% 50%,
+        rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.32) 38%, transparent 62%);
+    animation: fade 140ms ease both;
+}
+
+.wheel {
+    position: relative;
+    width: 460px;
+    height: 460px;
+    animation: pop 220ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+.wheel__svg { width: 100%; height: 100%; overflow: visible; }
+
+/* --- Slices ------------------------------------------------------------- */
+
+.slice__path {
+    fill: rgba(18, 14, 26, 0.86);
+    stroke: rgba(255, 255, 255, 0.10);
+    stroke-width: 1.5;
+    transition: fill 120ms ease;
+}
+
+.slice.is-active .slice__path {
+    fill: var(--slice-colour, var(--som-pink));
+    stroke: rgba(255, 255, 255, 0.5);
+}
+
+.slice__icon { color: rgba(255, 255, 255, 0.72); transition: color 120ms ease; }
+.slice.is-active .slice__icon { color: #fff; }
+
+.slice__label {
+    fill: rgba(255, 255, 255, 0.72);
+    font-family: var(--som-font);
+    font-size: 12px;
+    font-weight: 600;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    pointer-events: none;
+    transition: fill 120ms ease;
+}
+
+.slice.is-active .slice__label { fill: #fff; }
+
+/* A slice leading to a submenu gets a chevron on its outer edge. */
+.slice__more { fill: rgba(255, 255, 255, 0.45); pointer-events: none; }
+.slice.is-active .slice__more { fill: #fff; }
+
+/* --- Hub ---------------------------------------------------------------- */
+
+.hub {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 152px;
+    height: 152px;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    text-align: center;
+    padding: 0 18px;
+    background: rgba(10, 8, 14, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 0 40px -8px var(--som-pink-a61), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    pointer-events: none;
+}
+
+.hub__label {
+    font-size: 0.95rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+}
+
+.hub__hint {
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.38);
+}
+
+/* --- Cursor -------------------------------------------------------------
+ *
+ * Drawn rather than using the system cursor: the wheel is picked by direction
+ * from centre, so a pointer that shows the angle reads better than an arrow.
+ */
+
+.dot {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    margin: -5px 0 0 -5px;
+    border-radius: 50%;
+    background: var(--som-pink);
+    box-shadow: 0 0 12px var(--som-pink);
+    pointer-events: none;
+    transition: opacity 120ms ease;
+}
+
+.dot.is-dead { opacity: 0.25; }
+
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop {
+    from { opacity: 0; transform: scale(0.88); }
+    to   { opacity: 1; transform: none; }
+}

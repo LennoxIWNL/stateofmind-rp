@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>som-radial</title>
+    <link rel="stylesheet" href="https://cfx-nui-som-assets/tokens.css">
+    <link rel="stylesheet" href="https://cfx-nui-som-radial/html/style.css">
+</head>
+<body>
+    <div id="root" class="root hidden">
+        <div class="wheel" id="wheel">
+            <!-- Slices are drawn as SVG paths so the hit area matches the
+                 wedge exactly. A ring of positioned divs would give every
+                 slice a rectangular hit box that overlaps its neighbours. -->
+            <svg id="svg" class="wheel__svg" viewBox="-200 -200 400 400" aria-hidden="true"></svg>
+
+            <div class="hub" id="hub">
+                <span class="hub__label" id="hub-label">Select</span>
+                <span class="hub__hint" id="hub-hint">Release to pick</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cfx-nui-som-radial/html/app.js"></script>
+</body>
+</html>
