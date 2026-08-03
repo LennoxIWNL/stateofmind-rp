@@ -29,6 +29,11 @@ local menuHistory = {}
 local nearbyZones
 
 -- Toggle ox_target, instead of holding the hotkey
+-- SOM: how far the eye reaches, in metres. Stock is a hardcoded 20, which
+-- lit up interactions from across a car park and made the eye feel like a
+-- scanner rather than something you point at what is in front of you.
+-- Convar so it can be tuned without touching this file again.
+local maxDistance = GetConvarInt('ox_target:maxDistance', 5)
 local toggleHotkey = GetConvarInt('ox_target:toggleHotkey', 0) == 1
 local mouseButton = GetConvarInt('ox_target:leftClick', 1) == 1 and 24 or 25
 local debug = GetConvarInt('ox_target:debug', 0) == 1
@@ -45,7 +50,10 @@ local function shouldHide(option, distance, endCoords, entityHit, entityType, en
         return true
     end
 
-    if distance > (option.distance or 7) then
+    -- Stock default is 7m. Options that do not state a distance now fall back
+    -- to the same reach as the raycast, so nothing is offered from further away
+    -- than the eye can actually see.
+    if distance > (option.distance or maxDistance) then
         return true
     end
 
@@ -177,7 +185,7 @@ local function startTargeting()
         end
 
         local playerCoords = GetEntityCoords(cache.ped)
-        hit, entityHit, endCoords = lib.raycast.fromCamera(flag, 4, 20)
+        hit, entityHit, endCoords = lib.raycast.fromCamera(flag, 4, maxDistance)
         distance = #(playerCoords - endCoords)
 
         if entityHit ~= 0 and entityHit ~= lastEntity then
@@ -187,7 +195,7 @@ local function startTargeting()
 
         if entityType == 0 then
             local _flag = flag == 511 and 26 or 511
-            local _hit, _entityHit, _endCoords = lib.raycast.fromCamera(_flag, 4, 20)
+            local _hit, _entityHit, _endCoords = lib.raycast.fromCamera(_flag, 4, maxDistance)
             local _distance = #(playerCoords - _endCoords)
 
             if _distance < distance then

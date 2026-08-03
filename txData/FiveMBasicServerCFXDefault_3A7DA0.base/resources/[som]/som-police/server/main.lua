@@ -369,6 +369,12 @@ lib.callback.register('som-police:server:takeItem', function(source, data)
             registered = true,
             serial = ('POL%s'):format(officer.citizenid:sub(-5):upper()),
         }
+
+        -- The taser is issued EMPTY of a loaded round beyond the first, because
+        -- it is a single-shot device: one cartridge, one deployment, then
+        -- reload. Handing it over with a full magazine would undo the whole
+        -- point of making cartridges a consumable.
+        if entry.item == 'weapon_stungun' then metadata.ammo = 1 end
     end
 
     local added = exports.ox_inventory:AddItem(source, entry.item, entry.count, metadata)

@@ -152,6 +152,12 @@ RegisterNUICallback('rent', function(data, cb)
     local res = lib.callback.await('som-rentals:server:rent', false, {
         location = currentLocation,
         model = type(data) == 'table' and data.model or nil,
+        -- The chosen account was being DROPPED here. The UI sent it, this
+        -- forwarded only the model, so the server always saw a nil account and
+        -- Money.PayWith refused it with "that is not a way to pay" no matter
+        -- how much money the player had. som-core validates it; this only
+        -- relays.
+        account = type(data) == 'table' and data.account or nil,
     })
 
     cb(res or { success = false })

@@ -37,8 +37,12 @@ local drawZoneSprites = GetConvarInt('ox_target:drawSprite', 24)
 local SetDrawOrigin = SetDrawOrigin
 local DrawSprite = DrawSprite
 local ClearDrawOrigin = ClearDrawOrigin
-local colour = vector(155, 155, 155, 175)
-local hover = vector(98, 135, 236, 255)
+-- SOM: the indicator dots are pink, matching som-assets/tokens.css
+-- (--som-pink #ff1493). Stock is grey with a blue hover, which reads as a
+-- different product to everything else on screen.
+-- Re-apply on an ox_target upgrade.
+local colour = vector(255, 20, 147, 150)
+local hover = vector(255, 105, 180, 255)
 local currentZones = {}
 local previousZones = {}
 local drawZones = {}

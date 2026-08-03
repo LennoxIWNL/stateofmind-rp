@@ -85,8 +85,9 @@ function renderPayment() {
         btn.type = 'button';
         if (option.account === state.account) btn.classList.add('is-active');
 
-        btn.append(el('span', 'pay__label', option.label),
-            el('span', 'pay__value', money(option.balance)));
+        // Label only. Showing the balance turned a two-word choice into a
+        // financial readout, and the player already knows what they have.
+        btn.append(el('span', 'pay__label', option.label));
 
         btn.addEventListener('click', () => {
             state.account = option.account;
