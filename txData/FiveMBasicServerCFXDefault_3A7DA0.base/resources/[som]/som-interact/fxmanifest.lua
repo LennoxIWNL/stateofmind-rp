@@ -26,6 +26,6 @@ files {
 
 dependencies {
     'ox_lib',
-    'qb-target',
+    'sleepless_interact',
     'som-assets',
 }

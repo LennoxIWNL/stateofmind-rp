@@ -4,13 +4,58 @@ The single interaction surface for SOM. Wraps the preserved target system and pr
 
 ## Why a wrapper
 
-`qb-target` is escrow protected (`dependency '/assetpacks'`) and carries no version field, so it can never be read, forked, or upgraded. The rebuild spec therefore says reuse it, not replace it. Isolating it behind this resource means every future `som-*` script codes against a stable SOM API, and swapping in `ox_target` later is a change to `client/target.lua` and nothing else.
+The engine has already been swapped once, and this file is why that cost an
+afternoon rather than a rewrite.
 
-The wrapper calls qb-target's **ox_target-shaped compat exports** rather than its PascalCase natives, because that surface is smaller and is what a real `ox_target` already understands. It also normalises two rough edges in that shim: zone argument order, and `addGlobalVehicle` being registered twice with the first registration referencing an undefined global.
+It was `qb-target`, which is escrow protected (`dependency '/assetpacks'`) and
+carries no version field, so it could never be read, forked or upgraded. It is
+now **`sleepless_interact`**, which is GPL-3.0, actively maintained, and draws a
+small circle at every interactable point.
+
+Its **native** API is wrapped rather than its ox_target compat shim: the native
+one exposes `holdTime`, `cooldown` and the active callbacks, and one less
+translation layer is one less place for a signature to drift quietly.
+
+## Circles only while Left Alt is held
+
+`sleepless_interact/client/modules/config.lua` is a SOM patch. **Re-apply it
+after upgrading that resource.**
+
+```lua
+config.useShowKeyBind      = true       -- was false, circles were permanent
+config.defaultShowKeyBind  = 'LMENU'    -- Left Alt, same as qb-target
+config.showKeyBindBehavior = 'hold'     -- was 'toggle'
+config.themeColor          = { 255, 20, 147, 200 }
+config.maxInteractDistance = 5.0
+```
+
+The indicator uses the base game `shared / emptydot_32` texture, so nothing has
+to be streamed for it to work.
+
+## Zones are points
+
+The engine draws a circle at a coordinate, and there is nowhere to put a circle
+for a 20 metre polygon. `addBoxZone`, `addSphereZone` and `addPolyZone` all
+resolve to a **single point** with a per-option `distance`; a poly resolves to
+its centroid.
+
+For a door, a till or a stash that is what you wanted anyway. For a genuine
+region ("am I inside this area"), use several points or a PolyZone in
+`som-zones` instead.
+
+## No event fields
+
+`sleepless_interact` options support `event`, `serverEvent` and `command`. The
+wrapper **does not pass any of them through**. A config value naming a server
+event lets the client choose both the event and its payload, which is the same
+hole `som-radial` refuses to open. Use `onSelect` and go through a validated
+export, or a request the server re-checks.
 
 ## Security
 
-**qb-target's `groups` filtering is a client side UI filter.** It decides what a player can see, not what they may do. Any action reached through an interaction must re-check job, gang, grade, and distance on the server. Treat every `onSelect` as an untrusted request.
+**`groups` is a client side UI filter.** It decides what a player can see, not
+what they may do. sleepless has no `groups` field of its own, so the wrapper
+folds it into `canInteract`: same visibility behaviour, same non-guarantee. Any action reached through an interaction must re-check job, gang, grade, and distance on the server. Treat every `onSelect` as an untrusted request.
 
 ```lua
 -- WRONG: the client decided it was allowed
