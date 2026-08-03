@@ -114,6 +114,7 @@ local function close()
     if not isOpen then return end
 
     isOpen = false
+    SetNuiFocusKeepInput(false)
     SetNuiFocus(false, false)
     SendNUIMessage({ action = 'close' })
 end
@@ -136,6 +137,16 @@ local function open()
 
     isOpen = true
     SetNuiFocus(true, true)
+
+    -- Keep input, or the wheel flickers.
+    --
+    -- Taking NUI focus alone stops the game seeing the held key, so it reports
+    -- F1 released, -somradial fires and closes the wheel, and the still-held
+    -- key immediately re-fires +somradial. With keep-input the game still sees
+    -- the key, so the release command fires once, on the real release.
+    -- qb-target used this for its hold-Alt eye for the same reason.
+    SetNuiFocusKeepInput(true)
+
     SendNUIMessage({
         action = 'open',
         data = {

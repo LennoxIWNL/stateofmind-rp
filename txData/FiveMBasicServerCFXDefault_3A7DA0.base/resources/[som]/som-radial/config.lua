@@ -69,14 +69,6 @@ Config.Items = {
         export = 'som-id.useIdCard',
     },
     {
-        id = 'self.phone',
-        section = 'self',
-        label = 'Phone',
-        icon = 'phone',
-        order = 20,
-        export = 'som-phone.openPhone',
-    },
-    {
         id = 'self.handsup',
         section = 'self',
         label = 'Hands Up',

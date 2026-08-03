@@ -8,8 +8,11 @@ const hubHint = document.getElementById('hub-hint');
 
 const R_OUTER = 190;
 const R_INNER = 78;
-const R_LABEL = 138;
-const R_ICON = 108;
+// One anchor per slice. Icon and label are stacked vertically around it in
+// SCREEN space, not placed at two different radii. Two radii works at the top
+// and bottom of the wheel and collides on the left and right, where the pair
+// end up side by side on the same horizontal line.
+const R_ANCHOR = 133;
 
 let colours = {};
 let deadZone = 0.22;
@@ -108,29 +111,31 @@ function render(items) {
 
         group.appendChild(el('path', { d: wedge(a0, a1) }, 'slice__path'));
 
-        // Icon
-        const [ix, iy] = polar(R_ICON, mid);
+        const [ax, ay] = polar(R_ANCHOR, mid);
+        const lines = labelLines(item.label);
+
+        // Whole stack is centred on the anchor: icon on top, label under it.
+        const stackHeight = 24 + 4 + lines.length * 13;
+        const top = ay - stackHeight / 2;
+
         const icon = el('svg', {
-            viewBox: '0 0 24 24', width: 26, height: 26, x: ix - 13, y: iy - 13,
+            viewBox: '0 0 24 24', width: 24, height: 24, x: ax - 12, y: top,
             fill: 'none', stroke: 'currentColor', 'stroke-width': 1.8,
             'stroke-linecap': 'round', 'stroke-linejoin': 'round',
         }, 'slice__icon');
         icon.innerHTML = ICONS[item.icon] || ICONS.dot;
         group.appendChild(icon);
 
-        // Label
-        const [lx, ly] = polar(R_LABEL, mid);
-        const lines = labelLines(item.label);
         lines.forEach((line, n) => {
             const text = el('text', {
-                x: lx, y: ly + (n - (lines.length - 1) / 2) * 13,
+                x: ax, y: top + 24 + 4 + n * 13 + 6,
             }, 'slice__label');
             text.textContent = line;
             group.appendChild(text);
         });
 
         if (item.menu) {
-            const [cx, cy] = polar(R_OUTER - 13, mid);
+            const [cx, cy] = polar(R_OUTER - 16, mid);
             const chevron = el('circle', { cx, cy, r: 2.6 }, 'slice__more');
             group.appendChild(chevron);
         }
