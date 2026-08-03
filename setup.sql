@@ -452,6 +452,29 @@ CREATE TABLE IF NOT EXISTS `som_phone_settings` (
   PRIMARY KEY (`citizenid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ---------------------------------------------------------------------------
+-- Appearance changes
+--
+-- Every alteration to a character's FACE, with who and when. The appearance
+-- itself lives in som_characters.appearance; this is the audit trail.
+--
+-- It exists because a barber can change a face, which has to be possible so a
+-- character creator mistake is recoverable, but a face that can change
+-- silently is a face that cannot be investigated. Nothing reads this yet;
+-- som-police and the MDT will.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS `som_appearance_log` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `scope`      VARCHAR(24) NOT NULL,
+  `section`    VARCHAR(24) NOT NULL,
+  `price`      BIGINT NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_citizen_time` (`citizenid`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ===========================================================================
 --  8. PRESERVED THIRD PARTY
 --

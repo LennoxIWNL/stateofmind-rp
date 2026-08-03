@@ -121,12 +121,21 @@ Config.HairComponent = 2
 Config.Scopes = {
     -- Character creation: everything.
     creator  = { 'heritage', 'features', 'hair', 'overlays', 'apparel' },
-    -- Barber: hair, facial hair, eyebrows, and their colours.
-    barber   = { 'hair', 'overlays' },
+
+    -- Barber: hair, facial hair, AND the face itself.
+    --
+    -- Face work is included because a character creator mistake is otherwise
+    -- permanent, and "I have to delete and re-roll a character I have played
+    -- for a month" is a worse outcome than the alternative.
+    --
+    -- The alternative is real though, and worth being deliberate about: a face
+    -- that can be changed cheaply stops being an identity. Witnesses, mugshots
+    -- and "I know who did it" all lean on the face staying put. Config.Pricing
+    -- is what keeps it a repair rather than a disguise.
+    barber   = { 'heritage', 'features', 'hair', 'overlays' },
+
     -- Clothing store: what you are wearing, nothing about your body.
     clothing = { 'apparel' },
-    -- Surgeon: the face, but not what you are wearing.
-    surgeon  = { 'heritage', 'features' },
 }
 
 -- ---------------------------------------------------------------------------
@@ -157,3 +166,35 @@ Config.Camera = {
 -- Rotating the ped is how you check the back of a haircut. Degrees per frame
 -- while held.
 Config.RotateSpeed = 2.0
+
+-- ---------------------------------------------------------------------------
+-- Pricing
+--
+-- Charged per SECTION actually changed, not per visit, and only for sections
+-- outside creation. Creation is free: you have not earned anything yet.
+--
+-- Face work is priced an order of magnitude above a haircut on purpose. It has
+-- to exist so a creation mistake is recoverable, but it must not be the casual
+-- way to shed a description the police are circulating. Expensive and traceable
+-- makes it a repair; cheap makes it a disguise.
+--
+-- Charged through som-core's transaction bus, so it lands in the ledger and
+-- counts as an economy sink like anything else.
+-- ---------------------------------------------------------------------------
+
+Config.Pricing = {
+    account = 'bank',
+
+    sections = {
+        hair     = 75,
+        overlays = 50,
+        features = 2500,
+        heritage = 2500,
+        apparel  = 0,      -- clothing shops price per garment, later
+    },
+}
+
+-- Every face change is written to som_appearance_log with who and when.
+-- Nothing reads it yet; som-police and the MDT will. A face that can change
+-- silently is a face that cannot be investigated.
+Config.LogFaceChanges = true

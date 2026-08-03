@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>som-appearance</title>
+    <link rel="stylesheet" href="https://cfx-nui-som-assets/tokens.css">
+    <link rel="stylesheet" href="https://cfx-nui-som-appearance/html/style.css">
+</head>
+<body>
+    <div id="root" class="root hidden">
+        <!-- Left rail only. The character occupies the rest of the screen and
+             must never be covered: you are editing what you can see. -->
+        <aside class="panel">
+            <header class="panel__head">
+                <h1 class="panel__title" id="title">Create Character</h1>
+                <p class="panel__sub" id="subtitle">Set your appearance</p>
+            </header>
+
+            <nav class="tabs" id="tabs"></nav>
+
+            <div class="controls" id="controls"></div>
+
+            <footer class="panel__foot">
+                <span class="price" id="price"></span>
+                <div class="actions">
+                    <button class="btn btn--ghost hidden" id="cancel" type="button">Cancel</button>
+                    <button class="btn btn--primary" id="confirm" type="button">Confirm</button>
+                </div>
+            </footer>
+        </aside>
+
+        <!-- Turntable. Rotating the model is how you check the back of a
+             haircut, so it sits under the character rather than in the rail. -->
+        <div class="turntable">
+            <button class="turn" id="turn-left" type="button" aria-label="Rotate left">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <span class="turn__hint">Rotate</span>
+            <button class="turn" id="turn-right" type="button" aria-label="Rotate right">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+        </div>
+
+        <div class="toast hidden" id="toast"></div>
+    </div>
+
+    <script src="https://cfx-nui-som-appearance/html/app.js"></script>
+</body>
+</html>
