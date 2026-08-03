@@ -105,15 +105,48 @@ CreateThread(function()
     -- asking whether any of it landed.
     Wait(1000)
 
-    if IsPrincipalAceAllowed('group.god', 'som.god') then
+    -- Which server.cfg is actually loaded.
+    --
+    -- Everything about this problem hinges on that question and nothing so far
+    -- has answered it. The marker is set by a `sets` line in server.cfg, so if
+    -- it reads MISSING the file being executed is not the file being edited,
+    -- and no amount of correcting that file will ever change anything.
+    local marker = GetConvar('som_cfg_marker', 'MISSING')
+
+    -- Two checks, because they fail for different reasons. A group principal
+    -- resolving through an inherited ACE is a different question from a direct
+    -- grant on a leaf principal, and only the second proves ACE writes work.
+    local viaGroup = IsPrincipalAceAllowed('group.god', 'som.god')
+
+    local viaIdentifier = false
+    for identifier in pairs(Config.Permissions.owners or {}) do
+        if IsPrincipalAceAllowed('identifier.' .. identifier, 'som.god') then
+            viaIdentifier = true
+            break
+        end
+    end
+
+    print(('^5[som-core]^7 permissions: cfg marker %s | group.god=%s | owner identifier=%s')
+        :format(marker, tostring(viaGroup), tostring(viaIdentifier)))
+
+    if viaGroup or viaIdentifier then
         print('^2[som-core]^7 permissions applied.')
         return
     end
 
-    print('^1[som-core] PERMISSIONS FAILED.^7 group.god does not hold som.god even after')
-    print('           som-core applied it directly, which rules out server.cfg entirely.')
-    print('           Something is rejecting ACE changes at runtime. Check for another')
-    print('           resource clearing principals, or a txAdmin permission override.')
+    print('^1[som-core] PERMISSIONS FAILED.^7 Neither route resolved.')
+
+    if marker == 'MISSING' then
+        print('           The cfg marker is MISSING, so the server.cfg being executed is')
+        print('           NOT the one in this repo. That explains everything: the ACE')
+        print('           block never ran, and `add_ace resource.som-core command allow`')
+        print('           never ran either, which is why som-core cannot apply ACEs')
+        print('           itself. Find the file txAdmin actually loads and fix that one.')
+    else
+        print('           The cfg IS the right file, so ACE writes are being rejected at')
+        print('           runtime. som-core needs `add_ace resource.som-core command allow`')
+        print('           to grant ACEs via ExecuteCommand; check that line survived.')
+    end
 end)
 
 ---@param source number

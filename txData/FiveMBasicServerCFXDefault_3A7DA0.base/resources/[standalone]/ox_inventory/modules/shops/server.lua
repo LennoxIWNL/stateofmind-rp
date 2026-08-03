@@ -169,8 +169,31 @@ lib.callback.register('ox_inventory:openShop', function(source, data)
 	return { label = playerInv.label, type = playerInv.type, slots = playerInv.slots, weight = playerInv.weight, maxWeight = playerInv.maxWeight }, shop
 end)
 
+-- SOM PATCH: money is not an item here.
+--
+-- som-core owns cash, bank, crypto and dirty outright, and inventory:accounts
+-- is empty on purpose so ox never registers a money account item. Shops
+-- however price everything in a currency they expect to COUNT IN THE
+-- INVENTORY, so every purchase read a balance of zero and reported that the
+-- player could not afford it.
+--
+-- Currencies named here resolve against som-core instead. Anything else is
+-- still a real item, which is what `currency = 'gold_bar'` style shops want.
+-- Re-apply after an ox_inventory upgrade.
+local SOM_CURRENCY = {
+	money = 'cash',
+	black_money = 'dirty',
+}
+
 local function canAffordItem(inv, currency, price)
-	local canAfford = price >= 0 and Inventory.GetItemCount(inv, currency) >= price
+	local account = SOM_CURRENCY[currency]
+	local canAfford
+
+	if account then
+		canAfford = price >= 0 and exports['som-core']:hasMoney(inv.id, account, price) or false
+	else
+		canAfford = price >= 0 and Inventory.GetItemCount(inv, currency) >= price
+	end
 
 	return canAfford or {
 		type = 'error',
@@ -179,6 +202,15 @@ local function canAffordItem(inv, currency, price)
 end
 
 local function removeCurrency(inv, currency, price)
+	local account = SOM_CURRENCY[currency]
+
+	if account then
+		-- Through the transaction bus, so the purchase lands in som_transactions
+		-- and counts as a sink in the economy figures.
+		exports['som-core']:removeMoney(inv.id, account, price, 'shop-purchase')
+		return
+	end
+
 	Inventory.RemoveItem(inv, currency, price)
 end
 

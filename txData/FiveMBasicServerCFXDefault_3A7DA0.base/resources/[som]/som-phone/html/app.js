@@ -253,7 +253,8 @@ function renderHistory() {
         glyph.appendChild(icon(isIn ? 'arrowDown' : 'arrowUp'));
 
         const main = el('div', 'row__main');
-        main.appendChild(el('div', 'row__title', t.reason || 'Transaction'));
+        // `label` is written by the server; the raw reason slug is never sent.
+        main.appendChild(el('div', 'row__title', t.label || 'Transaction'));
 
         const when = new Date(t.created_at);
         main.appendChild(el('div', 'row__sub',
@@ -393,6 +394,43 @@ function renderThemes() {
     wrap.replaceChildren(frag);
 }
 
+
+// --- Banners ------------------------------------------------------------
+//
+// Anything phone-shaped is announced on the phone, not in the world corner.
+// A bill arriving is the phone's business; "you are now on duty" is not.
+
+const bannersEl = document.getElementById('banners');
+
+function banner(title, text, iconName) {
+    const node = el('div', 'banner');
+
+    const badge = el('span', 'banner__icon');
+    badge.appendChild(icon(iconName || 'bank', null, '#fff'));
+
+    const body = el('div', 'banner__body');
+    body.append(el('div', 'banner__title', title), el('div', 'banner__text', text));
+
+    node.append(badge, body);
+    bannersEl.appendChild(node);
+
+    // Three at a time, oldest first, so a burst cannot cover the screen.
+    while (bannersEl.children.length > 3) bannersEl.firstChild.remove();
+
+    setTimeout(() => {
+        node.classList.add('is-leaving');
+        setTimeout(() => {
+            node.remove();
+
+            // Nothing left to show and the phone is not open, so get off screen.
+            if (!bannersEl.children.length && root.classList.contains('is-banners-only')) {
+                root.classList.add('hidden');
+                root.classList.remove('is-banners-only');
+            }
+        }, 240);
+    }, 5000);
+}
+
 // --- Wiring -------------------------------------------------------------
 
 function unlock() {
@@ -484,11 +522,25 @@ window.addEventListener('message', async (event) => {
 
         // Always opens locked. It is one click, and it is the difference
         // between a menu and something that reads as a phone.
+        root.classList.remove('is-banners-only');
         locked = true;
         showView('lock');
         tick();
 
         root.classList.remove('hidden');
+        return;
+    }
+
+    if (msg.action === 'banner') {
+        // Arrives whether or not the phone is open. If it is closed, the root
+        // is shown in banner-only mode: no device, no focus, just the drop
+        // down, and it hides itself again once the last one expires.
+        if (root.classList.contains('hidden')) {
+            root.classList.add('is-banners-only');
+            root.classList.remove('hidden');
+        }
+
+        banner(msg.title || 'Notification', msg.text || '', msg.icon);
         return;
     }
 

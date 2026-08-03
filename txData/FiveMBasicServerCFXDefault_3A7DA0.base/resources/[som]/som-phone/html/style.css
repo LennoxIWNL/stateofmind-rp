@@ -684,3 +684,93 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     0%, 100% { opacity: 0.4; }
     50%      { opacity: 0.9; }
 }
+
+/* --- Notification banners -----------------------------------------------
+ *
+ * These replace the world notification for anything phone-shaped. A bill
+ * arriving is the phone's business, so it belongs on the phone rather than
+ * in the same corner toast as "you are now on duty".
+ */
+
+.banners {
+    position: absolute;
+    top: 46px;
+    left: 8px;
+    right: 8px;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    pointer-events: none;
+}
+
+.banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 11px 13px;
+    border-radius: 18px;
+    background: rgba(38, 33, 50, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    backdrop-filter: blur(22px);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
+    animation: bannerIn 320ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+.banner.is-leaving { animation: bannerOut 240ms ease both; }
+
+.banner__icon {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    background: var(--accent);
+    color: #fff;
+}
+.banner__icon svg { width: 17px; height: 17px; }
+
+.banner__body { flex: 1; min-width: 0; }
+
+.banner__title {
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.banner__text {
+    margin-top: 1px;
+    font-size: 0.76rem;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.82);
+    overflow-wrap: anywhere;
+}
+
+@keyframes bannerIn {
+    from { opacity: 0; transform: translateY(-120%) scale(0.96); }
+    to   { opacity: 1; transform: none; }
+}
+@keyframes bannerOut {
+    from { opacity: 1; transform: none; }
+    to   { opacity: 0; transform: translateY(-90%) scale(0.97); }
+}
+
+/* Banner without the phone.
+ *
+ * A notification has to arrive whether or not the phone is open, the same way
+ * it does on a real one. In this mode the device is hidden and the banner
+ * floats where the phone would have been. The client never takes NUI focus for
+ * it, so it cannot interrupt what the player is doing.
+ */
+
+.root.is-banners-only { pointer-events: none; }
+.root.is-banners-only .phone { display: none; }
+
+.root.is-banners-only .banners {
+    position: fixed;
+    top: 22px;
+    right: 22px;
+    left: auto;
+    width: 320px;
+}

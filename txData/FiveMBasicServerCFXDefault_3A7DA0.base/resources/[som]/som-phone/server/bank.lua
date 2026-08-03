@@ -10,6 +10,67 @@
 
 Bank = {}
 
+-- ---------------------------------------------------------------------------
+-- Statement labels
+--
+-- som_transactions.reason is a machine readable slug: it is what the sink and
+-- faucet analysis groups by, and what an investigation greps for. It is NOT
+-- something a player should ever read. "character-creation" on a bank
+-- statement breaks the fiction the rest of the phone is holding up.
+--
+-- Translation happens HERE rather than in the NUI, so the raw slug never
+-- reaches the client at all and cannot leak through dev tools either.
+--
+-- A whitelist, deliberately. An unknown reason falls back to a generic label
+-- rather than being prettified, because prettifying still shows the slug and
+-- the whole point is that it never appears. Unknowns are logged so they can be
+-- given a real label.
+-- ---------------------------------------------------------------------------
+
+local STATEMENT_LABELS = {
+    ['character-creation'] = 'Opening balance',
+    ['shop-purchase']      = 'Purchase',
+    ['phone-transfer']     = 'Transfer',
+    ['transfer-reversal']  = 'Reversal',
+    ['paycheck']           = 'Wages',
+    ['salary']             = 'Wages',
+    ['fine']               = 'Fine',
+    ['tax']                = 'Tax',
+    ['treasury']           = 'City treasury',
+}
+
+-- Reasons that carry an id, matched on their prefix.
+local STATEMENT_PREFIXES = {
+    ['bill']      = 'Bill payment',
+    ['bill-auto'] = 'Automatic collection',
+    ['license']   = 'Licence fee',
+    ['licence']   = 'Licence fee',
+}
+
+local unknownReasons = {}
+
+---@param reason string|nil
+---@return string label safe to show a player
+local function statementLabel(reason)
+    if type(reason) ~= 'string' or reason == '' then return 'Transaction' end
+
+    local exact = STATEMENT_LABELS[reason]
+    if exact then return exact end
+
+    local prefix = reason:match('^([%a%-]+):')
+    if prefix and STATEMENT_PREFIXES[prefix] then return STATEMENT_PREFIXES[prefix] end
+
+    -- Logged once each, so a missing label is visible in the console without
+    -- flooding it, and never visible to the player.
+    if not unknownReasons[reason] then
+        unknownReasons[reason] = true
+        print(('[som-phone] no statement label for reason "%s", showing "Transaction"')
+            :format(reason))
+    end
+
+    return 'Transaction'
+end
+
 ---Generates a shareable account number for a character, once.
 ---@param player table som-core player
 ---@return string|nil account_no
@@ -64,6 +125,14 @@ function Bank.GetOverview(source)
         ORDER BY id DESC
         LIMIT ?
     ]], { player.citizenid, Config.Bank.historyLimit }) or {}
+
+    -- The raw slug is replaced, not supplemented, so it never leaves the
+    -- server. See STATEMENT_LABELS.
+    for i = 1, #history do
+        local row = history[i]
+        row.label = statementLabel(row.reason)
+        row.reason = nil
+    end
 
     local bills = MySQL.query.await([[
         SELECT id, from_name, amount, reason, created_at
@@ -125,8 +194,8 @@ function Bank.ShareAccount(source)
                         ON DUPLICATE KEY UPDATE label = VALUES(label)
                     ]], { receiver.citizenid, accountNo, name })
 
-                    TriggerClientEvent('som:client:notify', targetId,
-                        ('%s shared their account: %s'):format(name, accountNo), 'info', 10000)
+                    TriggerClientEvent('som-phone:client:banner', targetId,
+                        'Bank', ('%s shared their account: %s'):format(name, accountNo), 'bank')
                     TriggerClientEvent('som-phone:client:refresh', targetId)
 
                     shared = shared + 1
@@ -215,8 +284,8 @@ function Bank.CreateBill(source, accountNo, amount, reason)
 
     local targetPlayer = exports['som-core']:getPlayerByCitizenId(target.owner)
     if targetPlayer then
-        TriggerClientEvent('som:client:notify', targetPlayer.source,
-            ('%s sent you a bill for $%s'):format(senderName, amount), 'info', 10000)
+        TriggerClientEvent('som-phone:client:banner', targetPlayer.source,
+            'Bank', ('%s sent you a bill for $%s'):format(senderName, amount), 'receipt')
         TriggerClientEvent('som-phone:client:refresh', targetPlayer.source)
     end
 
@@ -252,8 +321,8 @@ function Bank.PayBill(source, billId)
         -- Self-billing exists so one person can exercise the whole flow. No
         -- money moves, because debiting and crediting the same account is a
         -- no-op that would only add two confusing ledger rows.
-        TriggerClientEvent('som:client:notify', source,
-            'Bill settled against your own account', 'success')
+        TriggerClientEvent('som-phone:client:banner', source,
+            'Bank', 'Bill settled against your own account', 'receipt')
 
     else
         -- Paid by citizenid, so the sender does not have to be online to be
@@ -264,8 +333,8 @@ function Bank.PayBill(source, billId)
 
         local recipient = exports['som-core']:getPlayerByCitizenId(bill.from_citizenid)
         if recipient then
-            TriggerClientEvent('som:client:notify', recipient.source,
-                ('Bill paid: $%s'):format(bill.amount), 'success')
+            TriggerClientEvent('som-phone:client:banner', recipient.source,
+                'Bank', ('Bill paid: $%s'):format(bill.amount), 'receipt')
             TriggerClientEvent('som-phone:client:refresh', recipient.source)
         end
     end
@@ -319,8 +388,8 @@ function Bank.CollectOverdue()
 
             local debtor = exports['som-core']:getPlayerByCitizenId(bill.to_citizenid)
             if debtor then
-                TriggerClientEvent('som:client:notify', debtor.source,
-                    ('$%s was collected for an unpaid bill'):format(bill.amount), 'error', 10000)
+                TriggerClientEvent('som-phone:client:banner', debtor.source,
+                    'Bank', ('$%s was collected for an unpaid bill'):format(bill.amount), 'receipt')
                 TriggerClientEvent('som-phone:client:refresh', debtor.source)
             end
         end
@@ -376,9 +445,9 @@ function Bank.Transfer(source, accountNo, amount)
 
     local recipient = exports['som-core']:getPlayerByCitizenId(target.owner)
     if recipient then
-        TriggerClientEvent('som:client:notify', recipient.source,
+        TriggerClientEvent('som-phone:client:banner', recipient.source, 'Bank',
             ('Received $%s from %s %s'):format(amount, player.charinfo.firstname, player.charinfo.lastname),
-            'success')
+            'arrowDown')
         TriggerClientEvent('som-phone:client:refresh', recipient.source)
     end
 

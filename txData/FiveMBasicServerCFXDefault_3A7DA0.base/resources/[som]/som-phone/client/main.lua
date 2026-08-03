@@ -73,6 +73,27 @@ RegisterNetEvent('som-phone:client:refresh', function()
     if isOpen then SendNUIMessage({ action = 'refresh' }) end
 end)
 
+-- Anything phone-shaped announces itself ON the phone.
+--
+-- NO NUI FOCUS. A notification must never take the mouse, so when the phone is
+-- closed the NUI shows the banner alone, floating where the device would be,
+-- and hides itself again once it expires. That is what makes it a notification
+-- rather than an interruption.
+--
+-- Deliberately not routed through som-ui: a bill arriving is the phone's
+-- business. "You do not have a phone" stays a som-ui toast, because at that
+-- point there is no phone to put a banner on.
+RegisterNetEvent('som-phone:client:banner', function(title, text, iconName)
+    if type(title) ~= 'string' or type(text) ~= 'string' then return end
+
+    SendNUIMessage({
+        action = 'banner',
+        title = title,
+        text = text,
+        icon = type(iconName) == 'string' and iconName or 'bank',
+    })
+end)
+
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
     if isOpen then SetNuiFocus(false, false) end

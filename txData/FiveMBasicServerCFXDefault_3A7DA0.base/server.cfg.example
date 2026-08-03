@@ -63,6 +63,15 @@ setr inventory:police '["police"]'
 setr inventory:imagepath "nui://ox_inventory/web/images"
 
 # ---------------------------------------------------------------------------
+# Which cfg is this?
+#
+# som-core prints this value at boot. If it reports MISSING, the file being
+# executed is not this file, and editing this one will never change anything.
+# That is the first thing to check when permissions do not apply.
+# ---------------------------------------------------------------------------
+sets som_cfg_marker "repo-server-cfg"
+
+# ---------------------------------------------------------------------------
 # Boot order
 # ---------------------------------------------------------------------------
 
