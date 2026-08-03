@@ -202,10 +202,14 @@ Config.Departments = {
 -- there is a real cost to spraying rounds around.
 -- ---------------------------------------------------------------------------
 
+-- Keys MUST be real ox_inventory item names. A name that does not exist is not
+-- an error anywhere: the money moves, AddItem quietly fails, and the officer is
+-- charged for nothing. `ifak`, `ammo_pistol` and `ammo_rifle` were all wrong
+-- here and are corrected below against ox_inventory/data.
 Config.Armoury = {
     -- Paid for by the department account. Free to the officer.
     departmentIssue = {
-        ifak = 0,
+        ifaks = 0,
         bandage = 0,
         armour = 0,
         radio = 0,
@@ -214,11 +218,12 @@ Config.Armoury = {
 
     -- Charged to the officer personally.
     personal = {
+        weapon_nightstick = 400,
         weapon_pistol = 2500,
         weapon_stungun = 1200,
         weapon_carbinerifle = 12000,
-        ammo_pistol = 45,
-        ammo_rifle = 90,
+        ['ammo-9'] = 45,
+        ['ammo-rifle'] = 90,
     },
 
     -- Department pays this share of personal equipment. 0.0 means the officer

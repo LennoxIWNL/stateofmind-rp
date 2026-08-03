@@ -292,6 +292,81 @@ function Bank.CreateBill(source, accountNo, amount, reason)
     return true, id
 end
 
+---Raises a bill against a citizen on behalf of a business, with automatic
+---collection after a deadline.
+---
+---SERVER ONLY, and deliberately not reachable from a client. Bank.CreateBill
+---above is the player-facing path and enforces the account-sharing rules that
+---stop billing being used as harassment. This one skips all of that, because
+---its caller is a department issuing a fine rather than a person asking for
+---money: there is no account to have been shared, and no consent to obtain.
+---
+---The safety here is that only another resource can call it, and the money can
+---only ever land in a business account.
+---@param citizenid string who owes it
+---@param business string business account the money lands in
+---@param amount number
+---@param reason string shown on the phone, so it must read as English
+---@param opts table|nil { dueDays, issuerCitizenid, fromName }
+---@return number|nil billId, string|nil error
+function Bank.BillCitizen(citizenid, business, amount, reason, opts)
+    if type(citizenid) ~= 'string' or #citizenid < 3 then return nil, 'bad citizen id' end
+    if type(business) ~= 'string' or business == '' then return nil, 'a business is required' end
+
+    amount = math.floor(tonumber(amount) or 0)
+    if amount < 1 then return nil, 'invalid amount' end
+
+    if type(reason) ~= 'string' or #reason < 3 or #reason > 128 then
+        return nil, 'a reason is required'
+    end
+
+    opts = type(opts) == 'table' and opts or {}
+
+    local days = tonumber(opts.dueDays)
+    days = (days and days > 0) and days or nil
+
+    -- The issuer, when there is one, so the record says who wrote the ticket.
+    -- from_citizenid is NOT NULL, so it falls back to the debtor when a
+    -- department raises a bill with no individual behind it. That is safe
+    -- because PayBill and CollectOverdue both branch on `business` FIRST: a
+    -- bill with a business set never reaches the self-billing no-op, whatever
+    -- from_citizenid happens to hold.
+    local issuer = type(opts.issuerCitizenid) == 'string' and opts.issuerCitizenid or citizenid
+    local name = type(opts.fromName) == 'string' and opts.fromName or business
+
+    local id
+
+    if days then
+        -- The deadline is computed by MySQL rather than in Lua, because
+        -- CollectOverdue compares it against MySQL's NOW(). Building it from
+        -- the server's clock would drift the moment the two disagree on
+        -- timezone, and a fine that collects a day early is a support ticket.
+        id = MySQL.insert.await([[
+            INSERT INTO som_phone_bills
+                (from_citizenid, to_citizenid, from_name, business, amount,
+                 reason, auto_collect, due_at)
+            VALUES (?, ?, ?, ?, ?, ?, 1, DATE_ADD(NOW(), INTERVAL ? DAY))
+        ]], { issuer, citizenid, name, business, amount, reason, days })
+    else
+        id = MySQL.insert.await([[
+            INSERT INTO som_phone_bills
+                (from_citizenid, to_citizenid, from_name, business, amount, reason)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ]], { issuer, citizenid, name, business, amount, reason })
+    end
+
+    local target = exports['som-core']:getPlayerByCitizenId(citizenid)
+    if target then
+        TriggerClientEvent('som-phone:client:banner', target.source,
+            'Bank', ('%s: $%s'):format(reason, amount), 'receipt')
+        TriggerClientEvent('som-phone:client:refresh', target.source)
+    end
+
+    return id
+end
+
+exports('billCitizen', Bank.BillCitizen)
+
 ---Accepts a bill. This is the only path that moves the money.
 ---@param source number
 ---@param billId number

@@ -5876,3 +5876,121 @@ $(".map-clear").on('click', function() {
       ClearMap();
     }, 1500);
 });
+
+/* ===========================================================================
+ * SOM addition: police certifications panel.
+ *
+ * Deliberately APPENDED and self-contained. It edits none of the code above,
+ * so a fault here breaks this panel and nothing else in the MDT. That matters
+ * because ps-mdt is otherwise preserved third-party code that we do not test.
+ *
+ * It hooks onto the profile view by WATCHING the citizen id field rather than
+ * by patching the profile loader. ps-mdt writes that input every time a profile
+ * is opened, so polling it is enough to know which citizen is on screen, and it
+ * needs no knowledge of how the profile is fetched.
+ *
+ * Certifications live in som_licenses under a `cert.` prefix and are read and
+ * written by som-police. Nothing here decides anything: the server re-checks
+ * the granting officer's rank on every write.
+ * ======================================================================== */
+(function somCertifications() {
+    var lastCitizenId = null;
+    var canGrant = false;
+
+    function post(endpoint, body) {
+        return fetch('https://ps-mdt/' + endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify(body || {}),
+        }).then(function (r) { return r.json(); }).catch(function () { return null; });
+    }
+
+    function render(list) {
+        var holder = $('.certs-holder');
+        holder.empty();
+
+        if (!list || !list.length) {
+            $('.certs-amount').text('');
+            return;
+        }
+
+        var heldCount = 0;
+
+        list.forEach(function (cert) {
+            if (cert.held) heldCount += 1;
+
+            // .text() rather than string interpolation into html(): the labels
+            // come from a config file, and building markup out of them is how
+            // a config edit turns into script injection.
+            var tag = $('<div class="license-tag"></div>');
+            tag.addClass(cert.held ? 'som-cert-held' : 'som-cert-missing');
+            tag.text(cert.label);
+            tag.attr('title', cert.description || '');
+            tag.data('cert', cert.id);
+            tag.data('held', cert.held ? 1 : 0);
+
+            tag.css({
+                opacity: cert.held ? 1 : 0.45,
+                cursor: canGrant ? 'pointer' : 'default',
+            });
+
+            holder.append(tag);
+        });
+
+        $('.certs-amount').text('(' + heldCount + '/' + list.length + ')');
+    }
+
+    function load(citizenId) {
+        post('somGetCerts', { citizenid: citizenId }).then(function (res) {
+            if (!res || !res.success) {
+                $('.manage-profile-certs-container').addClass('display_hidden');
+                return;
+            }
+
+            canGrant = res.canGrant === true;
+            $('.manage-profile-certs-container').removeClass('display_hidden');
+            render(res.certifications);
+        });
+    }
+
+    // Toggling. Bound once on the holder rather than per tag, so tags replaced
+    // by a re-render keep working.
+    $(document).on('click', '.certs-holder .license-tag', function () {
+        if (!canGrant || !lastCitizenId) return;
+
+        var tag = $(this);
+        var cert = tag.data('cert');
+        var granted = tag.data('held') !== 1;
+
+        post('somSetCert', {
+            citizenid: lastCitizenId,
+            cert: cert,
+            granted: granted,
+        }).then(function (res) {
+            // Reloaded from the server rather than flipped locally, so what is
+            // shown is what was actually stored. A refusal therefore shows the
+            // unchanged state instead of a lie.
+            if (res && res.success === false && res.error) {
+                console.log('[som-police] ' + res.error);
+            }
+            load(lastCitizenId);
+        });
+    });
+
+    // ps-mdt rewrites this input on every profile open. Polling it is cheap and
+    // avoids touching the profile loader, which is the whole point.
+    setInterval(function () {
+        var value = $('.manage-profile-citizenid-input').val();
+
+        if (!value) {
+            lastCitizenId = null;
+            $('.manage-profile-certs-container').addClass('display_hidden');
+            return;
+        }
+
+        if (value === lastCitizenId) return;
+
+        lastCitizenId = value;
+        load(value);
+    }, 700);
+})();

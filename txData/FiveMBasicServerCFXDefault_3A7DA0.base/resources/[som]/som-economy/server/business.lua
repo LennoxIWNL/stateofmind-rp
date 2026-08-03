@@ -143,11 +143,28 @@ end
 -- there is a real cost to spraying rounds around.
 -- ---------------------------------------------------------------------------
 
+---What an officer personally pays for an item, or 0 if the department issues
+---it. Shops show a price before charging it, so this has to be readable
+---without attempting a purchase.
+---@param item string
+---@return number|nil price, boolean isDepartmentIssue
+function Business.ArmouryPrice(item)
+    if Config.Armoury.departmentIssue[item] ~= nil then return 0, true end
+
+    local price = Config.Armoury.personal[item]
+    if not price then return nil, false end
+
+    local subsidy = math.floor(price * (Config.Armoury.departmentSubsidy or 0.0))
+    return price - subsidy, false
+end
+
 ---@param source number
 ---@param department string
 ---@param item string
+---@param account string|nil what the officer pays with, for personal items.
+---       Defaults to bank. Validated by som-core, never trusted from here.
 ---@return boolean success, string|nil err
-function Business.IssueEquipment(source, department, item)
+function Business.IssueEquipment(source, department, item, account)
     local player = exports['som-core']:getPlayer(source)
     if not player then return false, 'player not found' end
 
@@ -186,9 +203,13 @@ function Business.IssueEquipment(source, department, item)
     end
 
     if officerPays > 0 then
-        local paid = exports['som-core']:removeMoney(source, 'bank', officerPays,
-            ('armoury:%s'):format(item))
-        if not paid then return false, 'you cannot afford that' end
+        -- payWith rather than a hardcoded bank debit, so the armoury offers the
+        -- same cash-or-card choice every other shop does. som-core rejects any
+        -- account that is not payable, so naming 'dirty' here buys nothing.
+        local paid, payError = exports['som-core']:payWith(source, account or 'bank',
+            officerPays, ('armoury:%s'):format(item))
+
+        if not paid then return false, payError or 'you cannot afford that' end
     end
 
     return true
@@ -236,3 +257,4 @@ exports('getBusinessBalance', Business.GetBalance)
 exports('recordBusinessRevenue', Business.RecordRevenue)
 exports('businessSpend', Business.Spend)
 exports('issueEquipment', Business.IssueEquipment)
+exports('armouryPrice', Business.ArmouryPrice)

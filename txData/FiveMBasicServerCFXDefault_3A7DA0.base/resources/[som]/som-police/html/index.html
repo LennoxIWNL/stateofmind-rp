@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>som-police</title>
+    <link rel="stylesheet" href="https://cfx-nui-som-assets/tokens.css">
+    <link rel="stylesheet" href="https://cfx-nui-som-police/html/style.css">
+</head>
+<body>
+    <div id="root" class="root hidden">
+        <section class="panel">
+            <header class="panel__head">
+                <div>
+                    <h1 class="panel__title" id="title">Armoury</h1>
+                    <p class="panel__sub">Department issue is free. Personal equipment is charged.</p>
+                </div>
+                <!-- Cash or card. The same control belongs on every shop, so
+                     the options and balances come from som-core rather than
+                     being decided here. -->
+                <div class="pay" id="pay"></div>
+            </header>
+
+            <div class="section">
+                <h2 class="section__title">Department issue</h2>
+                <div class="list" id="issue"></div>
+            </div>
+
+            <div class="section">
+                <h2 class="section__title">Personal equipment</h2>
+                <div class="list" id="personal"></div>
+            </div>
+
+            <footer class="panel__foot">
+                <span class="note">Rifles require certification</span>
+                <button class="btn" id="close" type="button">Close</button>
+            </footer>
+        </section>
+    </div>
+
+    <script src="https://cfx-nui-som-police/html/app.js"></script>
+</body>
+</html>

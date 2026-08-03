@@ -1149,3 +1149,50 @@ if Config.UseWolfknightRadar == true then
         end
     end)
 end
+
+-- ---------------------------------------------------------------------------
+-- SOM addition: police certifications.
+--
+-- Appended rather than woven in, so it cannot disturb anything above it. The
+-- panel that calls these lives at the end of ui/app.js.
+--
+-- Routed through QBCore.Functions.TriggerCallback rather than lib.callback,
+-- because ps-mdt does not load ox_lib and `lib` is nil here. That shim lives in
+-- som-compat, where ox_lib IS loaded, and it already backs every other callback
+-- this file makes. Using it means this needs no change to ps-mdt's manifest.
+--
+-- Both are pure relays. They decide nothing: som-police re-checks the calling
+-- officer's job and rank on every read and every write, so a crafted NUI
+-- message from a modified UI gains exactly nothing.
+-- ---------------------------------------------------------------------------
+
+RegisterNUICallback('somGetCerts', function(data, cb)
+    if GetResourceState('som-police') ~= 'started' then
+        return cb({ success = false, error = 'som-police is not running' })
+    end
+
+    local citizenid = type(data) == 'table' and data.citizenid or nil
+    if type(citizenid) ~= 'string' then
+        return cb({ success = false, error = 'bad citizen id' })
+    end
+
+    QBCore.Functions.TriggerCallback('som-police:server:certsFor', function(res)
+        cb(res or { success = false, error = 'no response' })
+    end, citizenid)
+end)
+
+RegisterNUICallback('somSetCert', function(data, cb)
+    if GetResourceState('som-police') ~= 'started' then
+        return cb({ success = false, error = 'som-police is not running' })
+    end
+
+    if type(data) ~= 'table' then return cb({ success = false, error = 'invalid request' }) end
+
+    QBCore.Functions.TriggerCallback('som-police:server:setCert', function(res)
+        cb(res or { success = false, error = 'no response' })
+    end, {
+        citizenid = data.citizenid,
+        cert = data.cert,
+        granted = data.granted == true,
+    })
+end)
