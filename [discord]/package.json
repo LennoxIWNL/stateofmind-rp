@@ -1,0 +1,9 @@
+{
+  "name": "state-of-mind-discord-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "pm2 start ecosystem.config.cjs"
+  }
+}
