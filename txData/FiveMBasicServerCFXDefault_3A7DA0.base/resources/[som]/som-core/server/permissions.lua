@@ -88,61 +88,21 @@ end
 
 exports('debugPermissions', Permissions.Debug)
 
----Reports whether the permissions block in server.cfg took effect at all.
----
----A player being denied som.god has two very different causes that look
----identical from the player's side: the ACE lines never ran, or they ran but
----the player is not in the group. Checking the GROUP rather than the player
----separates them, because group.god holding som.god does not depend on any
----identifier being correct.
----Applies the ACE structure and the owner grants.
----
----This exists because server.cfg is gitignored: its ACE block cannot be
----version controlled, cannot be deployed with a push, and on the VPS it never
----took effect at all. Owning the grants here makes them travel with the repo
----and behave identically on every machine.
----
----Re-applying an existing ACE is a no-op, so this is safe every start.
-local function bootstrap()
-    if not Config.Permissions.bootstrap then return end
-
-    local commands = {
-        -- Inheritance. god implies admin implies mod.
-        'add_principal group.god group.admin',
-        'add_principal group.admin group.mod',
-
-        'add_ace group.god som.god allow',
-        'add_ace group.god som.admin allow',
-        'add_ace group.god som.mod allow',
-        'add_ace group.god command allow',
-
-        'add_ace group.admin som.admin allow',
-        'add_ace group.admin som.mod allow',
-        'add_ace group.admin command allow',
-
-        'add_ace group.mod som.mod allow',
-    }
-
-    for identifier, group in pairs(Config.Permissions.owners or {}) do
-        commands[#commands + 1] = ('add_principal identifier.%s %s'):format(identifier, group)
-
-        -- Granted straight to the identifier as well as through the group, so
-        -- access survives a mistake in the group wiring.
-        commands[#commands + 1] = ('add_ace identifier.%s som.god allow'):format(identifier)
-        commands[#commands + 1] = ('add_ace identifier.%s command allow'):format(identifier)
-    end
-
-    for i = 1, #commands do
-        ExecuteCommand(commands[i])
-    end
-end
+-- ACE grants are NOT applied from here any more.
+--
+-- som-core used to re-apply them with ExecuteCommand at boot. Every call was
+-- refused with "Access denied for command add_ace", because granting an ACE
+-- itself requires one, and the `add_ace resource.som-core command allow` line
+-- that would have permitted it had not taken effect either. The result was a
+-- console full of denials and no permissions.
+--
+-- The grants live in som.cfg, which now declares them ABOVE the ensure lines.
+-- Owners are matched by identifier regardless, so staff access does not depend
+-- on any of this resolving.
 
 CreateThread(function()
-    bootstrap()
-
-    -- ExecuteCommand queues, so give the console a moment to drain before
-    -- asking whether any of it landed.
-    Wait(1000)
+    -- After the cfg has finished executing.
+    Wait(2000)
 
     -- Which server.cfg is actually loaded.
     --

@@ -99,20 +99,18 @@ Config.Permissions = {
     hierarchy = { 'som.god', 'som.admin', 'som.mod' },
 
     -- -----------------------------------------------------------------------
-    -- Permissions are applied by som-core at boot, not by server.cfg.
+    -- OWNERS ARE MATCHED BY IDENTIFIER, NOT BY ACE.
     --
-    -- server.cfg is gitignored, so its ACE block cannot be version controlled,
-    -- cannot be deployed with a push, and drifts silently between machines. On
-    -- the VPS its block never took effect at all and cost several sessions to
-    -- chase. Owning this here removes the whole class of problem: the grants
-    -- travel with the repo and are identical everywhere.
+    -- ACE has never resolved on this server. The cfg provably executes, the
+    -- grants are present and correctly ordered, and IsPlayerAceAllowed still
+    -- returns false for an identifier that is listed. Re-applying them from Lua
+    -- was refused outright: granting an ACE itself requires one.
     --
-    -- An ACE block in server.cfg still works and still wins if present. This
-    -- only guarantees a floor.
+    -- Rather than keep guessing, ownership is settled here by a direct
+    -- identifier match that cannot fail. ACE is still declared in som.cfg and
+    -- still governs everyone else; this only guarantees that whoever owns the
+    -- server can always administer it.
     -- -----------------------------------------------------------------------
-
-    -- Applied every start. Harmless to re-apply.
-    bootstrap = true,
 
     -- Who gets what, by identifier. `license:` is the reliable one: it works
     -- without Steam and is what the server sees whatever the player launched
