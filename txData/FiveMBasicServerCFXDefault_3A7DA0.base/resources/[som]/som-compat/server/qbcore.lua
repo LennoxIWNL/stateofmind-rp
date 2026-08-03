@@ -12,26 +12,40 @@
 -- Nothing here creates money or items. Money-adjacent members are intentionally
 -- absent, so a legacy resource cannot mint currency through the shim.
 
+-- Items, Weapons and Vehicles are deliberately ABSENT from this literal. They
+-- are built on first read (see shared/lazy.lua, shared/items.lua and
+-- shared/vehicles.lua), and the metamethod that serves them only fires for keys
+-- the table does not already have.
 local QBCore = {
     Functions = {},
-    Shared = { Vehicles = {}, Items = {} },
+    Shared = {},
     Commands = {},
 }
 
 local core = exports['som-core']
 
 ---Wraps a SOM player in the field layout legacy resources expect.
+---
+---`Functions` is the important half and was missing entirely until now: the
+---wrapper returned only PlayerData, so every Player.Functions.* call errored.
+---That is why setting a callsign in the MDT did nothing.
+---
+---Only what the preserved resources actually call is implemented, and nothing
+---that mints money or items. ps-mdt needs SetMetaData and RemoveMoney;
+---r14-evidence needs the same plus the shared item tables.
 ---@param player table som-core player
 ---@return table|nil
 local function wrap(player)
     if not player then return nil end
 
-    return {
+    local source = player.source
+
+    local wrapped = {
         PlayerData = {
-            source = player.source,
+            source = source,
             citizenid = player.citizenid,
             license = player.license,
-            name = GetPlayerName(player.source),
+            name = GetPlayerName(source),
             charinfo = player.charinfo,
             job = {
                 name = player.job.name,
@@ -48,8 +62,71 @@ local function wrap(player)
                 grade = { name = player.gang.gradeLabel, level = player.gang.grade },
             },
             metadata = player.metadata,
+            money = player.money,
         },
     }
+
+    wrapped.Functions = {
+        ---som-core rejects any key not in Config.DefaultMetadata, so a legacy
+        ---resource cannot invent state through this.
+        SetMetaData = function(key, value)
+            return core:setMetadata(source, key, value)
+        end,
+
+        GetMetaData = function(key)
+            return core:getMetadata(source, key)
+        end,
+
+        ---Reads only. Writing a balance goes through the transaction bus.
+        GetMoney = function(account)
+            return core:getMoney(source, account == 'money' and 'cash' or account)
+        end,
+
+        ---qb calls the cash account 'money'. Reason is required by the bus, so
+        ---the calling resource is recorded even when it does not supply one.
+        AddMoney = function(account, amount, reason)
+            return core:addMoney(source, account == 'money' and 'cash' or account,
+                amount, reason or 'compat')
+        end,
+
+        RemoveMoney = function(account, amount, reason)
+            return core:removeMoney(source, account == 'money' and 'cash' or account,
+                amount, reason or 'compat')
+        end,
+
+        SetJob = function(job, grade)
+            return core:setJob(source, job, grade)
+        end,
+
+        SetGang = function(gang, grade)
+            return core:setGang(source, gang, grade)
+        end,
+
+        SetDuty = function(onduty)
+            return core:setDuty(source, onduty)
+        end,
+
+        Notify = function(text, notifyType, duration)
+            TriggerClientEvent('som:client:notify', source, text, notifyType, duration)
+        end,
+
+        ---ox_inventory owns items. These exist because legacy resources call
+        ---them on the player object rather than on the inventory.
+        AddItem = function(item, amount, slot, info)
+            return exports.ox_inventory:AddItem(source, item, amount, info, slot)
+        end,
+
+        RemoveItem = function(item, amount, slot)
+            return exports.ox_inventory:RemoveItem(source, item, amount, nil, slot)
+        end,
+
+        GetItemByName = function(item)
+            local items = exports.ox_inventory:Search(source, 'slots', item)
+            return items and items[1] or nil
+        end,
+    }
+
+    return wrapped
 end
 
 function QBCore.Functions.GetPlayer(source)
@@ -124,6 +201,29 @@ function QBCore.Commands.Add(name, help, arguments, argsrequired, callback, perm
         callback(source, args, raw)
     end)
 end
+
+function QBCore.Functions.Notify(source, text, notifyType, duration)
+    TriggerClientEvent('som:client:notify', source, text, notifyType, duration)
+end
+
+---@param vehicle number entity
+function QBCore.Functions.GetPlate(vehicle)
+    if not vehicle or vehicle == 0 then return nil end
+    -- Trailing whitespace is part of the game's plate string and is not part of
+    -- the plate, so it is stripped. The extra parentheses truncate gsub to its
+    -- first return; without them the count leaks into any table this builds.
+    return (GetVehicleNumberPlateText(vehicle):gsub('%s+$', ''))
+end
+
+function QBCore.Functions.GetPlayers()
+    local list = {}
+    for _, id in ipairs(GetPlayers()) do list[#list + 1] = tonumber(id) end
+    return list
+end
+
+-- Shared.Items, Shared.Weapons and Shared.Vehicles are projected on first read.
+SomCompatShared.attach(QBCore.Shared)
+SomCompatVehicles.attach(QBCore.Shared)
 
 -- Registering an export under ANOTHER resource's name.
 --

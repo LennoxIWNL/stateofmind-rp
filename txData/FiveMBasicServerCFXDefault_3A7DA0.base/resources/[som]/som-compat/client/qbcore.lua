@@ -1,9 +1,13 @@
 -- qb-core compatibility shim, client side.
 -- Same contract as the server half: only what preserved resources actually call.
 
+-- Items, Weapons and Vehicles are deliberately ABSENT from this literal. They
+-- are built on first read (see shared/lazy.lua, shared/items.lua and
+-- shared/vehicles.lua), and the metamethod that serves them only fires for keys
+-- the table does not already have.
 local QBCore = {
     Functions = {},
-    Shared = { Vehicles = {}, Items = {} },
+    Shared = {},
 }
 
 local core = exports['som-core']
@@ -38,13 +42,27 @@ function QBCore.Functions.Notify(message, notifyType, duration)
     TriggerEvent('som:client:notify', message, notifyType, duration)
 end
 
+-- Legacy resources notify by EVENT as often as by function, and nothing on this
+-- server registered it, so every one of those notifications was being dropped
+-- on the floor. ps-mdt, r14-evidence, elixir-petshop and som-spray all fire it.
+--
+-- RegisterNetEvent also serves resources that raise it locally with
+-- TriggerEvent, which ps-mdt's client does.
+RegisterNetEvent('QBCore:Notify', function(text, notifyType, duration)
+    if type(text) ~= 'string' then return end
+    QBCore.Functions.Notify(text, notifyType, duration)
+end)
+
 function QBCore.Functions.TriggerCallback(name, cb, ...)
     lib.callback(name, false, cb, ...)
 end
 
 function QBCore.Functions.GetPlate(vehicle)
     if not vehicle or vehicle == 0 then return nil end
-    return GetVehicleNumberPlateText(vehicle):gsub('^%s*(.-)%s*$', '%1')
+    -- The parentheses truncate gsub to its first return. Without them this
+    -- hands back (plate, replacementCount), and any caller that builds a table
+    -- or a query parameter list from it gets a stray number appended.
+    return (GetVehicleNumberPlateText(vehicle):gsub('^%s*(.-)%s*$', '%1'))
 end
 
 function QBCore.Functions.RequestAnimDict(dict)
@@ -76,6 +94,59 @@ function QBCore.Functions.SetVehicleProperties(vehicle, props)
     if not vehicle or vehicle == 0 or type(props) ~= 'table' then return end
     lib.setVehicleProperties(vehicle, props)
 end
+
+---Progress bar. r14-evidence uses this for every collection action.
+---
+---Mapped onto ox_lib, which is already a dependency, rather than reproducing
+---qb-progressbar. The callback fires only on success, matching qb's behaviour.
+function QBCore.Functions.Progressbar(name, label, duration, useWhileDead, canCancel, disableControls, anim, prop, propTwo, onFinish, onCancel)
+    local disable = disableControls or {}
+
+    local ok = lib.progressBar({
+        duration = duration or 1000,
+        label = label or '',
+        useWhileDead = useWhileDead or false,
+        canCancel = canCancel ~= false,
+        disable = {
+            move = disable.disableMovement,
+            car = disable.disableCarMovement,
+            combat = disable.disableCombat,
+            mouse = disable.disableMouse,
+        },
+        anim = anim and {
+            dict = anim.animDict,
+            clip = anim.anim,
+            flag = anim.flags,
+        } or nil,
+        prop = prop and prop.model and {
+            model = prop.model,
+            pos = prop.coords,
+            rot = prop.rotation,
+        } or nil,
+    })
+
+    if ok then
+        if onFinish then onFinish() end
+    elseif onCancel then
+        onCancel()
+    end
+
+    return ok
+end
+
+---@param coords vector3|nil defaults to the player
+function QBCore.Functions.GetClosestVehicle(coords)
+    coords = coords or GetEntityCoords(cache.ped)
+
+    local vehicle = GetClosestVehicle(coords.x, coords.y, coords.z, 10.0, 0, 71)
+    if not vehicle or vehicle == 0 then return nil, nil end
+
+    return vehicle, #(coords - GetEntityCoords(vehicle))
+end
+
+-- Shared.Items, Shared.Weapons and Shared.Vehicles are projected on first read.
+SomCompatShared.attach(QBCore.Shared)
+SomCompatVehicles.attach(QBCore.Shared)
 
 -- See the note in server/qbcore.lua: `provide` does not forward exports, the
 -- __cfx_export_<resource>_<name> event is what actually publishes under

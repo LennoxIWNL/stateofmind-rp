@@ -13,6 +13,9 @@ provide 'qb-core'
 
 shared_scripts {
     '@ox_lib/init.lua',
+    'shared/lazy.lua',
+    'shared/items.lua',
+    'shared/vehicles.lua',
 }
 
 client_scripts {
