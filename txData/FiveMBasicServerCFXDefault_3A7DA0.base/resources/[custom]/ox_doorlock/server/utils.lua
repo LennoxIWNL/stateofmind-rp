@@ -24,7 +24,9 @@ function utils.getFilesInDirectory(path, pattern)
 	return files, fileCount
 end
 
-local frameworks = { 'es_extended', 'ND_Core', 'ox_core', 'qbx_core', 'qb-core' }
+-- SOM: som-compat added, and FIRST, so it wins before anything else can
+-- match. See server/framework/som-compat.lua.
+local frameworks = { 'som-compat', 'es_extended', 'ND_Core', 'ox_core', 'qbx_core', 'qb-core' }
 local sucess = false
 
 for i = 1, #frameworks do

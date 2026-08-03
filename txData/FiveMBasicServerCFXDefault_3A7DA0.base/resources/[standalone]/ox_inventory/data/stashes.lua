@@ -1,22 +1,12 @@
 return {
-	{
-		coords = vec3(452.3, -991.4, 30.7),
-		target = {
-			loc = vec3(451.25, -994.28, 30.69),
-			length = 1.2,
-			width = 5.6,
-			heading = 0,
-			minZ = 29.49,
-			maxZ = 32.09,
-			label = 'Open personal locker'
-		},
-		name = 'policelocker',
-		label = 'Personal locker',
-		owner = true,
-		slots = 70,
-		weight = 70000,
-		groups = shared.police
-	},
+	-- SOM: the MRPD personal locker was REMOVED from here.
+	--
+	-- som-police registers its own lockers, on the eye, at coordinates verified
+	-- against the Gabz MLO. This entry put a second locker a few metres away
+	-- with an E prompt, so MRPD had two, one of which som-police knew nothing
+	-- about. See som-police/shared/config.lua.
+	--
+	-- Re-apply this removal on an ox_inventory upgrade.
 
 	{
 		coords = vec3(301.3, -600.23, 43.28),

@@ -86,6 +86,58 @@ end)
 AddEventHandler('som:client:onJobChanged', refresh)
 
 -- ---------------------------------------------------------------------------
+-- Certifications, readable by any officer
+-- ---------------------------------------------------------------------------
+
+function Duty.ShowCerts()
+    local certs = lib.callback.await('som-police:server:myCerts', false) or {}
+
+    -- Sorted BEFORE the options are built, because pairs() has no stable order
+    -- and the list would otherwise reshuffle every time it is opened.
+    local ids = {}
+    for id in pairs(Config.Certifications) do ids[#ids + 1] = id end
+
+    table.sort(ids, function(a, b)
+        return Config.Certifications[a].label < Config.Certifications[b].label
+    end)
+
+    local options = {}
+    for _, id in ipairs(ids) do
+        local def = Config.Certifications[id]
+
+        options[#options + 1] = {
+            title = def.label,
+            description = certs[id] and def.description or 'Not certified',
+            icon = certs[id] and 'circle-check' or 'circle-xmark',
+        }
+    end
+
+    lib.registerContext({
+        id = 'som_police_mycerts',
+        title = 'Certifications',
+        options = options,
+    })
+
+    lib.showContext('som_police_mycerts')
+end
+
+exports('showCerts', Duty.ShowCerts)
+
+---Opens the MDT.
+---
+---ps-mdt registers /mdt as a client command and does its own job check, so
+---this hands off rather than reimplementing the open. It exists so the radial
+---has something to call: a radial entry naming a command would let the client
+---choose the command.
+exports('openMDT', function()
+    if GetResourceState('ps-mdt') ~= 'started' then
+        return TriggerEvent('som:client:notify', 'The MDT is not available', 'error')
+    end
+
+    ExecuteCommand('mdt')
+end)
+
+-- ---------------------------------------------------------------------------
 -- The duty point
 -- ---------------------------------------------------------------------------
 
@@ -127,38 +179,7 @@ CreateThread(function()
                 label = 'My certifications',
                 distance = 2.0,
                 canInteract = function() return Duty.IsOfficer() end,
-                onSelect = function()
-                    local certs = lib.callback.await('som-police:server:myCerts', false) or {}
-
-                    -- Sorted BEFORE the options are built, because pairs() has
-                    -- no stable order and the list would otherwise reshuffle
-                    -- every time it is opened.
-                    local ids = {}
-                    for id in pairs(Config.Certifications) do ids[#ids + 1] = id end
-
-                    table.sort(ids, function(a, b)
-                        return Config.Certifications[a].label < Config.Certifications[b].label
-                    end)
-
-                    local options = {}
-                    for _, id in ipairs(ids) do
-                        local def = Config.Certifications[id]
-
-                        options[#options + 1] = {
-                            title = def.label,
-                            description = certs[id] and def.description or 'Not certified',
-                            icon = certs[id] and 'circle-check' or 'circle-xmark',
-                        }
-                    end
-
-                    lib.registerContext({
-                        id = 'som_police_mycerts',
-                        title = 'Certifications',
-                        options = options,
-                    })
-
-                    lib.showContext('som_police_mycerts')
-                end,
+                onSelect = Duty.ShowCerts,
             },
         },
     })

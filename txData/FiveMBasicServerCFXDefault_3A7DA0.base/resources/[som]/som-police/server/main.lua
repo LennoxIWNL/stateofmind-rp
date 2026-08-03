@@ -222,8 +222,34 @@ lib.callback.register('som-police:server:toggleDuty', function(source)
     local ok = core:setDuty(source, going)
     if not ok then return { success = false, error = 'could not change duty' } end
 
+    if going then Police.GrantWeaponLicence(source, officer) end
+
     return { success = true, onduty = going }
 end)
+
+---Officers hold a weapons licence by virtue of the job.
+---
+---ox_inventory gates WEAPON_PISTOL and the carbine on a `weapon` licence
+---(data/licenses.lua), which a civilian buys for $5000. An officer being told
+---to go and buy one before they can carry a service pistol is nonsense, so the
+---badge grants it.
+---
+---Written on going on duty rather than on being hired, because that is a point
+---this resource actually observes. It is idempotent, so repeating it is free.
+---
+---Deliberately NOT revoked when going off duty: taking the licence away would
+---make an off-duty officer's own registered pistol contraband.
+---@param source number
+---@param officer table
+function Police.GrantWeaponLicence(source, officer)
+    local licences = core:getMetadata(source, 'licenses')
+    licences = type(licences) == 'table' and licences or {}
+
+    if licences.weapon then return end
+
+    licences.weapon = true
+    core:setMetadata(source, 'licenses', licences)
+end
 
 -- ---------------------------------------------------------------------------
 -- Armoury
@@ -333,7 +359,19 @@ lib.callback.register('som-police:server:takeItem', function(source, data)
 
     if not paid then return { success = false, error = payError or 'could not pay' } end
 
-    local added = exports.ox_inventory:AddItem(source, entry.item, entry.count)
+    -- Firearms are issued REGISTERED, with a serial carrying the officer's
+    -- citizenid. ox_inventory's own armoury did this and it is worth keeping:
+    -- it is what lets a casing at a scene be traced back to the weapon that
+    -- fired it, which is the whole point of the forensics coming later.
+    local metadata
+    if entry.item:find('^weapon_') then
+        metadata = {
+            registered = true,
+            serial = ('POL%s'):format(officer.citizenid:sub(-5):upper()),
+        }
+    end
+
+    local added = exports.ox_inventory:AddItem(source, entry.item, entry.count, metadata)
 
     if not added then
         -- Refunded rather than lost. A full inventory is not a reason to take
@@ -388,6 +426,45 @@ lib.callback.register('som-police:server:openStash', function(source, stashId)
         def.coords)
 
     return { success = true, stash = name }
+end)
+
+-- ---------------------------------------------------------------------------
+-- Radial entries
+--
+-- Registered with som-radial rather than declared in its config, so the police
+-- entries live with the police code. som-radial filters these SERVER side on
+-- the job and duty fields below, so a client cannot restore an entry it is not
+-- entitled to by editing its own menu.
+-- ---------------------------------------------------------------------------
+
+CreateThread(function()
+    -- After som-radial has started.
+    Wait(1000)
+
+    if GetResourceState('som-radial') ~= 'started' then return end
+
+    local radial = exports['som-radial']
+
+    radial:register({
+        id = 'police.mdt',
+        section = 'job',
+        label = 'MDT',
+        icon = 'laptop',
+        order = 10,
+        export = 'som-police.openMDT',
+        job = Config.Job,
+        duty = true,
+    })
+
+    radial:register({
+        id = 'police.certs',
+        section = 'job',
+        label = 'Certifications',
+        icon = 'badge',
+        order = 20,
+        export = 'som-police.showCerts',
+        job = Config.Job,
+    })
 end)
 
 -- ---------------------------------------------------------------------------

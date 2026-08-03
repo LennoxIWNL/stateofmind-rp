@@ -657,10 +657,19 @@ return {
 			durability = 0.1,
 		},
 
+		-- SOM: the taser takes cartridges.
+		--
+		-- Stock ox gives the stungun no ammoname, so it fires forever. Naming
+		-- an ammo type makes every shot consume one cartridge, and because a
+		-- real taser is a single-shot device the magazine is one round: fire,
+		-- and it is empty until another cartridge is loaded.
+		--
+		-- Re-apply on an ox_inventory upgrade.
 		['WEAPON_STUNGUN'] = {
 			label = 'Tazer',
 			weight = 227,
 			durability = 0.1,
+			ammoname = 'ammo-taser',
 		},
 
 		['WEAPON_AUTOSHOTGUN'] = {
@@ -1810,6 +1819,12 @@ return {
 		['ammo-9'] = {
 			label = '9mm',
 			weight = 7,
+		},
+
+		-- SOM: one shot per cartridge. See WEAPON_STUNGUN above.
+		['ammo-taser'] = {
+			label = 'Taser Cartridge',
+			weight = 40,
 		},
 
 		['ammo-firework'] = {

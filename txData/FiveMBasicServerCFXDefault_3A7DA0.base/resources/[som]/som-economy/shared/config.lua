@@ -224,6 +224,9 @@ Config.Armoury = {
         weapon_carbinerifle = 12000,
         ['ammo-9'] = 45,
         ['ammo-rifle'] = 90,
+        -- Per cartridge, and a taser shot is one cartridge, so this is the
+        -- real per-use cost of reaching for the taser rather than the pistol.
+        ['ammo-taser'] = 75,
     },
 
     -- Department pays this share of personal equipment. 0.0 means the officer

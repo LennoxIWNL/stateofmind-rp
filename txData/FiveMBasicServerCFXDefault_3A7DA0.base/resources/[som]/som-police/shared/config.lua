@@ -73,18 +73,20 @@ Config.Stations = {
             rotation = 305.0,
         },
 
+        -- Verified in game.
         armoury = {
-            coords = vec3(481.71, -995.35, 30.69),
+            coords = vec3(480.73, -995.31, 30.69),
             size = vec3(1.8, 1.4, 2.0),
-            rotation = 305.0,
+            rotation = 351.15,
         },
 
         stashes = {
+            -- Verified in game.
             {
                 id = 'locker', label = 'Personal Locker', kind = 'personal',
                 slots = 50, weight = 100000,
-                coords = vec3(451.85, -990.15, 30.69),
-                size = vec3(2.0, 4.0, 2.0), rotation = 305.0,
+                coords = vec3(462.91, -999.64, 30.69),
+                size = vec3(2.0, 4.0, 2.0), rotation = 1.97,
             },
             {
                 id = 'evidence', label = 'Evidence Locker', kind = 'shared',
@@ -152,6 +154,9 @@ Config.Armoury = {
     personal = {
         { item = 'weapon_nightstick',  label = 'Nightstick',    count = 1 },
         { item = 'weapon_stungun',     label = 'Taser',         count = 1 },
+        -- One shot per cartridge. ox_inventory's stungun had no ammo type at
+        -- all, so it fired forever; it now consumes these.
+        { item = 'ammo-taser',         label = 'Taser Cartridges', count = 5 },
         { item = 'weapon_pistol',      label = 'Service Pistol', count = 1 },
         { item = 'ammo-9',             label = '9mm Ammo',      count = 30 },
         { item = 'weapon_carbinerifle', label = 'Carbine Rifle', count = 1, cert = 'cert.rifle' },

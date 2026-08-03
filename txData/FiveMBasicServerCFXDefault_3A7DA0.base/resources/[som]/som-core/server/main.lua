@@ -214,8 +214,21 @@ Permissions.AddCommand('setjob', {
     if not player then return end
 
     local ok, err = player:setJob(args.job, args.grade or 0)
+
     if not ok then
-        TriggerClientEvent('som:client:notify', source, err, 'error')
+        return TriggerClientEvent('som:client:notify', source, err, 'error')
+    end
+
+    -- Success was silent, which is indistinguishable from the command not
+    -- running at all. Both the admin and the target are told.
+    TriggerClientEvent('som:client:notify', source,
+        ('%s is now %s (%s)'):format(GetPlayerName(args.id) or args.id,
+            player.job.label, player.job.gradeLabel), 'success')
+
+    if args.id ~= source then
+        TriggerClientEvent('som:client:notify', args.id,
+            ('You are now %s (%s)'):format(player.job.label, player.job.gradeLabel),
+            'success')
     end
 end)
 
