@@ -25,6 +25,7 @@
 --    5. Vehicles and licences
 --    6. Economy             market, fines, department funding
 --    7. Phone               bills, saved accounts, settings
+--   7b. Police              custody, impounds, flagged plates
 --    8. Preserved third party   ps-mdt, ox_doorlock
 --    9. Seed data
 -- ===========================================================================
@@ -473,6 +474,79 @@ CREATE TABLE IF NOT EXISTS `som_appearance_log` (
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_citizen_time` (`citizenid`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
+--  7b. POLICE
+--
+--  Custody, impounds and flagged plates. Certifications are NOT here: they are
+--  rows in som_licenses with a `cert.` prefix on the type, which already
+--  carries issued_by, issued_at and revoked, so every grant is attributable
+--  without another table.
+--
+--  Like som_appearance_log above, these carry no foreign keys and index
+--  instead. They are audit trails, and a record that cascades away when a
+--  character is deleted is not one. That is the deliberate trade: the rows
+--  outlive the characters they name, so a citizenid here may no longer resolve.
+-- ===========================================================================
+
+-- Every cuffing, and its release. The chain the custody verbs write to, and
+-- what jail will read.
+--
+-- Cuffing is NOT police-only: it needs handcuffs and proximity, nothing else,
+-- so a kidnapping writes rows here exactly as an arrest does. `by_job` is what
+-- separates the two after the fact, recorded at the time because the person's
+-- job can change afterwards and the record should not.
+CREATE TABLE IF NOT EXISTS `som_police_custody` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`   VARCHAR(16) NOT NULL,
+  `by_cid`      VARCHAR(16) DEFAULT NULL,
+  `by_job`      VARCHAR(32) DEFAULT NULL,
+  `by_grade`    TINYINT UNSIGNED DEFAULT NULL,
+  `cuffed_at`   TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `released_at` TIMESTAMP   NULL DEFAULT NULL,
+  `released_by` VARCHAR(16) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_citizen_time` (`citizenid`, `cuffed_at`),
+  -- Finds the open detention for a person: released_at IS NULL.
+  KEY `idx_open` (`citizenid`, `released_at`),
+  KEY `idx_by` (`by_cid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Impound records. The LIVE state of a vehicle is som_vehicles.state, which
+-- already has an 'impounded' value; this is the history behind it, including
+-- who seized it and what the owner was charged to get it back.
+CREATE TABLE IF NOT EXISTS `som_police_impound` (
+  `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `plate`        VARCHAR(12) NOT NULL,
+  `citizenid`    VARCHAR(16) DEFAULT NULL,
+  `officer_cid`  VARCHAR(16) DEFAULT NULL,
+  `reason`       VARCHAR(160) NOT NULL DEFAULT '',
+  `fee`          BIGINT NOT NULL DEFAULT 0,
+  `impounded_at` TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `released_at`  TIMESTAMP   NULL DEFAULT NULL,
+  `released_to`  VARCHAR(16) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_plate` (`plate`),
+  KEY `idx_open` (`plate`, `released_at`),
+  KEY `idx_owner` (`citizenid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Flagged plates.
+--
+-- Rows are kept and cleared rather than deleted, so "this plate was flagged for
+-- a month last year" survives the flag being lifted. A plate is currently
+-- flagged if it has a row with cleared_at IS NULL.
+CREATE TABLE IF NOT EXISTS `som_police_plates` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `plate`      VARCHAR(12) NOT NULL,
+  `reason`     VARCHAR(160) NOT NULL DEFAULT '',
+  `flagged_by` VARCHAR(16) DEFAULT NULL,
+  `flagged_at` TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `cleared_at` TIMESTAMP   NULL DEFAULT NULL,
+  `cleared_by` VARCHAR(16) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_plate_active` (`plate`, `cleared_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ===========================================================================

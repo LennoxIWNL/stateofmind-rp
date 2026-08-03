@@ -94,7 +94,11 @@ Config.LogPerms = {
 		[4] = true,
 	},
 	['police'] = {
-		[4] = true,
+		-- Command ranks only. Was grade 4, which was the Chief until the
+		-- LSPD ladder grew to seven ranks; grade 4 is now a Sergeant, and
+		-- leaving it would have handed record deletion to a mid rank.
+		[5] = true, -- Lieutenant
+		[6] = true, -- Chief of Police
 	},
     ['bcso'] = {
 		[4] = true,
@@ -121,7 +125,11 @@ Config.RemoveIncidentPerms = {
 		[4] = true,
 	},
 	['police'] = {
-		[4] = true,
+		-- Command ranks only. Was grade 4, which was the Chief until the
+		-- LSPD ladder grew to seven ranks; grade 4 is now a Sergeant, and
+		-- leaving it would have handed record deletion to a mid rank.
+		[5] = true, -- Lieutenant
+		[6] = true, -- Chief of Police
 	},
     ['bcso'] = {
 		[4] = true,
@@ -148,7 +156,11 @@ Config.RemoveReportPerms = {
 		[4] = true,
 	},
 	['police'] = {
-		[4] = true,
+		-- Command ranks only. Was grade 4, which was the Chief until the
+		-- LSPD ladder grew to seven ranks; grade 4 is now a Sergeant, and
+		-- leaving it would have handed record deletion to a mid rank.
+		[5] = true, -- Lieutenant
+		[6] = true, -- Chief of Police
 	},
     ['bcso'] = {
 		[4] = true,
@@ -175,7 +187,11 @@ Config.RemoveWeaponsPerms = {
 		[4] = true,
 	},
 	['police'] = {
-		[4] = true,
+		-- Command ranks only. Was grade 4, which was the Chief until the
+		-- LSPD ladder grew to seven ranks; grade 4 is now a Sergeant, and
+		-- leaving it would have handed record deletion to a mid rank.
+		[5] = true, -- Lieutenant
+		[6] = true, -- Chief of Police
 	},
     ['bcso'] = {
 		[4] = true,

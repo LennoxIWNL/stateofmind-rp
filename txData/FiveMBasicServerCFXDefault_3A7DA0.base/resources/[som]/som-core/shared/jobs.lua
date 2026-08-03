@@ -44,12 +44,27 @@ Jobs = {
         offDutyPay = false,
         armoryGrade = 0,
         radio = 1,
+        -- Seven ranks on the LSPD ladder. Grades are zero indexed here, so the
+        -- seventh rank is grade 6.
+        --
+        -- Rank is SENIORITY ONLY. It decides pay, who can promote whom, and who
+        -- reads the command-level parts of the MDT. It deliberately does not
+        -- decide what an officer is allowed to carry or drive: that is what
+        -- certifications are for, and they are an independent axis, so a
+        -- Lieutenant with no rifle certification still cannot draw a rifle.
+        --
+        -- Anything that gates on grade elsewhere has to be checked when this
+        -- list changes. ps-mdt's four record-deletion permissions were pinned to
+        -- grade 4 because that used to be the Chief; adding ranks would have
+        -- quietly handed them to a Sergeant.
         grades = {
             [0] = { name = 'Cadet', payment = 1200 },
-            [1] = { name = 'Officer', payment = 1800 },
-            [2] = { name = 'Sergeant', payment = 2400 },
-            [3] = { name = 'Lieutenant', payment = 3200 },
-            [4] = { name = 'Chief', payment = 4200, isboss = true },
+            [1] = { name = 'Officer', payment = 1600 },
+            [2] = { name = 'Senior Officer', payment = 2000 },
+            [3] = { name = 'Corporal', payment = 2400 },
+            [4] = { name = 'Sergeant', payment = 2900 },
+            [5] = { name = 'Lieutenant', payment = 3500, isboss = true },
+            [6] = { name = 'Chief of Police', payment = 4200, isboss = true },
         },
     },
 
