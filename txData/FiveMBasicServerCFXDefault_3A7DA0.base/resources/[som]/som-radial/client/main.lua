@@ -138,6 +138,23 @@ local function open()
     isOpen = true
     SetNuiFocus(true, true)
 
+    -- The camera stays put while the wheel is up.
+    --
+    -- Keep-input is what stops the flicker, but it also means the mouse still
+    -- drives the camera, so aiming at a slice swung the view around behind it.
+    -- Only the look and attack controls are disabled: DisableAllControlActions
+    -- would take the held key with it and bring the flicker straight back.
+    CreateThread(function()
+        while isOpen do
+            DisableControlAction(0, 1, true)    -- look left/right
+            DisableControlAction(0, 2, true)    -- look up/down
+            DisableControlAction(0, 24, true)   -- attack
+            DisableControlAction(0, 25, true)   -- aim
+            DisableControlAction(0, 106, true)  -- vehicle mouse control
+            Wait(0)
+        end
+    end)
+
     -- Keep input, or the wheel flickers.
     --
     -- Taking NUI focus alone stops the game seeing the held key, so it reports
