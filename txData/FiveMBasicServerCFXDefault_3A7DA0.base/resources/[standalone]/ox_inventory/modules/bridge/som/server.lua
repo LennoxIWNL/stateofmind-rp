@@ -171,5 +171,10 @@ function server.getOwnedVehicleId(entityId)
     local plate = GetVehicleNumberPlateText(entityId)
     if not plate then return nil end
 
-    return MySQL.scalar.await('SELECT id FROM som_vehicles WHERE plate = ?', { plate:gsub('%s+$', '') })
+    -- The extra parentheses matter. gsub returns the string AND the number of
+    -- replacements, so `{ plate:gsub(...) }` builds a two element table and
+    -- oxmysql rejects the query for having one placeholder and two parameters.
+    local trimmed = (plate:gsub('%s+$', ''))
+
+    return MySQL.scalar.await('SELECT id FROM som_vehicles WHERE plate = ?', { trimmed })
 end
