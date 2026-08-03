@@ -3,7 +3,7 @@ const RESOURCE = window.location.hostname.replace('cfx-nui-', '');
 const root = document.getElementById('root');
 const listEl = document.getElementById('list');
 
-let state = { deposit: 0, balance: 0 };
+let state = { deposit: 0, payment: [], account: null };
 
 function post(endpoint, body) {
     return fetch(`https://${RESOURCE}/${endpoint}`, {
@@ -45,13 +45,15 @@ function render(data) {
 
         row.append(left, el('span', 'row__price', money(total)));
 
-        // Shown as unaffordable rather than hidden, so the price stays
-        // information rather than becoming a mystery.
-        if (state.balance < total) row.disabled = true;
+        // Unaffordable ON THE SELECTED ACCOUNT, rather than hidden. Switching
+        // to the other one re-renders, so the list answers "can I pay for this
+        // with what I just picked" instead of hiding the price.
+        const selected = state.payment.find((p) => p.account === state.account);
+        if (!selected || selected.balance < total) row.disabled = true;
 
         row.addEventListener('click', async () => {
             row.disabled = true;
-            const res = await post('rent', { model: v.model });
+            const res = await post('rent', { model: v.model, account: state.account });
 
             // The server decides. A refusal re-enables the row rather than
             // pretending the click did something.
@@ -65,6 +67,34 @@ function render(data) {
     });
 
     listEl.replaceChildren(frag);
+}
+
+/* Cash or card. The options and balances come from som-core, so every shop
+ * offers the same choice and the server validates whatever comes back. */
+function renderPayment() {
+    const wrap = document.getElementById('pay');
+    const frag = document.createDocumentFragment();
+
+    state.payment.forEach((option) => {
+        const btn = el('button', 'pay__opt');
+        btn.type = 'button';
+        if (option.account === state.account) btn.classList.add('is-active');
+
+        btn.append(el('span', 'pay__label', option.label),
+            el('span', 'pay__value', money(option.balance)));
+
+        btn.addEventListener('click', () => {
+            state.account = option.account;
+            renderPayment();
+            // Re-rendered because affordability is per account: what you can
+            // buy changes with how you are paying.
+            render(state.catalogue);
+        });
+
+        frag.appendChild(btn);
+    });
+
+    wrap.replaceChildren(frag);
 }
 
 function close() {
@@ -84,13 +114,23 @@ window.addEventListener('message', (event) => {
 
     if (msg.action === 'open') {
         const d = msg.data || {};
-        state = { deposit: d.deposit || 0, balance: d.balance || 0 };
+        const payment = d.payment || [];
+
+        state = {
+            deposit: d.deposit || 0,
+            payment: payment,
+            // Defaults to whichever account can actually cover the cheapest
+            // option, so a player with an empty wallet and a full bank is not
+            // told everything is unaffordable.
+            account: (payment.find((p) => p.balance > 0) || payment[0] || {}).account,
+            catalogue: d,
+        };
 
         document.getElementById('title').textContent = d.label || 'Vehicle Rental';
-        document.getElementById('balance').textContent = money(d.balance);
         document.getElementById('deposit-note').textContent =
             `${money(d.deposit)} deposit, returned with the vehicle`;
 
+        renderPayment();
         render(d);
         root.classList.remove('hidden');
         return;

@@ -304,6 +304,63 @@ function Money.TransferToCitizen(fromRef, toCitizenId, account, amount, reason)
     return true
 end
 
+local payable = {}
+for _, name in ipairs(Config.Money.payable or {}) do payable[name] = true end
+
+---Charges a player for a purchase, from an account THEY chose.
+---
+---Every shop offers cash or card, so the validation lives here rather than
+---being re-implemented, slightly differently, in each one. The account arrives
+---from the client because the player picked it in a menu, which makes it
+---exactly the kind of value that must be checked rather than trusted: without
+---this, a shop could be paid in `dirty` and laundering would be pointless.
+---@param source number
+---@param account string as chosen by the player
+---@param amount number
+---@param reason string
+---@return boolean success, string|nil err
+function Money.PayWith(source, account, amount, reason)
+    if type(account) ~= 'string' or not payable[account] then
+        return false, 'that is not a way to pay'
+    end
+
+    local value = sanitiseAmount(amount)
+    if not value then return false, 'invalid amount' end
+
+    local player = resolve(source)
+    if not player then return false, 'player not found' end
+
+    if (player.money[account] or 0) < value then
+        return false, ('not enough %s'):format(Config.Money.payableLabels[account] or account)
+    end
+
+    local ok, err = Money.Remove(source, account, value, reason, {
+        resource = callerResource(),
+    })
+
+    return ok, err
+end
+
+---What a player can pay with, and how much of each they have. Shops show this
+---so the choice is informed rather than a guess.
+---@param source number
+---@return table[] { { account, label, balance } }
+function Money.PaymentOptions(source)
+    local player = resolve(source)
+    if not player then return {} end
+
+    local options = {}
+    for _, account in ipairs(Config.Money.payable or {}) do
+        options[#options + 1] = {
+            account = account,
+            label = Config.Money.payableLabels[account] or account,
+            balance = player.money[account] or 0,
+        }
+    end
+
+    return options
+end
+
 ---Takes cash from one player and gives it to another.
 ---
 ---This is how cash gets robbed. Cash is not an item, so it cannot be dragged
@@ -478,6 +535,8 @@ exports('stealCash', Money.StealCash)
 exports('hasMoney', Money.Has)
 exports('transferMoney', Money.Transfer)
 exports('transferToCitizen', Money.TransferToCitizen)
+exports('payWith', Money.PayWith)
+exports('paymentOptions', Money.PaymentOptions)
 exports('businessTransact', Money.BusinessTransact)
 exports('taxToTreasury', Money.TaxToTreasury)
 exports('getTreasury', Money.GetTreasury)

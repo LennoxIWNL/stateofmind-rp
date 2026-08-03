@@ -15,10 +15,10 @@
                     <h1 class="panel__title" id="title">Vehicle Rental</h1>
                     <p class="panel__sub">Deposit refunded on return</p>
                 </div>
-                <div class="wallet">
-                    <span class="wallet__label">Cash</span>
-                    <span class="wallet__value" id="balance">$0</span>
-                </div>
+                <!-- Cash or card. The same control belongs on every shop, so
+                     the options and balances come from som-core rather than
+                     being decided here. -->
+                <div class="pay" id="pay"></div>
             </header>
 
             <div class="list" id="list"></div>

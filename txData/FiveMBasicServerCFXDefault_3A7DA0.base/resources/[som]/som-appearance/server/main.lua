@@ -33,6 +33,9 @@ lib.callback.register('som-appearance:server:get', function(source)
     return {
         appearance = appearance,
         gender = player.charinfo and player.charinfo.gender or 0,
+        -- Cash or card, with balances. som-core owns the list so every shop
+        -- offers the same choice.
+        payment = exports['som-core']:paymentOptions(source),
     }
 end)
 
@@ -120,11 +123,13 @@ lib.callback.register('som-appearance:server:save', function(source, data)
     local price = scope == 'creator' and 0 or priceFor(changed)
 
     if price > 0 then
-        local paid = exports['som-core']:removeMoney(source, Config.Pricing.account, price,
+        -- The account comes from the client because the player chose it, so
+        -- som-core validates it rather than this file trusting it.
+        local paid, payError = exports['som-core']:payWith(source, data.account, price,
             ('appearance:%s'):format(scope))
 
         if not paid then
-            return { success = false, error = ('you need $%d'):format(price) }
+            return { success = false, error = payError or ('you need $%d'):format(price) }
         end
     end
 

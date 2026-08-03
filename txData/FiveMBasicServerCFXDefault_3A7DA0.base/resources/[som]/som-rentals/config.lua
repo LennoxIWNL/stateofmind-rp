@@ -76,11 +76,16 @@ Config.Locations = {
 -- disposable car you abandon at the first traffic light.
 -- ---------------------------------------------------------------------------
 
-Config.Deposit = 500
+-- Held against the vehicle and returned with it.
+--
+-- 250 rather than 500: a new character starts with 500 cash, and a deposit
+-- that eats all of it means the cheapest rental is unaffordable to exactly the
+-- people who need one. A rental has to be reachable on day one or it is
+-- decoration.
+Config.Deposit = 250
 
--- Taken from cash, not bank. Renting a car at a counter is a cash transaction,
--- and it gives the starting cash balance something to do.
-Config.Account = 'cash'
+-- The player chooses cash or card at the counter, so there is no account here.
+-- som-core validates the choice; see Money.PayWith.
 
 -- Refunded portion of the deposit when the vehicle is returned. Below 1.0 the
 -- difference is a sink; at 1.0 renting costs only the hire fee.

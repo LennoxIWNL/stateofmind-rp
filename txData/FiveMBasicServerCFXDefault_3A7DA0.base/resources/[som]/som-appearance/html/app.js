@@ -314,8 +314,40 @@ function renderPrice() {
 document.getElementById('turn-left').addEventListener('click', () => post('rotate', { dir: -1 }));
 document.getElementById('turn-right').addEventListener('click', () => post('rotate', { dir: 1 }));
 
+/* Cash or card, the same control every SOM shop uses. som-core supplies the
+ * options and balances; the server validates whatever comes back. Hidden for
+ * creation, which is free. */
+function renderPayment() {
+    const wrap = document.getElementById('pay');
+
+    if (state.scope === 'creator' || !(state.payment || []).length) {
+        wrap.classList.add('hidden');
+        return;
+    }
+
+    const frag = document.createDocumentFragment();
+    state.payment.forEach((option) => {
+        const btn = el('button', 'pay__opt');
+        btn.type = 'button';
+        if (option.account === state.account) btn.classList.add('is-active');
+
+        btn.append(el('span', 'pay__label', option.label),
+            el('span', 'pay__value', `$${Number(option.balance).toLocaleString('en-US')}`));
+
+        btn.addEventListener('click', () => {
+            state.account = option.account;
+            renderPayment();
+        });
+
+        frag.appendChild(btn);
+    });
+
+    wrap.replaceChildren(frag);
+    wrap.classList.remove('hidden');
+}
+
 document.getElementById('confirm').addEventListener('click', async () => {
-    const res = await post('confirm');
+    const res = await post('confirm', { account: state.account });
     if (!res.success) toast(res.error || 'Could not save');
 });
 
@@ -340,8 +372,12 @@ window.addEventListener('message', (event) => {
         document.getElementById('confirm').textContent =
             state.scope === 'creator' ? 'Start Playing' : 'Confirm';
 
+        state.account = (state.payment || []).find((p) => p.balance > 0)?.account
+            || (state.payment || [])[0]?.account;
+
         renderTabs();
         selectSection(state.sections[0]);
+        renderPayment();
         renderPrice();
 
         root.classList.remove('hidden');

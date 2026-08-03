@@ -183,8 +183,8 @@ Config.RotateSpeed = 2.0
 -- ---------------------------------------------------------------------------
 
 Config.Pricing = {
-    account = 'bank',
-
+    -- No account here. The player picks cash or card at the counter, the same
+    -- control every SOM shop uses, and som-core validates the choice.
     sections = {
         hair     = 75,
         overlays = 50,

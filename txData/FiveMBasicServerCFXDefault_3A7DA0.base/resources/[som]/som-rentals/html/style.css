@@ -57,18 +57,41 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .panel__title { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.01em; }
 .panel__sub { margin-top: 2px; font-size: 0.76rem; color: rgba(255, 255, 255, 0.45); }
 
-.wallet { text-align: right; flex: 0 0 auto; }
-
-.wallet__label {
-    display: block;
-    font-size: 0.6rem;
-    font-weight: 700;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.4);
+.pay {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 3px;
+    padding: 3px;
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.06);
 }
 
-.wallet__value { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pay__opt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 6px 13px;
+    border-radius: 9px;
+    transition: background 140ms ease, color 140ms ease;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.pay__opt:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
+
+.pay__opt.is-active {
+    background: var(--som-pink);
+    color: #0b0810;
+}
+
+.pay__label {
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+}
+
+.pay__value { font-size: 0.92rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 .list {
     flex: 1;

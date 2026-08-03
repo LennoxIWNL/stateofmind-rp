@@ -259,3 +259,42 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     from { opacity: 0; transform: translateX(-24px); }
     to   { opacity: 1; transform: none; }
 }
+
+/* --- Payment ------------------------------------------------------------
+ *
+ * The same cash-or-card control every SOM shop uses. Hidden during creation,
+ * which is free.
+ */
+
+.pay {
+    display: flex;
+    gap: 3px;
+    margin-bottom: 10px;
+    padding: 3px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.pay__opt {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.5);
+    transition: background 140ms ease, color 140ms ease;
+}
+
+.pay__opt:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
+.pay__opt.is-active { background: var(--som-pink); color: #0b0810; }
+
+.pay__label {
+    font-size: 0.56rem;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+}
+
+.pay__value { font-size: 0.84rem; font-weight: 700; font-variant-numeric: tabular-nums; }

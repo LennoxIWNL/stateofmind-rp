@@ -48,8 +48,9 @@ lib.callback.register('som-rentals:server:catalogue', function(source, locationI
     return {
         label = location.label,
         deposit = Config.Deposit,
-        account = Config.Account,
-        balance = player.money[Config.Account] or 0,
+        -- Cash or card, with balances, so the choice at the counter is
+        -- informed rather than a guess. som-core owns the list.
+        payment = exports['som-core']:paymentOptions(source),
         vehicles = location.vehicles,
     }
 end)
@@ -87,11 +88,14 @@ lib.callback.register('som-rentals:server:rent', function(source, data)
 
     -- Paid before anything is created, so a failure to spawn cannot leave the
     -- player with a vehicle they did not pay for.
-    local paid = exports['som-core']:removeMoney(source, Config.Account, total,
+    --
+    -- The account comes from the client because the player picked it, so
+    -- som-core validates it rather than this file trusting it.
+    local paid, payError = exports['som-core']:payWith(source, data.account, total,
         'vehicle-rental')
 
     if not paid then
-        return { success = false, error = ('you need $%d'):format(total) }
+        return { success = false, error = payError or ('you need $%d'):format(total) }
     end
 
     local entity = CreateVehicle(joaat(vehicle.model),
@@ -103,7 +107,7 @@ lib.callback.register('som-rentals:server:rent', function(source, data)
 
     if not DoesEntityExist(entity) then
         -- Refund in full. The player did nothing wrong.
-        exports['som-core']:addMoney(source, Config.Account, total, 'vehicle-rental-refund')
+        exports['som-core']:addMoney(source, data.account, total, 'vehicle-rental-refund')
         return { success = false, error = 'the vehicle could not be brought round' }
     end
 
@@ -117,6 +121,7 @@ lib.callback.register('som-rentals:server:rent', function(source, data)
         model = vehicle.model,
         label = vehicle.label,
         netId = netId,
+        account = data.account,
         rentedAt = os.time(),
     }
 
@@ -185,9 +190,12 @@ lib.callback.register('som-rentals:server:return', function(source, locationId)
         end
     end
 
+    -- Returned to whatever it was paid from, so a card deposit does not come
+    -- back as cash and quietly become a way to withdraw without a bank.
     local refund = math.floor(Config.Deposit * Config.DepositRefund)
     if refund > 0 then
-        exports['som-core']:addMoney(source, Config.Account, refund, 'vehicle-rental-deposit')
+        exports['som-core']:addMoney(source, rental.account or 'cash', refund,
+            'vehicle-rental-deposit')
     end
 
     return { success = true, refund = refund }

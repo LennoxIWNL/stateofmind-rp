@@ -38,6 +38,25 @@ Config.Money = {
     -- Accounts a player may never move money into or out of directly.
     -- 'dirty' only changes through laundering in Phase 4.
     protected = { dirty = true },
+
+    -- -----------------------------------------------------------------------
+    -- Accounts a SHOP may be paid from, and the order they are offered in.
+    --
+    -- Every shop lets the player choose cash or card, so this is one list
+    -- rather than a decision each shop makes for itself. crypto and dirty are
+    -- absent deliberately: paying a till in laundered money would make
+    -- laundering pointless, and that is the whole tension the economy is
+    -- built on.
+    --
+    -- Enforced by Money.PayWith, so a client naming any other account is
+    -- refused rather than trusted.
+    -- -----------------------------------------------------------------------
+    payable = { 'cash', 'bank' },
+
+    payableLabels = {
+        cash = 'Cash',
+        bank = 'Card',
+    },
     -- Paychecks are HOURLY. Job `payment` values are therefore per hour, not
     -- per tick, which makes them directly comparable to prices.
     paycheckInterval = 60,

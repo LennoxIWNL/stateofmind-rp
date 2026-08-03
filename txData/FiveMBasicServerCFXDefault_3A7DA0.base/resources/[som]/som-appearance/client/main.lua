@@ -108,6 +108,7 @@ function Editor.Open(requested)
                 props = Config.Props,
             },
             pricing = Config.Pricing,
+            payment = data.payment,
             -- Creation cannot be cancelled: there is nothing to go back to.
             canCancel = scope ~= 'creator',
         },
@@ -164,10 +165,12 @@ RegisterNUICallback('rotate', function(data, cb)
     SetEntityHeading(cache.ped, heading)
 end)
 
-RegisterNUICallback('confirm', function(_, cb)
+RegisterNUICallback('confirm', function(data, cb)
     local res = lib.callback.await('som-appearance:server:save', false, {
         scope = scope,
         appearance = working,
+        -- Chosen at the counter. som-core validates it; this only relays.
+        account = type(data) == 'table' and data.account or nil,
     })
 
     cb(res or { success = false })
