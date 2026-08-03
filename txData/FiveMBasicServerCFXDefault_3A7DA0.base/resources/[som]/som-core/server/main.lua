@@ -193,19 +193,23 @@ exports('getGangs', function() return Gangs end)
 -- Staff commands
 --
 -- These are the only commands som-core registers. Everything else in the
--- framework is an interaction, per Phase 8. Each one is ACE gated and each
--- money path lands in the ledger like any other.
+-- framework is an interaction, per Phase 8. Each money path lands in the
+-- ledger like any other.
+--
+-- Registered through Permissions.AddCommand rather than with lib.addCommand's
+-- `restricted`, because that hands the check to FiveM's ACE and ACE does not
+-- resolve here. See the note on Permissions.AddCommand: with `restricted` set,
+-- these commands were refused before their handler ran and printed nothing.
 -- ---------------------------------------------------------------------------
 
-lib.addCommand('setjob', {
+Permissions.AddCommand('setjob', {
     help = 'Set a player job',
     params = {
         { name = 'id', type = 'playerId', help = 'Target player' },
         { name = 'job', type = 'string', help = 'Job name' },
         { name = 'grade', type = 'number', help = 'Job grade', optional = true },
     },
-    restricted = Config.Permissions.admin,
-}, function(source, args)
+}, Config.Permissions.admin, function(source, args)
     local player = Players.Get(args.id)
     if not player then return end
 
@@ -215,15 +219,14 @@ lib.addCommand('setjob', {
     end
 end)
 
-lib.addCommand('setgang', {
+Permissions.AddCommand('setgang', {
     help = 'Set a player gang',
     params = {
         { name = 'id', type = 'playerId', help = 'Target player' },
         { name = 'gang', type = 'string', help = 'Gang name' },
         { name = 'grade', type = 'number', help = 'Gang grade', optional = true },
     },
-    restricted = Config.Permissions.admin,
-}, function(source, args)
+}, Config.Permissions.admin, function(source, args)
     local player = Players.Get(args.id)
     if not player then return end
 
@@ -233,15 +236,14 @@ lib.addCommand('setgang', {
     end
 end)
 
-lib.addCommand('givemoney', {
+Permissions.AddCommand('givemoney', {
     help = 'Give money to a player',
     params = {
         { name = 'id', type = 'playerId', help = 'Target player' },
         { name = 'account', type = 'string', help = 'cash, bank or crypto' },
         { name = 'amount', type = 'number', help = 'Amount' },
     },
-    restricted = Config.Permissions.god,
-}, function(source, args)
+}, Config.Permissions.god, function(source, args)
     local ok, err = Money.Add(args.id, args.account, args.amount, ('admin:%s'):format(GetPlayerName(source)))
     TriggerClientEvent('som:client:notify', source, ok and 'Money added' or err, ok and 'success' or 'error')
 end)

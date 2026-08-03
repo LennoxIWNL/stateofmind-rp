@@ -88,6 +88,29 @@ end
 
 exports('debugPermissions', Permissions.Debug)
 
+---Deliberately UNRESTRICTED, and deliberately self-only.
+---
+---A permission problem is the one thing an admin command cannot diagnose,
+---because if permissions are broken the diagnostic is refused too. So this
+---reports on the CALLER and nobody else, which makes it safe to leave open:
+---it tells a player their own identifiers and their own access, which they
+---could determine anyway.
+---
+---Run this first when a staff command appears to do nothing. If the license
+---printed here is not the one in Config.Permissions.owners, that is the answer.
+lib.addCommand('somperms', {
+    help = 'Show your own identifiers and staff access',
+}, function(source)
+    if source == 0 then return end
+
+    Permissions.Debug(source)
+
+    local tier = Permissions.GetTier(source) or 'none'
+    TriggerClientEvent('som:client:notify', source,
+        ('Access: %s. Identifiers printed to the server console.'):format(tier),
+        tier == 'none' and 'error' or 'success', 8000)
+end)
+
 -- ACE grants are NOT applied from here any more.
 --
 -- som-core used to re-apply them with ExecuteCommand at boot. Every call was
@@ -186,6 +209,47 @@ function Permissions.Guard(source, ace, action)
     print(('[som-core] permission denied: %s (%s) attempted %s without %s')
         :format(GetPlayerName(source) or 'unknown', source, action, ace))
     return false
+end
+
+---Registers a staff command whose permission is checked by Permissions.Has.
+---
+---WHY THIS EXISTS, and why `restricted` must not be used on a staff command:
+---
+---lib.addCommand ends with
+---
+---    RegisterCommand(name, handler, restricted and true)
+---
+---and that third argument hands enforcement to FiveM, which gates the command
+---on the `command.<name>` ACE. On this server ACE does not resolve, so FiveM
+---refused every staff command BEFORE the handler ran. Nothing reached Lua and
+---nothing was printed, which is why /setjob looked like it did nothing at all.
+---
+---The identifier fallback in Permissions.Has was written to survive exactly
+---this, and it was being bypassed by every command that needed it.
+---
+---So the command is registered UNRESTRICTED, which means FiveM lets it through,
+---and the permission is checked here instead. Registering it unrestricted is
+---safe only because of that check: without the guard below, this would publish
+---/givemoney to the entire server.
+---@param name string
+---@param props table lib.addCommand properties. `restricted` is ignored.
+---@param ace string the ACE tier required, e.g. Config.Permissions.admin
+---@param handler fun(source: number, args: table, raw: string)
+function Permissions.AddCommand(name, props, ace, handler)
+    props = props or {}
+    props.restricted = false
+
+    lib.addCommand(name, props, function(source, args, raw)
+        -- The console (source 0) is always allowed: it is the server operator
+        -- and has no identifier to match against.
+        if source ~= 0 and not Permissions.Guard(source, ace, name) then
+            TriggerClientEvent('som:client:notify', source,
+                'You do not have permission to do that', 'error')
+            return
+        end
+
+        handler(source, args, raw)
+    end)
 end
 
 exports('hasPermission', function(source, ace)

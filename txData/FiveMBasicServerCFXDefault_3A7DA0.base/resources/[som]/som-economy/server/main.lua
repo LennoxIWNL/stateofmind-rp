@@ -79,10 +79,19 @@ end)
 -- for "show me the state of the economy". It moves into som-admin at Phase 4d.
 -- ---------------------------------------------------------------------------
 
+-- Not `restricted`: that hands the check to FiveM's ACE, which does not resolve
+-- on this server, so the command was refused before its handler ran and printed
+-- nothing at all. som-core's hasPermission has an owner-by-identifier fallback
+-- that works, so the check happens here instead. See som-core/server/
+-- permissions.lua, Permissions.AddCommand.
 lib.addCommand('economy', {
     help = 'Show market and treasury state',
-    restricted = 'som.admin',
 }, function(source)
+    if source ~= 0 and not exports['som-core']:hasPermission(source, 'som.admin') then
+        return TriggerClientEvent('som:client:notify', source,
+            'You do not have permission to do that', 'error')
+    end
+
     print('---- SOM economy ----')
     print(('treasury: %d'):format(exports['som-core']:getTreasury()))
 

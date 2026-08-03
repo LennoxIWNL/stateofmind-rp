@@ -398,10 +398,22 @@ end)
 -- rather than a guessing game.
 -- ---------------------------------------------------------------------------
 
+-- Not `restricted`, for two reasons. It hands the check to FiveM's ACE, which
+-- does not resolve on this server, so the command would be refused before its
+-- handler ran and print nothing. And 'group.admin' is a PRINCIPAL, not an ACE,
+-- so it was the wrong kind of value to begin with.
+--
+-- som-core's hasPermission has an owner-by-identifier fallback that works.
 lib.addCommand('pdcoords', {
     help = 'Print your position formatted for the som-police config',
-    restricted = 'group.admin',
 }, function(source)
+    if source == 0 then return end
+
+    if not core:hasPermission(source, 'som.admin') then
+        return TriggerClientEvent('som:client:notify', source,
+            'You do not have permission to do that', 'error')
+    end
+
     local ped = GetPlayerPed(source)
     if not ped or ped == 0 then return end
 
