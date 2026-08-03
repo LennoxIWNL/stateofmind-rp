@@ -261,15 +261,57 @@ function slotStepper(label, kind, id, max, min = 0) {
     return wrap;
 }
 
+/* Which apparel sub-tab is showing. Remembered across re-renders so changing a
+ * garment does not throw you back to the first group. */
+let apparelGroup = null;
+
+/* Clothing is split into sub-tabs rather than listed in one column.
+ *
+ * Fifteen steppers stacked together is a wall you have to read rather than a
+ * menu you can use, and the slot you want is never the one on screen. The
+ * grouping lives in the config so it can be re-cut without touching this.
+ *
+ * Server side this is still ONE `apparel` section, so pricing and the scope
+ * merge do not know or care that the UI subdivides it.
+ */
 function renderApparel(frag) {
-    frag.appendChild(el('div', 'group', 'Clothing'));
+    const groups = state.definitions.apparelGroups || [];
+
+    // Only groups that actually contain something, so an empty tab can never
+    // be offered.
+    const populated = groups.filter((g) =>
+        state.definitions.components.some((c) => c.group === g.id) ||
+        state.definitions.props.some((p) => p.group === g.id));
+
+    if (!populated.length) return;
+
+    if (!populated.some((g) => g.id === apparelGroup)) {
+        apparelGroup = populated[0].id;
+    }
+
+    const nav = el('div', 'subtabs');
+    for (const g of populated) {
+        const tab = el('button', 'subtab', g.label);
+        tab.type = 'button';
+        if (g.id === apparelGroup) tab.classList.add('is-active');
+
+        tab.addEventListener('click', () => {
+            apparelGroup = g.id;
+            renderSection();
+        });
+
+        nav.appendChild(tab);
+    }
+    frag.appendChild(nav);
+
     for (const c of state.definitions.components) {
+        if (c.group !== apparelGroup) continue;
         const limit = state.limits.components[String(c.id)] || { drawables: 1 };
         frag.appendChild(slotStepper(c.label, 'component', c.id, limit.drawables || 1));
     }
 
-    frag.appendChild(el('div', 'group', 'Accessories'));
     for (const p of state.definitions.props) {
+        if (p.group !== apparelGroup) continue;
         const limit = state.limits.props[String(p.id)] || { drawables: 1 };
         frag.appendChild(slotStepper(p.label, 'prop', p.id, limit.drawables || 1, -1));
     }

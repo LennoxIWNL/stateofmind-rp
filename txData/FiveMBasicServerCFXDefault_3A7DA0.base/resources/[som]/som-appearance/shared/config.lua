@@ -84,25 +84,39 @@ Config.HeadOverlays = {
 -- 3, 4 and 5 are absent from props because the game does not use them.
 -- ---------------------------------------------------------------------------
 
+-- `group` splits the clothing tab into sub-tabs. Fifteen steppers in one list
+-- is a wall, and the grouping other appearance menus settle on is roughly
+-- outfit / accessories / the rest, so that is what this uses.
+--
+-- The groups are a UI CONCERN ONLY. Server side this is still one `apparel`
+-- section, so pricing and the scope merge are unaffected by regrouping.
+Config.ApparelGroups = {
+    { id = 'outfit',      label = 'Outfit' },
+    { id = 'accessories', label = 'Accessories' },
+    { id = 'extras',      label = 'Extras' },
+}
+
 Config.Components = {
-    { id = 1,  label = 'Mask' },
-    { id = 3,  label = 'Arms' },
-    { id = 4,  label = 'Legs' },
-    { id = 5,  label = 'Bag' },
-    { id = 6,  label = 'Shoes' },
-    { id = 7,  label = 'Neck' },
-    { id = 8,  label = 'Undershirt' },
-    { id = 9,  label = 'Armour' },
-    { id = 10, label = 'Decals' },
-    { id = 11, label = 'Top' },
+    { id = 11, label = 'Top',        group = 'outfit' },
+    { id = 8,  label = 'Undershirt', group = 'outfit' },
+    { id = 4,  label = 'Legs',       group = 'outfit' },
+    { id = 6,  label = 'Shoes',      group = 'outfit' },
+    { id = 3,  label = 'Arms',       group = 'outfit' },
+
+    { id = 7,  label = 'Neck',       group = 'accessories' },
+    { id = 1,  label = 'Mask',       group = 'accessories' },
+
+    { id = 5,  label = 'Bag',        group = 'extras' },
+    { id = 9,  label = 'Armour',     group = 'extras' },
+    { id = 10, label = 'Decals',     group = 'extras' },
 }
 
 Config.Props = {
-    { id = 0, label = 'Hat' },
-    { id = 1, label = 'Glasses' },
-    { id = 2, label = 'Earrings' },
-    { id = 6, label = 'Watch' },
-    { id = 7, label = 'Bracelet' },
+    { id = 0, label = 'Hat',      group = 'accessories' },
+    { id = 1, label = 'Glasses',  group = 'accessories' },
+    { id = 2, label = 'Earrings', group = 'accessories' },
+    { id = 6, label = 'Watch',    group = 'accessories' },
+    { id = 7, label = 'Bracelet', group = 'accessories' },
 }
 
 -- Hair is component 2 but is edited alongside its colour, so it gets its own

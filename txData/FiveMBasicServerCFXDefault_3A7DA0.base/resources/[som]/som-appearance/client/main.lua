@@ -106,6 +106,9 @@ function Editor.Open(requested)
                 headOverlays = Config.HeadOverlays,
                 components = Config.Components,
                 props = Config.Props,
+                -- Sub-tabs for the clothing section. A UI concern only: the
+                -- server still treats apparel as one section.
+                apparelGroups = Config.ApparelGroups,
             },
             pricing = Config.Pricing,
             payment = data.payment,
