@@ -5,6 +5,38 @@ Permissions = {}
 
 local hierarchy = Config.Permissions.hierarchy
 
+---Highest tier an owner is granted, by identifier.
+---
+---ACE is still the mechanism for everyone else. This exists because on this
+---server ACE never resolved: the cfg provably executes, the add_ace and
+---add_principal lines are present and correct, som-core re-applies them at
+---boot as well, and IsPlayerAceAllowed still returns false for an identifier
+---that is listed. Several sessions went into that without an explanation.
+---
+---Rather than keep guessing, ownership is settled by a direct identifier match
+---that cannot fail. It is less flexible than ACE and deliberately covers only
+---the handful of people in Config.Permissions.owners.
+---@param source number
+---@return string|nil group
+local function ownerGroup(source)
+    local owners = Config.Permissions.owners
+    if not owners or not next(owners) then return nil end
+
+    for i = 0, GetNumPlayerIdentifiers(source) - 1 do
+        local group = owners[GetPlayerIdentifier(source, i)]
+        if group then return group end
+    end
+
+    return nil
+end
+
+-- What each group implies, most privileged first.
+local GROUP_TIERS = {
+    ['group.god']   = { 'som.god', 'som.admin', 'som.mod' },
+    ['group.admin'] = { 'som.admin', 'som.mod' },
+    ['group.mod']   = { 'som.mod' },
+}
+
 ---Returns true if the player holds the given ACE, or anything above it.
 ---@param source number
 ---@param ace string
@@ -13,6 +45,13 @@ function Permissions.Has(source, ace)
     local id = tonumber(source)
     if not id or id <= 0 then return false end
     if type(ace) ~= 'string' then return false end
+
+    local group = ownerGroup(id)
+    if group then
+        for _, held in ipairs(GROUP_TIERS[group] or {}) do
+            if held == ace then return true end
+        end
+    end
 
     -- The server native expects the player id as a string. Passing a number
     -- happens to work in some builds and silently fails in others, so be
@@ -134,24 +173,37 @@ CreateThread(function()
         return
     end
 
-    print('^1[som-core] PERMISSIONS FAILED.^7 Neither route resolved.')
+    -- ACE did not resolve. On this server it never has, for reasons that
+    -- survived several sessions of diagnosis, so owners fall back to a direct
+    -- identifier match and everything below is informational.
+    local owners = 0
+    for _ in pairs(Config.Permissions.owners or {}) do owners = owners + 1 end
+
+    print('^3[som-core]^7 ACE did not resolve. Owners fall back to identifier matching,')
+    print(('           which covers %d configured %s and is unaffected by this.')
+        :format(owners, owners == 1 and 'owner' or 'owners'))
 
     if marker == 'MISSING' then
-        print('           The cfg marker is MISSING, so the server.cfg being executed is')
-        print('           NOT the one in this repo. That explains everything: the ACE')
-        print('           block never ran, and `add_ace resource.som-core command allow`')
-        print('           never ran either, which is why som-core cannot apply ACEs')
-        print('           itself. Find the file txAdmin actually loads and fix that one.')
+        print('^1           The cfg marker is MISSING^7, so the file being executed is not')
+        print('           the one in this repo. Fix that first; nothing else is reliable')
+        print('           until it is.')
     else
-        print('           The cfg IS the right file, so ACE writes are being rejected at')
-        print('           runtime. som-core needs `add_ace resource.som-core command allow`')
-        print('           to grant ACEs via ExecuteCommand; check that line survived.')
+        print('           The cfg IS the right file and its ACE lines ran, so anyone who')
+        print('           is not a configured owner will have no staff access. Add them')
+        print('           to Config.Permissions.owners in som-core/shared/config.lua.')
     end
 end)
 
 ---@param source number
 ---@return string|nil highest ACE tier held, or nil
 function Permissions.GetTier(source)
+    -- Owners first, for the same reason as Permissions.Has.
+    local group = ownerGroup(source)
+    if group then
+        local tiers = GROUP_TIERS[group]
+        if tiers and tiers[1] then return tiers[1] end
+    end
+
     -- String, for the same reason as Permissions.Has. This was passing a number
     -- and silently reporting no tier at all.
     local src = tostring(source)

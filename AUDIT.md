@@ -1150,6 +1150,23 @@ The original build notes, kept because the reasoning still applies:
 - The settings tab is **not** built. There are no settings to put in one yet; it
   arrives with the HUD and keybind work rather than shipping empty.
 
+### 14.14 Decisions taken after the first build pass
+
+Recorded so they are not re-litigated. Each replaced something already built.
+
+| Area | Decision |
+|---|---|
+| **Pause menu** | Built twice, discarded twice. A full menu and then a slim bar, both replacing the native frontend, and both worse than what they replaced. What ships is a pink `DrawRect` wash and nothing else. NUI cannot be used: it renders above the frontend and captures the cursor, making the menu underneath unclickable. |
+| **Interaction engine** | `qb-target` out, `sleepless_interact` in. Escrowed and unversioned versus GPL-3.0 and maintained. Indicator circles appear only while Left Alt is **held**, which is not the resource's default. |
+| **Zones are points** | The engine draws a circle at a coordinate, so box, sphere and poly all resolve to a single point with a per-option distance. Genuine regions belong in `som-zones`. |
+| **Radial contents** | Things that act on **you**, on the **vehicle you are in**, or on the **person you are looking at**. qb-radialmenu's clothing and housing blocks are rejected: those are UIs wearing a wheel as a costume. Emotes stay on `/e`. |
+| **No `event` in registries** | Neither `som-radial` nor `som-interact` passes `event`, `serverEvent` or `command` through from config. A config value naming a server event lets the client choose both the event and its payload. |
+| **Ledger slugs are never shown** | `som_transactions.reason` is machine readable and translated to a label **server side**, with the slug replaced rather than supplemented so it cannot leak to the client at all. |
+| **Phone owns its own notifications** | Anything phone-shaped is a banner on the phone, working whether or not the phone is open. Only "you do not have a phone" stays a world toast. |
+| **ID cards are light** | A document is pale with print on it. Dark chrome reads as interface. Adapted from `alp1x/um-idcard` (GPL-3.0). |
+| **Config lives in `som.cfg`** | `server.cfg` is gitignored, so config could not be version controlled and drifted between machines. Everything non-secret moved to a tracked `som.cfg`, loaded with `exec`. |
+| **Owner permissions bypass ACE** | ACE never resolved on this server despite the cfg provably executing and the grants being present and correct. Owners are matched by identifier in `som-core/shared/config.lua`. ACE remains the mechanism for everyone else. **Unexplained, and worth revisiting.** |
+
 ### 14.12 Command minimisation
 
 Already covered in section 10, and it serves the same goal. Interaction-driven
