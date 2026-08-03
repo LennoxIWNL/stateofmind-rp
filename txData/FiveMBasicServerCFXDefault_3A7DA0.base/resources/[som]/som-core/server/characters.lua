@@ -215,16 +215,6 @@ function Characters.Select(source, citizenid)
         GetPlayerEndpoint(source), license,
     })
 
-    -- Welcome gift, once per character.
-    --
-    -- Given on first load rather than at creation, because ox_inventory only
-    -- has an inventory to write into once the player is actually loaded.
-    -- Flagged in metadata so it cannot be farmed by relogging.
-    if not player.metadata.welcomed then
-        player:setMetadata('welcomed', true)
-        Characters.GiveWelcomeGift(source)
-    end
-
     TriggerEvent('som:server:playerLoaded', source, player.citizenid)
     TriggerClientEvent('som:client:playerLoaded', source, {
         citizenid = player.citizenid,
@@ -236,10 +226,26 @@ function Characters.Select(source, citizenid)
         position = player.position or Config.Characters.defaultSpawn,
     })
 
+    -- Welcome gift, once per character, and only AFTER som:server:playerLoaded.
+    --
+    -- ox_inventory's som bridge builds the player's inventory on that event, so
+    -- anything handed over before it is written into an inventory that does not
+    -- exist yet and is silently lost. The flag is set only once something has
+    -- actually landed, so a failure here is retried on the next login rather
+    -- than marking the character welcomed forever.
+    if not player.metadata.welcomed then
+        Characters.GiveWelcomeGift(source)
+    end
+
     return true
 end
 
 ---Hands a new character their starter items.
+---
+---Runs in its own thread and waits for ox_inventory to finish building the
+---player's inventory. setPlayerInventory loads from the database, so the
+---inventory does not exist the instant som:server:playerLoaded fires and an
+---AddItem before then goes nowhere.
 ---
 ---Missing items are skipped with a warning rather than aborting: an item name
 ---that does not exist in ox_inventory should not stop the rest of the gift, or
@@ -254,23 +260,60 @@ function Characters.GiveWelcomeGift(source)
         return
     end
 
-    local given = 0
-    for _, entry in ipairs(gift) do
-        local ok = pcall(function()
-            return exports.ox_inventory:AddItem(source, entry.item, entry.count)
-        end)
+    CreateThread(function()
+        -- Bounded wait. If the inventory never appears the gift is skipped and
+        -- the character stays unwelcomed, so the next login tries again.
+        local ready = false
+        for _ = 1, 40 do
+            local ok, inv = pcall(function()
+                return exports.ox_inventory:GetInventory(source)
+            end)
 
-        if ok then
-            given = given + 1
-        else
-            print(('[som-core] welcome gift: item %s could not be given'):format(entry.item))
+            if ok and inv then
+                ready = true
+                break
+            end
+
+            Wait(250)
         end
-    end
 
-    if given > 0 then
+        local player = Players.Get(source)
+        if not player then return end
+
+        if not ready then
+            print(('[som-core] welcome gift: inventory never loaded for %s, will retry next login')
+                :format(player.citizenid))
+            return
+        end
+
+        local given = 0
+        for _, entry in ipairs(gift) do
+            -- AddItem returns false rather than raising when an item is unknown
+            -- or the inventory is full, so the return value is what matters
+            -- here. pcall alone would report every failure as a success.
+            local ok, added = pcall(function()
+                return exports.ox_inventory:AddItem(source, entry.item, entry.count)
+            end)
+
+            if ok and added then
+                given = given + 1
+            else
+                print(('[som-core] welcome gift: %s could not be given to %s')
+                    :format(entry.item, player.citizenid))
+            end
+        end
+
+        if given == 0 then
+            print(('[som-core] welcome gift: nothing given to %s, not marking welcomed')
+                :format(player.citizenid))
+            return
+        end
+
+        player:setMetadata('welcomed', true)
+
         TriggerClientEvent('som:client:notify', source,
             'You have received a gift', 'success', 8000)
-    end
+    end)
 end
 
 ---Soft delete. The row is kept so the ledger keeps referential integrity.
