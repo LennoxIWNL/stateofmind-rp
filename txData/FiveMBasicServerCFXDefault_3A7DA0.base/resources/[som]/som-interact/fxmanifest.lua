@@ -26,6 +26,6 @@ files {
 
 dependencies {
     'ox_lib',
-    'sleepless_interact',
+    'ox_target',
     'som-assets',
 }

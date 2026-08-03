@@ -4,48 +4,54 @@ The single interaction surface for SOM. Wraps the preserved target system and pr
 
 ## Why a wrapper
 
-The engine has already been swapped once, and this file is why that cost an
+The engine has been swapped twice, and this file is why each swap cost an
 afternoon rather than a rewrite.
 
 It was `qb-target`, which is escrow protected (`dependency '/assetpacks'`) and
-carries no version field, so it could never be read, forked or upgraded. It is
-now **`sleepless_interact`**, which is GPL-3.0, actively maintained, and draws a
-small circle at every interactable point.
+carries no version field, so it could never be read, forked or upgraded.
 
-Its **native** API is wrapped rather than its ox_target compat shim: the native
-one exposes `holdTime`, `cooldown` and the active callbacks, and one less
-translation layer is one less place for a signature to drift quietly.
+It briefly ran on `sleepless_interact`, which was the wrong pick: that resource
+has no raycast, no aim and no eye at all, only proximity indicators. "Hold Alt,
+look at the ped, pick an option beside it" cannot be expressed in that model, so
+it was never a skin difference.
 
-## Circles only while Left Alt is held
+It is now **`ox_target`**: MIT, maintained, and an aiming eye. Hold the key, look
+at something, the eye changes to show it is interactable, options appear beside
+it, and a left click picks one.
 
-`sleepless_interact/client/modules/config.lua` is a SOM patch. **Re-apply it
-after upgrading that resource.**
+## Configured by convar, not by patching
 
-```lua
-config.useShowKeyBind      = true       -- was false, circles were permanent
-config.defaultShowKeyBind  = 'LMENU'    -- Left Alt, same as qb-target
-config.showKeyBindBehavior = 'hold'     -- was 'toggle'
-config.themeColor          = { 255, 20, 147, 200 }
-config.maxInteractDistance = 5.0
+```cfg
+setr ox_target:defaultHotkey "LMENU"   # Left Alt
+setr ox_target:toggleHotkey 0          # hold, not toggle
+setr ox_target:leftClick 1             # left click selects
 ```
 
-The indicator uses the base game `shared / emptydot_32` texture, so nothing has
-to be streamed for it to work.
+Convars rather than a patched config file, so upgrading ox_target cannot quietly
+undo any of it. The one thing that IS patched is `web/`, the reskin, and that is
+listed in som-core's README with the rest.
 
-## Zones are points
+## The circle is drawn for ZONES
 
-The engine draws a circle at a coordinate, and there is nowhere to put a circle
-for a 20 metre polygon. `addBoxZone`, `addSphereZone` and `addPolyZone` all
-resolve to a **single point** with a per-option `distance`; a poly resolves to
-its centroid.
+**ox_target draws its indicator for zones only, not for entity targets.**
 
-For a door, a till or a stash that is what you wanted anyway. For a genuine
-region ("am I inside this area"), use several points or a PolyZone in
-`som-zones` instead.
+Anything static that should show a circle, a shop counter, a stash, a door, is
+registered as a zone even when there is an entity standing there. `som-rentals`
+does exactly this: the counter ped is a sphere zone, because registered against
+the ped there would be no circle at all, just an eye that happens to change.
+
+Players and vehicles stay entity targets. Those are aimed at, and a world full
+of circles defeats the point.
+
+## Real zones
+
+Box, sphere and poly are genuine volumes again. `sleepless_interact` collapsed
+all three to a single point, which this wrapper had to paper over; ox_target
+does not, so that compromise is gone.
 
 ## No event fields
 
-`sleepless_interact` options support `event`, `serverEvent` and `command`. The
+`ox_target` options support `event`, `serverEvent` and `command`. The
 wrapper **does not pass any of them through**. A config value naming a server
 event lets the client choose both the event and its payload, which is the same
 hole `som-radial` refuses to open. Use `onSelect` and go through a validated
@@ -54,8 +60,8 @@ export, or a request the server re-checks.
 ## Security
 
 **`groups` is a client side UI filter.** It decides what a player can see, not
-what they may do. sleepless has no `groups` field of its own, so the wrapper
-folds it into `canInteract`: same visibility behaviour, same non-guarantee. Any action reached through an interaction must re-check job, gang, grade, and distance on the server. Treat every `onSelect` as an untrusted request.
+what they may do. ox_target has a `groups` field and it is passed straight
+through, but it is still only a filter on what is drawn. Any action reached through an interaction must re-check job, gang, grade, and distance on the server. Treat every `onSelect` as an untrusted request.
 
 ```lua
 -- WRONG: the client decided it was allowed
