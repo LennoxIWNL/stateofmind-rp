@@ -7,15 +7,14 @@ local hierarchy = Config.Permissions.hierarchy
 
 ---Highest tier an owner is granted, by identifier.
 ---
----ACE is still the mechanism for everyone else. This exists because on this
----server ACE never resolved: the cfg provably executes, the add_ace and
----add_principal lines are present and correct, som-core re-applies them at
----boot as well, and IsPlayerAceAllowed still returns false for an identifier
----that is listed. Several sessions went into that without an explanation.
+---ACE is the real mechanism and it DOES resolve now; som-core prints proof of
+---that at boot. This is a fallback that costs nothing and covers only the
+---handful of people in Config.Permissions.owners, so that whoever owns the
+---server can still administer it if ACE ever breaks again.
 ---
----Rather than keep guessing, ownership is settled by a direct identifier match
----that cannot fail. It is less flexible than ACE and deliberately covers only
----the handful of people in Config.Permissions.owners.
+---It was originally written because ACE genuinely did not resolve. That has
+---since been fixed by ordering som.cfg correctly. See the note in
+---Config.Permissions.
 ---@param source number
 ---@return string|nil group
 local function ownerGroup(source)
@@ -213,24 +212,22 @@ end
 
 ---Registers a staff command whose permission is checked by Permissions.Has.
 ---
----WHY THIS EXISTS, and why `restricted` must not be used on a staff command:
----
 ---lib.addCommand ends with
 ---
 ---    RegisterCommand(name, handler, restricted and true)
 ---
----and that third argument hands enforcement to FiveM, which gates the command
----on the `command.<name>` ACE. On this server ACE does not resolve, so FiveM
----refused every staff command BEFORE the handler ran. Nothing reached Lua and
----nothing was printed, which is why /setjob looked like it did nothing at all.
+---and that third argument hands enforcement to FiveM, gating the command on the
+---`command.<name>` ACE. That works, because ACE resolves here.
 ---
----The identifier fallback in Permissions.Has was written to survive exactly
----this, and it was being bypassed by every command that needed it.
+---This is used anyway, for two reasons. It routes the check through
+---Permissions.Has, so the owner-by-identifier fallback applies and staff access
+---survives ACE breaking again. And a refusal becomes a message the player can
+---see, rather than FiveM silently swallowing the command with no output
+---anywhere, which is genuinely hard to tell apart from a broken script.
 ---
----So the command is registered UNRESTRICTED, which means FiveM lets it through,
----and the permission is checked here instead. Registering it unrestricted is
----safe only because of that check: without the guard below, this would publish
----/givemoney to the entire server.
+---The command is therefore registered UNRESTRICTED so FiveM lets it through,
+---and the permission is checked below. That is safe ONLY because of the guard:
+---without it, this would publish /givemoney to the entire server.
 ---@param name string
 ---@param props table lib.addCommand properties. `restricted` is ignored.
 ---@param ace string the ACE tier required, e.g. Config.Permissions.admin

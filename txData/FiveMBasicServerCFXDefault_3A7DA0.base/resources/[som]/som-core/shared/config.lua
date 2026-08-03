@@ -118,12 +118,21 @@ Config.Permissions = {
     hierarchy = { 'som.god', 'som.admin', 'som.mod' },
 
     -- -----------------------------------------------------------------------
-    -- OWNERS ARE MATCHED BY IDENTIFIER, NOT BY ACE.
+    -- OWNERS ARE ALSO MATCHED BY IDENTIFIER, AS A BELT-AND-BRACES FALLBACK.
     --
-    -- ACE has never resolved on this server. The cfg provably executes, the
-    -- grants are present and correctly ordered, and IsPlayerAceAllowed still
-    -- returns false for an identifier that is listed. Re-applying them from Lua
-    -- was refused outright: granting an ACE itself requires one.
+    -- ACE DOES resolve on this server now. Moving the permissions block above
+    -- the ensure lines in som.cfg fixed it, and som-core confirms it at boot:
+    --
+    --   [som-core] permissions: cfg marker som-cfg-exec-ok | group.god=1 |
+    --              owner identifier=true
+    --
+    -- This note used to say ACE had never resolved. That was true when it was
+    -- written and stale afterwards, and it cost a debugging session: a staff
+    -- command that did nothing was blamed on ACE when ACE was fine. Trust the
+    -- boot line over this comment, and correct this comment if it disagrees.
+    --
+    -- The identifier match is kept anyway, because it costs nothing and means
+    -- whoever owns the server can still administer it if ACE ever breaks again.
     --
     -- Rather than keep guessing, ownership is settled here by a direct
     -- identifier match that cannot fail. ACE is still declared in som.cfg and
