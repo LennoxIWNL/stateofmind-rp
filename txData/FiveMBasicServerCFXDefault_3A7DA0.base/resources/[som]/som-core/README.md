@@ -86,6 +86,23 @@ Set `setr inventory:framework "som"` in `server.cfg`. **Re-apply the patch on ev
 
 The bridge maps SOM job and gang into ox's `groups` table (`{ police = 2, ballas = 0 }`), which drives stash access rules and the police evidence-grade check.
 
+### Everything patched inside ox_inventory
+
+Six places. All of them are overwritten by an upgrade, so check this list first
+when something inventory-shaped breaks after one.
+
+| File | Change |
+|---|---|
+| `modules/bridge/som/{client,server}.lua` | The bridge itself. Also replaces `lib.notify` so ox's error toasts render in som-ui. `lib` is per-resource, so this affects ox_inventory only. |
+| `modules/mysql/server.lua` | A second hardcoded framework switch. Needs a `som` branch pointing at `som_characters` / `citizenid`, or every player load fails. |
+| `data/items.lua` | `client.export` on `id_card`, `driver_license` and `weaponlicense` for som-id. |
+| `data/vehicles.lua` | Motorcycles removed from the `glovebox` table. |
+| `client.lua` | `openGlovebox` falls back to the player's own inventory when a vehicle has no glovebox, instead of doing nothing. |
+| `web/build/assets/index-*.css` | Hides the item notification scrollbar. |
+
+Notifications are otherwise handled by convar, not by patching: `inventory:itemnotify 0`
+and `inventory:weaponnotify 0` remove the item and weapon cards outright.
+
 ## Client exports
 
 ```lua

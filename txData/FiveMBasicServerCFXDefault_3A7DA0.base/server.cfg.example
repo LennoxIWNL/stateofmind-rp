@@ -51,6 +51,14 @@ setr inventory:accounts "[]"
 setr inventory:slots 40
 setr inventory:weight 120000
 setr inventory:target false
+# No ox_inventory notifications. SOM has its own notification style in som-ui,
+# and two competing toast designs on screen is the inconsistency we are trying
+# to remove. itemnotify kills the item pickup and drop cards, weaponnotify the
+# equip and holster ones. Error toasts are redirected to som-ui by the som
+# bridge rather than silenced, so failures still say why.
+setr inventory:itemnotify 0
+setr inventory:weaponnotify 0
+setr inventory:disablesetupnotification 1
 setr inventory:police '["police"]'
 setr inventory:imagepath "nui://ox_inventory/web/images"
 

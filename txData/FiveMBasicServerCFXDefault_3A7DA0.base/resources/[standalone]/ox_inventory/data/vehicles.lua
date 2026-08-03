@@ -45,7 +45,10 @@ return {
 		[5] = {11, 88000},		-- Sports Classic
 		[6] = {11, 88000},		-- Sports
 		[7] = {11, 88000},		-- Super
-		[8] = {5, 40000},		-- Motorcycle
+		-- SOM PATCH: motorcycles have no glovebox. A bike with a storage
+		-- compartment is not a thing, and the inventory key on one now opens
+		-- the rider's own inventory alone. Re-apply after an upgrade.
+		-- [8] = {5, 40000},	-- Motorcycle
 		[9] = {11, 88000},		-- Offroad
 		[10] = {11, 88000},		-- Industrial
 		[11] = {11, 88000},		-- Utility

@@ -741,17 +741,25 @@ local function registerCommands()
 		RegisterCommand('steal', openNearbyInventory, false)
 	end
 
+	-- SOM PATCH: fall back to the player's own inventory instead of doing
+	-- nothing when the vehicle has no glovebox. Bikes and quads are the case
+	-- that matters: pressing the inventory key on one used to be silently
+	-- ignored, which reads as the key being broken. Re-apply after an
+	-- ox_inventory upgrade.
 	local function openGlovebox(vehicle)
 		if not IsPedInAnyVehicle(playerPed, false) or not NetworkGetEntityIsNetworked(vehicle) then return end
 
-		if IsEntityDead(vehicle) then return end
+		if IsEntityDead(vehicle) then return client.openInventory() end
 
 		local vehicleHash = GetEntityModel(vehicle)
 		local vehicleClass = GetVehicleClass(vehicle)
 		local checkVehicle = Vehicles.Storage[vehicleHash]
 
-		-- No storage or no glovebox
-		if (checkVehicle == 0 or checkVehicle == 2) or (not Vehicles.glovebox[vehicleClass] and not Vehicles.glovebox.models[vehicleHash]) then return end
+		-- No storage or no glovebox: open the player inventory alone, with no
+		-- second panel beside it.
+		if (checkVehicle == 0 or checkVehicle == 2) or (not Vehicles.glovebox[vehicleClass] and not Vehicles.glovebox.models[vehicleHash]) then
+			return client.openInventory()
+		end
 
 		local isOpen = client.openInventory('glovebox', { netid = NetworkGetNetworkIdFromEntity(vehicle) })
 

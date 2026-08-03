@@ -2,6 +2,46 @@
 --
 -- Patch to a third-party resource, see the header of som/server.lua.
 
+-- ---------------------------------------------------------------------------
+-- Notifications
+--
+-- ox_inventory's own notifications are off: inventory:itemnotify and
+-- inventory:weaponnotify are 0 in server.cfg, which removes the item pickup,
+-- drop, equip and holster cards entirely.
+--
+-- What is left are ox_lib error toasts, and those are redirected here rather
+-- than silenced. Two toast designs on screen is the inconsistency we are
+-- removing, but a player who cannot open a stash still needs telling why.
+--
+-- `lib` is per-resource in FiveM, so replacing lib.notify affects only
+-- ox_inventory. This file is required first by client.lua, before anything
+-- that could fire a notification.
+-- ---------------------------------------------------------------------------
+
+do
+    local passthrough = lib.notify
+
+    -- ox_lib calls its neutral type 'inform'; som-ui calls it 'info'. Unmapped
+    -- values fall through to som-ui's own default.
+    local TYPES = { inform = 'info', success = 'success', error = 'error', warning = 'warning' }
+
+    ---@param data { type?: string, description?: string, title?: string, duration?: number }
+    lib.notify = function(data)
+        if type(data) ~= 'table' then return end
+
+        local text = data.description or data.title
+        if not text then return end
+
+        if GetResourceState('som-ui') ~= 'started' then
+            -- som-ui missing is a broken install, not a reason to swallow the
+            -- message. Fall back to ox_lib rather than losing it.
+            return passthrough(data)
+        end
+
+        TriggerEvent('som:client:notify', text, TYPES[data.type] or 'info', data.duration)
+    end
+end
+
 RegisterNetEvent('som:client:playerLoaded', function()
     -- The server drives inventory setup from som:server:playerLoaded. Nothing
     -- to do here beyond letting ox know a character is live.

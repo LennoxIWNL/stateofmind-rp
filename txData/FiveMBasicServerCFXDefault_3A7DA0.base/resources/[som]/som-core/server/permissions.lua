@@ -49,11 +49,42 @@ end
 
 exports('debugPermissions', Permissions.Debug)
 
+---Reports whether the permissions block in server.cfg took effect at all.
+---
+---A player being denied som.god has two very different causes that look
+---identical from the player's side: the ACE lines never ran, or they ran but
+---the player is not in the group. Checking the GROUP rather than the player
+---separates them, because group.god holding som.god does not depend on any
+---identifier being correct.
+CreateThread(function()
+    -- After the cfg has finished executing.
+    Wait(3000)
+
+    local aces = IsPrincipalAceAllowed('group.god', 'som.god')
+
+    if aces then
+        print('^2[som-core]^7 permissions: server.cfg ACE block is active.')
+        print('           If a player still shows deny, their identifier is not in group.god.')
+        return
+    end
+
+    print('^1[som-core] PERMISSIONS NOT APPLIED.^7 group.god does not hold som.god, which')
+    print('           means the ACE block in server.cfg never executed. Everything after')
+    print('           the point it stopped is missing too, not just permissions.')
+    print('           Common causes: the cfg is not the one being loaded, or a line above')
+    print('           the block aborted execution. Check the console for errors during')
+    print('           startup, above the first resource start.')
+end)
+
 ---@param source number
 ---@return string|nil highest ACE tier held, or nil
 function Permissions.GetTier(source)
+    -- String, for the same reason as Permissions.Has. This was passing a number
+    -- and silently reporting no tier at all.
+    local src = tostring(source)
+
     for i = 1, #hierarchy do
-        if IsPlayerAceAllowed(source, hierarchy[i]) then return hierarchy[i] end
+        if IsPlayerAceAllowed(src, hierarchy[i]) then return hierarchy[i] end
     end
     return nil
 end
