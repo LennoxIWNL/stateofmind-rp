@@ -131,9 +131,11 @@ function applyTheme(name) {
     const c = parseHex(hex);
 
     root.style.setProperty('--accent', hex);
-    root.style.setProperty('--accent-soft', rgba(c, 0.55));
-    root.style.setProperty('--accent-wash', rgba(c, 0.32));
-    root.style.setProperty('--accent-deep', rgba(c, 0.46));
+    // Low on purpose. The wallpaper is a backdrop for the icons, and at full
+    // strength it read as a lit sign rather than a phone screen.
+    root.style.setProperty('--accent-soft', rgba(c, 0.30));
+    root.style.setProperty('--accent-wash', rgba(c, 0.16));
+    root.style.setProperty('--accent-deep', rgba(c, 0.40));
 }
 
 function toast(text, isError) {

@@ -57,23 +57,33 @@ exports('debugPermissions', Permissions.Debug)
 ---separates them, because group.god holding som.god does not depend on any
 ---identifier being correct.
 CreateThread(function()
-    -- After the cfg has finished executing.
-    Wait(3000)
+    -- Polled rather than checked once. som-core is started from an `ensure`
+    -- roughly seventy lines above the permissions block, so it is running while
+    -- the rest of the cfg is still being read. A single early check cannot tell
+    -- "never ran" from "has not run yet".
+    local started = GetGameTimer()
 
-    local aces = IsPrincipalAceAllowed('group.god', 'som.god')
+    for _ = 1, 60 do
+        if IsPrincipalAceAllowed('group.god', 'som.god') then
+            print(('^2[som-core]^7 permissions: ACE block active after %dms.')
+                :format(GetGameTimer() - started))
+            print('           If a player still shows deny, their identifier is not in group.god.')
+            return
+        end
 
-    if aces then
-        print('^2[som-core]^7 permissions: server.cfg ACE block is active.')
-        print('           If a player still shows deny, their identifier is not in group.god.')
-        return
+        Wait(500)
     end
 
-    print('^1[som-core] PERMISSIONS NOT APPLIED.^7 group.god does not hold som.god, which')
-    print('           means the ACE block in server.cfg never executed. Everything after')
-    print('           the point it stopped is missing too, not just permissions.')
-    print('           Common causes: the cfg is not the one being loaded, or a line above')
-    print('           the block aborted execution. Check the console for errors during')
-    print('           startup, above the first resource start.')
+    print('^1[som-core] PERMISSIONS NOT APPLIED.^7 group.god still does not hold som.god')
+    print('           30 seconds after start, so the ACE block in server.cfg did not run.')
+    print('           Everything after the point it stopped is missing too, not just')
+    print('           permissions, which is worth checking before treating this as one bug.')
+    print('           Causes, in the order worth checking:')
+    print('             1. A different server.cfg is being loaded than the one you edited.')
+    print('             2. An unbalanced quote in the cfg, which swallows the rest of it.')
+    print('             3. The block is missing from that file entirely.')
+    print('           A missing resource named in an ensure line is NOT a cause: FiveM')
+    print('           logs it and carries on.')
 end)
 
 ---@param source number

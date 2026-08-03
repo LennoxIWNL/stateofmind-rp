@@ -36,10 +36,12 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .root {
     --accent: var(--som-pink);
     /* Overwritten by applyTheme with rgba derived from the accent. The
-     * fallbacks keep the phone readable if that ever fails to run. */
-    --accent-soft: rgba(255, 20, 147, 0.55);
-    --accent-wash: rgba(255, 20, 147, 0.32);
-    --accent-deep: rgba(255, 20, 147, 0.46);
+     * fallbacks keep the phone readable if that ever fails to run.
+     * Kept low: the wallpaper is a backdrop, and at full strength it read as
+     * a lit sign rather than a phone screen. */
+    --accent-soft: rgba(255, 20, 147, 0.30);
+    --accent-wash: rgba(255, 20, 147, 0.16);
+    --accent-deep: rgba(255, 20, 147, 0.40);
     --glass: rgba(255, 255, 255, 0.08);
     --glass-line: rgba(255, 255, 255, 0.12);
     --ink-2: rgba(255, 255, 255, 0.62);
@@ -50,7 +52,9 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    padding-right: 4.5vw;
+    /* Padding rather than a transform: with align-items centre, padding on the
+     * container is what shifts the phone down without moving its shadow. */
+    padding: 10vh 4.5vw 0 0;
     animation: fade 200ms ease both;
 }
 
@@ -62,24 +66,26 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 .phone {
     position: relative;
-    width: 386px;
-    height: 812px;
-    max-height: 90vh;
-    padding: 5px;
-    border-radius: 54px;
+    width: 310px;
+    height: 650px;
+    max-height: 72vh;
+    padding: 4px;
+    border-radius: 44px;
     background:
         linear-gradient(150deg, #4a4a52 0%, #17171c 26%, #0e0e12 55%, #3a3a42 100%);
+    /* A wide accent bloom read as the phone leaking light onto the world. The
+     * contact shadow does the work of separating it from the background; the
+     * accent is now a tight rim rather than a halo. */
     box-shadow:
-        0 40px 90px rgba(0, 0, 0, 0.8),
-        0 0 0 1px rgba(255, 255, 255, 0.07),
-        0 0 60px -10px var(--accent);
+        0 26px 60px rgba(0, 0, 0, 0.75),
+        0 0 0 1px rgba(255, 255, 255, 0.07);
     animation: rise 380ms cubic-bezier(.16, 1, .3, 1) both;
 }
 
 .screen {
     position: relative;
     height: 100%;
-    border-radius: 49px;
+    border-radius: 40px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -95,20 +101,20 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     inset: 0;
     z-index: 0;
     background:
-        radial-gradient(120% 80% at 12% 4%, var(--accent-soft) 0%, transparent 58%),
-        radial-gradient(90% 70% at 96% 22%, rgba(140, 60, 220, 0.45) 0%, transparent 60%),
-        radial-gradient(120% 90% at 50% 108%, var(--accent-wash) 0%, transparent 62%),
+        radial-gradient(110% 70% at 14% 2%, var(--accent-soft) 0%, transparent 55%),
+        radial-gradient(80% 60% at 96% 20%, rgba(120, 55, 190, 0.22) 0%, transparent 58%),
+        radial-gradient(110% 80% at 50% 106%, var(--accent-wash) 0%, transparent 58%),
         linear-gradient(175deg, #14101d 0%, #07060c 62%);
 }
 
 /* Dynamic island. */
 .island {
     position: absolute;
-    top: 13px;
+    top: 11px;
     left: 50%;
     transform: translateX(-50%);
-    width: 118px;
-    height: 33px;
+    width: 100px;
+    height: 28px;
     border-radius: 20px;
     background: #000;
     z-index: 40;
@@ -132,8 +138,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     position: relative;
     z-index: 30;
     flex: 0 0 auto;
-    height: 59px;
-    padding: 0 30px;
+    height: 50px;
+    padding: 0 24px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -161,13 +167,13 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 .lock {
     align-items: center;
-    padding: 46px 30px 30px;
+    padding: 38px 24px 24px;
     text-align: center;
     animation: fade 260ms ease both;
 }
 
 .lock__time {
-    font-size: 5.3rem;
+    font-size: 4.4rem;
     font-weight: 250;
     line-height: 0.98;
     letter-spacing: -0.04em;
@@ -212,12 +218,12 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 /* --- Home --------------------------------------------------------------- */
 
-.home { padding: 14px 22px 0; overflow-y: auto; }
+.home { padding: 12px 16px 0; overflow-y: auto; }
 
 .apps {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 22px 8px;
+    gap: 18px 6px;
 }
 
 .app {
@@ -234,8 +240,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     position: relative;
     display: grid;
     place-items: center;
-    width: 62px;
-    height: 62px;
+    width: 54px;
+    height: 54px;
     border-radius: 34%;
     color: #fff;
     /* Solid fallback under the gradient JS sets inline. Without it, a rejected
@@ -249,7 +255,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     transition: transform 220ms cubic-bezier(.16, 1, .3, 1);
 }
 
-.app__icon svg { width: 30px; height: 30px; color: #fff; stroke: #fff; }
+.app__icon svg { width: 26px; height: 26px; color: #fff; stroke: #fff; }
 .app__icon--glyph { font-size: 1.5rem; font-weight: 700; color: #fff; }
 
 .app:hover .app__icon { transform: translateY(-4px) scale(1.05); }
@@ -317,7 +323,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 /* --- Bank --------------------------------------------------------------- */
 
 .balance {
-    padding: 22px 20px 18px;
+    padding: 18px 16px 15px;
     border-radius: 22px;
     background:
         linear-gradient(140deg,
@@ -338,7 +344,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 .balance__value {
     margin-top: 6px;
-    font-size: 2.35rem;
+    font-size: 2rem;
     font-weight: 600;
     letter-spacing: -0.03em;
     font-variant-numeric: tabular-nums;
@@ -641,14 +647,14 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     position: relative;
     z-index: 30;
     flex: 0 0 auto;
-    height: 26px;
+    height: 22px;
     display: grid;
     place-items: center;
 }
 .homebar::after {
     content: '';
-    width: 132px;
-    height: 5px;
+    width: 108px;
+    height: 4px;
     border-radius: 3px;
     background: rgba(255, 255, 255, 0.4);
     transition: background 160ms ease, width 160ms ease;
