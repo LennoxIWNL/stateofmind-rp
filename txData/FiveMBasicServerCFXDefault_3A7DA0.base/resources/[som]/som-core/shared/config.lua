@@ -97,4 +97,31 @@ Config.Permissions = {
     mod = 'som.mod',
     -- Ordered most privileged first, used by som:server:hasPermission.
     hierarchy = { 'som.god', 'som.admin', 'som.mod' },
+
+    -- -----------------------------------------------------------------------
+    -- Permissions are applied by som-core at boot, not by server.cfg.
+    --
+    -- server.cfg is gitignored, so its ACE block cannot be version controlled,
+    -- cannot be deployed with a push, and drifts silently between machines. On
+    -- the VPS its block never took effect at all and cost several sessions to
+    -- chase. Owning this here removes the whole class of problem: the grants
+    -- travel with the repo and are identical everywhere.
+    --
+    -- An ACE block in server.cfg still works and still wins if present. This
+    -- only guarantees a floor.
+    -- -----------------------------------------------------------------------
+
+    -- Applied every start. Harmless to re-apply.
+    bootstrap = true,
+
+    -- Who gets what, by identifier. `license:` is the reliable one: it works
+    -- without Steam and is what the server sees whatever the player launched
+    -- from.
+    --
+    -- NOTE: these are committed to the repository. A Rockstar license
+    -- identifier is not a secret, it identifies rather than authenticates, but
+    -- if this repo ever goes public, move this list to a convar.
+    owners = {
+        ['license:1edd18060d34914e203e0036ff7ea5ae0a06ae7e'] = 'group.god',
+    },
 }

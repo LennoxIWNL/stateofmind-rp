@@ -56,34 +56,64 @@ exports('debugPermissions', Permissions.Debug)
 ---the player is not in the group. Checking the GROUP rather than the player
 ---separates them, because group.god holding som.god does not depend on any
 ---identifier being correct.
-CreateThread(function()
-    -- Polled rather than checked once. som-core is started from an `ensure`
-    -- roughly seventy lines above the permissions block, so it is running while
-    -- the rest of the cfg is still being read. A single early check cannot tell
-    -- "never ran" from "has not run yet".
-    local started = GetGameTimer()
+---Applies the ACE structure and the owner grants.
+---
+---This exists because server.cfg is gitignored: its ACE block cannot be
+---version controlled, cannot be deployed with a push, and on the VPS it never
+---took effect at all. Owning the grants here makes them travel with the repo
+---and behave identically on every machine.
+---
+---Re-applying an existing ACE is a no-op, so this is safe every start.
+local function bootstrap()
+    if not Config.Permissions.bootstrap then return end
 
-    for _ = 1, 60 do
-        if IsPrincipalAceAllowed('group.god', 'som.god') then
-            print(('^2[som-core]^7 permissions: ACE block active after %dms.')
-                :format(GetGameTimer() - started))
-            print('           If a player still shows deny, their identifier is not in group.god.')
-            return
-        end
+    local commands = {
+        -- Inheritance. god implies admin implies mod.
+        'add_principal group.god group.admin',
+        'add_principal group.admin group.mod',
 
-        Wait(500)
+        'add_ace group.god som.god allow',
+        'add_ace group.god som.admin allow',
+        'add_ace group.god som.mod allow',
+        'add_ace group.god command allow',
+
+        'add_ace group.admin som.admin allow',
+        'add_ace group.admin som.mod allow',
+        'add_ace group.admin command allow',
+
+        'add_ace group.mod som.mod allow',
+    }
+
+    for identifier, group in pairs(Config.Permissions.owners or {}) do
+        commands[#commands + 1] = ('add_principal identifier.%s %s'):format(identifier, group)
+
+        -- Granted straight to the identifier as well as through the group, so
+        -- access survives a mistake in the group wiring.
+        commands[#commands + 1] = ('add_ace identifier.%s som.god allow'):format(identifier)
+        commands[#commands + 1] = ('add_ace identifier.%s command allow'):format(identifier)
     end
 
-    print('^1[som-core] PERMISSIONS NOT APPLIED.^7 group.god still does not hold som.god')
-    print('           30 seconds after start, so the ACE block in server.cfg did not run.')
-    print('           Everything after the point it stopped is missing too, not just')
-    print('           permissions, which is worth checking before treating this as one bug.')
-    print('           Causes, in the order worth checking:')
-    print('             1. A different server.cfg is being loaded than the one you edited.')
-    print('             2. An unbalanced quote in the cfg, which swallows the rest of it.')
-    print('             3. The block is missing from that file entirely.')
-    print('           A missing resource named in an ensure line is NOT a cause: FiveM')
-    print('           logs it and carries on.')
+    for i = 1, #commands do
+        ExecuteCommand(commands[i])
+    end
+end
+
+CreateThread(function()
+    bootstrap()
+
+    -- ExecuteCommand queues, so give the console a moment to drain before
+    -- asking whether any of it landed.
+    Wait(1000)
+
+    if IsPrincipalAceAllowed('group.god', 'som.god') then
+        print('^2[som-core]^7 permissions applied.')
+        return
+    end
+
+    print('^1[som-core] PERMISSIONS FAILED.^7 group.god does not hold som.god even after')
+    print('           som-core applied it directly, which rules out server.cfg entirely.')
+    print('           Something is rejecting ACE changes at runtime. Check for another')
+    print('           resource clearing principals, or a txAdmin permission override.')
 end)
 
 ---@param source number

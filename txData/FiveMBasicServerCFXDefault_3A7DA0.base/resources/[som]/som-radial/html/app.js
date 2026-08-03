@@ -17,6 +17,8 @@ let slices = [];
 let activeIndex = -1;
 let stack = [];          // breadcrumb of submenus
 let cursor = { x: 0, y: 0 };
+// Set on the first mousemove after opening. Until then nothing is selectable.
+let moved = false;
 
 function post(endpoint, body) {
     return fetch(`https://${RESOURCE}/${endpoint}`, {
@@ -161,6 +163,13 @@ function setHub(item) {
 
 function updateActive() {
     const rect = svg.getBoundingClientRect();
+
+    // While the root is hidden the element has no box, so getBoundingClientRect
+    // returns all zeros. Measuring against that put the centre at the top left
+    // of the screen, which made an arbitrary slice active the moment the wheel
+    // opened, and releasing the key then picked it.
+    if (rect.width === 0) return;
+
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
 
@@ -170,7 +179,9 @@ function updateActive() {
 
     let index = -1;
 
-    if (dist >= deadZone && slices.length) {
+    // Nothing is selectable until the mouse has actually been moved. Holding
+    // the key and letting go without aiming must never pick anything.
+    if (moved && dist >= deadZone && slices.length) {
         const step = (Math.PI * 2) / slices.length;
         const offset = -Math.PI / 2 - step / 2;
         let angle = Math.atan2(dy, dx) - offset;
@@ -188,7 +199,9 @@ function updateActive() {
 }
 
 document.addEventListener('mousemove', (e) => {
+    if (root.classList.contains('hidden')) return;
     cursor = { x: e.clientX, y: e.clientY };
+    moved = true;
     updateActive();
 });
 
@@ -257,11 +270,13 @@ window.addEventListener('message', (event) => {
         deadZone = typeof d.deadZone === 'number' ? d.deadZone : 0.22;
         stack = [];
 
-        // Start centred so nothing is selected until the mouse actually moves.
+        // Unhide BEFORE rendering. render() measures the wheel to work out
+        // which slice the cursor is over, and a hidden element has no box.
+        moved = false;
         cursor = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+        root.classList.remove('hidden');
 
         render(d.items || []);
-        root.classList.remove('hidden');
         return;
     }
 
