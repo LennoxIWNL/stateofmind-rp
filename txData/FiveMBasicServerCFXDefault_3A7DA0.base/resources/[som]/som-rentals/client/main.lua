@@ -22,9 +22,23 @@ end
 
 local function spawnPeds()
     for id, location in pairs(Config.Locations) do
+        local c = location.ped.coords
+
+        -- The ped is best effort, the ZONE IS NOT.
+        --
+        -- These are registered independently on purpose. A model that fails to
+        -- load used to take the interaction down with it, so the counter
+        -- silently did not exist: no ped, no circle, no option, and nothing in
+        -- the console to say why. Now a missing ped is an invisible clerk
+        -- rather than a broken rental.
+        --
+        -- a_m_y_business_01 is a base game model, so nothing has to be
+        -- streamed for this to work. A CUSTOM ped would have to live in a
+        -- started stream resource, and this is where it would fail if it did
+        -- not.
         local hash = loadModel(location.ped.model)
+
         if hash then
-            local c = location.ped.coords
             local ped = CreatePed(4, hash, c.x, c.y, c.z - 1.0, c.w, false, false)
 
             SetEntityInvincible(ped, true)
@@ -38,7 +52,12 @@ local function spawnPeds()
 
             SetModelAsNoLongerNeeded(hash)
             peds[id] = ped
+        else
+            print(('[som-rentals] ped model "%s" would not load for %s. The counter still works, there is just nobody standing at it.')
+                :format(location.ped.model, id))
+        end
 
+        do
             -- A ZONE, not an entity target, and that is deliberate.
             --
             -- ox_target draws its indicator circle for zones only. Registered

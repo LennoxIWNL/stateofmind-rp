@@ -1,3 +1,5 @@
+// MADE BY MOTION SCRIPTS - https://discord.gg/WRR8q8XYfT
+
 const resource = GetParentResourceName();
 
 export async function fetchNui(eventName, data) {

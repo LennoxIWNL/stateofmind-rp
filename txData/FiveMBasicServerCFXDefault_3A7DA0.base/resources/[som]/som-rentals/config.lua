@@ -42,17 +42,18 @@ Config.Locations = {
     lsia = {
         label = 'LSIA Vehicle Rental',
 
-        -- The ped you interact with. Coordinates are a starting point: stand
-        -- where you want it and use F11 to print your position, then correct
-        -- these. z here is the ground, the ped is dropped onto it.
+        -- Surveyed in game with F11. z is the ground the player stood on; the
+        -- ped is dropped onto it by the client.
         ped = {
             model = 'a_m_y_business_01',
-            coords = vec4(-1037.9, -2737.5, 20.17, 328.0),
+            coords = vec4(-1039.30, -2730.76, 20.21, 234.41),
             scenario = 'WORLD_HUMAN_CLIPBOARD',
         },
 
-        -- Where the rented vehicle appears. Must be clear of the ped and on
-        -- something drivable.
+        -- Where the rented vehicle appears. STILL A GUESS: this one has not
+        -- been surveyed, so check the car does not land in a wall or on top of
+        -- the counter, and correct it with F11 if it does. It has to be clear
+        -- of the ped and on something drivable.
         spawn = vec4(-1027.6, -2748.9, 21.3, 148.0),
 
         blip = { sprite = 326, colour = 5, scale = 0.7 },
