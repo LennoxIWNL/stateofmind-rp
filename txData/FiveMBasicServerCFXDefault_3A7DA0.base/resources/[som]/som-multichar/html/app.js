@@ -128,6 +128,9 @@ function renderRoster() {
             if (activeSlot === i) row.classList.add('is-active');
             row.addEventListener('click', () => {
                 activeSlot = activeSlot === i ? null : i;
+                // The ped in the scene follows whoever is highlighted, so the
+                // roster and the character on screen never disagree.
+                if (activeSlot === i) post('previewGender', { gender: Number(character.gender) || 0 });
                 renderRoster();
             });
         } else {

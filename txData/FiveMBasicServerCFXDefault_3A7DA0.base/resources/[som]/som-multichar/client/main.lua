@@ -490,6 +490,19 @@ local function openSelection()
         entitlements = {}
     end
 
+    -- Put somebody in the scene before the UI appears.
+    --
+    -- setPreviewPed used to be reachable only from the creation form's gender
+    -- picker, so opening the selector with existing characters showed an empty
+    -- room. Going into "create a character" and back spawned one, which is why
+    -- it looked like the ped was there all along and had simply failed to
+    -- render the first time.
+    --
+    -- Defaults to the first character's gender; the roster updates it when a
+    -- different slot is highlighted.
+    local first = characters[1]
+    setPreviewPed(first and tonumber(first.gender) or 0)
+
     SendNUIMessage({
         action = 'open',
         characters = characters,
