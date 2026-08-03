@@ -21,7 +21,7 @@ server. Interaction-driven, phone-centric, low-command.
 | Database | MariaDB via `oxmysql` |
 | Library | `ox_lib` |
 | Inventory | `ox_inventory`, bridged to SOM |
-| Interaction | `qb-target`, wrapped by `som-interact` |
+| Interaction | `sleepless_interact`, wrapped by `som-interact` |
 | Voice | `pma-voice`, `pa-radio` |
 | MDT | `ps-mdt`, preserved and unmodified |
 | Management | txAdmin |
@@ -38,7 +38,13 @@ All under `resources/[som]/`. Each has its own README.
 | **som-multichar** | Character selection, creation and spawn. |
 | **som-theft** | Server-validated cash robbery. |
 | **som-compat** | Fake `qb-core` export surface so preserved third-party resources run untouched. |
-| **som-assets** | Shared design tokens. Every SOM NUI imports these. |
+| **som-assets** | Shared design tokens and the logo. Every SOM NUI imports these. |
+| **som-chat** | A command line, not a chat. Hidden unless typing. |
+| **som-economy** | Business register, market saturation, fines, treasury. |
+| **som-phone** | The phone. Banking over the ledger, app registry, notifications. |
+| **som-radial** | The F1 wheel. Contextual actions contributed by other resources. |
+| **som-id** | Identity documents, shown to players nearby. |
+| **som-pause** | A pink wash over the native pause menu. Nothing else. |
 
 ### How the framework is consumed
 
@@ -70,7 +76,8 @@ Three rules that hold everywhere:
 
 ```
 txData/FiveMBasicServerCFXDefault_3A7DA0.base/
-  server.cfg.example        template, real server.cfg is gitignored
+  server.cfg.example        template; the real server.cfg is gitignored
+  som.cfg                   boot order, convars, permissions. TRACKED
   resources/
     [som]/                  the framework
     [assets-streams]/       ~5GB of streamed content, gitignored
@@ -99,7 +106,19 @@ tools/
    the one you edited.
 
 2. **Config.** Copy `server.cfg.example` to `server.cfg` and fill in the
-   licence key, Steam API key, MySQL string and your admin identifiers.
+   licence key, Steam API key and MySQL string. That is all it holds.
+
+   Everything else, boot order, convars and permissions, lives in `som.cfg`,
+   which **is** tracked. `server.cfg` ends with `exec som.cfg`.
+
+   The split exists because `server.cfg` is gitignored: while the config lived
+   there, every change was local only and had to be hand copied to the server,
+   so config drifted between machines and produced bugs that looked like code
+   bugs. Now a push carries the config and the only file you copy by hand is
+   the one with your keys in it.
+
+   `som-core` prints a cfg marker at boot. If it reads `MISSING`, the `exec`
+   line did not find `som.cfg`.
 
 3. **Start** via txAdmin.
 
@@ -128,14 +147,19 @@ on the character screen, **F11** prints your coordinates. See
 Restart a single resource from the txAdmin console rather than the whole server;
 only `server.cfg` changes need a full restart.
 
-### Two patched third-party resources
+### Patched third-party resources
 
-Both must be re-applied after upgrading the resource:
+Every one of these is overwritten by an upgrade of the resource it lives in, so
+check them first when something breaks after one. The full list with the reason
+for each is in
+[som-core's README](txData/FiveMBasicServerCFXDefault_3A7DA0.base/resources/%5Bsom%5D/som-core/README.md).
 
-- `ox_inventory/modules/bridge/som/` — the SOM framework bridge. ox resolves its
-  bridge by folder name from a convar, so it cannot be supplied externally.
-- `ox_inventory/web/build/assets/index-*.css` — hides a permanently rendered
-  scrollbar track that drew a grey line across the screen.
+- **ox_inventory**, six places: the SOM bridge, a second hardcoded framework
+  switch in `modules/mysql`, shop currency resolving against som-core rather
+  than an inventory item, `client.export` on the identity documents, motorcycles
+  losing their glovebox, and a CSS scrollbar fix.
+- **sleepless_interact**, one place: `client/modules/config.lua`, which makes
+  the indicator circles appear only while Left Alt is held, in brand pink.
 
 ## Documentation
 

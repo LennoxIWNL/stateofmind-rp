@@ -52,6 +52,12 @@ txData/default/config.json
 !**/server.cfg.example
 # Backups of server.cfg also hold the live secrets — never commit them
 **/server.cfg.bkp
+**/server.cfg.backup
+**/server.cfg.bak
+
+# som.cfg is deliberately NOT ignored. It holds boot order, convars and
+# permissions, none of which are secret, so a push carries the config to the
+# VPS instead of it being hand copied and drifting.
 *.bkp
 *.bak
 **/server-tls.key
