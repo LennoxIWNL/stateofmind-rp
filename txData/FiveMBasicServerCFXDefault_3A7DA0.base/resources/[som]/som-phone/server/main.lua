@@ -164,3 +164,52 @@ CreateThread(function()
         pcall(Bank.CollectOverdue)
     end
 end)
+
+-- ---------------------------------------------------------------------------
+-- App notifications
+--
+-- The one way another resource puts a notification ON THE PHONE. It exists so
+-- callers name an APP rather than an icon, which keeps the icon and the label
+-- decided here instead of in every resource that wants to say something.
+--
+-- WHAT BELONGS HERE, and what does not:
+--
+-- The phone is not the notification system. "You are now on duty", "too far
+-- away" and "you do not have permission" are world feedback and belong in the
+-- som-ui toast via som:client:notify, because they are the game talking to the
+-- player, not an app talking to them.
+--
+-- A phone notification is for something that would genuinely reach you through
+-- a device: a bill, a bank transfer, a message, a dispatch call, a job offer.
+-- The test is whether it would still make sense if the player had left their
+-- phone at home. If it would, it is not a phone notification.
+-- ---------------------------------------------------------------------------
+
+---Icons are resolved from Config.Apps so an app only declares its icon once.
+---@param appId string
+---@return string label, string icon
+local function appIdentity(appId)
+    for _, app in ipairs(Config.Apps or {}) do
+        if app.id == appId then return app.label, app.icon end
+    end
+
+    -- An unknown app still notifies rather than failing silently. `system` is
+    -- the catch-all for anything without an app of its own yet.
+    return 'System', 'settings'
+end
+
+---@param source number
+---@param appId string an id from Config.Apps, or 'system'
+---@param text string
+---@return boolean
+exports('notifyApp', function(source, appId, text)
+    if type(text) ~= 'string' or text == '' then return false end
+
+    local id = tonumber(source)
+    if not id or id <= 0 then return false end
+
+    local label, icon = appIdentity(type(appId) == 'string' and appId or 'system')
+
+    TriggerClientEvent('som-phone:client:banner', id, label, text, icon)
+    return true
+end)

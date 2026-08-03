@@ -765,12 +765,42 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
  */
 
 .root.is-banners-only { pointer-events: none; }
-.root.is-banners-only .phone { display: none; }
+
+/* The PEEK.
+ *
+ * A notification arriving on a closed phone shows the top of the handset
+ * sliding up from the bottom right, exactly as a real one does when it is face
+ * up on a desk. The device is not hidden and the banner is not re-parented:
+ * the same phone, the same banner, just cropped and moved.
+ *
+ * That is why this is only positioning. Anything that rebuilt the notification
+ * as a separate card would drift from the phone's own styling the first time
+ * either changed.
+ */
+.root.is-banners-only .phone {
+    position: fixed;
+    right: 26px;
+    bottom: 0;
+    left: auto;
+    /* Only the top of the handset is on screen. The rest hangs below the
+     * viewport, which is what makes it read as a phone rather than a panel. */
+    height: 640px;
+    max-height: none;
+    transform: translateY(calc(100% - 172px));
+    transform-origin: bottom center;
+    animation: peekIn 420ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+/* The screen keeps its rounded top, and the cropped bottom simply runs off. */
+.root.is-banners-only .screen > *:not(.banners):not(.statusbar):not(.island) {
+    opacity: 0;
+}
 
 .root.is-banners-only .banners {
-    position: fixed;
-    top: 22px;
-    right: 22px;
-    left: auto;
-    width: 320px;
+    top: 52px;
+}
+
+@keyframes peekIn {
+    from { opacity: 0; transform: translateY(100%); }
+    to   { opacity: 1; transform: translateY(calc(100% - 172px)); }
 }
