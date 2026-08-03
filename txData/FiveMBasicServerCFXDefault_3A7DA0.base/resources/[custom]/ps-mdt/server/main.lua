@@ -231,7 +231,12 @@ RegisterNetEvent('mdt:server:openMDT', function()
 
 	local JobType = GetJobType(PlayerData.job.name)
 	local bulletin = GetBulletins(JobType)
-	local calls = exports['ps-dispatch']:GetDispatchCalls()
+	-- SOM: guarded. This line sits immediately before the open event, so when no
+	-- dispatch resource is running the export threw, this handler aborted, and
+	-- mdt:client:open never fired: the MDT simply did not open. isDispatchRunning
+	-- is ps-mdt's own flag and the other call sites already use it; these two were
+	-- missed upstream. Re-apply on a ps-mdt upgrade.
+	local calls = isDispatchRunning and exports['ps-dispatch']:GetDispatchCalls() or {}
 	TriggerClientEvent('mdt:client:open', src, bulletin, activeUnits, calls, PlayerData.citizenid)
 end)
 
@@ -1133,7 +1138,8 @@ RegisterNetEvent('mdt:server:searchCalls', function(calls)
 	local Player = QBCore.Functions.GetPlayer(src)
 	local JobType = GetJobType(Player.PlayerData.job.name)
 	if JobType == 'police' then
-		local calls = exports['ps-dispatch']:GetDispatchCalls()
+		-- SOM: guarded, same reason as the site in mdt:server:openMDT above.
+		local calls = isDispatchRunning and exports['ps-dispatch']:GetDispatchCalls() or {}
 		TriggerClientEvent('mdt:client:getCalls', src, calls)
 
 	end

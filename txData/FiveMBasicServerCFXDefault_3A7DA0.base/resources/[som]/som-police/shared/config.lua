@@ -129,6 +129,19 @@ Config.Stations = {
     },
 }
 
+-- Blips for the working parts of a station, drawn only for officers.
+--
+-- `from` names a key on the station table above, so moving a location moves its
+-- blip with it and there is one set of coordinates rather than two that drift.
+-- The station blip itself is separate and is shown to EVERYONE: a citizen who
+-- cannot find the police station on the map is a bug, not a security measure.
+Config.StaffBlips = {
+    { from = 'armoury', label = 'Armoury',      sprite = 110, colour = 29, scale = 0.6 },
+    { from = 'garage',  label = 'Motor Pool',   sprite = 357, colour = 29, scale = 0.6 },
+    { from = 'helipad', label = 'Air Support',  sprite = 43,  colour = 29, scale = 0.6 },
+    { from = 'impound', label = 'Impound Lot',  sprite = 68,  colour = 29, scale = 0.6 },
+}
+
 -- ---------------------------------------------------------------------------
 -- Armoury
 --

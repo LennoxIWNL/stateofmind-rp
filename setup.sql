@@ -27,6 +27,7 @@
 --    7. Phone               bills, saved accounts, settings
 --   7b. Police              custody, impounds, flagged plates
 --    8. Preserved third party   ps-mdt, ox_doorlock
+--   8c. Compatibility views    players, player_vehicles, for ps-mdt's qb SQL
 --    9. Seed data
 -- ===========================================================================
 
@@ -718,6 +719,87 @@ CALL som_add_column('som_phone_bills', 'auto_collect', 'TINYINT(1) NOT NULL DEFA
 CALL som_add_column('som_phone_bills', 'due_at', 'DATETIME NULL DEFAULT NULL');
 
 DROP PROCEDURE IF EXISTS som_add_column;
+
+-- ===========================================================================
+--  8c. COMPATIBILITY VIEWS
+--
+--  ps-mdt is preserved third-party code written against QBCore's schema. It
+--  issues 20 queries against `players`, `player_vehicles`, `player_houses` and
+--  `apartments`, none of which exist here. Without these views the MDT opens
+--  but every profile search, vehicle lookup and property list comes back empty.
+--
+--  A VIEW rather than 20 edits, for three reasons:
+--
+--    * ps-mdt stays byte-for-byte preserved, so a future upgrade does not have
+--      to have its SQL re-patched.
+--    * The mapping lives in ONE place, next to the tables it maps.
+--    * The two writes ps-mdt makes (server/dbm.lua:138 and :161, the offline
+--      branch of licence revocation) both set `metadata` on a single-table view
+--      with no aggregate, union or DISTINCT, which MySQL and MariaDB treat as
+--      updatable. The computed `charinfo` column is not itself updatable, and
+--      nothing writes it.
+--
+--  If a MariaDB build ever refuses that UPDATE, point those two call sites at
+--  som_characters directly; every read still goes through these views.
+-- ===========================================================================
+
+-- qb stores name, DOB and phone inside a `charinfo` JSON blob. SOM stores them
+-- as real columns, so the blob is assembled here. ps-mdt reads it with
+-- JSON_VALUE(p.charinfo, '$.firstname'), so the key names must match qb's.
+CREATE OR REPLACE VIEW `players` AS
+SELECT
+  `citizenid`,
+  `license`,
+  `job`,
+  `metadata`,
+  JSON_OBJECT(
+    'firstname',   `firstname`,
+    'lastname',    `lastname`,
+    'birthdate',   `dob`,
+    'gender',      `gender`,
+    'nationality', `nationality`,
+    'phone',       `phone`
+  ) AS `charinfo`
+FROM `som_characters`;
+
+-- Column renames: model -> vehicle, props -> mods.
+--
+-- `state` is the load-bearing one. SOM uses an ENUM; ps-mdt compares against
+-- INTEGERS and renders 0 as "Out", 1 as "Garaged", 2 as "Impounded"
+-- (ps-mdt/server/main.lua:976-981). Emitting the string here would show a blank
+-- status on every vehicle in the MDT, so it is mapped.
+CREATE OR REPLACE VIEW `player_vehicles` AS
+SELECT
+  `id`,
+  `citizenid`,
+  `plate`,
+  `model` AS `vehicle`,
+  `props` AS `mods`,
+  `garage`,
+  `fuel`,
+  `engine`,
+  `body`,
+  CASE `state`
+    WHEN 'out'       THEN 0
+    WHEN 'garaged'   THEN 1
+    WHEN 'impounded' THEN 2
+    ELSE 1
+  END AS `state`
+FROM `som_vehicles`;
+
+-- Housing does not exist in SOM at all. These three return nothing rather than
+-- erroring, which is what the MDT's property panel expects. `houselocations` is
+-- here because ps-mdt INNER JOINs it, so its absence would fail the query
+-- outright rather than return an empty set.
+CREATE OR REPLACE VIEW `player_houses` AS
+SELECT NULL AS `citizenid`, NULL AS `house` FROM DUAL WHERE FALSE;
+
+CREATE OR REPLACE VIEW `houselocations` AS
+SELECT NULL AS `name`, NULL AS `label`, NULL AS `coords` FROM DUAL WHERE FALSE;
+
+CREATE OR REPLACE VIEW `apartments` AS
+SELECT NULL AS `citizenid`, NULL AS `name`, NULL AS `type`, NULL AS `label`
+FROM DUAL WHERE FALSE;
 
 -- ===========================================================================
 --  9. SEED DATA

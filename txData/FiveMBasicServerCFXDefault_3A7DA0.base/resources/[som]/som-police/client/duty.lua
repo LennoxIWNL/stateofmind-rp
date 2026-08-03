@@ -32,25 +32,49 @@ local function clearBlips()
     blips = {}
 end
 
-local function createBlips()
+---@param def table { coords, sprite, colour, scale }
+---@param label string
+local function addBlip(def, label)
+    local blip = AddBlipForCoord(def.coords.x, def.coords.y, def.coords.z)
+
+    SetBlipSprite(blip, def.sprite)
+    SetBlipColour(blip, def.colour)
+    SetBlipScale(blip, def.scale or 0.7)
+    SetBlipAsShortRange(blip, true)
+    SetBlipDisplay(blip, 4)
+
+    BeginTextCommandSetBlipName('STRING')
+    AddTextComponentSubstringPlayerName(label)
+    EndTextCommandSetBlipName(blip)
+
+    blips[#blips + 1] = blip
+end
+
+---@param isPolice boolean whether the player works here
+local function createBlips(isPolice)
     clearBlips()
 
     for _, station in pairs(Config.Stations) do
-        local def = station.blip
-        if def then
-            local blip = AddBlipForCoord(def.coords.x, def.coords.y, def.coords.z)
+        -- The station itself is visible to EVERYONE. It was previously drawn
+        -- only for officers, which meant a citizen could not find the police
+        -- station on the map at all.
+        if station.blip then addBlip(station.blip, station.label) end
 
-            SetBlipSprite(blip, def.sprite)
-            SetBlipColour(blip, def.colour)
-            SetBlipScale(blip, def.scale)
-            SetBlipAsShortRange(blip, true)
-            SetBlipDisplay(blip, 4)
+        -- The working parts of the building are only useful to somebody who
+        -- can actually use them, so those stay officer-only.
+        if isPolice then
+            for _, entry in ipairs(Config.StaffBlips or {}) do
+                local target = station[entry.from]
 
-            BeginTextCommandSetBlipName('STRING')
-            AddTextComponentSubstringPlayerName(station.label)
-            EndTextCommandSetBlipName(blip)
-
-            blips[#blips + 1] = blip
+                if target and target.coords then
+                    addBlip({
+                        coords = target.coords,
+                        sprite = entry.sprite,
+                        colour = entry.colour,
+                        scale = entry.scale,
+                    }, entry.label)
+                end
+            end
         end
     end
 end
@@ -65,11 +89,16 @@ local function refresh()
 
     onDuty = isPolice and job.onduty == true
 
-    if isPolice then createBlips() else clearBlips() end
+    createBlips(isPolice)
 
     -- Broadcast rather than have every other file poll. Keybinds and the eye
     -- both need to know, and both need to know at the same moment.
     TriggerEvent('som-police:client:dutyChanged', onDuty)
+
+    -- The radial caches its entries and only refetches on a job or gang change,
+    -- so going on duty left the MDT slice missing until a relog. som-radial
+    -- exposes this event for exactly that and had no callers.
+    TriggerEvent('som-radial:client:refresh')
 end
 
 Duty.Refresh = refresh
