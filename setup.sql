@@ -29,6 +29,10 @@
 --    8. Preserved third party   ps-mdt, ox_doorlock
 --   8c. Compatibility views    players, player_vehicles, for ps-mdt's qb SQL
 --    9. Seed data
+--
+--  Doors are NOT here. sql/mrpd-doors.sql is a separate one-time import,
+--  because ox_doorlock has no unique key on `name` and re-running this file
+--  would insert a duplicate set of doors every time.
 -- ===========================================================================
 
 SET NAMES utf8mb4;
