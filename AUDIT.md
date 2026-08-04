@@ -1477,6 +1477,30 @@ Ordered. Item 1 blocks three separate symptoms and should be first.
     pointed at som-dispatch instead of the dead `police:server:policeAlert`.
 12. **Deployables** (spike strips, cones) and **jail**.
 
+Added after the list above was first written, and 13 and 14 are quick:
+
+13. **Empty the PD motor pool.** Every model currently in `Config.Fleets.lspd`
+    comes out, and the rows with it. `som_vehicles` rows for the pool are
+    created on first boot and topped up when `count` rises, but nothing removes
+    a row when a model leaves the config, so clearing the list alone leaves
+    orphan rows that still occupy plates and still appear in the list. The
+    fleet seeder needs a retire path, not just a top-up path.
+14. **Storing a vehicle has no radial entry.** `store()` in
+    `som-garage/client/garage.lua:235` already handles both cases correctly, in
+    the car or standing beside it, but its only entry point is the ox_target
+    eye, and **ox_target does not work from a driver's seat**. So the only way
+    to store is to get out first, which is not obvious and reads as the feature
+    being missing. This is the same defect the mod bay had, and the same fix:
+    register `garage.store` on the radial with a `hasGarageNear` visibility
+    check.
+15. **Replace the police fleet with something that sounds and drives right.**
+    See 16.7: the silence is a config bug and should be fixed and re-judged
+    before any pack is replaced, because a silent car is not evidence of a bad
+    model.
+16. **Lore-friendly NPC traffic.** Research task. Note the constraint in 16.8:
+    a new vehicle pack cannot be installed by Claude, only recommended and then
+    wired up.
+
 Deferred, previously agreed: officer map blips with callsigns, an F1 panic
 button with sound, the gang and boss laptop app, an end-of-phase coherency pass
 across every UI, and anticheat tuning.
@@ -1485,7 +1509,7 @@ across every UI, and anticheat tuning.
 
 | Pack | State |
 |---|---|
-| `origen_police` | In use. Rear lights sit wrong on some models, which is a model defect and not config. Its `carcols.meta` loads correctly, and the `*.xml`, `*.dat` and `*.ytyp` manifest warnings are dead globs matching nothing |
+| `origen_police` | In use, ensured individually at `som.cfg:239` because dev mode skips the `[assets-streams]` group. Rear lights sit wrong on some models, which is a model defect and not config. Its `carcols.meta` loads correctly, and the `*.xml`, `*.dat` and `*.ytyp` manifest warnings are dead globs matching nothing |
 | `ex-cars` police pack | Dropped. Broken liveries, misaligned headlights, 365MB |
 | `TIG-PACK` | Dropped. The models do not spawn at all |
 | `rd-vehicleconfig`, `ro-VehicleConfig` | Declare roughly 400 models with no stream folder. Those models do not exist |
@@ -1494,7 +1518,48 @@ Vanilla police models were removed from the shared garage at the owner's
 request. Liveries and mod bay changes now persist per vehicle, and
 `Config.ResetPoolProps` is off so pool cars keep what was set on them.
 
-### 16.8 Not verified
+**The police cars are silent because their audio is unset, not because the
+models are bad.** `<audioNameHash />` is **empty** in four of the six
+`data/<model>/vehicles.meta` files:
+
+| Model | `audioNameHash` | Result |
+|---|---|---|
+| `polcaracara` | empty | silent |
+| `polcomet` | empty | silent |
+| `polvstr` | empty | silent |
+| `polvigero2` | empty | silent |
+| `poldom` | `tamustanggt50p` | an addon bank from a Mustang pack that is not installed here, so also silent |
+| `polbuffalo4` | `schafter4` | a real base-game bank, so this one has sound |
+
+That pattern is decisive: an empty hash produces no engine audio no matter how
+good the model is. The fix is to set each one to the audio name of the vanilla
+vehicle the model is derived from, read out of the game's own `vehicles.meta`
+rather than guessed, and `poldom` repointed off the missing addon bank.
+
+Handling is a separate question and unproven. Every model does have a
+`handling.meta` with a matching `<handlingName>`, so handling entries exist and
+the complaint is about the values in them, not a missing entry. Those are worth
+reading against the base model's vanilla handling before concluding the pack is
+at fault.
+
+**Judge the pack again after the audio is fixed.** Deciding to replace six
+models on the evidence of a blank config field would be replacing them for the
+wrong reason.
+
+### 16.8 Constraint on any vehicle pack work
+
+Claude must not add, move or modify binary assets: `stream/`, `*.yft`, `*.ytd`,
+`*.ydr`, `*.ydd`, `*.ybn`, `*.awc` and audio packs are all out of scope per
+CLAUDE.md. Installing a vehicle pack is therefore **the owner's step**, and the
+most any session can do is research and recommend one, then wire up the config,
+`som.cfg` and the `.meta` files once the files are on disk.
+
+`.meta` files are text and may be edited. Note though that
+`[assets-streams]` is **gitignored** (`.gitignore:75`), so meta edits inside it
+are not version controlled and cannot be recovered from history. Back them up
+by hand before editing.
+
+### 16.9 Not verified
 
 - Every coordinate other than MRPD duty, armoury, locker, garage and the mod
   bay, all of which were measured in game.
