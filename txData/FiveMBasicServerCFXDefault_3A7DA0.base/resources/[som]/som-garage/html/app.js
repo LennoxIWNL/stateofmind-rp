@@ -52,6 +52,13 @@ function meter(label, value) {
     return wrap;
 }
 
+/* Which row is selected. Selecting PREVIEWS; taking is a separate, deliberate
+ * button.
+ *
+ * Clicking a row used to pull the car straight out, which meant browsing the
+ * fleet was impossible: every look cost you a spawn. */
+let selectedId = null;
+
 function renderOwned(filter) {
     const frag = document.createDocumentFragment();
 
@@ -68,9 +75,9 @@ function renderOwned(filter) {
     }
 
     rows.forEach((v) => {
-        const row = el('button', 'row');
-        row.type = 'button';
+        const row = el('div', 'row');
         if (v.locked) row.classList.add('is-locked');
+        if (v.id === selectedId) row.classList.add('is-selected');
 
         const head = el('div', 'row__head');
         head.append(
@@ -88,24 +95,34 @@ function renderOwned(filter) {
 
         if (v.shared) row.appendChild(el('span', 'tag', 'Pool'));
 
-        // Previewing is free and instant, so hovering shows the car. Selecting
-        // a locked one still previews it: seeing what you cannot have yet is
-        // the point of showing it at all.
-        row.addEventListener('mouseenter', () => {
+        // Selecting only previews. A locked car still previews: seeing what you
+        // cannot have yet is the reason to show it at all.
+        row.addEventListener('click', () => {
+            selectedId = v.id;
             post('select', { model: v.model, props: v.props });
+            render();
         });
 
-        row.addEventListener('click', async () => {
-            if (v.locked) return toast(v.lockReason || 'That one is not available');
+        // The take button, shown only on the selected row so the list stays a
+        // list rather than a wall of buttons.
+        if (v.id === selectedId && !v.locked) {
+            const take = el('button', 'row__take', 'Take out');
+            take.type = 'button';
 
-            row.disabled = true;
-            const res = await post('take', { id: v.id });
+            take.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                take.disabled = true;
 
-            if (!res.success) {
-                row.disabled = false;
-                toast(res.error || 'Could not take that');
-            }
-        });
+                const res = await post('take', { id: v.id });
+
+                if (!res.success) {
+                    take.disabled = false;
+                    toast(res.error || 'Could not take that');
+                }
+            });
+
+            row.appendChild(take);
+        }
 
         frag.appendChild(row);
     });
@@ -251,6 +268,8 @@ window.addEventListener('message', (event) => {
             account: (payment.find((p) => p.balance > 0) || payment[0] || {}).account,
             tab: 'owned',
         };
+
+        selectedId = (state.vehicles[0] || {}).id ?? null;
 
         document.getElementById('title').textContent = d.label || 'Garage';
         document.getElementById('tab-buy').classList.toggle('hidden', !state.catalogue.length);

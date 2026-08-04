@@ -81,11 +81,27 @@ Config.Garages = {
         fleet = 'lspd',
         business = 'lspd',
         coords = vec3(449.27, -978.18, 28.47),
-        -- Spawn and preview share the access point until a separate bay is
-        -- measured. If cars come out on top of you, run /garagecoords where
-        -- they SHOULD appear and set `spawn` to that instead.
-        spawn = vec4(449.27, -978.18, 28.47, 333.37),
-        preview = vec4(449.27, -978.18, 28.47, 333.37),
+
+        -- Four measured bays, tried in order.
+        --
+        -- A single spawn point means the second car of a shift materialises
+        -- inside the first. The server walks this list and takes the first bay
+        -- with nothing parked in it, so a busy motor pool fills up rather than
+        -- stacking vehicles on one another.
+        --
+        -- `spawn` is kept as the first bay so anything reading a single point
+        -- still works.
+        spawn = vec4(445.46, -986.26, 25.70, 272.73),
+        bays = {
+            vec4(445.46, -986.26, 25.70, 272.73),
+            vec4(445.15, -988.65, 25.70, 274.14),
+            vec4(445.60, -991.65, 25.70, 293.55),
+            vec4(445.52, -994.01, 25.70, 273.09),
+        },
+
+        -- The preview stands in the first bay. It is a local, non-networked
+        -- ghost, so it never blocks a real car from spawning there.
+        preview = vec4(445.46, -986.26, 25.70, 272.73),
         -- No blip: som-police already draws one for the motor pool, and two
         -- markers on one door is worse than none.
     },

@@ -40,6 +40,44 @@ end
 
 Garage.CanAccess = canAccess
 
+---The first parking bay with nothing already in it.
+---
+---Without this the second car of a shift spawns inside the first, which is
+---both ugly and how a motor pool ends up with two vehicles welded together.
+---
+---Checked with an entity scan rather than by tracking what we spawned,
+---because a car somebody simply PARKED in a bay counts as occupying it just as
+---much as one the garage put there.
+---@param garage table
+---@return vector4
+local function freeBay(garage)
+    local bays = garage.bays
+
+    -- A garage with no bay list still works; it just has the one spot.
+    if not bays or #bays == 0 then return garage.spawn end
+
+    for _, bay in ipairs(bays) do
+        local occupied = false
+
+        local vehicles = GetAllVehicles and GetAllVehicles() or {}
+
+        for _, entity in ipairs(vehicles) do
+            if DoesEntityExist(entity)
+                and #(GetEntityCoords(entity) - vector3(bay.x, bay.y, bay.z)) < 2.6 then
+                occupied = true
+                break
+            end
+        end
+
+        if not occupied then return bay end
+    end
+
+    -- Every bay is full. The last one is returned rather than refusing: a car
+    -- clipping another is recoverable, being unable to get your vehicle out at
+    -- all is not.
+    return bays[#bays]
+end
+
 ---Resolves a garage the player is actually standing at.
 ---@param source number
 ---@param garageId any
@@ -243,7 +281,8 @@ lib.callback.register('som-garage:server:take', function(source, data)
     -- car through every subsequent shift.
     if Config.ResetPoolProps and not row.citizenid then props = nil end
 
-    local netId, spawnError = Vehicles.Spawn(row, garage.spawn)
+    -- First free bay, not a fixed point, so two cars cannot occupy one spot.
+    local netId, spawnError = Vehicles.Spawn(row, freeBay(garage))
 
     if not netId then
         -- Put it back. A failed spawn must not leave a car permanently out.
