@@ -277,6 +277,100 @@ exports('openModBay', function()
     open()
 end)
 
+-- Making it findable.
+--
+-- The bay had no blip and no marker, so the only way to discover it was to
+-- already know the coordinate. A radial slice that appears in one 8m circle and
+-- nowhere else is invisible unless something says "here".
+--
+-- Three cues, because each covers a different distance: the blip finds the bay
+-- from across the map, the floor marker finds it from across the car park, and
+-- the prompt says which key to press once you are sitting in it.
+
+local blip
+
+CreateThread(function()
+    local bay = Config.ModShop
+    if not bay then return end
+
+    blip = AddBlipForCoord(bay.coords.x, bay.coords.y, bay.coords.z)
+
+    SetBlipSprite(blip, 72)
+    SetBlipColour(blip, 29)
+    SetBlipScale(blip, 0.6)
+    SetBlipAsShortRange(blip, true)
+    SetBlipDisplay(blip, 4)
+
+    BeginTextCommandSetBlipName('STRING')
+    AddTextComponentSubstringPlayerName('Mod Bay')
+    EndTextCommandSetBlipName(blip)
+end)
+
+CreateThread(function()
+    local bay = Config.ModShop
+    if not bay then return end
+
+    local prompting = false
+
+    local function prompt(on)
+        if on == prompting then return end
+
+        prompting = on
+
+        if on then
+            exports['som-interact']:showTextUI('Mod Bay', { key = 'F1' })
+        else
+            exports['som-interact']:hideTextUI()
+        end
+    end
+
+    -- The configured Z is a PED position captured with /garagecoords, not the
+    -- floor, and how far above the floor it sits depends on whether whoever
+    -- captured it was standing or sitting in a car. A fixed offset would
+    -- therefore bury the marker on one reading and float it on the other, so
+    -- the floor is measured instead.
+    --
+    -- Resolved lazily rather than at boot because the collision has to be
+    -- streamed in for the trace to hit anything, and cached because the floor
+    -- of a car park does not move.
+    local floorZ
+
+    while true do
+        -- Idles at 1.5s and only goes per-frame inside a 30m bubble, which is
+        -- the whole of the lower car park and nothing else on the map.
+        local wait = 1500
+        local dist = #(GetEntityCoords(cache.ped) - bay.coords)
+
+        if dist < 30.0 then
+            wait = 0
+
+            if not floorZ then
+                local hit, z = GetGroundZFor_3dCoord(bay.coords.x, bay.coords.y, bay.coords.z + 1.0, false)
+                if hit then floorZ = z + 0.03 end
+            end
+
+            DrawMarker(1, bay.coords.x, bay.coords.y, floorZ or (bay.coords.z - 0.95),
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                5.5, 5.5, 0.4,
+                255, 20, 147, 90,
+                false, false, 2, false, nil, nil, false)
+
+            prompt(dist < 8.0 and currentVehicle() ~= nil)
+        else
+            prompt(false)
+        end
+
+        Wait(wait)
+    end
+end)
+
+AddEventHandler('onResourceStop', function(resource)
+    if resource ~= GetCurrentResourceName() then return end
+
+    if blip then RemoveBlip(blip) end
+    exports['som-interact']:hideTextUI()
+end)
+
 -- The zone stays as well, for anyone standing beside a car rather than sitting
 -- in it. It costs nothing and covers the case the radial cannot.
 CreateThread(function()
