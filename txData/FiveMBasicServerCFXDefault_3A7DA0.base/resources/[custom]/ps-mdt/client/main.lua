@@ -15,7 +15,16 @@ local lastVeh = nil
 local lastPlate = nil
 
 CreateThread(function()
-    if GetResourceState('ps-dispatch') == 'started' then
+    -- SOM: som-dispatch added.
+    --
+    -- It answers to the ps-dispatch export name, but `provide 'ps-dispatch'`
+    -- does NOT make GetResourceState('ps-dispatch') report started, so this
+    -- check alone would leave isDispatchRunning false and every waypoint, unit
+    -- attach and call response silently do nothing.
+    --
+    -- Re-apply on a ps-mdt upgrade.
+    if GetResourceState('ps-dispatch') == 'started'
+        or GetResourceState('som-dispatch') == 'started' then
         TriggerServerEvent("ps-mdt:dispatchStatus", true)
     end
 end)
