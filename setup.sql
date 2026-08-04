@@ -220,6 +220,24 @@ BEGIN
 END //
 DELIMITER ;
 
+-- Same problem for indexes: MariaDB accepts CREATE INDEX IF NOT EXISTS but
+-- MySQL 8 does not, so neither is portable on its own.
+DROP PROCEDURE IF EXISTS som_add_index;
+DELIMITER //
+CREATE PROCEDURE som_add_index(
+    IN tbl VARCHAR(64), IN idx VARCHAR(64), IN cols TEXT
+)
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = tbl AND INDEX_NAME = idx
+    ) THEN
+        SET @s = CONCAT('CREATE INDEX `', idx, '` ON `', tbl, '` (', cols, ')');
+        PREPARE stmt FROM @s; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+    END IF;
+END //
+DELIMITER ;
+
 CALL som_add_column('som_businesses', 'funding',
     "ENUM('sales','fines','treasury') NOT NULL DEFAULT 'sales'");
 CALL som_add_column('som_businesses', 'category',
@@ -227,8 +245,8 @@ CALL som_add_column('som_businesses', 'category',
 CALL som_add_column('som_businesses', 'active', 'TINYINT(1) NOT NULL DEFAULT 1');
 CALL som_add_column('som_businesses', 'treasury_cut', 'DECIMAL(5,4) NOT NULL DEFAULT 0.0000');
 
--- som_add_column stays defined until section 8b, where the rest of the
--- upgrade ALTERs run. It is dropped there.
+-- som_add_column and som_add_index stay defined until section 8b, where the
+-- rest of the upgrade ALTERs run. Both are dropped there.
 
 -- Applying happens at an NPC, not through a /job command. This is that queue.
 CREATE TABLE IF NOT EXISTS `som_job_applications` (
@@ -309,9 +327,23 @@ CREATE TABLE IF NOT EXISTS `som_turf_events` (
 --  5. VEHICLES AND LICENCES
 -- ===========================================================================
 
+-- One row shape serves three kinds of vehicle, distinguished by who owns it:
+--
+--   personal      citizenid set, owner_group NULL
+--   org fleet     citizenid NULL, owner_group set (a department pool car)
+--   job-locked    BOTH set, group_restricted = 1 (an officer's bought cruiser:
+--                 genuinely theirs, but it only leaves the PD garage)
+--
+-- `citizenid` is therefore NULLABLE. A pool car belongs to the department, not
+-- to a person, and forcing a citizenid on it would mean inventing an owner.
+-- The foreign key still holds for rows that do name one: SQL foreign keys
+-- permit NULL.
+--
+-- `state` is the liveness flag and doubles as pool availability: a taken car is
+-- 'out', so it disappears from everyone else's list with no second table.
 CREATE TABLE IF NOT EXISTS `som_vehicles` (
   `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `citizenid`  VARCHAR(16)  NOT NULL,
+  `citizenid`  VARCHAR(16)  DEFAULT NULL,
   `plate`      VARCHAR(12)  NOT NULL,
   `model`      VARCHAR(32)  NOT NULL,
   `props`      JSON         DEFAULT NULL,
@@ -320,10 +352,23 @@ CREATE TABLE IF NOT EXISTS `som_vehicles` (
   `fuel`       TINYINT UNSIGNED NOT NULL DEFAULT 100,
   `body`       DECIMAL(6,2) NOT NULL DEFAULT 1000.00,
   `engine`     DECIMAL(6,2) NOT NULL DEFAULT 1000.00,
+  -- Business or gang that owns it, by som_businesses.name / som_gangs.name.
+  `owner_group`      VARCHAR(48) DEFAULT NULL,
+  -- Only retrievable at that group's garage, even by its personal owner.
+  `group_restricted` TINYINT(1)  NOT NULL DEFAULT 0,
+  -- Who currently has a pool car out, and since when. Accountability, and what
+  -- a supervisory force-return would read.
+  `assigned_to` VARCHAR(16) DEFAULT NULL,
+  `taken_at`    TIMESTAMP   NULL DEFAULT NULL,
+  -- What was paid for it. The partial refund on leaving a job is a share of
+  -- this, so it has to survive the price in config changing afterwards.
+  `purchase_price` BIGINT NOT NULL DEFAULT 0,
   `created_at` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_plate` (`plate`),
   KEY `idx_owner` (`citizenid`),
+  KEY `idx_group` (`owner_group`, `state`),
+  KEY `idx_garage` (`garage`, `state`),
   CONSTRAINT `fk_veh_char` FOREIGN KEY (`citizenid`) REFERENCES `som_characters` (`citizenid`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -718,7 +763,25 @@ CALL som_add_column('som_characters', 'photo', 'VARCHAR(255) DEFAULT NULL');
 CALL som_add_column('som_phone_bills', 'auto_collect', 'TINYINT(1) NOT NULL DEFAULT 0');
 CALL som_add_column('som_phone_bills', 'due_at', 'DATETIME NULL DEFAULT NULL');
 
+-- som-garage. See the note on som_vehicles for what each of these is for.
+CALL som_add_column('som_vehicles', 'owner_group', 'VARCHAR(48) DEFAULT NULL');
+CALL som_add_column('som_vehicles', 'group_restricted', 'TINYINT(1) NOT NULL DEFAULT 0');
+CALL som_add_column('som_vehicles', 'assigned_to', 'VARCHAR(16) DEFAULT NULL');
+CALL som_add_column('som_vehicles', 'taken_at', 'TIMESTAMP NULL DEFAULT NULL');
+CALL som_add_column('som_vehicles', 'purchase_price', 'BIGINT NOT NULL DEFAULT 0');
+
+CALL som_add_index('som_vehicles', 'idx_group', '`owner_group`, `state`');
+CALL som_add_index('som_vehicles', 'idx_garage', '`garage`, `state`');
+
 DROP PROCEDURE IF EXISTS som_add_column;
+DROP PROCEDURE IF EXISTS som_add_index;
+
+-- citizenid becomes NULLABLE so a department pool car can exist without
+-- inventing a personal owner for it. Unconditional because MODIFY to the same
+-- definition is a no-op, so re-importing costs nothing.
+--
+-- Not a som_add_column job: that only ADDS columns, and this changes one.
+ALTER TABLE `som_vehicles` MODIFY COLUMN `citizenid` VARCHAR(16) DEFAULT NULL;
 
 -- ===========================================================================
 --  8c. COMPATIBILITY VIEWS

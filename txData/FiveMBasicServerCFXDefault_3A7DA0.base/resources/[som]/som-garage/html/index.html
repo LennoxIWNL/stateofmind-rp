@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>som-garage</title>
+    <link rel="stylesheet" href="https://cfx-nui-som-assets/tokens.css">
+    <link rel="stylesheet" href="https://cfx-nui-som-garage/html/style.css">
+</head>
+<body>
+    <div id="root" class="root hidden">
+        <!-- Drag anywhere to turn the camera. It sits UNDER the rail so the
+             panel stays clickable, and covers the whole screen so the drag
+             does not stop at an invisible edge. -->
+        <div class="stage" id="stage">
+            <span class="stage__hint">Drag to rotate</span>
+        </div>
+
+        <!-- Left rail only. The vehicle occupies the rest of the screen and
+             must never be covered: you are choosing what you can see. -->
+        <aside class="panel">
+            <header class="panel__head">
+                <h1 class="panel__title" id="title">Garage</h1>
+                <div class="tabs">
+                    <button class="tab is-active" id="tab-owned" type="button">Vehicles</button>
+                    <button class="tab hidden" id="tab-buy" type="button">Buy</button>
+                </div>
+            </header>
+
+            <input class="search" id="search" type="text"
+                   placeholder="Search plate or model" autocomplete="off">
+
+            <div class="list" id="list"></div>
+
+            <footer class="panel__foot">
+                <div class="pay hidden" id="pay"></div>
+                <button class="btn" id="close" type="button">Close</button>
+            </footer>
+        </aside>
+
+        <div class="toast hidden" id="toast"></div>
+    </div>
+
+    <script src="https://cfx-nui-som-garage/html/app.js"></script>
+</body>
+</html>

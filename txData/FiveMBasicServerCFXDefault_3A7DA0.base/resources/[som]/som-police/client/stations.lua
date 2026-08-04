@@ -208,30 +208,41 @@ CreateThread(function()
         })
     end
 
-    exports['som-interact']:addBoxZone({
-        name = 'police:garage',
-        coords = station.garage.coords,
-        size = station.garage.size,
-        rotation = station.garage.rotation,
-        options = {
-            {
-                name = 'police:garage:take',
-                icon = 'fa-solid fa-car',
-                label = 'Motor pool',
-                distance = 3.0,
-                canInteract = onDutyOfficer,
-                onSelect = function() openMotorPool('garage') end,
+    -- The motor pool is som-garage's when it is running.
+    --
+    -- Both resources put a garage on this exact spot, so registering both would
+    -- stack two "Motor pool" options on one door, each backed by a different
+    -- fleet: som-police's spawns an unlimited config list, som-garage's hands
+    -- out real rows so "five cruisers" actually runs out. som-garage wins, and
+    -- this one is only kept as the fallback for a server running without it.
+    --
+    -- The helipad below is unaffected; som-garage does not model aircraft yet.
+    if GetResourceState('som-garage') ~= 'started' then
+        exports['som-interact']:addBoxZone({
+            name = 'police:garage',
+            coords = station.garage.coords,
+            size = station.garage.size,
+            rotation = station.garage.rotation,
+            options = {
+                {
+                    name = 'police:garage:take',
+                    icon = 'fa-solid fa-car',
+                    label = 'Motor pool',
+                    distance = 3.0,
+                    canInteract = onDutyOfficer,
+                    onSelect = function() openMotorPool('garage') end,
+                },
+                {
+                    name = 'police:garage:store',
+                    icon = 'fa-solid fa-square-parking',
+                    label = 'Return vehicle',
+                    distance = 3.0,
+                    canInteract = onDutyOfficer,
+                    onSelect = function() storeVehicle('garage') end,
+                },
             },
-            {
-                name = 'police:garage:store',
-                icon = 'fa-solid fa-square-parking',
-                label = 'Return vehicle',
-                distance = 3.0,
-                canInteract = onDutyOfficer,
-                onSelect = function() storeVehicle('garage') end,
-            },
-        },
-    })
+        })
+    end
 
     exports['som-interact']:addBoxZone({
         name = 'police:helipad',
