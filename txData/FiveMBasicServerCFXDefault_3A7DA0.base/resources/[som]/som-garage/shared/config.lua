@@ -138,20 +138,22 @@ Config.Fleets = {
     lspd = {
         platePrefix = 'LSPD',
 
-        -- ADDON models, streamed by ex-cars and TIG-PACK. Both are named
-        -- explicitly in som.cfg because dev mode skips [assets-streams]; if
-        -- either is not started these will not spawn at all.
+        -- origen_police for patrol, TIG-PACK for the pursuit cars.
         --
-        -- Names verified against the vehicles.meta on disk rather than taken
-        -- from a listing, since a wrong spawn name is a silent no-show.
+        -- ex-cars was tried and dropped: broken liveries and misaligned
+        -- headlights on every police model in the pack. It is 365MB, so leaving
+        -- it enabled for models nobody uses is a download for nothing.
+        --
+        -- Counts are deliberately SMALL. Thirty-odd cars in one list is a
+        -- scrolling exercise, not a motor pool, and a pool only means something
+        -- when it can actually run out.
         vehicles = {
-            { model = 'polvic',   label = 'Patrol Cruiser',  count = 5, price = 50000 },
-            { model = 'polchar',  label = 'Patrol Charger',  count = 5, price = 50000 },
-            { model = 'poltah',   label = 'Patrol SUV',      count = 5, price = 65000 },
-            { model = 'poltaurus', label = 'Patrol Taurus',  count = 3, price = 55000 },
-            { model = 'polraptor', label = 'Raptor',         count = 2, price = 70000 },
+            { model = 'polbuffalo4', label = 'Buffalo STX',   count = 3, price = 50000 },
+            { model = 'polcaracara', label = 'Caracara 4x4',  count = 2, price = 65000 },
+            { model = 'poldom',      label = 'Dominator',     count = 2, price = 55000 },
+            { model = 'polvstr',     label = 'Vectre',        count = 2, price = 60000 },
 
-            -- TIG-PACK, pursuit rated.
+            -- Pursuit rated, TIG-PACK.
             {
                 model = 'scpolstang', label = 'Interceptor Mustang',
                 count = 2, price = 95000, cert = 'cert.interceptor',
@@ -161,8 +163,8 @@ Config.Fleets = {
                 count = 2, price = 95000, cert = 'cert.interceptor',
             },
 
-            -- Base game. Kept because no addon transport van or helicopter is
-            -- streamed, and these always exist.
+            -- Base game. No addon transport van or helicopter is streamed, and
+            -- these always exist.
             { model = 'policet', label = 'Transport Van', count = 2 },
             {
                 model = 'polmav', label = 'Police Maverick',

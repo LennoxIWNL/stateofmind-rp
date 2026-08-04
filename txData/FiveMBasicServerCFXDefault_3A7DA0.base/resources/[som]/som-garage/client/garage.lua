@@ -79,6 +79,12 @@ end
 ---appearing and the button working can never disagree.
 ---@return string|nil garage id
 local function nearestGarage()
+    -- Not while driving. The garage is a place you walk up to, and offering it
+    -- from the driver's seat means the F1 wheel suggests parking a car by
+    -- opening a menu that lists the car you are sitting in. Storing one has its
+    -- own eye option on the zone, which is where that belongs.
+    if cache.vehicle then return nil end
+
     local here = GetEntityCoords(cache.ped)
     local job, gang = core:getJob(), core:getGang()
 
