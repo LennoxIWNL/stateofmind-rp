@@ -67,10 +67,11 @@ Config.Stations = {
 
         -- Duty is a zone rather than a ped, so it cannot be blocked by
         -- somebody parking a car on the desk.
+        -- Verified in game.
         duty = {
-            coords = vec3(441.36, -982.13, 30.68),
+            coords = vec3(441.56, -982.02, 32.30),
             size = vec3(1.6, 1.6, 2.0),
-            rotation = 305.0,
+            rotation = 272.94,
         },
 
         -- Verified in game.
@@ -102,11 +103,13 @@ Config.Stations = {
             },
         },
 
+        -- Verified in game. som-garage owns this door when it is running; these
+        -- coordinates are kept in step so the fallback lands in the same place.
         garage = {
-            coords = vec3(454.6, -1017.4, 28.4),
-            size = vec3(3.0, 3.0, 2.0),
-            rotation = 0.0,
-            spawn = vec4(438.4, -1018.3, 28.6, 90.0),
+            coords = vec3(449.27, -978.18, 28.47),
+            size = vec3(4.0, 4.0, 3.0),
+            rotation = 333.37,
+            spawn = vec4(449.27, -978.18, 28.47, 333.37),
             -- Where a vehicle must be brought back to, and how close.
             returnRadius = 30.0,
         },

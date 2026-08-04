@@ -80,9 +80,12 @@ Config.Garages = {
         shared = true,
         fleet = 'lspd',
         business = 'lspd',
-        coords = vec3(454.6, -1017.4, 28.4),
-        spawn = vec4(438.4, -1018.3, 28.6, 90.0),
-        preview = vec4(438.4, -1018.3, 28.6, 90.0),
+        coords = vec3(449.27, -978.18, 28.47),
+        -- Spawn and preview share the access point until a separate bay is
+        -- measured. If cars come out on top of you, run /garagecoords where
+        -- they SHOULD appear and set `spawn` to that instead.
+        spawn = vec4(449.27, -978.18, 28.47, 333.37),
+        preview = vec4(449.27, -978.18, 28.47, 333.37),
         -- No blip: som-police already draws one for the motor pool, and two
         -- markers on one door is worse than none.
     },

@@ -64,6 +64,51 @@ local function open(garageId)
     })
 end
 
+---Opens whichever garage the player is standing at.
+---
+---The radial entry point. It resolves the garage from POSITION rather than
+---taking an id, so one menu entry serves every garage and the radial never has
+---to know which ones exist.
+---
+---Access is only filtered here to pick a sensible target; the server re-checks
+---it, along with the distance, on the list itself.
+exports('openNearest', function()
+    if isOpen then return end
+
+    local here = GetEntityCoords(cache.ped)
+    local job, gang = core:getJob(), core:getGang()
+
+    local bestId, bestDistance
+
+    for id, garage in pairs(Config.Garages) do
+        local distance = #(here - garage.coords)
+
+        -- Ten metres, matching the server's twelve with a little room for the
+        -- player drifting while the menu opens.
+        if distance < 10.0 and (not bestDistance or distance < bestDistance) then
+            local allowed = not garage.groups
+
+            if not allowed then
+                for name, minGrade in pairs(garage.groups) do
+                    if (job and job.name == name and (job.grade or 0) >= minGrade)
+                        or (gang and gang.name == name and (gang.grade or 0) >= minGrade) then
+                        allowed = true
+                        break
+                    end
+                end
+            end
+
+            if allowed then bestId, bestDistance = id, distance end
+        end
+    end
+
+    if not bestId then
+        return TriggerEvent('som:client:notify', 'No garage here', 'error')
+    end
+
+    open(bestId)
+end)
+
 -- ---------------------------------------------------------------------------
 -- NUI
 -- ---------------------------------------------------------------------------

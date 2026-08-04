@@ -443,10 +443,7 @@ end)
 -- entitled to by editing its own menu.
 -- ---------------------------------------------------------------------------
 
-CreateThread(function()
-    -- After som-radial has started.
-    Wait(1000)
-
+local function registerRadial()
     if GetResourceState('som-radial') ~= 'started' then return end
 
     local radial = exports['som-radial']
@@ -466,11 +463,26 @@ CreateThread(function()
         id = 'police.certs',
         section = 'job',
         label = 'Certifications',
-        icon = 'badge',
+        icon = 'certificate',
         order = 20,
         export = 'som-police.showCerts',
         job = Config.Job,
     })
+end
+
+CreateThread(function()
+    -- After som-radial has started.
+    Wait(1000)
+    registerRadial()
+end)
+
+-- som-radial wipes its registry on restart, so entries registered once at boot
+-- vanish and never come back until this resource is also restarted. Registering
+-- again when it starts is what makes `restart som-radial` survivable.
+AddEventHandler('onResourceStart', function(resource)
+    if resource ~= 'som-radial' then return end
+    Wait(500)
+    registerRadial()
 end)
 
 -- ---------------------------------------------------------------------------

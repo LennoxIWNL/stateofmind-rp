@@ -46,6 +46,13 @@ const ICONS = {
     phone: '<rect x="6" y="2" width="12" height="20" rx="2.6"/><path d="M10.5 18.4h3"/>',
     hands: '<path d="M7 13V6.5a1.5 1.5 0 0 1 3 0V12"/><path d="M10 12V5.5a1.5 1.5 0 0 1 3 0V12"/><path d="M13 12V7a1.5 1.5 0 0 1 3 0v7a7 7 0 0 1-7 7 6 6 0 0 1-6-6v-3a1.5 1.5 0 0 1 3 0"/>',
     back: '<path d="M19 12H5M12 19l-7-7 7-7"/>',
+    /* Added for som-police and som-garage. Same stroke-only style as the rest:
+     * these are drawn on a 24x24 grid with no fills, so they sit consistently
+     * against the others at any wedge size. */
+    laptop: '<rect x="3" y="5" width="18" height="11" rx="1.6"/><path d="M2 19h20"/><path d="M10 19h4"/>',
+    garage: '<path d="M3 21V8.5L12 4l9 4.5V21"/><path d="M7 21v-7h10v7"/><path d="M7 17h10"/>',
+    certificate: '<circle cx="12" cy="9" r="5"/><path d="M8.5 13.2L7 21l5-2.4L17 21l-1.5-7.8"/>',
+    panic: '<path d="M12 3v6"/><circle cx="12" cy="14" r="6"/><path d="M5.5 6.5L3.8 4.8M18.5 6.5l1.7-1.7"/>',
     dot: '<circle cx="12" cy="12" r="4"/>',
 };
 

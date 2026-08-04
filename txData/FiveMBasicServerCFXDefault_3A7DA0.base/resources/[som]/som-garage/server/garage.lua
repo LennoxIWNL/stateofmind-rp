@@ -319,6 +319,44 @@ end)
 -- Helpers shared with fleet.lua
 -- ---------------------------------------------------------------------------
 
+-- ---------------------------------------------------------------------------
+-- Radial
+--
+-- One entry for every garage. It resolves the garage from where the player is
+-- standing rather than taking an id, so the radial never has to know which
+-- garages exist and a new one needs no menu change.
+--
+-- No job filter: personal garages are for everyone, and the PD motor pool is
+-- gated by the access check on the list rather than by hiding the button.
+-- ---------------------------------------------------------------------------
+
+local function registerRadial()
+    if GetResourceState('som-radial') ~= 'started' then return end
+
+    exports['som-radial']:register({
+        id = 'garage.open',
+        section = 'self',
+        label = 'Garage',
+        icon = 'garage',
+        order = 20,
+        export = 'som-garage.openNearest',
+    })
+end
+
+CreateThread(function()
+    Wait(1000)
+    registerRadial()
+end)
+
+-- Re-registered when som-radial restarts, because it wipes its registry and
+-- entries added once at boot would otherwise be gone until this resource is
+-- restarted too.
+AddEventHandler('onResourceStart', function(resource)
+    if resource ~= 'som-radial' then return end
+    Wait(500)
+    registerRadial()
+end)
+
 ---The fleet definition for a model at a garage, if it has one.
 ---@param garage table
 ---@param model string
