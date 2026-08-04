@@ -321,3 +321,35 @@ function Appearance.Limits(ped)
         hair = GetNumberOfPedDrawableVariations(ped, Config.HairComponent),
     }
 end
+
+---Applies an appearance to ANY ped, without touching the model.
+---
+---Appearance.Apply above cannot be used for this: it swaps the model with
+---SetPlayerModel, which acts on the PLAYER. Calling it on a preview ped would
+---leave the preview untouched and change the player's own body instead.
+---
+---The caller is therefore responsible for creating the ped with the right
+---model. som-multichar already does, from the character's stored gender.
+---@param ped number
+---@param data table an appearance blob
+---@return boolean applied
+exports('applyToPed', function(ped, data)
+    if not ped or ped == 0 or not DoesEntityExist(ped) then return false end
+    if type(data) ~= 'table' then return false end
+
+    -- Freemode peds start bald and untextured, so the defaults go on first and
+    -- the stored appearance overwrites what it defines.
+    SetPedDefaultComponentVariation(ped)
+
+    Appearance.ApplyHeadBlend(ped, data)
+    Appearance.ApplyFaceFeatures(ped, data)
+    Appearance.ApplyOverlays(ped, data)
+    Appearance.ApplyHair(ped, data)
+    Appearance.ApplyApparel(ped, data)
+
+    if data.eyeColour then
+        SetPedEyeColor(ped, math.floor(clamp(data.eyeColour, 0, 31, 0)))
+    end
+
+    return true
+end)

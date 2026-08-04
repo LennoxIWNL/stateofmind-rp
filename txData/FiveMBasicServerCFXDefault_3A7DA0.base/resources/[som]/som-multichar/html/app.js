@@ -130,7 +130,14 @@ function renderRoster() {
                 activeSlot = activeSlot === i ? null : i;
                 // The ped in the scene follows whoever is highlighted, so the
                 // roster and the character on screen never disagree.
-                if (activeSlot === i) post('previewGender', { gender: Number(character.gender) || 0 });
+                // The appearance goes with the gender, or the preview shows the
+                // freemode default for every slot no matter who is selected.
+                if (activeSlot === i) {
+                    post('previewGender', {
+                        gender: Number(character.gender) || 0,
+                        appearance: character.appearance || null,
+                    });
+                }
                 renderRoster();
             });
         } else {

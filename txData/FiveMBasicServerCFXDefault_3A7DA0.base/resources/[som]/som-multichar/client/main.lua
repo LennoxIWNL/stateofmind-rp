@@ -183,7 +183,9 @@ end
 
 ---Spawns the ped shown in the preview scene.
 ---@param gender number 0 male, 1 female
-local function setPreviewPed(gender)
+---@param gender number
+---@param appearance table|string|nil the character's stored appearance
+local function setPreviewPed(gender, appearance)
     destroyPreviewPed()
 
     local modelName = Config.PedModels[gender] or Config.PedModels[0]
@@ -204,8 +206,31 @@ local function setPreviewPed(gender)
     SetEntityInvincible(previewPed, true)
     FreezeEntityPosition(previewPed, true)
     SetBlockingOfNonTemporaryEvents(previewPed, true)
-    SetPedDefaultComponentVariation(previewPed)
     SetModelAsNoLongerNeeded(model)
+
+    -- Dress the ped as the character actually looks.
+    --
+    -- This was SetPedDefaultComponentVariation, so every slot showed the same
+    -- freemode default regardless of what the character was wearing. The stored
+    -- blob arrives as JSON from the database, so it is decoded here rather than
+    -- assumed to already be a table.
+    if type(appearance) == 'string' then
+        local ok, decoded = pcall(json.decode, appearance)
+        appearance = ok and decoded or nil
+    end
+
+    local dressed = false
+
+    if type(appearance) == 'table' and GetResourceState('som-appearance') == 'started' then
+        -- applyToPed deliberately does NOT change the model. Appearance.Apply
+        -- swaps it with SetPlayerModel, which acts on the PLAYER, so using it
+        -- here would leave the preview untouched and change your own body.
+        dressed = exports['som-appearance']:applyToPed(previewPed, appearance) == true
+    end
+
+    -- A character created before appearances were stored, or som-appearance
+    -- being down, still gets a dressed ped rather than a bald naked one.
+    if not dressed then SetPedDefaultComponentVariation(previewPed) end
 
     -- Idle animation, so the character reads as a person rather than a mannequin.
     -- Picked at random so the screen is not identical every single time.
@@ -501,7 +526,7 @@ local function openSelection()
     -- Defaults to the first character's gender; the roster updates it when a
     -- different slot is highlighted.
     local first = characters[1]
-    setPreviewPed(first and tonumber(first.gender) or 0)
+    setPreviewPed(first and tonumber(first.gender) or 0, first and first.appearance)
 
     SendNUIMessage({
         action = 'open',
@@ -584,9 +609,19 @@ RegisterNUICallback('deleteCharacter', function(data, cb)
     cb(result or { success = false, error = 'No response from server' })
 end)
 
+---Re-dresses the preview ped for whichever slot is highlighted.
+---
+---Also serves the creation form's gender picker, which sends no appearance
+---because a character being created has none yet. That case falls back to the
+---freemode default, which is correct: it is what they will look like until they
+---go through the creator.
+---
+---The appearance comes from the client, and that is fine. It is display data
+---the roster was already sent, and dressing a preview ped decides nothing: the
+---character's real appearance is loaded server side on spawn.
 RegisterNUICallback('previewGender', function(data, cb)
     local gender = tonumber(data and data.gender) or 0
-    setPreviewPed(gender)
+    setPreviewPed(gender, data and data.appearance)
     cb({ ok = true })
 end)
 

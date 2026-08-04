@@ -103,6 +103,10 @@ function Characters.List(source)
     return MySQL.query.await([[
         SELECT c.citizenid, c.slot, c.firstname, c.lastname, c.dob, c.gender,
                c.nationality, c.job, c.job_grade, c.gang, c.last_played,
+               -- The selector needs this to dress its preview ped. Without it
+               -- every character stood in the shell wearing the freemode
+               -- default, whatever they actually look like.
+               c.appearance,
                m.cash, m.bank
         FROM som_characters c
         LEFT JOIN som_character_money m ON m.citizenid = c.citizenid
