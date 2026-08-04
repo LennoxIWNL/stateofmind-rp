@@ -121,8 +121,8 @@ AddEventHandler('som:client:onJobChanged', refresh)
 function Duty.ShowCerts()
     local certs = lib.callback.await('som-police:server:myCerts', false) or {}
 
-    -- Sorted BEFORE the options are built, because pairs() has no stable order
-    -- and the list would otherwise reshuffle every time it is opened.
+    -- Sorted BEFORE the list is built: pairs() has no stable order, so the card
+    -- would reshuffle every time it was opened.
     local ids = {}
     for id in pairs(Config.Certifications) do ids[#ids + 1] = id end
 
@@ -130,24 +130,28 @@ function Duty.ShowCerts()
         return Config.Certifications[a].label < Config.Certifications[b].label
     end)
 
-    local options = {}
+    local list = {}
     for _, id in ipairs(ids) do
         local def = Config.Certifications[id]
 
-        options[#options + 1] = {
-            title = def.label,
-            description = certs[id] and def.description or 'Not certified',
-            icon = certs[id] and 'circle-check' or 'circle-xmark',
+        list[#list + 1] = {
+            id = id,
+            label = def.label,
+            description = def.description,
+            held = certs[id] == true,
         }
     end
 
-    lib.registerContext({
-        id = 'som_police_mycerts',
-        title = 'Certifications',
-        options = options,
-    })
+    local data = core:getPlayerData() or {}
+    local info = data.charinfo or {}
+    local job = data.job or {}
 
-    lib.showContext('som_police_mycerts')
+    Armoury.ShowCerts({
+        certifications = list,
+        name = ('%s %s  %s'):format(
+            info.firstname or '', info.lastname or '', job.gradeLabel or ''),
+        badge = 'LSPD',
+    })
 end
 
 exports('showCerts', Duty.ShowCerts)

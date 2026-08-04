@@ -231,3 +231,137 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     from { opacity: 0; transform: translateY(14px) scale(0.985); }
     to { opacity: 1; transform: none; }
 }
+
+/* --- Certification card ---------------------------------------------------
+ *
+ * A CARD, not a menu. Certifications are something you read, and an arrow-down
+ * list implies choices that are not there: granting happens in the MDT, where
+ * the rank check lives.
+ */
+
+.card {
+    position: relative;
+    width: 420px;
+    max-height: 78vh;
+    display: flex;
+    flex-direction: column;
+    border-radius: 16px;
+    overflow: hidden;
+    background: linear-gradient(170deg, #1a1524 0%, #0d0a13 68%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 28px 60px rgba(0, 0, 0, 0.7);
+    animation: rise 260ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+.card__head {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 18px 20px 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.card__badge {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 11px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    background: var(--som-pink-a25);
+    border: 1px solid var(--som-pink-a45);
+    color: #fff;
+}
+
+.card__title { font-size: 1rem; font-weight: 650; letter-spacing: -0.01em; }
+.card__sub { margin-top: 1px; font-size: 0.74rem; color: var(--som-text-dim); }
+
+/* Held out of the total, so the card answers "how far along am I" without
+ * counting rows. */
+.card__count {
+    margin-left: auto;
+    font-family: var(--som-font-mono);
+    font-size: 0.9rem;
+    font-weight: 650;
+    color: var(--som-pink-light);
+}
+
+.card__body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 12px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.card__body::-webkit-scrollbar { width: 4px; }
+.card__body::-webkit-scrollbar-thumb { background: var(--som-pink-a45); border-radius: 2px; }
+
+.cert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.035);
+    border-left: 3px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Colour AND a mark carry the state. Opacity alone reads as disabled rather
+ * than as not granted. */
+.cert--held {
+    background: var(--som-pink-a16);
+    border-left-color: var(--som-pink);
+}
+
+.cert__mark {
+    flex: 0 0 auto;
+    width: 15px;
+    text-align: center;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.cert--held .cert__mark { color: var(--som-pink-light); }
+.cert--none .cert__mark { color: rgba(255, 255, 255, 0.3); }
+
+.cert__body { flex: 1; min-width: 0; }
+.cert__label { display: block; font-size: 0.83rem; font-weight: 600; }
+
+.cert__desc {
+    display: block;
+    margin-top: 1px;
+    font-size: 0.72rem;
+    line-height: 1.3;
+    color: var(--som-text-mute);
+}
+
+.cert__empty {
+    padding: 20px 0;
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--som-text-mute);
+}
+
+.card__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 13px 20px 17px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.card__hint { font-size: 0.7rem; color: var(--som-text-mute); }
+
+.btn--ghost {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn--ghost:hover { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.18); }

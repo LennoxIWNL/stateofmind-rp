@@ -8,16 +8,16 @@
     <link rel="stylesheet" href="https://cfx-nui-som-police/html/style.css">
 </head>
 <body>
+    <!-- The armoury and the certification card share one page, because a
+         resource may only declare one ui_page and two NUI frames fighting for
+         focus is a worse problem than one router. -->
     <div id="root" class="root hidden">
-        <section class="panel">
+        <section class="panel hidden" id="armoury">
             <header class="panel__head">
                 <div>
                     <h1 class="panel__title" id="title">Armoury</h1>
                     <p class="panel__sub">Department issue is free. Personal equipment is charged.</p>
                 </div>
-                <!-- Cash or card. The same control belongs on every shop, so
-                     the options and balances come from som-core rather than
-                     being decided here. -->
                 <div class="pay" id="pay"></div>
             </header>
 
@@ -34,6 +34,27 @@
             <footer class="panel__foot">
                 <span class="note">Rifles require certification</span>
                 <button class="btn" id="close" type="button">Close</button>
+            </footer>
+        </section>
+
+        <!-- Certifications. A card rather than a menu: this is something you
+             READ, and a list you arrow through implies choices that are not
+             there. -->
+        <section class="card hidden" id="certs">
+            <header class="card__head">
+                <div class="card__badge" id="cert-badge">LSPD</div>
+                <div>
+                    <h1 class="card__title">Certifications</h1>
+                    <p class="card__sub" id="cert-name">Officer</p>
+                </div>
+                <div class="card__count" id="cert-count"></div>
+            </header>
+
+            <div class="card__body" id="cert-list"></div>
+
+            <footer class="card__foot">
+                <span class="card__hint">Granted by command staff through the MDT</span>
+                <button class="btn btn--ghost" id="cert-close" type="button">Close</button>
             </footer>
         </section>
     </div>

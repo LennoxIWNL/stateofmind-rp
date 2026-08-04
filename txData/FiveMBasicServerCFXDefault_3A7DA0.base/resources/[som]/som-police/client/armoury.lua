@@ -27,6 +27,17 @@ function Armoury.Open(data)
     })
 end
 
+---Shows the certification card. Read-only: granting lives in the MDT, where
+---the rank check is, and a control here that always refused would be worse than
+---no control.
+---@param data table { certifications, name, badge }
+function Armoury.ShowCerts(data)
+    isOpen = true
+    SetNuiFocus(true, true)
+
+    SendNUIMessage({ action = 'certs', data = data })
+end
+
 local function close()
     if not isOpen then return end
 

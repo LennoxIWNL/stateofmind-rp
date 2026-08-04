@@ -181,10 +181,17 @@ Config.Purchase = {
     keepProps = true,
 }
 
--- Pool vehicles are handed out at stock condition every time, so an officer
--- who wrecks one is not passing the damage to the next shift, and nobody can
--- park a tuned cruiser in the pool.
-Config.ResetPoolProps = true
+-- Pool vehicles KEEP their appearance.
+--
+-- This was true and is now false, deliberately. Resetting to stock meant a
+-- livery set on a department car was thrown away the next time anyone took it
+-- out, which makes liveries pointless on exactly the vehicles that most need
+-- them: a marked unit should look the same every shift.
+--
+-- Condition is a separate question. Damage and fuel are still stored per
+-- vehicle when it is put away, so wrecking a pool car does pass the damage on,
+-- which is the accountability half of a shared fleet.
+Config.ResetPoolProps = false
 
 -- ---------------------------------------------------------------------------
 -- Temporary mod bay

@@ -102,7 +102,7 @@ function renderPayment() {
 }
 
 function close() {
-    root.classList.add('hidden');
+    show(null);
     post('close');
 }
 
@@ -112,9 +112,65 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !root.classList.contains('hidden')) close();
 });
 
+/* Two views on one page. Showing one always hides the other, so a stray message
+ * can never leave both up at once. */
+function show(which) {
+    document.getElementById('armoury').classList.toggle('hidden', which !== 'armoury');
+    document.getElementById('certs').classList.toggle('hidden', which !== 'certs');
+    root.classList.toggle('hidden', which === null);
+}
+
+/* Certifications. Read-only by design: granting happens in the MDT, where the
+ * rank check lives, and offering a control here that always refused would be
+ * worse than offering none. */
+function renderCerts(d) {
+    const list = document.getElementById('cert-list');
+    const frag = document.createDocumentFragment();
+
+    const held = (d.certifications || []).filter((c) => c.held).length;
+    const total = (d.certifications || []).length;
+
+    document.getElementById('cert-name').textContent = d.name || 'Officer';
+    document.getElementById('cert-badge').textContent = d.badge || 'LSPD';
+    document.getElementById('cert-count').textContent = `${held}/${total}`;
+
+    (d.certifications || []).forEach((cert) => {
+        const row = el('div', 'cert');
+        row.classList.add(cert.held ? 'cert--held' : 'cert--none');
+
+        const mark = el('span', 'cert__mark', cert.held ? '✓' : '✕');
+
+        const body = el('div', 'cert__body');
+        body.append(
+            el('span', 'cert__label', cert.label),
+            // What it actually gates, not a restatement of the name. A
+            // certification list nobody can act on has to at least explain
+            // itself.
+            el('span', 'cert__desc', cert.held ? (cert.description || '') : 'Not certified'));
+
+        row.append(mark, body);
+        frag.appendChild(row);
+    });
+
+    if (!total) frag.appendChild(el('p', 'cert__empty', 'No certifications defined.'));
+
+    list.replaceChildren(frag);
+}
+
+document.getElementById('cert-close').addEventListener('click', () => {
+    show(null);
+    post('close');
+});
+
 window.addEventListener('message', (event) => {
     const msg = event.data;
     if (!msg || typeof msg.action !== 'string') return;
+
+    if (msg.action === 'certs') {
+        renderCerts(msg.data || {});
+        show('certs');
+        return;
+    }
 
     if (msg.action === 'open') {
         const d = msg.data || {};
@@ -134,7 +190,7 @@ window.addEventListener('message', (event) => {
 
         renderPayment();
         render();
-        root.classList.remove('hidden');
+        show('armoury');
         return;
     }
 
@@ -151,5 +207,5 @@ window.addEventListener('message', (event) => {
         return;
     }
 
-    if (msg.action === 'close') root.classList.add('hidden');
+    if (msg.action === 'close') show(null);
 });

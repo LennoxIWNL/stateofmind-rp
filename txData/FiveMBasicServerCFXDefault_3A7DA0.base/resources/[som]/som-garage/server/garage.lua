@@ -398,9 +398,10 @@ lib.callback.register('som-garage:server:saveProps', function(source, data)
         return { success = false, error = 'that is not yours' }
     end
 
-    -- Pool cars are reset to stock on every spawn, so persisting a livery on
-    -- one would be written and then immediately ignored. Say so rather than
-    -- pretending it saved.
+    -- Only refused while pool cars are reset on spawn, because a livery saved
+    -- then would be written and immediately ignored. With Config.ResetPoolProps
+    -- off, a department car keeps what it is given, which is the point of
+    -- liveries on a marked unit.
     if row.citizenid == nil and Config.ResetPoolProps then
         return { success = false, error = 'pool vehicles are reset to stock each time' }
     end
