@@ -5919,22 +5919,40 @@ $(".map-clear").on('click', function() {
         list.forEach(function (cert) {
             if (cert.held) heldCount += 1;
 
-            // .text() rather than string interpolation into html(): the labels
-            // come from a config file, and building markup out of them is how
-            // a config edit turns into script injection.
-            var tag = $('<div class="license-tag"></div>');
-            tag.addClass(cert.held ? 'som-cert-held' : 'som-cert-missing');
-            tag.text(cert.label);
-            tag.attr('title', cert.description || '');
-            tag.data('cert', cert.id);
-            tag.data('held', cert.held ? 1 : 0);
+            // Its own classes rather than borrowing .license-tag. That class is
+            // an inline-block pill sized for a one-word licence, so five
+            // certifications collapsed into unreadable slabs with the label
+            // squeezed out entirely.
+            var row = $('<div class="som-cert"></div>');
+            row.addClass(cert.held ? 'som-cert--held' : 'som-cert--none');
 
-            tag.css({
-                opacity: cert.held ? 1 : 0.45,
-                cursor: canGrant ? 'pointer' : 'default',
-            });
+            var mark = $('<span class="som-cert__mark"></span>');
+            mark.text(cert.held ? '✓' : '✕');
 
-            holder.append(tag);
+            var body = $('<span class="som-cert__body"></span>');
+
+            // .text(), never .html(): these labels come from a config file, and
+            // building markup out of config is how a config edit becomes script
+            // injection.
+            body.append($('<span class="som-cert__label"></span>').text(cert.label));
+            body.append($('<span class="som-cert__desc"></span>')
+                .text(cert.held ? (cert.description || '') : 'Not certified'));
+
+            row.append(mark, body);
+
+            if (canGrant) {
+                row.addClass('som-cert--editable');
+                // Says what the CLICK will do, which is the thing that was
+                // impossible to tell before.
+                row.attr('title', (cert.held ? 'Click to revoke ' : 'Click to grant ') + cert.label);
+                row.append($('<span class="som-cert__action"></span>')
+                    .text(cert.held ? 'Revoke' : 'Grant'));
+            }
+
+            row.data('cert', cert.id);
+            row.data('held', cert.held ? 1 : 0);
+
+            holder.append(row);
         });
 
         $('.certs-amount').text('(' + heldCount + '/' + list.length + ')');
@@ -5955,7 +5973,7 @@ $(".map-clear").on('click', function() {
 
     // Toggling. Bound once on the holder rather than per tag, so tags replaced
     // by a re-render keep working.
-    $(document).on('click', '.certs-holder .license-tag', function () {
+    $(document).on('click', '.certs-holder .som-cert', function () {
         if (!canGrant || !lastCitizenId) return;
 
         var tag = $(this);

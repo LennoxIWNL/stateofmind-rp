@@ -714,10 +714,10 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     border: 1px solid rgba(255, 255, 255, 0.13);
     backdrop-filter: blur(22px);
     box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
-    animation: bannerIn 320ms cubic-bezier(.16, 1, .3, 1) both;
+    animation: bannerIn 420ms cubic-bezier(.22, 1, .28, 1) both;
 }
 
-.banner.is-leaving { animation: bannerOut 240ms ease both; }
+.banner.is-leaving { animation: bannerOut 380ms cubic-bezier(.4, 0, .7, 0) both; }
 
 .banner__icon {
     flex: 0 0 auto;
@@ -788,7 +788,15 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     max-height: none;
     transform: translateY(calc(100% - 172px));
     transform-origin: bottom center;
-    animation: peekIn 420ms cubic-bezier(.16, 1, .3, 1) both;
+    animation: peekIn 620ms cubic-bezier(.22, 1, .28, 1) both;
+}
+
+/* Leaving. Without this the phone vanished the instant the last banner cleared,
+ * which read as a glitch rather than as the handset going back down. The exit
+ * is slightly slower than the entrance because a thing arriving should catch
+ * the eye and a thing leaving should not. */
+.root.is-banners-only.is-dismissing .phone {
+    animation: peekOut 520ms cubic-bezier(.4, 0, .7, 0) both;
 }
 
 /* The screen keeps its rounded top, and the cropped bottom simply runs off. */
@@ -803,4 +811,9 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 @keyframes peekIn {
     from { opacity: 0; transform: translateY(100%); }
     to   { opacity: 1; transform: translateY(calc(100% - 172px)); }
+}
+
+@keyframes peekOut {
+    from { opacity: 1; transform: translateY(calc(100% - 172px)); }
+    to   { opacity: 0; transform: translateY(100%); }
 }

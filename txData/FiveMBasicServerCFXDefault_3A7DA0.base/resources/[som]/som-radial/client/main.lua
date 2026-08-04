@@ -56,6 +56,31 @@ local function contextual()
             if item.seatedOnly and not seated then ok = false end
         end
 
+        -- A situational check the OWNING resource answers.
+        --
+        -- The radial cannot know what "near a garage" means, and teaching it
+        -- would mean teaching it about every feature that ever wants a
+        -- condition. Instead an entry names a client export returning a
+        -- boolean, and the resource that owns the feature decides.
+        --
+        -- This is a VISIBILITY filter, exactly like the vehicle checks above,
+        -- and is not a permission: entitlement is decided server side in
+        -- permitted(). A client that forced this true would see a button whose
+        -- action still gets refused.
+        if ok and item.visible then
+            local resource, method = item.visible:match('^([^.]+)%.(.+)$')
+
+            if not resource or GetResourceState(resource) ~= 'started' then
+                ok = false
+            else
+                local success, result = pcall(function()
+                    return exports[resource][method]()
+                end)
+
+                ok = success and result == true
+            end
+        end
+
         if ok then items[#items + 1] = item end
     end
 

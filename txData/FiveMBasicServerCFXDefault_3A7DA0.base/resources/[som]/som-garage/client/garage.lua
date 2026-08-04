@@ -64,17 +64,12 @@ local function open(garageId)
     })
 end
 
----Opens whichever garage the player is standing at.
+---The garage the player is standing at, if any, and if they may use it.
 ---
----The radial entry point. It resolves the garage from POSITION rather than
----taking an id, so one menu entry serves every garage and the radial never has
----to know which ones exist.
----
----Access is only filtered here to pick a sensible target; the server re-checks
----it, along with the distance, on the list itself.
-exports('openNearest', function()
-    if isOpen then return end
-
+---Shared by the radial's visibility check and by openNearest, so the button
+---appearing and the button working can never disagree.
+---@return string|nil garage id
+local function nearestGarage()
     local here = GetEntityCoords(cache.ped)
     local job, gang = core:getJob(), core:getGang()
 
@@ -83,8 +78,8 @@ exports('openNearest', function()
     for id, garage in pairs(Config.Garages) do
         local distance = #(here - garage.coords)
 
-        -- Ten metres, matching the server's twelve with a little room for the
-        -- player drifting while the menu opens.
+        -- Ten metres, against the server's twelve, so the menu never offers one
+        -- that the list callback will then refuse for distance.
         if distance < 10.0 and (not bestDistance or distance < bestDistance) then
             local allowed = not garage.groups
 
@@ -102,11 +97,32 @@ exports('openNearest', function()
         end
     end
 
-    if not bestId then
+    return bestId
+end
+
+---Whether the radial should offer the garage entry at all.
+exports('hasGarageNear', function()
+    return nearestGarage() ~= nil
+end)
+
+---Opens whichever garage the player is standing at.
+---
+---The radial entry point. It resolves the garage from POSITION rather than
+---taking an id, so one menu entry serves every garage and the radial never has
+---to know which ones exist.
+---
+---Access is only filtered here to pick a sensible target; the server re-checks
+---it, along with the distance, on the list itself.
+exports('openNearest', function()
+    if isOpen then return end
+
+    local id = nearestGarage()
+
+    if not id then
         return TriggerEvent('som:client:notify', 'No garage here', 'error')
     end
 
-    open(bestId)
+    open(id)
 end)
 
 -- ---------------------------------------------------------------------------

@@ -26,6 +26,9 @@ exports('register', function(item)
         export = item.export,
         menu = item.menu,
         seatedOnly = item.seatedOnly,
+        -- Client-side situational check, e.g. 'som-garage.hasGarageNear'. A
+        -- VISIBILITY filter only; entitlement is decided by permitted() below.
+        visible = type(item.visible) == 'string' and item.visible or nil,
         job = item.job,
         gang = item.gang,
         minGrade = item.minGrade,

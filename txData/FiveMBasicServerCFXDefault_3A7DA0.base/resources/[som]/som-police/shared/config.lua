@@ -69,9 +69,9 @@ Config.Stations = {
         -- somebody parking a car on the desk.
         -- Verified in game.
         duty = {
-            coords = vec3(441.56, -982.02, 32.30),
-            size = vec3(1.6, 1.6, 2.0),
-            rotation = 272.94,
+            coords = vec3(441.97, -981.85, 30.94),
+            size = vec3(1.8, 1.8, 2.0),
+            rotation = 8.92,
         },
 
         -- Verified in game.

@@ -6789,3 +6789,90 @@ input[type="range"].vehicle-info-points-input::-moz-range-track {
 .leaflet-tooltip-right {
 	margin-left: 6px;
 }
+
+/* ===========================================================================
+ * SOM addition: police certifications panel.
+ *
+ * Appended and self-contained, like the JS block at the end of ui/app.js.
+ * These do NOT reuse .license-tag: that is an inline-block pill sized for a
+ * one-word licence, so five certifications collapsed into unreadable slabs
+ * with the label squeezed out.
+ * ======================================================================== */
+
+.certs-holder {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 4px 0;
+}
+
+.som-cert {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-left: 3px solid rgba(255, 255, 255, 0.14);
+    transition: background 140ms ease, border-color 140ms ease;
+}
+
+/* Held and not-held differ by colour AND by a mark, not by opacity alone: a
+ * faded row reads as disabled rather than as "not granted". */
+.som-cert--held {
+    background: rgba(46, 204, 113, 0.10);
+    border-left-color: #2ecc71;
+}
+
+.som-cert--none {
+    background: rgba(255, 255, 255, 0.04);
+    border-left-color: rgba(255, 255, 255, 0.16);
+}
+
+.som-cert--editable { cursor: pointer; }
+.som-cert--editable:hover { background: rgba(255, 255, 255, 0.10); }
+
+.som-cert__mark {
+    flex: 0 0 auto;
+    width: 16px;
+    text-align: center;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.som-cert--held .som-cert__mark { color: #2ecc71; }
+.som-cert--none .som-cert__mark { color: rgba(255, 255, 255, 0.35); }
+
+.som-cert__body { flex: 1; min-width: 0; }
+
+.som-cert__label {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.som-cert__desc {
+    display: block;
+    margin-top: 1px;
+    font-size: 11px;
+    line-height: 1.3;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+/* Says what the click will DO, which is what was impossible to tell before. */
+.som-cert__action {
+    flex: 0 0 auto;
+    align-self: center;
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.10);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.som-cert--held .som-cert__action { background: rgba(231, 76, 60, 0.22); color: #ff8c7a; }
+.som-cert--none .som-cert__action { background: rgba(46, 204, 113, 0.20); color: #7ce8a8; }

@@ -340,6 +340,10 @@ local function registerRadial()
         icon = 'garage',
         order = 20,
         export = 'som-garage.openNearest',
+        -- Only shown when actually standing at a garage. A permanent "Garage"
+        -- slice that fails everywhere but four spots is a slice you learn to
+        -- ignore, and it costs a wedge on every open.
+        visible = 'som-garage.hasGarageNear',
     })
 end
 

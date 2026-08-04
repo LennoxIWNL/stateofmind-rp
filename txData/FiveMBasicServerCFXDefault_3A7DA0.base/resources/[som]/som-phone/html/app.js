@@ -402,6 +402,13 @@ function renderThemes() {
 
 const bannersEl = document.getElementById('banners');
 
+/* How long a notification stays up before it starts leaving.
+ *
+ * Deliberately a named constant: messages and calls will want their own values
+ * (a call has to stay until answered), and hunting for a magic 5000 in the
+ * middle of a function is how those end up inconsistent. */
+const BANNER_HOLD_MS = 6500;
+
 function banner(title, text, iconName) {
     const node = el('div', 'banner');
 
@@ -419,16 +426,26 @@ function banner(title, text, iconName) {
 
     setTimeout(() => {
         node.classList.add('is-leaving');
+
+        // Must outlast the CSS, or the node is removed mid-animation and the
+        // banner disappears instead of sliding away.
         setTimeout(() => {
             node.remove();
 
-            // Nothing left to show and the phone is not open, so get off screen.
+            // Nothing left to show and the phone is not open, so put the
+            // handset back down. The class drives the peekOut animation, and
+            // only once THAT has run is the whole thing hidden: hiding straight
+            // away is what made it vanish rather than slide.
             if (!bannersEl.children.length && root.classList.contains('is-banners-only')) {
-                root.classList.add('hidden');
-                root.classList.remove('is-banners-only');
+                root.classList.add('is-dismissing');
+
+                setTimeout(() => {
+                    root.classList.add('hidden');
+                    root.classList.remove('is-banners-only', 'is-dismissing');
+                }, 520);
             }
-        }, 240);
-    }, 5000);
+        }, 380);
+    }, BANNER_HOLD_MS);
 }
 
 // --- Wiring -------------------------------------------------------------
