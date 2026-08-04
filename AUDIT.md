@@ -1309,3 +1309,198 @@ Known functional gaps at this point: no appearance or clothing system
 (`qb-clothing` removed, Phase 7 owns it), no HUD, no inventory bridge yet
 (`inventory:framework` is still `qbx`, see section 6.4), and no job, gang,
 vehicle, or housing content.
+
+---
+
+## 16. Session handoff: state and open queue
+
+Written so the next session can continue without re-deriving any of this.
+Everything described below is committed and pushed to `main`. Read this section
+before touching police, garage, dispatch or the MDT.
+
+### 16.1 What now exists
+
+| Resource | State |
+|---|---|
+| `som-police` | Built. Duty, armoury, custody, fines, impounds, certifications, officer keybinds, vehicle lights and siren |
+| `som-dispatch` | Built. Crime detection, call store, answers to the `ps-dispatch` export name |
+| `som-garage` | Built. `som_vehicles` authority, ghost preview, garages, PD pool, buy and refund, temporary mod bay |
+| `som-compat` | Extended heavily. Full `Functions` surface, `Shared.Items/Weapons/Vehicles`, licence and DOB aliasing |
+| `ps-mdt` | Opens, profiles load, certifications panel added |
+| `ox_doorlock` | Doors lock and unlock at MRPD |
+
+`som-police` and `som-garage` overlap deliberately. som-garage owns the
+`som_vehicles` lifecycle and is the only code path that mints a row;
+som-police owns duty, custody and the impound transition. When they disagree
+about a vehicle, som-garage is right about ownership and som-police is right
+about `state = 'impounded'`.
+
+### 16.2 Patches made to third-party resources
+
+These are the only edits outside `[som]`, and every one is load-bearing. Any
+upgrade of these resources drops them, so this table is the re-apply list.
+
+| Resource | Patch | Why |
+|---|---|---|
+| `ps-mdt` | `server/main.lua:234` and `:1136` guarded with `isDispatchRunning` | Unguarded, they threw before `mdt:client:open` fired. Line 234 sits immediately before the open event, so the MDT never opened at all |
+| `ps-mdt` | `client/main.lua` accepts `som-dispatch` as a framework | `provide` does not make `GetResourceState` report the provided name as started |
+| `ps-mdt` | Certifications panel appended to `ui/app.js`, `ui/dashboard.html`, `ui/style.css`, `client/main.lua` | Append-only, so a fault breaks the panel and nothing else. The two NUI callbacks use `QBCore.Functions.TriggerCallback`, since ps-mdt does not load ox_lib |
+| `ps-mdt` | Record deletion moved from police grade 4 to grades 5 and 6, on four permission tables | Grade 4 was the Chief under the old ladder and is a Sergeant under ours |
+| `ox_inventory` | MRPD locker and `PoliceArmoury` removed from `data/stashes.lua` and `data/shops.lua` | They duplicated som-police's, and ox's armoury stocked no IFAK, armour or radio. This was the real cause of the "empty armoury", not som-police config |
+| `ox_inventory` | `ammo-taser` added, `WEAPON_STUNGUN` given `ammoname` | The stock stungun had no ammo type and fired forever |
+| `ox_doorlock` | `server/framework/som-compat.lua` added, listed first in `server/utils.lua` | Without it `GetPlayer` is nil and every door refuses silently |
+| `ox_doorlock` | `use_experimental_fxv2_oal` commented out | Suspected cause of the manifest and streaming faults; the texture dict still never loaded with it on |
+| `ox_doorlock` | Texture dict awaited before the lock sprite draws | Stock requested it once and drew regardless, rendering a white square forever |
+| `ox_target` | Reach set through the `ox_target:maxDistance` convar, dots restyled to SOM pink | Stock hardcodes a much longer reach and gives the dot no hover state |
+
+### 16.3 Bugs found and their real causes
+
+Recorded because in every one of these the obvious diagnosis was wrong.
+
+- **`lib.addCommand`'s `restricted` option calls `RegisterCommand(name, fn, true)`**,
+  which hands enforcement to FiveM's ACE. The command is refused before any Lua
+  runs, so nothing prints anywhere and the command looks dead. Staff commands
+  now register unrestricted and check `Permissions.Has` inside the handler.
+  `Permissions.AddCommand` in `som-core/server/permissions.lua` does this.
+- **ACE does resolve on this server.** A stale comment claiming it never had
+  sent a whole debugging pass down the wrong path. The boot line
+  `permissions: cfg marker som-cfg-exec-ok | group.god=1 | owner identifier=true`
+  is the authority. Trust it.
+- **Imported ox_doorlock doors broke doors that already worked.** Two records
+  for one physical door create two `AddDoorToSystem` entries, and unlocking one
+  leaves the other holding it shut. `/pddoors` exposed it: rows #1 and #4 were
+  0.8m apart on the same model hash. `sql/mrpd-doors.sql` is now a removal
+  script. Build MRPD doors with `/doorlock` in game, not by importing a set
+  found online, which will be for a different MLO.
+- **The `som:job` statebag replaces the client's job table wholesale.** Anything
+  omitted from the bag is stripped from the client moments after
+  `som:client:playerLoaded` sent it. This is why ps-mdt concatenated a nil
+  `job.grade.name` and sat on "Welcome, loading...". `syncState` now includes
+  `label` and `gradeLabel` on both the job and gang bags, and must keep doing so.
+- **qb spells it `licences`, SOM spells it `licenses`.** Only the online lookup
+  broke, because the offline path had a default, which disguised a spelling
+  mismatch as a database fault. `som-compat` aliases both directions.
+- **oxmysql returns a `DATE` column as epoch milliseconds**, so every date of
+  birth printed as `1217721600000`. Normalise through `SomFormatDate` in
+  `som-core/server/player.lua`.
+- **`SUM()` over a BIGINT returns DECIMAL, which the driver hands back as a
+  string**, so `row.faucet == 0` was never true and the economy report printed
+  `inf` and `-nan`.
+- **A vehicle left `state = 'out'` at shutdown was lost permanently.**
+  `reclaimVehicles()` now resets them to `garaged` at boot.
+- **`SetEntityAlpha` only honours multiples of 51.** The preview uses 153. The
+  third argument is ped-only.
+- **ox_target cannot be used from a driver's seat**, which made the mod bay
+  unreachable when it was on the eye. It is on the radial now, with the zone
+  kept for anyone standing beside a car.
+
+### 16.4 The compatibility view layer
+
+ps-mdt is written against QBCore's schema and is a preserved third-party
+resource, so rather than patch twenty SQL statements, `setup.sql` section 8c
+presents SOM's tables under the names ps-mdt expects: `players`,
+`player_vehicles`, `player_houses`, `houselocations`, `apartments`. Three
+details are load-bearing:
+
+- `charinfo` is reassembled with `JSON_OBJECT` into the blob qb expects, and
+  `birthdate` is formatted with `DATE_FORMAT` rather than passed through raw.
+- `job` must be a JSON object, not a string. ps-mdt calls `json.decode` on it.
+- Vehicle `state` maps from SOM's ENUM to the integers ps-mdt renders as
+  Out, Garaged and Impounded.
+
+The only two writes ps-mdt makes through a view (`server/dbm.lua:138` and
+`:161`, the offline branch of licence revocation) set `metadata` on a
+single-table view with no aggregate or union, which MySQL treats as updatable.
+
+`setup.sql` also now carries section 7b (three police tables, no foreign keys),
+a `som_add_index` procedure alongside the existing `som_add_column`, and the
+`som_vehicles` extension: `owner_group`, `group_restricted`, `assigned_to`,
+`taken_at`, `purchase_price`, with `citizenid` made nullable so a pool car can
+exist without an owner.
+
+**Re-import `setup.sql` before testing anything in this section.** It is
+idempotent.
+
+### 16.5 Diagnostics available in game
+
+| Command | Reports |
+|---|---|
+| `/somperms` | Your identifiers and staff tier. Unrestricted and self-only, so it still answers when permissions are the thing that is broken |
+| `/pdcoords`, `/pdzones` | Position formatted for config, and draws every configured police point |
+| `/garagecoords` | Position formatted for som-garage |
+| `/pddoors` | Every `ox_doorlock` record within 25m. This is what found the duplicate-door bug |
+| `/mdtsearch <name>` | Runs ps-mdt's person search directly and prints what the view returned. Output still needed, see 16.6 |
+| `/testphone`, `/testnotify` | Phone peek versus world toast |
+
+### 16.6 The queue
+
+Ordered. Item 1 blocks three separate symptoms and should be first.
+
+1. **MDT person search returns nothing.** This blocks Officers Involved,
+   Civilians Involved, and charges, because a charge attaches to a criminal you
+   have to search for first. `/mdtsearch <name>` was added specifically to tell
+   the two possible causes apart: "the view returns no rows" and "the UI will
+   not render rows it was handed" need completely different fixes. Get that
+   output before writing anything.
+2. **Do not build a charges system.** ps-mdt already ships `Config.PenalCode`
+   with 181 charges carrying class, penal code number, months, fine, colour and
+   description, and `mdt_convictions` already stores charges, fine, sentence and
+   `guilty` (the plea). It is unreachable only because of item 1.
+3. **Report box is a grey rectangle and will not accept typing.** Untraced.
+   First check whether the textarea carries `disabled` in `ui/dashboard.html`
+   the way `.manage-profile-info` does.
+4. **Custom progress bar.** Approach confirmed by the owner: build one component
+   in `som-ui` in the existing pink and dark language, then shim
+   `lib.progressBar` to it. ox_lib's UI is a compiled React bundle, so it cannot
+   simply be restyled. Every existing caller has to keep working: som-police
+   custody, the armoury, the mod bay, and r14-evidence later. Cancel and death
+   paths included.
+5. **Armoury UI redesign.** Owner called the current one cheap looking. Rebuild
+   against the same language as the certifications card in `som-police/html`.
+6. **Vehicle inspection menus** (check plate, flag plate, impound) are still
+   `lib.registerContext` and look like stock FiveM. They should move to the
+   certifications card pattern, as should the mod bay menus in
+   `som-garage/client/modshop.lua`.
+7. **Garage UI more cinematic.** The ghost preview works; the presentation
+   around it should reach the standard of the premium garage scripts.
+8. **Character selector loads late.** Several seconds in the shell with no menu.
+   Untraced.
+9. **Dispatch overhaul.** Not researched yet, and the owner asked for research
+   first: notification design, PD radio codes and blip handling cross-referenced
+   across several dispatch scripts, with a features-and-examples writeup and
+   confirmation before any code. The result must be pre-wired for EMS.
+10. **som-dealership.** Nothing creates a civilian-owned vehicle yet, so
+    personal garages are empty by construction.
+11. **Adopt `r14-evidence`.** Already on disk, and better than anything worth
+    writing: GSR, casings, blood, prints, vehicle forensics, per-type decay. It
+    needs the som-compat surface, which now exists, and its `Config.Alerts`
+    pointed at som-dispatch instead of the dead `police:server:policeAlert`.
+12. **Deployables** (spike strips, cones) and **jail**.
+
+Deferred, previously agreed: officer map blips with callsigns, an F1 panic
+button with sound, the gang and boss laptop app, an end-of-phase coherency pass
+across every UI, and anticheat tuning.
+
+### 16.7 Vehicle assets: what works and what does not
+
+| Pack | State |
+|---|---|
+| `origen_police` | In use. Rear lights sit wrong on some models, which is a model defect and not config. Its `carcols.meta` loads correctly, and the `*.xml`, `*.dat` and `*.ytyp` manifest warnings are dead globs matching nothing |
+| `ex-cars` police pack | Dropped. Broken liveries, misaligned headlights, 365MB |
+| `TIG-PACK` | Dropped. The models do not spawn at all |
+| `rd-vehicleconfig`, `ro-VehicleConfig` | Declare roughly 400 models with no stream folder. Those models do not exist |
+
+Vanilla police models were removed from the shared garage at the owner's
+request. Liveries and mod bay changes now persist per vehicle, and
+`Config.ResetPoolProps` is off so pool cars keep what was set on them.
+
+### 16.8 Not verified
+
+- Every coordinate other than MRPD duty, armoury, locker, garage and the mod
+  bay, all of which were measured in game.
+- No Lua toolchain is installed and there is still no `.luacheckrc`, so nothing
+  in this phase has been syntax checked by a tool. Checks were structural: block
+  and bracket balance, callback name cross-referencing between client and
+  server, and `node --check` on the JavaScript.
+- Everything in 16.1 has been exercised by hand in game except jail,
+  deployables and evidence, which are not built.
