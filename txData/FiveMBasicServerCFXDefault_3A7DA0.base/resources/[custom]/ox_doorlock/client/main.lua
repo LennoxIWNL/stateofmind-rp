@@ -294,13 +294,42 @@ CreateThread(function()
         local sprite1 = drawSprite[0]?[1]
         local sprite2 = drawSprite[1]?[1]
 
-        if sprite1 then
-            RequestStreamedTextureDict(sprite1, true)
+        -- SOM: WAIT for the dictionary.
+        --
+        -- Stock requests it once and starts drawing immediately. A dictionary
+        -- that is not resident yet renders as an untextured white quad, and
+        -- because the request is never repeated it stays white forever, which
+        -- is what put a white square on every door.
+        --
+        -- Bounded, so a missing dictionary degrades to no sprite rather than
+        -- hanging this thread and taking the lock prompt with it.
+        local function loadDict(dict)
+            if not dict then return end
+
+            RequestStreamedTextureDict(dict, true)
+
+            local deadline = GetGameTimer() + 10000
+            while not HasStreamedTextureDictLoaded(dict) and GetGameTimer() < deadline do
+                RequestStreamedTextureDict(dict, true)
+                Wait(50)
+            end
+
+            if not HasStreamedTextureDictLoaded(dict) then
+                print(('[ox_doorlock] texture dict %s never loaded; sprites disabled'):format(dict))
+                return false
+            end
+
+            return true
         end
 
-        if sprite2 then
-            RequestStreamedTextureDict(sprite2, true)
-        end
+        local ok1 = loadDict(sprite1)
+        local ok2 = sprite2 == sprite1 and ok1 or loadDict(sprite2)
+
+        -- Both failing means every draw would be a white square, so draw none.
+        -- The door still works: ClosestDoor and the keybind are independent of
+        -- the sprite, which is the part that got lost when it was configured
+        -- off entirely.
+        if not ok1 and not ok2 then drawSprite = false end
     end
 
     local SetDrawOrigin = SetDrawOrigin

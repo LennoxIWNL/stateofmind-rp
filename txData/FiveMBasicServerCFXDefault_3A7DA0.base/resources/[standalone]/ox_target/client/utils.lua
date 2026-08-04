@@ -37,12 +37,16 @@ local drawZoneSprites = GetConvarInt('ox_target:drawSprite', 24)
 local SetDrawOrigin = SetDrawOrigin
 local DrawSprite = DrawSprite
 local ClearDrawOrigin = ClearDrawOrigin
--- SOM: the indicator dots are pink, matching som-assets/tokens.css
--- (--som-pink #ff1493). Stock is grey with a blue hover, which reads as a
--- different product to everything else on screen.
+-- SOM: grey at rest, SOM pink when looked at.
+--
+-- Both were pink for a while, which meant the indicator carried no information:
+-- every dot in view looked like the one you were aiming at. Grey until the
+-- raycast lands on it, then --som-pink (#ff1493) from som-assets/tokens.css, so
+-- the colour change IS the feedback.
+--
 -- Re-apply on an ox_target upgrade.
-local colour = vector(255, 20, 147, 150)
-local hover = vector(255, 105, 180, 255)
+local colour = vector(180, 180, 180, 130)
+local hover = vector(255, 20, 147, 255)
 local currentZones = {}
 local previousZones = {}
 local drawZones = {}

@@ -6,22 +6,23 @@ Config = {}
 Config.Notify = true
 
 ---Create a persistent notification while in-range of a door, prompting to lock/unlock.
--- SOM: on. It replaces the sprite below, and it matches how every other
--- interaction on this server prompts.
-Config.DrawTextUI = true
+Config.DrawTextUI = false
 
 ---Set the properties used by [DrawSprite](https://docs.fivem.net/natives/?_0xE7FFAE5EBF23D890).
 --
--- SOM: DISABLED, which is what turns the white square on every door back into
--- nothing.
+-- SOM: the sprite is KEPT. Turning it off to hide a white square also took the
+-- lock prompt with it, which was worse than the square.
 --
--- client/main.lua calls RequestStreamedTextureDict ONCE when its thread starts
--- and never waits for HasStreamedTextureDictLoaded, so if the dictionary is not
--- resident by the first draw the game renders an untextured white quad and
--- keeps rendering it, because the request is never retried.
---
--- Config.DrawTextUI above replaces it. Re-apply on an ox_doorlock upgrade.
-Config.DrawSprite = false
+-- The white square itself is fixed in client/main.lua, where the texture
+-- dictionary is now waited for instead of being requested once and drawn
+-- regardless. See the note there.
+Config.DrawSprite = {
+    -- Unlocked
+    [0] = { 'obtaizen_ui', 'key', 0, 0, 0.021, 0.021, 0, 255, 255, 255, 500 },
+
+    -- Locked
+    [1] = { 'obtaizen_ui', 'key_red', 0, 0, 0.021, 0.021, 0, 255, 255, 255, 500 },
+}
 
 ---Allow the specified ace principal to use 'command.doorlock'.
 Config.CommandPrincipal = 'group.admin'
