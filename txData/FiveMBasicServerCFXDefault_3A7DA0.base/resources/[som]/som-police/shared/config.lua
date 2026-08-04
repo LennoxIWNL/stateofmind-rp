@@ -185,14 +185,18 @@ Config.Armoury = {
 -- ---------------------------------------------------------------------------
 
 Config.Vehicles = {
+    -- Only used when som-garage is NOT running; it owns the motor pool
+    -- otherwise. Kept in step with som-garage's fleet so the fallback offers
+    -- the same cars.
     garage = {
-        { model = 'police',   label = 'Cruiser' },
-        { model = 'police2',  label = 'Interceptor Sedan' },
-        { model = 'police3',  label = 'Interceptor' },
-        { model = 'policet',  label = 'Transport Van' },
-        { model = 'riata',    label = 'Unmarked 4x4' },
-        { model = 'police4',  label = 'Unmarked Cruiser', cert = 'cert.interceptor' },
-        { model = 'fbi2',     label = 'Pursuit SUV',      cert = 'cert.interceptor' },
+        { model = 'polvic',    label = 'Patrol Cruiser' },
+        { model = 'polchar',   label = 'Patrol Charger' },
+        { model = 'poltah',    label = 'Patrol SUV' },
+        { model = 'poltaurus', label = 'Patrol Taurus' },
+        { model = 'polraptor', label = 'Raptor' },
+        { model = 'policet',   label = 'Transport Van' },
+        { model = 'scpolstang', label = 'Interceptor Mustang', cert = 'cert.interceptor' },
+        { model = 'scpolc7',    label = 'Interceptor C7',      cert = 'cert.interceptor' },
     },
 
     helipad = {

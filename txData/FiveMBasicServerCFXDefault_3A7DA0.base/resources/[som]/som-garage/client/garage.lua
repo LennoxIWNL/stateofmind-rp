@@ -45,7 +45,16 @@ local function open(garageId)
     currentGarage = garageId
 
     local garage = Config.Garages[garageId]
-    Preview.Start(garage.preview or garage.spawn)
+
+    -- The server picked the bay, because only it can see every parked vehicle.
+    -- The heading comes with it, so a car previewed in the third bay faces the
+    -- same way as one previewed in the first.
+    local at = res.previewAt
+        and vec4(res.previewAt.x, res.previewAt.y, res.previewAt.z, res.previewAt.w)
+        or garage.preview
+        or garage.spawn
+
+    Preview.Start(at)
 
     -- The first vehicle is shown immediately, so the podium is never empty
     -- while the player reads the list.

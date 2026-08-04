@@ -43,4 +43,18 @@ if not sucess then
 	warn('no compatible framework was loaded, most features will not work')
 end
 
+-- SOM: say so out loud.
+--
+-- A bridge that fails to load makes GetPlayer nil, which makes isAuthorised
+-- fall through to `false`, which makes every door refuse silently. That is
+-- indistinguishable from "the door is not in the database" unless something
+-- reports it, so it reports it.
+CreateThread(function()
+	Wait(2000)
+
+	print(('[ox_doorlock] framework bridge: %s | GetPlayer: %s | IsPlayerInGroup: %s')
+		:format(sucess and 'loaded' or 'NONE',
+			type(GetPlayer), type(IsPlayerInGroup)))
+end)
+
 return utils

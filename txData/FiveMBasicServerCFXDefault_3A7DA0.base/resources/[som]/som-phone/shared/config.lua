@@ -148,3 +148,26 @@ Config.Themes = {
     ember    = { label = 'Ember',        accent = '#ff6b35', perk = 'phoneTheme' },
     mono     = { label = 'Monochrome',   accent = '#e0e0e0', perk = 'phoneTheme' },
 }
+
+-- ---------------------------------------------------------------------------
+-- Notification sounds
+--
+-- The game's OWN phone sound set, not an audio file lifted from another script.
+-- Two reasons: it is guaranteed present on every client with no streaming and
+-- no licence question, and it is the sound players already associate with a
+-- phone in this game, so it reads as a notification without being taught.
+--
+-- `set` and `name` map to PlaySoundFrontend(-1, name, set, true).
+-- ---------------------------------------------------------------------------
+
+Config.Sounds = {
+    enabled = true,
+
+    -- A message or a bill landing.
+    notification = { set = 'Phone_SoundSet_Default', name = 'Text_Arrive_Tone' },
+
+    -- Reserved. Messages and calls will want their own, and naming them here
+    -- rather than at the call site is what stops them drifting apart.
+    message = { set = 'Phone_SoundSet_Default', name = 'Text_Arrive_Tone' },
+    call     = { set = 'Phone_SoundSet_Michael', name = 'Remote_Ring' },
+}

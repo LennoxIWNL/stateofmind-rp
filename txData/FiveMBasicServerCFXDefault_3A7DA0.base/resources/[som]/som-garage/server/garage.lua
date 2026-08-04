@@ -203,10 +203,18 @@ lib.callback.register('som-garage:server:list', function(source, garageId)
         end
     end
 
+    -- Where the next car will actually come out. The preview stands there, so
+    -- the ghost is in the bay the real vehicle will occupy rather than in a
+    -- fixed spot that may already be full.
+    local bay = freeBay(garage)
+
     return {
         success = true,
         label = garage.label,
         garage = garageId,
+        -- Sent as plain numbers: a vector4 does not survive the callback
+        -- boundary intact, and the client rebuilds it.
+        previewAt = { x = bay.x, y = bay.y, z = bay.z, w = bay.w },
         vehicles = out,
         catalogue = catalogue,
         -- Cash or card, the same control every other shop offers. som-core owns

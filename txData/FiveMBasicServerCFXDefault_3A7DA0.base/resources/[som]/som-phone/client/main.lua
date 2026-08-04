@@ -83,8 +83,26 @@ end)
 -- Deliberately not routed through som-ui: a bill arriving is the phone's
 -- business. "You do not have a phone" stays a som-ui toast, because at that
 -- point there is no phone to put a banner on.
+---Plays one of Config.Sounds. Front-end, so it is not positional: a phone in
+---your pocket does not come from somewhere in the world.
+---
+---A plain local rather than a member of a Phone table, because this file has no
+---such table: writing to one would have been an index of nil at load and taken
+---the whole client half of the phone down with it.
+---@param kind string a key of Config.Sounds
+local function playSound(kind)
+    if not Config.Sounds or not Config.Sounds.enabled then return end
+
+    local sound = Config.Sounds[kind]
+    if not sound then return end
+
+    PlaySoundFrontend(-1, sound.name, sound.set, true)
+end
+
 RegisterNetEvent('som-phone:client:banner', function(title, text, iconName)
     if type(title) ~= 'string' or type(text) ~= 'string' then return end
+
+    playSound('notification')
 
     SendNUIMessage({
         action = 'banner',

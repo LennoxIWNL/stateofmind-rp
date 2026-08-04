@@ -519,3 +519,57 @@ lib.addCommand('pdcoords', {
         ('vec3(%.2f, %.2f, %.2f)'):format(c.x, c.y, c.z),
         ('vec4(%.2f, %.2f, %.2f, %.2f)'):format(c.x, c.y, c.z, h))
 end)
+
+-- ---------------------------------------------------------------------------
+-- Door diagnostics
+--
+-- ox_doorlock fails silently in three different ways that all look identical in
+-- game: the door is not in the database, the door IS there but its coordinates
+-- do not match this MLO so it is never found, or the framework bridge did not
+-- load so authorisation refuses everyone. This tells them apart.
+-- ---------------------------------------------------------------------------
+
+lib.addCommand('pddoors', {
+    help = 'Report what ox_doorlock actually knows about doors near you',
+}, function(source)
+    if source == 0 then return end
+
+    if not core:hasPermission(source, 'som.admin') then
+        return TriggerClientEvent('som:client:notify', source,
+            'You do not have permission to do that', 'error')
+    end
+
+    local total = MySQL.scalar.await('SELECT COUNT(*) FROM ox_doorlock') or 0
+    local rows = MySQL.query.await('SELECT id, name, data FROM ox_doorlock') or {}
+
+    local ped = GetPlayerPed(source)
+    local here = GetEntityCoords(ped)
+
+    print(('[som-police] ox_doorlock holds %d door(s).'):format(total))
+
+    local near = 0
+
+    for _, row in ipairs(rows) do
+        local ok, data = pcall(json.decode, row.data)
+
+        if ok and data and data.coords then
+            local at = vector3(data.coords.x + 0.0, data.coords.y + 0.0, data.coords.z + 0.0)
+            local distance = #(here - at)
+
+            if distance < 25.0 then
+                near = near + 1
+                print(('    #%d  %-28s %.1fm  model %s  state %s'):format(
+                    row.id, row.name, distance,
+                    tostring(data.model or (data.doors and 'double' or '?')),
+                    tostring(data.state)))
+            end
+        end
+    end
+
+    print(('[som-police] %d within 25m of you.'):format(near))
+
+    TriggerClientEvent('som:client:notify', source,
+        ('%d doors total, %d near you. Details in the server console.')
+            :format(total, near),
+        near > 0 and 'success' or 'error', 9000)
+end)

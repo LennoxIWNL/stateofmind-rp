@@ -137,19 +137,33 @@ Config.Garages = {
 Config.Fleets = {
     lspd = {
         platePrefix = 'LSPD',
+
+        -- ADDON models, streamed by ex-cars and TIG-PACK. Both are named
+        -- explicitly in som.cfg because dev mode skips [assets-streams]; if
+        -- either is not started these will not spawn at all.
+        --
+        -- Names verified against the vehicles.meta on disk rather than taken
+        -- from a listing, since a wrong spawn name is a silent no-show.
         vehicles = {
-            { model = 'police',   label = 'Patrol Cruiser',    count = 5, price = 50000 },
-            { model = 'police2',  label = 'Patrol Sedan',      count = 5, price = 50000 },
-            { model = 'sheriff2', label = 'Patrol SUV',        count = 5, price = 65000 },
-            { model = 'policet',  label = 'Transport Van',     count = 2 },
+            { model = 'polvic',   label = 'Patrol Cruiser',  count = 5, price = 50000 },
+            { model = 'polchar',  label = 'Patrol Charger',  count = 5, price = 50000 },
+            { model = 'poltah',   label = 'Patrol SUV',      count = 5, price = 65000 },
+            { model = 'poltaurus', label = 'Patrol Taurus',  count = 3, price = 55000 },
+            { model = 'polraptor', label = 'Raptor',         count = 2, price = 70000 },
+
+            -- TIG-PACK, pursuit rated.
             {
-                model = 'police3', label = 'Interceptor',
+                model = 'scpolstang', label = 'Interceptor Mustang',
                 count = 2, price = 95000, cert = 'cert.interceptor',
             },
             {
-                model = 'fbi2', label = 'Unmarked Pursuit SUV',
+                model = 'scpolc7', label = 'Interceptor C7',
                 count = 2, price = 95000, cert = 'cert.interceptor',
             },
+
+            -- Base game. Kept because no addon transport van or helicopter is
+            -- streamed, and these always exist.
+            { model = 'policet', label = 'Transport Van', count = 2 },
             {
                 model = 'polmav', label = 'Police Maverick',
                 count = 1, cert = 'cert.helicopter',
