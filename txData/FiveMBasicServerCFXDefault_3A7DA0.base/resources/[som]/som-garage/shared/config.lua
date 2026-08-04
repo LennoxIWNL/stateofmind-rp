@@ -138,37 +138,29 @@ Config.Fleets = {
     lspd = {
         platePrefix = 'LSPD',
 
-        -- origen_police for patrol, TIG-PACK for the pursuit cars.
+        -- origen_police only.
         --
-        -- ex-cars was tried and dropped: broken liveries and misaligned
-        -- headlights on every police model in the pack. It is 365MB, so leaving
-        -- it enabled for models nobody uses is a download for nothing.
+        -- TIG-PACK was dropped: its models do not spawn at all, so an officer
+        -- picking one got nothing and the pool silently lost a slot. ex-cars
+        -- went earlier for broken liveries and misaligned headlights.
         --
-        -- Counts are deliberately SMALL. Thirty-odd cars in one list is a
-        -- scrolling exercise, not a motor pool, and a pool only means something
-        -- when it can actually run out.
+        -- No vanilla models here either. A shared department garage full of
+        -- base-game cruisers next to custom ones looks like an oversight, and
+        -- the transport van and helicopter belong at the helipad rather than in
+        -- the motor pool list.
         vehicles = {
             { model = 'polbuffalo4', label = 'Buffalo STX',   count = 3, price = 50000 },
             { model = 'polcaracara', label = 'Caracara 4x4',  count = 2, price = 65000 },
             { model = 'poldom',      label = 'Dominator',     count = 2, price = 55000 },
-            { model = 'polvstr',     label = 'Vectre',        count = 2, price = 60000 },
 
-            -- Pursuit rated, TIG-PACK.
+            -- Pursuit rated. The two quickest models in the pack.
             {
-                model = 'scpolstang', label = 'Interceptor Mustang',
+                model = 'polcomet', label = 'Interceptor Comet',
                 count = 2, price = 95000, cert = 'cert.interceptor',
             },
             {
-                model = 'scpolc7', label = 'Interceptor C7',
+                model = 'polvstr', label = 'Interceptor Vectre',
                 count = 2, price = 95000, cert = 'cert.interceptor',
-            },
-
-            -- Base game. No addon transport van or helicopter is streamed, and
-            -- these always exist.
-            { model = 'policet', label = 'Transport Van', count = 2 },
-            {
-                model = 'polmav', label = 'Police Maverick',
-                count = 1, cert = 'cert.helicopter',
             },
         },
     },
@@ -206,6 +198,7 @@ Config.ResetPoolProps = true
 -- ---------------------------------------------------------------------------
 
 Config.ModShop = {
-    coords = vec3(-337.2, -136.3, 39.0),
-    rotation = 250.0,
+    -- Verified in game.
+    coords = vec3(452.05, -976.92, 25.70),
+    rotation = 84.88,
 }

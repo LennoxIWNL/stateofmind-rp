@@ -49,6 +49,32 @@ local function seedFleet(fleetId, fleet)
     end
 end
 
+---Every vehicle marked `out` is put back.
+---
+---A restart destroys every spawned entity, so a row still marked `out`
+---describes a car that no longer exists anywhere. Left alone it is
+---unretrievable FOREVER: the garage refuses it as already out, and nothing ever
+---clears the flag. That is a permanent loss of somebody's vehicle, and it
+---applies to bought and personal cars just as much as to the pool.
+---
+---Pool cars go home to their own garage. Personal cars keep whichever garage
+---they were last stored at, so nobody's car teleports across the map because
+---the server rebooted.
+local function reclaimVehicles()
+    local reclaimed = MySQL.update.await([[
+        UPDATE som_vehicles
+        SET state = 'garaged', assigned_to = NULL, taken_at = NULL,
+            garage = CASE WHEN owner_group IS NOT NULL AND citizenid IS NULL
+                          THEN owner_group ELSE garage END
+        WHERE state = 'out'
+    ]]) or 0
+
+    if reclaimed > 0 then
+        print(('[som-garage] reclaimed %d vehicle(s) left out by the last shutdown.')
+            :format(reclaimed))
+    end
+end
+
 CreateThread(function()
     -- After som-core has confirmed the schema is present.
     Wait(3000)
@@ -62,10 +88,16 @@ CreateThread(function()
         return
     end
 
+    -- Before seeding, so a fleet that looks short only because its cars are
+    -- flagged out does not get topped up with duplicates.
+    reclaimVehicles()
+
     for fleetId, fleet in pairs(Config.Fleets) do
         seedFleet(fleetId, fleet)
     end
 end)
+
+exports('reclaimVehicles', reclaimVehicles)
 
 -- ---------------------------------------------------------------------------
 -- Buying

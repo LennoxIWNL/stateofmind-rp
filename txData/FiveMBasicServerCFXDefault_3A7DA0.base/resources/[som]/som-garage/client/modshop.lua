@@ -5,11 +5,14 @@
 -- feature. A real Los Santos Customs charges money, books revenue to the
 -- business and validates every mod server side, and none of that is here.
 --
--- Everything below is client-only and applies to the vehicle you are sitting
--- in. That is safe because a vehicle's appearance is not authority: som-garage
--- only persists props when a car is STORED, through a server callback that
--- re-derives ownership. Somebody changing a car they do not own alters nothing
--- that survives them driving away.
+-- The menus apply changes locally, and every change is then SAVED through a
+-- server callback that re-derives ownership from the vehicle's own statebag.
+-- Applying locally is safe because appearance is not authority; persisting is
+-- what makes it worth doing, since anything not saved was lost at the next
+-- restart. Somebody changing a car they do not own still saves nothing.
+--
+-- Pool cars are refused on purpose: they are reset to stock on every spawn, so
+-- writing a livery to one would be stored and then immediately ignored.
 
 local function currentVehicle()
     local vehicle = cache.vehicle
@@ -21,6 +24,28 @@ end
 
 local function needVehicle()
     TriggerEvent('som:client:notify', 'Sit in the driver seat first', 'error')
+end
+
+---Persists what was just changed.
+---
+---Called after every modification rather than on closing the menu, because the
+---menu can be closed by dying, by a resource restart, or by simply driving off,
+---and a save that only happens on a tidy exit is a save that mostly does not
+---happen.
+---
+---Silent on success. The server refuses pool cars, which is expected rather
+---than an error worth interrupting somebody for, so only a real failure speaks.
+local function persist(vehicle)
+    if not vehicle or vehicle == 0 then return end
+
+    local res = lib.callback.await('som-garage:server:saveProps', false, {
+        netId = NetworkGetNetworkIdFromEntity(vehicle),
+        props = lib.getVehicleProperties(vehicle),
+    })
+
+    if res and not res.success and res.error ~= 'pool vehicles are reset to stock each time' then
+        TriggerEvent('som:client:notify', res.error or 'Could not save that', 'error')
+    end
 end
 
 -- Two livery systems exist and addon packs use either: the mod-kit livery at
@@ -42,6 +67,7 @@ local function liveryMenu()
             description = 'Mod kit livery',
             onSelect = function()
                 SetVehicleMod(vehicle, 48, i, false)
+                persist(vehicle)
                 TriggerEvent('som:client:notify', ('Livery %d'):format(i + 1), 'inform', 1200)
             end,
         }
@@ -53,6 +79,7 @@ local function liveryMenu()
             description = 'SetVehicleLivery',
             onSelect = function()
                 SetVehicleLivery(vehicle, i)
+                persist(vehicle)
                 TriggerEvent('som:client:notify', ('Legacy livery %d'):format(i + 1), 'inform', 1200)
             end,
         }
@@ -68,6 +95,7 @@ local function liveryMenu()
         onSelect = function()
             SetVehicleMod(vehicle, 48, -1, false)
             SetVehicleLivery(vehicle, -1)
+            persist(vehicle)
         end,
     }
 
@@ -101,6 +129,7 @@ local function extrasMenu()
                     -- SetVehicleExtra takes DISABLE, so the boolean is inverted
                     -- against what the label says. This trips everyone once.
                     SetVehicleExtra(vehicle, extra, on)
+                    persist(vehicle)
                     extrasMenu()
                 end,
             }
@@ -150,6 +179,7 @@ local function performanceMenu()
             onSelect = function()
                 -- Straight to maximum. This is a test bay, not a shop.
                 SetVehicleMod(vehicle, kind.mod, max - 1, false)
+                persist(vehicle)
                 TriggerEvent('som:client:notify', ('%s maxed'):format(kind.label), 'success', 1500)
                 performanceMenu()
             end,
@@ -161,6 +191,7 @@ local function performanceMenu()
         description = IsToggleModOn(vehicle, 18) and 'Fitted' or 'Not fitted',
         onSelect = function()
             ToggleVehicleMod(vehicle, 18, not IsToggleModOn(vehicle, 18))
+            persist(vehicle)
             performanceMenu()
         end,
     }

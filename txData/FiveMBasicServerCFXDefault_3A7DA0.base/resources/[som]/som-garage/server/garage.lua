@@ -362,6 +362,57 @@ lib.callback.register('som-garage:server:store', function(source, data)
     return { success = true }
 end)
 
+---Saves the appearance of a vehicle the player is currently in.
+---
+---The mod bay is client side, which is fine for LOOKING at a livery but not for
+---keeping it: props only persist when a car is stored, so anything changed and
+---then driven away was lost at the next restart.
+---
+---Ownership is re-derived from the row, never from the request. The row id
+---comes off the entity's own statebag, which the server set when it spawned it,
+---so pointing at somebody else's car saves nothing.
+lib.callback.register('som-garage:server:saveProps', function(source, data)
+    if type(data) ~= 'table' then return { success = false, error = 'invalid request' } end
+
+    local player = core:getPlayer(source)
+    if not player then return { success = false, error = 'not loaded' } end
+
+    local entity = NetworkGetEntityFromNetworkId(tonumber(data.netId) or 0)
+    if not entity or entity == 0 or not DoesEntityExist(entity) then
+        return { success = false, error = 'no such vehicle' }
+    end
+
+    local id = Entity(entity).state['som:vehicleId']
+    if not id then return { success = false, error = 'that vehicle is not registered' } end
+
+    local row = Vehicles.Get(id)
+    if not row then return { success = false, error = 'no such vehicle' } end
+
+    -- A pool car is the department's, so any member of it may re-kit one.
+    -- A personal car is only its owner's.
+    local mine = row.citizenid == player.citizenid
+    local ourFleet = row.citizenid == nil and row.owner_group
+        and row.owner_group == player.job.business
+
+    if not mine and not ourFleet then
+        return { success = false, error = 'that is not yours' }
+    end
+
+    -- Pool cars are reset to stock on every spawn, so persisting a livery on
+    -- one would be written and then immediately ignored. Say so rather than
+    -- pretending it saved.
+    if row.citizenid == nil and Config.ResetPoolProps then
+        return { success = false, error = 'pool vehicles are reset to stock each time' }
+    end
+
+    if type(data.props) ~= 'table' then return { success = false, error = 'no properties' } end
+
+    MySQL.update.await('UPDATE som_vehicles SET props = ? WHERE id = ?',
+        { json.encode(data.props), id })
+
+    return { success = true }
+end)
+
 -- ---------------------------------------------------------------------------
 -- Helpers shared with fleet.lua
 -- ---------------------------------------------------------------------------

@@ -191,12 +191,12 @@ Config.Vehicles = {
         { model = 'polbuffalo4', label = 'Buffalo STX' },
         { model = 'polcaracara', label = 'Caracara 4x4' },
         { model = 'poldom',      label = 'Dominator' },
-        { model = 'polvstr',     label = 'Vectre' },
-        { model = 'policet',     label = 'Transport Van' },
-        { model = 'scpolstang',  label = 'Interceptor Mustang', cert = 'cert.interceptor' },
-        { model = 'scpolc7',     label = 'Interceptor C7',      cert = 'cert.interceptor' },
+        { model = 'polcomet',    label = 'Interceptor Comet',  cert = 'cert.interceptor' },
+        { model = 'polvstr',     label = 'Interceptor Vectre', cert = 'cert.interceptor' },
     },
 
+    -- Vanilla, because no addon helicopter is streamed and the helipad is a
+    -- separate zone from the motor pool.
     helipad = {
         { model = 'polmav', label = 'Police Maverick', cert = 'cert.helicopter' },
     },
