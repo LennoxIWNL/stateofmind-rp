@@ -16,6 +16,7 @@ client_scripts {
     -- preview first: garage.lua calls into it.
     'client/preview.lua',
     'client/garage.lua',
+    'client/modshop.lua',
 }
 
 server_scripts {

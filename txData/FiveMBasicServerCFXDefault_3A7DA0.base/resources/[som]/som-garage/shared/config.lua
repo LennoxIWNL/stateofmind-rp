@@ -193,3 +193,19 @@ Config.Purchase = {
 -- who wrecks one is not passing the damage to the next shift, and nobody can
 -- park a tuned cruiser in the pool.
 Config.ResetPoolProps = true
+
+-- ---------------------------------------------------------------------------
+-- Temporary mod bay
+--
+-- Exists so liveries and extras on the addon police models can be checked. It
+-- is FREE and client-only; a real Los Santos Customs charges money and books
+-- revenue to the business, and none of that is here.
+--
+-- UNVERIFIED coordinate, taken from the LSC garage entrance. /garagecoords to
+-- correct it. Set to nil to remove the bay entirely.
+-- ---------------------------------------------------------------------------
+
+Config.ModShop = {
+    coords = vec3(-337.2, -136.3, 39.0),
+    rotation = 250.0,
+}

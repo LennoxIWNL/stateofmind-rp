@@ -1,6 +1,20 @@
 --[[ FX Information ]] --
 fx_version 'cerulean'
-use_experimental_fxv2_oal 'yes'
+-- SOM: DISABLED.
+--
+-- Every file this resource ships is present on disk (obtaizen_ui.ytd 18KB,
+-- oxdoorlock.awc 53KB, web/build), yet the server logged "could not find file
+-- audio/dlc_oxdoorlock/oxdoorlock.awc" and the client never loaded the
+-- obtaizen_ui texture dictionary. A reinstall would have changed nothing.
+--
+-- fxv2 OAL is an EXPERIMENTAL asset loader, and one loader misbehaving explains
+-- both symptoms at once: file resolution for the manifest and streaming for the
+-- ytd. Turning it off falls back to the stable path.
+--
+-- If the awc warning and the white square both disappear, this was the cause.
+-- If they persist, it was not, and the next suspect is the stream folder not
+-- being indexed at all.
+-- use_experimental_fxv2_oal 'yes'
 lua54 'yes'
 game 'gta5'
 

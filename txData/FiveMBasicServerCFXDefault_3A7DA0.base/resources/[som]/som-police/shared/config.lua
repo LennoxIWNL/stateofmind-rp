@@ -302,4 +302,35 @@ Config.Keybinds = {
     vehicle = { key = 'DOWN',  description = 'Put in or pull from the nearest vehicle' },
     escort  = { key = 'LEFT',  description = 'Escort the nearest person' },
     release = { key = 'RIGHT', description = 'Stop escorting' },
+
+    -- In-vehicle controls.
+    --
+    -- LMENU is also ox_target's eye, and that is FINE: the eye cannot be used
+    -- from a driver's seat, so the two never contend. These binds are disabled
+    -- unless the player is in a department vehicle, so a civilian pressing Q
+    -- does nothing.
+    lights = { key = 'Q',     description = 'Toggle emergency lights' },
+    siren  = { key = 'LMENU', description = 'Toggle siren' },
+}
+
+-- ---------------------------------------------------------------------------
+-- Emergency vehicles
+--
+-- Which models count as police vehicles for the light and siren binds. Derived
+-- from the fleet rather than listed twice, plus the base-game ones so a
+-- commandeered cruiser still works.
+-- ---------------------------------------------------------------------------
+
+Config.EmergencyModels = {
+    -- origen_police
+    polbuffalo4 = true, polcaracara = true, polcomet = true,
+    poldom = true, polvigero2 = true, polvstr = true,
+    -- TIG-PACK
+    scpolstang = true, scpolc7 = true, scpolvic = true,
+    scpolchal = true, scpolacr = true, scpolm4 = true,
+    -- Base game
+    police = true, police2 = true, police3 = true, police4 = true,
+    policeb = true, policet = true, sheriff = true, sheriff2 = true,
+    fbi = true, fbi2 = true, riata = true, polmav = true,
+    ambulance = true, firetruk = true,
 }

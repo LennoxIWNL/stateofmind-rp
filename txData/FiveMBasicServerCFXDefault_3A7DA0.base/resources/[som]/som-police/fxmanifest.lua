@@ -20,6 +20,7 @@ client_scripts {
     'client/custody.lua',
     'client/vehicles.lua',
     'client/keybinds.lua',
+    'client/vehiclecontrols.lua',
 }
 
 server_scripts {
