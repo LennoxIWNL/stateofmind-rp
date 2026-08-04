@@ -24,16 +24,32 @@ function PlayerMethods:syncState()
     local state = Player(self.source).state
 
     state:set('som:citizenid', self.citizenid, true)
+
+    -- `label` and `gradeLabel` are included deliberately.
+    --
+    -- som:client:playerLoaded sends the FULL job table, but the client's
+    -- statebag handler then REPLACES PlayerData.job with whatever is in this
+    -- bag. Anything omitted here is therefore stripped from the client a moment
+    -- after it arrives, which is how ps-mdt ended up concatenating a nil
+    -- job.grade.name and never rendering past "Welcome, loading...".
+    --
+    -- Both are display strings that are already public (a uniform announces
+    -- them), so replicating them costs nothing in privacy terms. Pay and
+    -- business stay off the bag: those are not the client's business.
     state:set('som:job', {
         name = self.job.name,
+        label = self.job.label,
         grade = self.job.grade,
+        gradeLabel = self.job.gradeLabel,
         onduty = self.job.onduty,
         type = self.job.type,
         isboss = self.job.isboss,
     }, true)
     state:set('som:gang', {
         name = self.gang.name,
+        label = self.gang.label,
         grade = self.gang.grade,
+        gradeLabel = self.gang.gradeLabel,
         isboss = self.gang.isboss,
     }, true)
 

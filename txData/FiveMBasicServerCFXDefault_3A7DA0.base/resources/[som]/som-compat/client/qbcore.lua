@@ -16,24 +16,39 @@ function QBCore.Functions.GetPlayerData()
     local data = core:getPlayerData()
     if not data or not data.job then return {} end
 
+    local gang = data.gang or {}
+
+    -- Every string below is defaulted rather than passed through.
+    --
+    -- Legacy resources CONCATENATE these without checking. ps-mdt builds its
+    -- header as "Welcome, " .. job.grade.name .. ' ' .. lastname, so one nil
+    -- field throws before SendNUIMessage runs and the whole MDT sits on
+    -- "loading..." with no clue as to why. A shim handing out nils to code that
+    -- cannot cope with them is a shim that has not finished its job.
     return {
         citizenid = data.citizenid,
         charinfo = data.charinfo,
         money = data.money,
         metadata = data.metadata,
         job = {
-            name = data.job.name,
-            label = data.job.label,
+            name = data.job.name or 'unemployed',
+            label = data.job.label or 'Civilian',
             type = data.job.type,
             onduty = data.job.onduty,
-            isboss = data.job.isboss,
-            grade = { name = data.job.gradeLabel, level = data.job.grade },
+            isboss = data.job.isboss or false,
+            grade = {
+                name = data.job.gradeLabel or 'Employee',
+                level = data.job.grade or 0,
+            },
         },
         gang = {
-            name = data.gang.name,
-            label = data.gang.label,
-            isboss = data.gang.isboss,
-            grade = { name = data.gang.gradeLabel, level = data.gang.grade },
+            name = gang.name or 'none',
+            label = gang.label or 'No Gang',
+            isboss = gang.isboss or false,
+            grade = {
+                name = gang.gradeLabel or 'Member',
+                level = gang.grade or 0,
+            },
         },
     }
 end

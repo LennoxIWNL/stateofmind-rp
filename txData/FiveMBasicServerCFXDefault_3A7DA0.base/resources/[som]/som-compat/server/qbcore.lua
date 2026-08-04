@@ -24,6 +24,30 @@ local QBCore = {
 
 local core = exports['som-core']
 
+-- qb spells it `licences`, SOM spells it `licenses`.
+--
+-- ps-mdt reads Player.PlayerData.metadata.licences directly and hands the
+-- result to its UI, which calls Object.entries() on it. A nil there is an
+-- uncaught TypeError and the profile never renders. Its OFFLINE branch falls
+-- back to a default table, so only online lookups broke, which made it look
+-- like a database problem rather than a spelling one.
+--
+-- Aliased in a COPY. Mutating som-core's live metadata table to add a second
+-- spelling would leave the alias to be written back to the database and
+-- rejected, since som-core only accepts keys it knows.
+---@param metadata table
+---@return table
+local function aliasMetadata(metadata)
+    if type(metadata) ~= 'table' then return {} end
+
+    local out = {}
+    for key, value in pairs(metadata) do out[key] = value end
+
+    out.licences = metadata.licenses or {}
+
+    return out
+end
+
 ---Wraps a SOM player in the field layout legacy resources expect.
 ---
 ---`Functions` is the important half and was missing entirely until now: the
@@ -61,7 +85,7 @@ local function wrap(player)
                 isboss = player.gang.isboss,
                 grade = { name = player.gang.gradeLabel, level = player.gang.grade },
             },
-            metadata = player.metadata,
+            metadata = aliasMetadata(player.metadata),
             money = player.money,
         },
     }
@@ -69,11 +93,18 @@ local function wrap(player)
     wrapped.Functions = {
         ---som-core rejects any key not in Config.DefaultMetadata, so a legacy
         ---resource cannot invent state through this.
+        ---
+        ---The `licences` spelling is translated back on the way in. ps-mdt
+        ---writes it under the qb spelling, which som-core would reject as an
+        ---unknown key, so revoking a licence from the MDT would have silently
+        ---done nothing.
         SetMetaData = function(key, value)
+            if key == 'licences' then key = 'licenses' end
             return core:setMetadata(source, key, value)
         end,
 
         GetMetaData = function(key)
+            if key == 'licences' then key = 'licenses' end
             return core:getMetadata(source, key)
         end,
 
