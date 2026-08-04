@@ -20,6 +20,36 @@ PlayerMethods.__index = PlayerMethods
 -- Keys are namespaced som: and are read-only to clients.
 -- ---------------------------------------------------------------------------
 
+---Normalises a DATE column into something readable.
+---
+---oxmysql hands a MySQL DATE back as epoch MILLISECONDS, so passing it straight
+---through printed 1217721600000 wherever a date of birth was shown: the MDT,
+---the ID card and the character selector all had the same number.
+---
+---Accepts what the driver actually returns rather than assuming: a number, an
+---ISO string, or something already formatted. Anything unrecognised comes back
+---untouched rather than becoming nil, because a slightly wrong date is better
+---than a blank field.
+---@param value any
+---@return string|nil
+function SomFormatDate(value)
+    if value == nil then return nil end
+
+    if type(value) == 'number' then
+        -- Milliseconds, and os.date wants seconds.
+        return os.date('%d/%m/%Y', math.floor(value / 1000))
+    end
+
+    if type(value) == 'string' then
+        local y, m, d = value:match('^(%d%d%d%d)-(%d%d)-(%d%d)')
+        if y then return ('%s/%s/%s'):format(d, m, y) end
+
+        return value
+    end
+
+    return tostring(value)
+end
+
 function PlayerMethods:syncState()
     local state = Player(self.source).state
 
@@ -215,7 +245,7 @@ function Players.Create(source, row, money)
     local charinfo = {
         firstname = row.firstname,
         lastname = row.lastname,
-        dob = row.dob,
+        dob = SomFormatDate(row.dob),
         gender = row.gender,
         nationality = row.nationality,
         phone = row.phone,

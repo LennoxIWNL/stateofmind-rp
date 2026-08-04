@@ -100,7 +100,7 @@ function Characters.List(source)
     local license = getLicense(source)
     if not license then return {} end
 
-    return MySQL.query.await([[
+    local rows = MySQL.query.await([[
         SELECT c.citizenid, c.slot, c.firstname, c.lastname, c.dob, c.gender,
                c.nationality, c.job, c.job_grade, c.gang, c.last_played,
                -- The selector needs this to dress its preview ped. Without it
@@ -113,6 +113,12 @@ function Characters.List(source)
         WHERE c.license = ? AND c.deleted = 0
         ORDER BY c.slot
     ]], { license }) or {}
+
+    -- Same reason as SomFormatDate: the selector renders this directly, and a
+    -- raw DATE arrives as epoch milliseconds.
+    for _, row in ipairs(rows) do row.dob = SomFormatDate(row.dob) end
+
+    return rows
 end
 
 ---@param source number

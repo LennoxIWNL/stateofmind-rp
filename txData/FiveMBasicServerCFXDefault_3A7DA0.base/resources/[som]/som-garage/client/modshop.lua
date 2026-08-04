@@ -11,8 +11,13 @@
 -- what makes it worth doing, since anything not saved was lost at the next
 -- restart. Somebody changing a car they do not own still saves nothing.
 --
--- Pool cars are refused on purpose: they are reset to stock on every spawn, so
--- writing a livery to one would be stored and then immediately ignored.
+-- Pool cars save too, now that Config.ResetPoolProps is off. They are only
+-- refused while that is on, because a livery written to a car that gets reset
+-- on its next spawn would be stored and then immediately ignored.
+--
+-- Reached from the RADIAL rather than the eye, because ox_target does not work
+-- from a driver's seat and you have to be in the car for the bay to be any use.
+-- The zone is kept for anyone standing beside a vehicle instead.
 
 local function currentVehicle()
     local vehicle = cache.vehicle
@@ -249,6 +254,31 @@ local function open()
     lib.showContext('som_modshop')
 end
 
+---Whether the player is parked in the bay.
+---
+---Used by the radial, because the EYE cannot reach this: ox_target does not
+---work from a driver's seat, and you have to be in the car for the bay to be
+---any use. That made the zone below unreachable in practice, which is the whole
+---reason this is on F1 instead.
+local function inBay()
+    local bay = Config.ModShop
+    if not bay then return false end
+    if not currentVehicle() then return false end
+
+    return #(GetEntityCoords(cache.ped) - bay.coords) < 8.0
+end
+
+exports('hasModBayNear', inBay)
+exports('openModBay', function()
+    if not inBay() then
+        return TriggerEvent('som:client:notify', 'Drive into the bay first', 'error')
+    end
+
+    open()
+end)
+
+-- The zone stays as well, for anyone standing beside a car rather than sitting
+-- in it. It costs nothing and covers the case the radial cannot.
 CreateThread(function()
     local bay = Config.ModShop
     if not bay then return end
@@ -263,8 +293,6 @@ CreateThread(function()
                 name = 'garage:modshop:open',
                 icon = 'fa-solid fa-screwdriver-wrench',
                 label = 'Mod bay',
-                -- Generous, because you are sitting in a car rather than
-                -- standing at a counter.
                 distance = 6.0,
                 onSelect = open,
             },

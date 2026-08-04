@@ -839,7 +839,10 @@ SELECT
   JSON_OBJECT(
     'firstname',   `firstname`,
     'lastname',    `lastname`,
-    'birthdate',   `dob`,
+    -- Formatted, not raw. A MySQL DATE reaches the client as epoch
+    -- milliseconds, which is why the MDT showed 1217721600000 where a date of
+    -- birth belonged.
+    'birthdate',   DATE_FORMAT(`dob`, '%d/%m/%Y'),
     'gender',      `gender`,
     'nationality', `nationality`,
     'phone',       `phone`

@@ -432,6 +432,18 @@ end)
 local function registerRadial()
     if GetResourceState('som-radial') ~= 'started' then return end
 
+    -- The mod bay is radial-only in practice: the eye cannot be used from a
+    -- driver's seat, and you have to be in the car for the bay to do anything.
+    exports['som-radial']:register({
+        id = 'garage.modbay',
+        section = 'vehicle',
+        label = 'Mod Bay',
+        icon = 'engine',
+        order = 60,
+        export = 'som-garage.openModBay',
+        visible = 'som-garage.hasModBayNear',
+    })
+
     exports['som-radial']:register({
         id = 'garage.open',
         section = 'self',
