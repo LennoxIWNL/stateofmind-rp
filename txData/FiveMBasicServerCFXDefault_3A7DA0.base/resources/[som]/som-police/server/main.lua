@@ -573,3 +573,78 @@ lib.addCommand('pddoors', {
             :format(total, near),
         near > 0 and 'success' or 'error', 9000)
 end)
+
+-- ---------------------------------------------------------------------------
+-- MDT search diagnostics
+--
+-- The person search is the single blocker behind three symptoms: Officers
+-- Involved is empty, Civilians Involved is empty, and charges cannot be reached
+-- because a charge attaches to a criminal you have to search for first.
+--
+-- ps-mdt's search runs against the `players` compatibility view, so the failure
+-- is either in the SQL or in the UI, and those need very different fixes. This
+-- runs the EXACT query ps-mdt uses so the two can be told apart without
+-- guessing again.
+-- ---------------------------------------------------------------------------
+
+lib.addCommand('mdtsearch', {
+    help = 'Run the MDT person search directly, to see whether the SQL or the UI is at fault',
+    params = {
+        { name = 'query', type = 'longString', help = 'A name to search for' },
+    },
+}, function(source, args)
+    if source == 0 then return end
+
+    if not core:hasPermission(source, 'som.admin') then
+        return TriggerClientEvent('som:client:notify', source,
+            'You do not have permission to do that', 'error')
+    end
+
+    local query = ('%%%s%%'):format((args.query or ''):lower())
+
+    -- Step 1: does the view return anything at all?
+    local total = MySQL.scalar.await('SELECT COUNT(*) FROM `players`') or 0
+    print(('[som-police] `players` view holds %d row(s).'):format(total))
+
+    -- Step 2: is charinfo valid JSON that JSON_VALUE can read? This is the part
+    -- most likely to differ between MariaDB and MySQL.
+    local sample = MySQL.single.await(
+        "SELECT citizenid, JSON_VALUE(charinfo, '$.firstname') AS fn, " ..
+        "JSON_VALUE(charinfo, '$.lastname') AS ln, " ..
+        "JSON_VALUE(charinfo, '$.birthdate') AS dob FROM `players` LIMIT 1")
+
+    if sample then
+        print(('[som-police] JSON_VALUE reads: %s %s, dob %s (cid %s)'):format(
+            tostring(sample.fn), tostring(sample.ln),
+            tostring(sample.dob), tostring(sample.citizenid)))
+    else
+        print('[som-police] the view returned no rows at all.')
+    end
+
+    -- Step 3: ps-mdt's own query, verbatim.
+    local ok, matches = pcall(MySQL.query.await,
+        "SELECT p.citizenid, p.charinfo FROM `players` p " ..
+        "LEFT JOIN mdt_data md ON p.citizenid = md.cid " ..
+        "WHERE LOWER(CONCAT(JSON_VALUE(p.charinfo, '$.firstname'), ' ', " ..
+        "JSON_VALUE(p.charinfo, '$.lastname'))) LIKE ? " ..
+        "OR LOWER(`charinfo`) LIKE ? OR LOWER(`citizenid`) LIKE ? LIMIT 20",
+        { query, query, query })
+
+    if not ok then
+        print(('[som-police] ^1the search query ERRORED: %s^7'):format(tostring(matches)))
+        return TriggerClientEvent('som:client:notify', source,
+            'The search query errored. See the server console.', 'error', 9000)
+    end
+
+    matches = matches or {}
+    print(('[som-police] ps-mdt search for "%s" returned %d row(s).')
+        :format(args.query or '', #matches))
+
+    for _, row in ipairs(matches) do
+        print(('    %s  %s'):format(row.citizenid, tostring(row.charinfo)))
+    end
+
+    TriggerClientEvent('som:client:notify', source,
+        ('%d row(s) matched. Details in the server console.'):format(#matches),
+        #matches > 0 and 'success' or 'error', 9000)
+end)
