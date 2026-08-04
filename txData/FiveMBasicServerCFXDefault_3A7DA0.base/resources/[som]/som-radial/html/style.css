@@ -25,7 +25,19 @@ body {
     cursor: default;
 }
 
-.hidden { display: none !important; }
+/* NOT display:none.
+ *
+ * display:none removes the wheel from layout entirely, so the FIRST open paid
+ * for style recalc, layout and rasterising every slice at once, which is
+ * exactly the stutter you see on the first press and never again. Hiding it
+ * this way keeps the element laid out and already painted, so opening is a
+ * compositor change rather than a rebuild.
+ *
+ * pointer-events:none is what stops the invisible wheel eating clicks. */
+.hidden {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
 
 .root {
     position: fixed;
@@ -34,14 +46,17 @@ body {
     place-items: center;
     background: radial-gradient(circle at 50% 50%,
         rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.32) 38%, transparent 62%);
-    animation: fade 140ms ease both;
+    animation: fade 90ms ease both;
 }
 
 .wheel {
     position: relative;
     width: 460px;
     height: 460px;
-    animation: pop 220ms cubic-bezier(.16, 1, .3, 1) both;
+    /* 220ms was the open time as far as the hand is concerned. A radial is
+     * held, not browsed, so the entrance has to be over before you have
+     * finished moving the mouse. */
+    animation: pop 120ms cubic-bezier(.16, 1, .3, 1) both;
 }
 
 .wheel__svg { width: 100%; height: 100%; overflow: visible; }
@@ -121,6 +136,6 @@ body {
 
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pop {
-    from { opacity: 0; transform: scale(0.88); }
+    from { opacity: 0; transform: scale(0.94); }
     to   { opacity: 1; transform: none; }
 }

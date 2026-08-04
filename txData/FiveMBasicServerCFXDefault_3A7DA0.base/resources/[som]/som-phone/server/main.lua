@@ -213,3 +213,64 @@ exports('notifyApp', function(source, appId, text)
     TriggerClientEvent('som-phone:client:banner', id, label, text, icon)
     return true
 end)
+
+-- ---------------------------------------------------------------------------
+-- Testing the notification peek
+--
+-- A phone notification is hard to exercise deliberately: the real ones fire on
+-- a bill arriving or a transfer landing, which needs a second player and a
+-- reason. This raises one on demand so the peek animation, the app icon and the
+-- routing can be checked in isolation.
+--
+-- Registered UNRESTRICTED and permission-checked in the handler, for the reason
+-- documented on som-core's Permissions.AddCommand: lib.addCommand's `restricted`
+-- hands the check to FiveM's ACE, which refuses the command before any Lua runs
+-- and prints nothing anywhere.
+-- ---------------------------------------------------------------------------
+
+lib.addCommand('testphone', {
+    help = 'Send yourself a test phone notification',
+    params = {
+        { name = 'app', type = 'string', help = 'App id, or "system"', optional = true },
+        { name = 'text', type = 'longString', help = 'Message', optional = true },
+    },
+}, function(source, args)
+    if source == 0 then return end
+
+    if not exports['som-core']:hasPermission(source, 'som.admin') then
+        return TriggerClientEvent('som:client:notify', source,
+            'You do not have permission to do that', 'error')
+    end
+
+    local app = args.app or 'bank'
+    local text = args.text or 'This is a test notification.'
+
+    local sent = exports['som-phone']:notifyApp(source, app, text)
+
+    -- Says which app it resolved to, because an unknown id silently falls back
+    -- to System and looking at the wrong icon while wondering why is a waste of
+    -- a test.
+    TriggerClientEvent('som:client:notify', source,
+        sent and ('Sent as "%s". Close the phone to see the peek.'):format(app)
+            or 'Could not send that',
+        sent and 'success' or 'error')
+end)
+
+-- The world toast, for comparison. The two are different systems on purpose and
+-- seeing them back to back is the quickest way to confirm the split is right.
+lib.addCommand('testnotify', {
+    help = 'Send yourself a test world notification (not the phone)',
+    params = {
+        { name = 'text', type = 'longString', help = 'Message', optional = true },
+    },
+}, function(source, args)
+    if source == 0 then return end
+
+    if not exports['som-core']:hasPermission(source, 'som.admin') then
+        return TriggerClientEvent('som:client:notify', source,
+            'You do not have permission to do that', 'error')
+    end
+
+    TriggerClientEvent('som:client:notify', source,
+        args.text or 'This is a world notification, not a phone one.', 'inform', 6000)
+end)

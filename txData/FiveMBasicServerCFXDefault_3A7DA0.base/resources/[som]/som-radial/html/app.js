@@ -91,12 +91,40 @@ function labelLines(text) {
 
 // --- Render -------------------------------------------------------------
 
+/* Signature of a rendered wheel, so an unchanged one is not rebuilt.
+ *
+ * The radial is opened constantly and its contents rarely change: the same
+ * eight slices get torn down and reconstructed, SVG paths and all, on every
+ * press. Comparing a cheap signature first turns a reopen into resetting one
+ * CSS class. */
+function signatureOf(items) {
+    return items.map((i) => `${i.id}|${i.label}|${i.icon}|${i.section}|${i.menu ? 1 : 0}`).join('~');
+}
+
+let renderedSignature = null;
+
 function render(items) {
+    const signature = signatureOf(items);
+
+    if (signature === renderedSignature && svg.childElementCount) {
+        // Same wheel as last time. Only the selection state needs clearing.
+        slices = items;
+        activeIndex = -1;
+        svg.querySelectorAll('.slice.is-active')
+            .forEach((n) => n.classList.remove('is-active'));
+        // The hub text is deliberately left alone, because a fresh render does
+        // not set it either: it is owned by the hover logic. Setting it here
+        // would make a reopened wheel look different from a first-opened one.
+        return;
+    }
+
+    renderedSignature = signature;
     slices = items;
     activeIndex = -1;
     svg.replaceChildren();
 
     if (!items.length) {
+        renderedSignature = null;
         hubLabel.textContent = 'Nothing here';
         hubHint.textContent = 'Release to close';
         return;
