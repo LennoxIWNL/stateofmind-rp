@@ -22,14 +22,36 @@ local function reportBalance()
         WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)
     ]], { window })
 
-    if not row or row.faucet == 0 then return end
+    if not row then return end
 
-    local ratio = row.sink / row.faucet
+    -- tonumber, because SUM() over a BIGINT returns DECIMAL and the MySQL
+    -- driver hands DECIMAL back as a STRING. The old guard compared that string
+    -- against the number 0, which is false for "0" in Lua, so the zero check
+    -- never fired: the division went ahead and printed `ratio inf` on an empty
+    -- hour and `ratio -nan` on 0/0.
+    local faucet = tonumber(row.faucet) or 0
+    local sink = tonumber(row.sink) or 0
+
+    -- Nothing happened, so there is nothing to report. An idle server printing
+    -- a row of zeroes every hour is noise that trains you to ignore the log,
+    -- which is exactly when a real warning gets missed.
+    if faucet == 0 and sink == 0 then return end
+
     local target = Config.Balance.targetSinkFaucetRatio
+
+    -- No money entered at all. A ratio needs a denominator, so say the useful
+    -- thing plainly rather than dividing by zero and printing infinity.
+    if faucet == 0 then
+        print(('[som-economy] last %dm: faucet 0, sink %d. ^3No money entered the economy.^7')
+            :format(window, sink))
+        return
+    end
+
+    local ratio = sink / faucet
     local drift = math.abs(ratio - target)
 
     print(('[som-economy] last %dm: faucet %d, sink %d, ratio %.2f (target %.2f)')
-        :format(window, row.faucet, row.sink, ratio, target))
+        :format(window, faucet, sink, ratio, target))
 
     if drift > Config.Balance.warnDeviation then
         print(('[som-economy] ^3ratio is %.2f off target. %s^7')
