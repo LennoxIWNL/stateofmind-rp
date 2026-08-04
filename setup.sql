@@ -817,8 +817,25 @@ CREATE OR REPLACE VIEW `players` AS
 SELECT
   `citizenid`,
   `license`,
-  `job`,
   `metadata`,
+  -- `job` is a JSON OBJECT, not the plain string SOM stores.
+  --
+  -- ps-mdt does `if type(target.job) == 'string' then json.decode(target.job)`
+  -- (server/main.lua:353) because qb keeps a whole job blob in this column.
+  -- Handing it the bare string 'police' made that decode fail and took the
+  -- entire profile lookup with it, which is why an OFFLINE character's profile
+  -- came back empty.
+  --
+  -- UnpackJob reads name, label and grade.name. The label and grade name live
+  -- in som-core/shared/jobs.lua rather than the database, so name is reused for
+  -- the label and the grade number is rendered as its name. That is enough for
+  -- the MDT to display a profile, and nothing here is used for authority.
+  JSON_OBJECT(
+    'name',   `job`,
+    'label',  `job`,
+    'onduty', IF(`job_duty` = 1, TRUE, FALSE),
+    'grade',  JSON_OBJECT('level', `job_grade`, 'name', CAST(`job_grade` AS CHAR))
+  ) AS `job`,
   JSON_OBJECT(
     'firstname',   `firstname`,
     'lastname',    `lastname`,

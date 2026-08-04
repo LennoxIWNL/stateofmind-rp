@@ -59,6 +59,29 @@ end
 ---r14-evidence needs the same plus the shared item tables.
 ---@param player table som-core player
 ---@return table|nil
+-- qb calls it `birthdate`, SOM calls it `dob`.
+--
+-- ps-mdt renders a profile's date of birth from charinfo.birthdate
+-- (server/main.lua:412), so passing SOM's charinfo through untranslated left
+-- the DOB field blank on every online character. The offline path reads the
+-- `players` view, which already emits `birthdate`, so only online lookups were
+-- wrong, which made it look like a display bug rather than a naming one.
+--
+-- Aliased in a COPY, and BOTH spellings are kept: som-* code reads `dob` and
+-- must keep working.
+---@param charinfo table
+---@return table
+local function aliasCharinfo(charinfo)
+    if type(charinfo) ~= 'table' then return {} end
+
+    local out = {}
+    for key, value in pairs(charinfo) do out[key] = value end
+
+    out.birthdate = charinfo.birthdate or charinfo.dob
+
+    return out
+end
+
 local function wrap(player)
     if not player then return nil end
 
@@ -70,7 +93,7 @@ local function wrap(player)
             citizenid = player.citizenid,
             license = player.license,
             name = GetPlayerName(source),
-            charinfo = player.charinfo,
+            charinfo = aliasCharinfo(player.charinfo),
             job = {
                 name = player.job.name,
                 label = player.job.label,
