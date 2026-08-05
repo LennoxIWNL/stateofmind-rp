@@ -178,9 +178,16 @@ Config.CardAlerts = {
     -- Accounts that count as a card. Keys are som-core account names.
     accounts = { bank = true },
 
-    -- Milliseconds. Long enough to catch a shopping run, short enough that the
-    -- alert still feels like a response to what you just did.
-    window = 4000,
+    -- Milliseconds.
+    --
+    -- Was 4000, which was far too long: the alert arrived so late it read as
+    -- unrelated to what caused it. The window only has to cover a burst of
+    -- clicks in one shop, not a whole shopping trip, and a person clicking
+    -- through a list does it in well under a second per item.
+    --
+    -- Short enough to feel like a response, long enough that three quick
+    -- purchases still arrive as one banner rather than three.
+    window = 1200,
 
     -- Movements smaller than this are ignored entirely. Stops rounding and
     -- one dollar adjustments buzzing a phone.

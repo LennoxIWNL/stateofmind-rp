@@ -184,8 +184,12 @@ CreateThread(function()
             -- Sirens heard from across the map with no car attached to them.
             DistantCopCarSirens(false)
 
+            -- EnableDispatchService, not SetDispatchServiceActive. The latter
+            -- does not exist and calling it threw, which killed this whole
+            -- thread on the first pass and meant none of the suppression above
+            -- ever ran either.
             for i = 1, #SUPPRESSED_DISPATCH do
-                SetDispatchServiceActive(SUPPRESSED_DISPATCH[i], false)
+                EnableDispatchService(SUPPRESSED_DISPATCH[i], false)
             end
         end
 
