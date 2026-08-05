@@ -1842,7 +1842,7 @@ because the work is already done and only needs wiring:
 
 | Gap | Why it is cheap |
 |---|---|
-| Fuel stations | `cdn-fuel` is already in the repo and simply not started |
+| ~~Fuel stations~~ | **Corrected: not cheap.** See below |
 | Lockpick and hack minigame | `ox_lib` skillcheck is already installed |
 | Clothing shops and barbers as places | som-appearance is built; it needs som-interact zones |
 | Custom loading screen | The `loadingscreen` resource already exists |
@@ -1852,6 +1852,22 @@ because the work is already done and only needs wiring:
 | Police patrol vehicles | The fleet system works; `Config.Fleets.lspd` is deliberately empty pending a pack |
 | Photo on ID cards | `screenshot-basic` is already started |
 | Money visible without opening the phone | Needs a HUD, which does not exist yet |
+
+**Correction, made while starting on this list.** Fuel was recorded as small
+because `cdn-fuel` is on disk. It is not small. Its manifest hard-depends on
+`qb-target`, `qb-input` and `qb-menu`, none of which are installed, and it
+shared-scripts `@qbx_core/shared/locale.lua`, and **qbx_core is removed from
+this server**, so it fails at load rather than degrading. Its ox_lib and
+ox_target branches exist but are commented out. Making it work means switching
+those branches, dropping the qbx_core include and rewiring its targets to
+som-interact: a medium, not a small. `ox_fuel` would be the genuinely cheap
+route and is **not** installed. Treat the row above as medium until one of those
+two is resolved.
+
+**Done from this list:** vanilla NPC police and the wanted star system are now
+suppressed in `som-core/client/main.lua`, configured by `Config.World`. Left on,
+GTA answers every shooting with its own infinite police who shoot back and
+arrest nobody, which makes the entire player police force decoration.
 
 ### 17.4 Emergency services (30 gaps)
 
@@ -2015,3 +2031,241 @@ Truthful, specific, and worth protecting when adding anything above.
 - Everything in this register is desk research against public sources plus a
   read of this repo. None of it has been validated by playing the surveyed
   servers.
+
+---
+
+## 18. Roadmap: current stage to launch
+
+Section 16.6 is the near-term queue and stays as it is. This section is the
+whole road, so that any queue item can be placed against it and so the size of
+what is left is visible rather than felt.
+
+Ordering principle throughout: **build the thing that unblocks the most next,
+not the thing that demos best.** A feature with no consequence layer under it
+produces a screenshot, not a server.
+
+Effort per phase is engineering time with one person working, and assumes the
+free resources named in section 17 are adopted rather than written from scratch
+wherever they fit.
+
+### 18.0 Where we are
+
+Framework layer largely done: authority, persistence, money and ledger,
+permissions, compat, inventory, phone, radial, eye, notifications, progress,
+character creation and selection, police, garages, dispatch skeleton, MDT.
+
+Content layer barely started: 32 player-facing capabilities, most of them police
+or framework, and nothing on the server currently has a consequence.
+
+### 18.1 Phase 1: World feel and cheap wins
+
+**Goal.** The server stops feeling like a fresh FiveM install within one working
+session. Nothing here is architectural; it is all wiring and settings.
+
+- Suppress vanilla NPC police and the wanted system. **DONE.**
+- Spawn point selection on login.
+- Custom loading screen (the resource is already on disk).
+- Clothing shops, barbers and tattoo as real places, wiring som-interact zones
+  to the existing som-appearance.
+- Lockpick and hacking minigames on `ox_lib` skillcheck, already installed.
+- Photos on ID cards and licences via MugShotBase64 and screenshot-basic, both
+  already on disk.
+- Cash withdrawal and deposit, so bank money can become cash.
+- Character status metadata that actually drains and has effects.
+- A HUD, so money, hunger, thirst, armour and vehicle state are visible without
+  opening the phone. This is the one item here that is a new build.
+
+**Exit criteria.** A new player can join, choose where to spawn, look how they
+want, see their own status, and no vanilla police ever appear.
+
+**Effort.** Roughly a week.
+
+### 18.2 Phase 2: Consequence
+
+**Goal.** Things that happen to a player matter. This is the phase the whole
+server is currently missing, and every crime and police feature is worth more
+after it than before it.
+
+- **Death and downed state.** Bleeding out, last stand, respawn rules, death
+  timer. The single highest-value item on this roadmap.
+- Revive and medical treatment, and the item and skill gating around it.
+- Ambulance job and a hospital, including AI medic fallback so the loop closes
+  when no medic is online.
+- Limb injuries and wound effects that persist until treated.
+- **Jail and serving a sentence.** Today an arrest ends with nowhere to put
+  anybody. Holding cells, bail, prisoner transport.
+- Morgue and coroner, and a decision on permadeath.
+- Wire som-dispatch's EMS half, which is already pre-wired for it.
+
+**Exit criteria.** A shooting produces a casualty, a medic, a hospital record
+and, if police attend, an arrest that ends in a cell.
+
+**Effort.** Three to four weeks. This is the biggest single phase.
+
+### 18.3 Phase 3: Police to a competitive standard
+
+**Goal.** som-police stands next to a serious server's police department. See
+18.9 for the specific comparison this phase is written against.
+
+- **Dispatch NUI.** The current notification is a generic toast and reads as
+  one. Own call stack, priority tiers, code chips, evidence rows, per-tier
+  tones, point and radius blips.
+- Full call taxonomy with a real code table, and a server-side caller for each
+  from the resource that owns the mechanic.
+- Officer map blips, callsigns and an F1 panic button with sound.
+- Evidence and forensics: adopt r14-evidence, which is already on disk and
+  currently fires at a dead event with its alerts disabled.
+- Booking: mugshot, prints, property, charges from the MDT's 181-charge list.
+- Deployables: spike strips, cones, barriers, road flares.
+- ANPR and speed radar via wk_wars2x, which is MIT.
+- Warrants that actually drive behaviour rather than only being records.
+- Weapon serial registry tied to evidence and ballistics.
+- More than one agency and more than one station.
+- K9, SWAT kit, air support with a helicam.
+- Bodycam, dashcam and CCTV.
+- Courts and DOJ, so charges have a destination.
+
+**Exit criteria.** An officer can run a full shift, from patrol and a traffic
+stop through pursuit, arrest, booking, evidence and charges, without leaving the
+game to do any of it.
+
+**Effort.** Three to four weeks, and it depends on phase 2 for the arrest to
+mean anything.
+
+### 18.4 Phase 4: The vehicle economy
+
+**Goal.** Cars can be owned, stolen, kept and lost. Personal garages stop being
+empty by construction.
+
+- **Vehicle keys, lockpicking and hotwiring.** Turns theft from taking a car
+  into a crime.
+- **A dealership.** New and used, with a test drive and a finance option.
+- Fuel, resolving the cdn-fuel or ox_fuel decision recorded in 17.3.
+- Mechanic shop, repair and a paid customisation catalogue.
+- Vehicle HUD: speedometer, fuel and indicators.
+- Player-to-player sale, registration and plate ownership.
+- Insurance, and impound release fees for civilians.
+- Tow job.
+- Racing.
+
+**Exit criteria.** A player can earn money, buy a car, insure it, modify it,
+have it stolen, and get it back from an impound lot.
+
+**Effort.** Three weeks.
+
+### 18.5 Phase 5: Earning a living
+
+**Goal.** A new player has something to do that pays, without a staff member
+typing a command.
+
+- Getting a job without staff: a city hall or job centre.
+- Licence issuance and a DMV driving test.
+- Freelance loops: trucker, garbage, bus, taxi, delivery, mining, fishing,
+  hunting. The first is medium, each after it is small.
+- Somewhere to sell what was gathered.
+- Boss menus, hiring and firing, society accounts.
+- Player-owned businesses.
+- Crafting, using the ox_inventory crafting that is already present.
+- Taxes, which som-economy already has config for.
+- Professional whitelisted roles: lawyer, judge, news, real estate.
+
+**Exit criteria.** A player who joins with nothing can reach a first car
+entirely through legal work.
+
+**Effort.** Three to four weeks.
+
+### 18.6 Phase 6: Crime with a supply chain
+
+**Goal.** Illegal money has a source, a process and a risk, rather than being a
+single button.
+
+- Store robberies, ATM robberies, house robbery.
+- Drug production chains and drug effects.
+- Chop shop and boosting contracts.
+- Money laundering and counterfeiting.
+- Black market and illegal weapon dealing.
+- Bank and jewellery heists with prep chains.
+- Gang organisation, stashes, and turf.
+- Bounty board.
+- An in-world route to sell illegal goods, which som-economy is half way to.
+
+**Exit criteria.** Every illegal income stream has a preparation step, a police
+alert, and a way to lose the proceeds.
+
+**Effort.** Four weeks.
+
+### 18.7 Phase 7: Property
+
+**Goal.** Somewhere to live and somewhere to keep things.
+
+- Housing and apartments, purchase and rental.
+- Property storage, wardrobes and house garages.
+- Furniture and decoration.
+- Landlord relations.
+- Businesses as property.
+
+**Exit criteria.** A player has an address, storage and a reason to defend both.
+
+**Effort.** Three weeks. Epic if written rather than adopted.
+
+### 18.8 Phase 8: Depth, then launch readiness
+
+**Goal.** The things that keep players past week two, then the things that keep
+the server up.
+
+Depth: skills, XP and reputation; activities and minigames; casinos; gyms;
+social media and the rest of the phone; world events; racing leagues.
+
+Launch readiness, none of which is optional:
+
+- Performance pass under load, with the ~5GB asset group live.
+- Anticheat tuning against real player behaviour rather than defaults.
+- Logging and staff tooling: an admin menu, reports, and a paper trail on every
+  economy and item movement.
+- New player onboarding.
+- A backup and restore procedure that has actually been tested by restoring.
+- A staging server, so changes stop being tested in production.
+- Rules, a Discord, and an application or whitelist flow if the server is
+  whitelisted.
+- Load testing with more players than are expected on opening night.
+
+**Effort.** Four weeks, and the launch readiness half is the part most likely to
+be skipped and most likely to hurt.
+
+### 18.9 What a competitive PD needs, measured against ours
+
+Written against the standard the owner named. Ordered by how badly the absence
+is felt, not by effort.
+
+| Need | SOM today | Why it matters |
+|---|---|---|
+| Somewhere to put an arrested person | **Missing** | An arrest currently ends with the officer holding a cuffed player and no next step. This is the single largest hole in the department |
+| A casualty state | **Missing** | No officer down, no shooting with a victim, no reason for EMS or for the whole custody chain to exist |
+| Dispatch that reads as dispatch | **Partial** | The owner's own assessment is that it looks like a standard notification. Correct, and it is the most visible part of police work |
+| Evidence that ties a scene to a suspect | **Missing** | r14-evidence is on disk, better than anything worth writing, wired to a dead event and disabled |
+| Knowing where other units are | **Missing** | No officer blips, no callsigns, no panic button. Officers currently coordinate entirely by voice |
+| Stopping a vehicle | **Missing** | No spike strips, no ANPR, no radar. Traffic policing is most of a real shift and almost none of it is supported |
+| Booking | **Missing** | No mugshot, no prints, no property. ps-mdt supports images and MugShotBase64 is already on disk |
+| Charges reaching a destination | **Partial** | 181 charges exist and are reachable now that the MDT search is fixed, but nothing consumes a sentence because there is no jail and no court |
+| More than one agency | **Missing** | One department and one station. State police, sheriff and their own stations are standard |
+| Cameras | **Missing** | Bodycam, dashcam and CCTV are all differentiators rather than requirements, but the named servers all have them |
+
+**The honest summary.** som-police has a genuinely good foundation: duty,
+armoury, custody, fines, impounds, certifications, plate flags and an MDT that
+now works. What it does not have is a **beginning and an end**. There is no
+casualty to respond to and no cell to finish in, so the middle, which is the
+part that is built, has nothing to connect. Jail and the downed state are worth
+more to the police experience than every remaining item on the list combined.
+
+### 18.10 Honest total
+
+Roughly **five to six months** of single-person full-time work from here to a
+launchable server, assuming free resources are adopted where they fit rather
+than written from scratch, and assuming the launch readiness phase is not
+skipped.
+
+That is not a discouraging number for a build with this much framework already
+correct. The expensive half, the part that is hard to retrofit, is largely done:
+server authority, a ledger on every money movement, a single mint path for
+vehicles, and a compat layer that keeps third-party resources upgradeable. Most
+of what remains is content on top of a foundation that will hold it.

@@ -109,6 +109,39 @@ Config.MetadataBounds = {
     jailtime = { 0, 10000 },
 }
 
+-- ---------------------------------------------------------------------------
+-- World behaviour
+--
+-- Client side only. None of this decides anything a server would care about; it
+-- decides how the WORLD behaves around a player, which is a rendering and
+-- ambience question.
+--
+-- The NPC police suppression is the load-bearing part. GTA's own police respond
+-- to crime with infinite units and a wanted star system that has nothing to do
+-- with som-police, so without this every shooting summons vanilla cops who
+-- shoot back and arrest nobody, and the entire player police force is
+-- decoration. Every serious roleplay server turns this off.
+-- ---------------------------------------------------------------------------
+
+Config.World = {
+    -- Vanilla police, their dispatch, their helicopters and their road blocks.
+    suppressNpcPolice = true,
+
+    -- The wanted star system. Separate from the above because a server that
+    -- wants NPC police as ambient traffic might still want no stars.
+    suppressWantedLevel = true,
+
+    -- The police scanner chatter that plays when the player commits a crime.
+    -- Pure audio, and it narrates a wanted system that no longer exists.
+    suppressPoliceScanner = true,
+
+    -- How often the suppression is re-applied, in milliseconds. These are not
+    -- one-shot settings: entering a new session, respawning and some cutscenes
+    -- all reset parts of them, so they are refreshed rather than set once. Slow
+    -- enough that it is not a per-frame loop, which CLAUDE.md forbids.
+    refreshInterval = 5000,
+}
+
 -- ACE groups, checked with IsPlayerAceAllowed. Never a client-sent flag.
 Config.Permissions = {
     god = 'som.god',
