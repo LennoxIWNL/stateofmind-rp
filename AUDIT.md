@@ -2506,3 +2506,94 @@ Known soft spots, in the order I would suspect them:
 4. Dispatch NUI, which is phase 3's most visible item and the one the owner has
    called out twice.
 5. Then EMS against `som-medical`'s existing revive contract.
+
+---
+
+## 20. What actually separates the big servers, and what to do about it
+
+Written against the standard the owner named: NoPixel, Prodigy, EchoRP.
+
+### 20.1 The uncomfortable finding
+
+The gap is not CSS quality. SOM's armoury, certification card and phone are
+already better looking than plenty of what those servers run. The gap is that
+**they have no stock UI anywhere and SOM still has a lot.**
+
+A player forms their impression from the surfaces they touch most, and on SOM
+those are, in order: the inventory, the HUD, the target eye, context menus,
+input dialogs, the pause menu and chat. Of those, SOM has styled **none**. The
+armoury is beautiful and is opened once a shift. ox_inventory is opened four
+hundred times and looks like ox_inventory.
+
+That is the whole finding. Polishing more of our own screens has diminishing
+returns until the stock ones are gone.
+
+### 20.2 The pattern that already exists and should be extended
+
+The progress bar problem was: ox_lib's UI is a compiled React bundle and cannot
+be restyled. The solution was not to fork ox_lib. It was a shim
+(`som-ui/client/progressbar.lua`) loaded into each consumer, replacing
+`lib.progressBar` with som-ui's own while keeping every caller working
+unchanged.
+
+**That same pattern solves the rest of ox_lib's UI surface**, and it is the
+highest-leverage NUI work available:
+
+| Surface | ox_lib call | Where it shows today |
+|---|---|---|
+| Context menus | `lib.registerContext` / `showContext` | Vehicle inspection, plate flags, impound, mod bay |
+| Input dialogs | `lib.inputDialog` | Anywhere a value is typed |
+| Alert dialogs | `lib.alertDialog` | Confirmations |
+| Text UI | `lib.showTextUI` | Already wrapped by som-interact, worth verifying |
+| Skill checks | `lib.skillCheck` | Not used yet; will be, for lockpicking |
+
+Doing context menus alone removes stock UI from four existing features. The
+shim is written once, the callers never change, and every future feature gets
+the SOM look by default rather than by remembering to.
+
+**This is the single most valuable NUI decision left to make.**
+
+### 20.3 Ranked, what to build
+
+1. **Inventory reskin.** Largest surface, most-touched, currently stock. Nothing
+   else moves the needle as far. Already named in 18.12.
+2. **ox_lib UI shims**, per 20.2. Removes stock UI from everything at once.
+3. **A HUD.** Does not exist. It is on screen permanently, so it sets the tone
+   for everything around it more than any single panel can.
+4. **Dispatch NUI.** The owner has called this out twice. It is the most
+   visible part of police work and currently a generic toast.
+5. **Death, arrest and jail screens.** They arrive with phase 2 and must arrive
+   already in-language, not be retrofitted.
+6. **Loading screen and character selector.** First and second things anyone
+   ever sees.
+
+### 20.4 What "wow" actually is, concretely
+
+Not gradients. The things those servers do that SOM does not:
+
+- **Diegetic where it can be.** The phone is a phone in a hand, not a panel.
+  SOM already does this and should extend it: an ID card held up, a clipboard
+  for the MDT, a physical radio. Every screen that can be an object should be.
+- **Motion with weight.** Things arrive from somewhere and leave somewhere.
+  The phone rework this session is the reference; everything else should match
+  its easing and duration rather than inventing its own.
+- **Sound on every interaction.** Started in 18.11 and currently wired only to
+  the armoury. Finish the sweep.
+- **Density without clutter.** Their MDTs and inventories show a lot and stay
+  readable, through hierarchy and restraint rather than through hiding things
+  behind tabs.
+- **One accent, used sparingly.** Pink everywhere is the fastest way to look
+  cheap. It should mark the one thing that matters on a screen, not decorate.
+- **Never a default.** No default cursor, no default scrollbar, no default
+  focus ring, no default font fallback visible anywhere.
+
+### 20.5 The systems half
+
+NUI is not the only gap, and the roadmap covers the rest. But two systems
+choices affect how premium the server FEELS out of proportion to their size:
+
+- **Feedback on every action**, which is 18.11 and half done.
+- **No stock GTA behaviour leaking through.** Vanilla police are suppressed now.
+  The same applies to the vanilla death screen (som-medical replaces it), the
+  vanilla pause map, vanilla radio, and vanilla weapon wheel. Each one that
+  survives tells the player they are in GTA rather than in Los Santos.
