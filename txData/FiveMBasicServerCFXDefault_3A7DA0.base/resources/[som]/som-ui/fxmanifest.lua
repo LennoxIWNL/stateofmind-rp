@@ -7,9 +7,14 @@ author 'State of Mind RP'
 description 'SOM notifications and progress, the single implementation behind som:client:notify'
 version '0.2.0'
 
+shared_scripts {
+    'shared/config.lua',
+}
+
 client_scripts {
     'client/notify.lua',
     'client/progress.lua',
+    'client/feedback.lua',
 }
 
 -- client/progressbar.lua is deliberately NOT in client_scripts. It is loaded by

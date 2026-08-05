@@ -63,6 +63,22 @@ RegisterNUICallback('take', function(data, cb)
 
     cb(res or { success = false, error = 'no response' })
 
+    -- The sound half of the feedback. The visual half is the UI's, because only
+    -- it knows which row was clicked and what the balance was before.
+    --
+    -- A free issue item is not a purchase and should not sound like one: taking
+    -- a bandage off the department shelf and spending $95,000 sounding the same
+    -- is exactly the flatness this is meant to fix.
+    if GetResourceState('som-ui') == 'started' then
+        local sound = 'error'
+
+        if res and res.success then
+            sound = (res.price or 0) > 0 and 'purchase' or 'success'
+        end
+
+        exports['som-ui']:playSound(sound)
+    end
+
     -- Refreshed after every purchase, because balances moved and what is
     -- affordable moved with them.
     if res and res.success then

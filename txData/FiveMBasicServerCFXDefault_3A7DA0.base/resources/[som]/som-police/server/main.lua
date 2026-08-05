@@ -388,7 +388,17 @@ lib.callback.register('som-police:server:takeItem', function(source, data)
         return { success = false, error = 'no room for that' }
     end
 
-    return { success = true }
+    -- Echoed back so the UI can say what actually happened rather than only
+    -- that something did. The client re-derives nothing from this: it is used
+    -- for the confirmation line and to pick a purchase sound over a free-issue
+    -- one, never to decide whether the purchase was allowed.
+    return {
+        success = true,
+        item = entry.item,
+        label = entry.label,
+        count = entry.count,
+        price = entry.price or 0,
+    }
 end)
 
 -- ---------------------------------------------------------------------------

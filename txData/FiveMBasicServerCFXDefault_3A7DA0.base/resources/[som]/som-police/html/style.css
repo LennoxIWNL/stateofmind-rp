@@ -105,6 +105,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
    and the header is identity. */
 
 .panel__pay {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -142,6 +143,12 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     box-shadow: 0 0 0 1px var(--som-pink-a45);
 }
 
+.pay__opt {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+}
+
 .pay__label {
     font-size: 11px;
     font-weight: 600;
@@ -150,6 +157,49 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 }
 
 .pay__opt.is-active .pay__label { color: #fff; }
+
+/* The balance is BACK on the switcher.
+ *
+ * An earlier pass removed it on the grounds that the player already knows what
+ * they have. That was wrong in one specific way: without it there is nothing on
+ * screen that visibly moves when you buy something, so a purchase and a failed
+ * purchase look identical. The number changing IS the feedback. */
+.pay__value {
+    font-size: 11px;
+    font-weight: 650;
+    font-family: var(--som-font-mono);
+    color: var(--som-text-mute);
+}
+
+.pay__opt.is-active .pay__value { color: var(--som-pink-light); }
+
+/* Flashes when the balance it shows just changed. */
+.pay__value.is-spent { animation: som-spend 900ms ease both; }
+
+@keyframes som-spend {
+    0%   { color: var(--som-danger); transform: translateY(-3px); }
+    30%  { color: var(--som-danger); transform: translateY(0); }
+    100% { color: var(--som-pink-light); }
+}
+
+/* The floating cost, so the amount is legible rather than inferred from two
+   balances a second apart. */
+.pay__delta {
+    position: absolute;
+    right: 20px;
+    font-family: var(--som-font-mono);
+    font-size: 11px;
+    font-weight: 650;
+    color: var(--som-danger);
+    pointer-events: none;
+    animation: som-delta 1100ms ease both;
+}
+
+@keyframes som-delta {
+    0%   { opacity: 0; transform: translateY(0); }
+    20%  { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-22px); }
+}
 
 /* Sections.
    One scroll container around both, so a long personal list does not scroll
@@ -280,6 +330,28 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     font-size: 0.75rem;
     color: var(--som-text-mute);
 }
+
+/* The row you just drew from acknowledges the click. Without this the only
+   evidence a purchase happened was the list silently redrawing, which looks
+   identical to nothing happening. */
+.row.is-taken { animation: som-taken 700ms ease both; }
+
+@keyframes som-taken {
+    0%   { background: var(--som-pink-a45); transform: translateX(6px); }
+    40%  { background: var(--som-pink-a25); transform: translateX(0); }
+    100% { background: rgba(255, 255, 255, 0.035); }
+}
+
+.row--issue.is-taken { animation: som-taken-issue 700ms ease both; }
+
+@keyframes som-taken-issue {
+    0%   { background: var(--som-pink-a45); transform: translateX(6px); }
+    40%  { background: var(--som-pink-a30); transform: translateX(0); }
+    100% { background: var(--som-pink-a16); }
+}
+
+/* Receipt line, replacing the static hint after the first draw. */
+.card__hint.is-receipt { color: var(--som-pink-light); }
 
 /* Footer */
 

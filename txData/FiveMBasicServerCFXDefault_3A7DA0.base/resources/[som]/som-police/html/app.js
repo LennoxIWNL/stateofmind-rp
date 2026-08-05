@@ -4,6 +4,11 @@ const root = document.getElementById('root');
 
 let state = { issue: [], personal: [], payment: [], account: null };
 
+/* Set the moment a draw succeeds and consumed by the next render, which is the
+ * one that has the new balances. Held here rather than animated at the click,
+ * because at the click the balance has not moved yet. */
+let pending = null;
+
 function post(endpoint, body) {
     return fetch(`https://${RESOURCE}/${endpoint}`, {
         method: 'POST',
@@ -38,6 +43,8 @@ function toast(text) {
 function renderRow(entry, free) {
     const row = el('button', 'row');
     row.type = 'button';
+    // So the row that was drawn from can be found again after the redraw.
+    row.dataset.item = entry.item;
 
     // Quantity is worth saying only when it is not one. "Single item" on every
     // row was noise that pushed the useful line out of view.
@@ -76,6 +83,8 @@ function renderRow(entry, free) {
 
     row.addEventListener('click', async () => {
         row.disabled = true;
+
+        const before = balanceOf(state.account);
         const res = await post('take', { item: entry.item, account: state.account });
 
         // The server decides. A refusal re-enables the row rather than
@@ -83,10 +92,45 @@ function renderRow(entry, free) {
         if (!res.success) {
             row.disabled = false;
             toast(res.error || 'Could not take that');
+            return;
         }
+
+        // Acknowledge it. The refresh that follows redraws this row, so the
+        // flash is applied to whatever replaces it rather than to this node,
+        // and the pending spend is held for renderPayment to animate.
+        pending = {
+            item: entry.item,
+            spent: res.price > 0 ? res.price : 0,
+            before: before,
+        };
+
+        receipt(res, free);
     });
 
     return row;
+}
+
+/** Balance on an account right now, or null if it is not a known account. */
+function balanceOf(account) {
+    const option = state.payment.find((p) => p.account === account);
+    return option ? option.balance : null;
+}
+
+/* The footer becomes a receipt after the first draw.
+ *
+ * Deliberately the footer and not a toast: a toast is for things that went
+ * wrong and disappears before it is read. What you drew and what it cost is
+ * worth leaving on screen while you keep shopping. */
+function receipt(res, free) {
+    const node = document.getElementById('receipt');
+    const count = res.count > 1 ? `${res.count}x ` : '';
+    const label = res.label || 'Item';
+
+    node.textContent = free || !res.price
+        ? `Drew ${count}${label} from department issue`
+        : `Bought ${count}${label} for ${money(res.price)}`;
+
+    node.classList.add('is-receipt');
 }
 
 function fillList(id, entries, free) {
@@ -112,6 +156,19 @@ function render() {
     // config: the server filters by certification and rank before sending.
     document.getElementById('stock-count').textContent =
         state.issue.length + state.personal.length;
+
+    // Flash the row that was just drawn from. Applied after the redraw, to the
+    // node that replaced the clicked one.
+    if (pending) {
+        const row = document.querySelector(`.row[data-item="${cssEscape(pending.item)}"]`);
+        if (row) row.classList.add('is-taken');
+    }
+}
+
+/* Attribute selectors need escaping and item names come from config. Quotes and
+ * backslashes are the only characters that can break out of the selector. */
+function cssEscape(value) {
+    return String(value).replace(/["\\]/g, '\\$&');
 }
 
 /* Cash or card. The options and balances come from som-core, so every shop
@@ -124,9 +181,14 @@ function renderPayment() {
         btn.type = 'button';
         if (option.account === state.account) btn.classList.add('is-active');
 
-        // Label only. Showing the balance turned a two-word choice into a
-        // financial readout, and the player already knows what they have.
-        btn.append(el('span', 'pay__label', option.label));
+        // Label AND balance. An earlier pass dropped the balance on the grounds
+        // that the player already knows what they have, which was wrong in one
+        // specific way: with it gone, nothing on screen moved when you bought
+        // something, so a purchase and a refusal looked identical. The number
+        // changing is the feedback.
+        btn.append(
+            el('span', 'pay__label', option.label),
+            el('span', 'pay__value', money(option.balance)));
 
         btn.addEventListener('click', () => {
             state.account = option.account;
@@ -134,10 +196,25 @@ function renderPayment() {
             render();
         });
 
+        // The account that just paid gets the moving number, so the spend is
+        // attached to the account it came out of rather than to the panel.
+        if (pending && pending.spent > 0 && option.account === state.account
+            && pending.before !== null && option.balance !== pending.before) {
+            btn.querySelector('.pay__value').classList.add('is-spent');
+        }
+
         frag.appendChild(btn);
     });
 
     document.getElementById('pay').replaceChildren(frag);
+
+    if (pending && pending.spent > 0) {
+        // The cost, floating up and out. Two balances a second apart do not
+        // tell you what something cost; this does.
+        const delta = el('span', 'pay__delta', `-${money(pending.spent)}`);
+        document.querySelector('.panel__pay').appendChild(delta);
+        setTimeout(() => delta.remove(), 1100);
+    }
 }
 
 function close() {
@@ -245,6 +322,11 @@ window.addEventListener('message', (event) => {
         // purchase would silently move the officer back to cash mid-shop.
         renderPayment();
         render();
+
+        // Cleared only once BOTH halves have used it. renderPayment animates
+        // the balance and render flashes the row, in that order, so clearing it
+        // inside either one would rob the other.
+        pending = null;
         return;
     }
 

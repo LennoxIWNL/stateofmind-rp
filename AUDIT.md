@@ -1322,7 +1322,7 @@ before touching police, garage, dispatch or the MDT.
 
 | Resource | State |
 |---|---|
-| `som-ui` | Notifications, and now the progress bar that replaces ox_lib's. See 16.6 item 4 for why the shim lives where it does |
+| `som-ui` | Notifications, the progress bar that replaces ox_lib's (see 16.6 item 4 for why the shim lives where it does), and the feedback sound layer (see 18.11) |
 | `som-police` | Built. Duty, armoury, custody, fines, impounds, certifications, officer keybinds, vehicle lights and siren |
 | `som-dispatch` | Built. Crime detection, call store, answers to the `ps-dispatch` export name |
 | `som-garage` | Built. `som_vehicles` authority, ghost preview, garages, PD pool, buy and refund, temporary mod bay |
@@ -2269,3 +2269,56 @@ correct. The expensive half, the part that is hard to retrofit, is largely done:
 server authority, a ledger on every money movement, a single mint path for
 vehicles, and a compat layer that keeps third-party resources upgradeable. Most
 of what remains is content on top of a foundation that will hold it.
+
+### 18.11 Feedback: the cross-cutting gap
+
+Raised by the owner against the armoury, and correctly diagnosed as general
+rather than local: **nothing on this server acknowledges an action.** A purchase,
+a vehicle coming out of a garage, a door unlocking, a fine being paid. All of
+them changed numbers silently and left the player to infer the outcome from a
+list redrawing. That is the difference between a shop and a debug menu, and it
+is not a per-screen problem, so it is not being solved per screen.
+
+**The split.** Sound is central, visuals are local.
+
+- `som-ui/client/feedback.lua` exports `playSound(kind)` against a vocabulary in
+  `som-ui/shared/config.lua`: `purchase`, `success`, `error`, `select`, `nav`,
+  `back`. Every resource asks for a meaning, never an audio string, which is
+  what stops the armoury and a future dealership drifting into two different
+  purchase sounds. There is also a `som-ui:client:sound` net event for feedback
+  the client cannot know it earned, such as a fine landing.
+- The VISUAL half belongs to whichever UI is on screen, because only it knows
+  what moved.
+
+Sounds are the game's own frontend sets, following the precedent som-phone
+already set: guaranteed present on every client, no streaming, no licence
+question, and already meaningful to players. **None has been heard on this
+server yet.** If one is silent it is a wrong string rather than broken code, and
+it is a one line fix in config. That is why they are config.
+
+**The armoury is the first consumer**, and it is worth reading as the template
+for every shop that follows:
+
+- A free issue item and a $95,000 rifle no longer sound the same. Drawing from
+  department issue plays `success`; spending money plays `purchase`.
+- The balance is back on the payment switcher. An earlier pass removed it on the
+  grounds that the player already knows what they have, which was right in
+  isolation and wrong in context: with it gone, nothing on screen moved when you
+  bought something, so a success and a refusal looked identical. **The number
+  changing is the feedback.**
+- The amount floats up out of the account that paid it, because two balances a
+  second apart do not tell you what something cost.
+- The row you drew from flashes, so the click is acknowledged by the thing you
+  clicked.
+- The footer becomes a receipt: what you drew and what it cost. Deliberately the
+  footer rather than a toast, because a toast is for things that went wrong and
+  vanishes before it is read, while what you just bought is worth leaving on
+  screen as you keep shopping.
+- `takeItem` now echoes the item, label, count and price back. The client uses
+  it for the confirmation line and to choose the sound, never to decide whether
+  the purchase was allowed.
+
+**Still to wire**, in rough order of how badly each is missed: garage take and
+store, the mod bay, rentals, fines and bills arriving, door lock and unlock,
+custody actions, and every shop added from here. None is more than a few lines
+now that the layer exists.

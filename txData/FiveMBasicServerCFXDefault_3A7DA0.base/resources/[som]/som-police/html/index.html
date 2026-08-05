@@ -50,7 +50,10 @@
             </div>
 
             <footer class="panel__foot">
-                <span class="card__hint">Certification gated items appear only when you hold the certification</span>
+                <!-- Replaced by the last thing you drew, so the footer answers
+                     "did that work" instead of restating a rule you already
+                     read. Falls back to the hint when nothing has happened. -->
+                <span class="card__hint" id="receipt">Certification gated items appear only when you hold the certification</span>
                 <button class="btn btn--ghost" id="close" type="button">Close</button>
             </footer>
         </section>
