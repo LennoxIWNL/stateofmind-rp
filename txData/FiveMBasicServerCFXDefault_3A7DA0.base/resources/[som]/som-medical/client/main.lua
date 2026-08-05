@@ -96,6 +96,22 @@ RegisterNetEvent('som-medical:client:down', function(since)
     isDown = true
     downSince = GetGameTimer()
 
+    -- Resurrected IN PLACE, immediately.
+    --
+    -- The ped is genuinely dead by the time this fires, and SetEntityHealth on
+    -- a dead ped does nothing at all: without this the player lies there as a
+    -- corpse, the hold loop fights a body that cannot be healed, and voice is
+    -- gone, which defeats the one thing this state exists to preserve.
+    --
+    -- Position and heading are kept, so being revived where you fell is exactly
+    -- what it looks like. The two booleans are p4 (keep tasks) and p5 (do not
+    -- reset the camera).
+    local at = GetEntityCoords(cache.ped)
+    local heading = GetEntityHeading(cache.ped)
+
+    NetworkResurrectLocalPlayer(at.x, at.y, at.z, heading, true, false)
+    SetEntityHealth(cache.ped, Config.DownedHealth)
+
     holdDown()
 
     SendNUIMessage({

@@ -2413,3 +2413,96 @@ A screenshot of any five screens, shown side by side, reads as one product by
 somebody who has not seen the server before. No screen uses a colour, radius,
 duration or font that is not in tokens. Every action has feedback. Nothing is
 stock.
+
+---
+
+## 19. Session handoff, second pass
+
+Supersedes nothing in 16; that section is still accurate about what it covers.
+This is what changed since, what has never been run, and what to do first.
+
+### 19.1 What was built
+
+| Thing | Where | State |
+|---|---|---|
+| MDT person search | `ps-mdt/ui/app.js` | Fixed. Was a ReferenceError, not SQL |
+| MDT report box | `ps-mdt/ui/app.js` | Falls back to a plain textarea when Trumbowyg's CDN is unreachable |
+| Fleet retire path | `som-garage/server/fleet.lua` | Pool empties on the next full boot, not a resource restart |
+| Store on the radial | `som-garage` | `canStoreNear` / `storeNearest` |
+| Police audio | `origen_police/data/*/vehicles.meta` | Six models repointed at their base banks |
+| Progress bar | `som-ui/client/progressbar.lua` | Replaces ox_lib's. Read 16.6 item 4 before touching it |
+| ox_target progress gap | `ox_target/client/main.lua` | Fifth row on the re-apply list in 16.2 |
+| Armoury | `som-police/html` | Rebuilt twice: card language, then a grid of goods with ox_inventory art |
+| Feedback layer | `som-ui/client/feedback.lua` | `playSound(kind)`, one vocabulary. See 18.11 |
+| Card alerts | `som-phone/server/main.lua` | Aggregated per label, 1200ms window |
+| Statement labels | `som-phone/server/bank.lua` | Says what was bought. Whitelist, never the raw slug |
+| Notification stacking | `som-ui/html/app.js` | Repeats bump a count instead of flooding |
+| NPC police suppression | `som-core/client/main.lua` | `Config.World` |
+| Streamed assets | `som.cfg` | Explicit list, not a group ensure |
+| **Downed state** | `som-medical` | **Never run. See 19.3** |
+
+### 19.2 Mistakes worth not repeating
+
+- **`SetDispatchServiceActive` does not exist.** The real native is
+  `EnableDispatchService`. The nil call threw on the first pass of the
+  suppression thread and killed it, so nothing in that block ran, and it was
+  reported as working. Check natives exist before shipping, every time.
+- **The cheap-win list was wrong about fuel.** `cdn-fuel` is on disk but
+  hard-depends on qb-target, qb-input and qb-menu, and shared-scripts
+  `@qbx_core/shared/locale.lua` while qbx_core is removed. It fails at load.
+  `ox_fuel` is the cheap route and is not installed.
+- **ps-mdt renders call text as interpolated HTML**, not textContent. A comment
+  in som-dispatch asserted the opposite, which is why a player-typed 911 message
+  was an XSS vector into every officer's MDT for as long as it was.
+- **Whitelists have to match the shape callers actually emit.** `fine`,
+  `paycheck` and `salary` sat in an exact-match table while every caller writes
+  `fine:%d`. They never matched a single real transaction.
+
+### 19.3 som-medical has never been run
+
+Structurally checked only. The first test should be, in order:
+
+1. Get shot. Confirm you go down rather than die, and that **you can still
+   talk**. If voice is gone, the in-place resurrect is not working.
+2. Confirm you cannot move, shoot, or enter a vehicle, and that a second shot
+   does not kill you.
+3. Wait two minutes. The hold prompt should appear.
+4. Hold E. Confirm the fade, the hospital position, and that **$350 leaves cash
+   first**, with the phone banner and the statement both reading
+   "Hospital treatment".
+
+Known soft spots, in the order I would suspect them:
+
+- **Death detection.** `CEventNetworkEntityDamage` with the fatal flag catches
+  being shot. It may not catch drowning, falling or a scripted kill. If some
+  deaths still produce a normal death screen, that is why, and the fix is a
+  health-based fallback alongside the event.
+- **The talk controls.** `DisableAllControlActions` then re-enabling 249 and 46
+  assumes pma-voice uses those. If push to talk is dead while down, that is the
+  first thing to check.
+- **The hospital coordinate is unverified.** `Config.Hospitals.pillbox`.
+- Ragdoll is deliberate placeholder presentation, not a bug.
+
+### 19.4 Open decisions
+
+1. **The shop money question was never resolved.** The armoury shows both
+   balances. If the complaint was about the ox_inventory shops (General Store,
+   Ammunation), those are stock ox UI and show nothing. Which was meant?
+2. **Icons.** A single complete set is needed, licence checked, and it must be
+   placed by hand. Patching missing icons from a third source is what produced
+   the current mix.
+3. **`interact-sound` has unvalidated net events.** `PlayOnOne`, `PlayOnAll` and
+   `PlayWithinDistance` let any client play any file at any volume for everyone.
+   Not fixed, not used by anything of ours, worth patching on its own merits.
+4. **Dispatch NUI** is still the generic toast. The security spine landed; the
+   surface did not.
+
+### 19.5 Next, in order
+
+1. Test som-medical end to end, above.
+2. The rest of phase 1's cheap wins: spawn selection, loading screen, clothing
+   and barber zones, lockpick minigame on `ox_lib` skillcheck, ID photos.
+3. A HUD. Nothing else in phase 1 sets the tone as much.
+4. Dispatch NUI, which is phase 3's most visible item and the one the owner has
+   called out twice.
+5. Then EMS against `som-medical`'s existing revive contract.
