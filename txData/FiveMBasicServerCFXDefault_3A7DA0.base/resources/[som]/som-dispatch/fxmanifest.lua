@@ -23,6 +23,9 @@ shared_scripts {
 client_scripts {
     'client/detect.lua',
     'client/alerts.lua',
+    -- The client half of the ps-dispatch export surface. ps-mdt calls
+    -- CustomAlert from the client, where nothing answered before.
+    'client/compat.lua',
 }
 
 server_scripts {

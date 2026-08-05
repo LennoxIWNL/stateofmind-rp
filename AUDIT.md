@@ -1380,6 +1380,22 @@ Recorded because in every one of these the obvious diagnosis was wrong.
   `som:client:playerLoaded` sent it. This is why ps-mdt concatenated a nil
   `job.grade.name` and sat on "Welcome, loading...". `syncState` now includes
   `label` and `gradeLabel` on both the job and gang bags, and must keep doing so.
+- **ps-mdt renders dispatch calls as INTERPOLATED HTML, not textContent.**
+  `ui/app.js:4448`, `:4454`, `:4589` and `:4595` build the call list by
+  substituting `dispatchMessage`, `dispatchCode` and the rest straight into a
+  markup string. A comment in `som-dispatch/server/main.lua` claimed the
+  opposite, which is how it went unnoticed. The 911 message is free text typed
+  by a player, so a player could put markup in a 911 call and run script in the
+  MDT of every officer who opened it. `sanitise()` now strips angle brackets and
+  control characters from every string field on the way in. Stripped rather than
+  entity encoded, because encoding is right for the interpolated context but
+  shows as a literal `&amp;` in any consumer using textContent, which
+  som-dispatch's own NUI will.
+- **The detection report could raise any alert in the config, including
+  `emergencyCall`.** Membership of `Config.Alerts` was the entire check, so a
+  client could fire `som-dispatch:server:report` with `emergencyCall` and raise
+  a priority 1 call at will, bypassing the 911 path's own validation. Alerts now
+  carry `reportable`, and only the five client-detected ones have it.
 - **ps-mdt spells it `cid`, som-dispatch compared `citizenid`.** Only one unit
   could ever attach to a dispatch call. ps-mdt builds its unit payload with
   `cid` (`server/main.lua:1441` and `:1512`), so comparing `citizenid` compared

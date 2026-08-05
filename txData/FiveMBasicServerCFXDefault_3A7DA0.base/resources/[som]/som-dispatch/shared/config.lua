@@ -32,6 +32,8 @@ Config.MaxCalls = 100
 
 Config.Alerts = {
     shotsFired = {
+        -- Raised by client detection, so the report event may carry it.
+        reportable = true,
         label = 'Shots Fired',
         code = '10-13',
         priority = 1,
@@ -44,6 +46,8 @@ Config.Alerts = {
     },
 
     driveBy = {
+        -- Raised by client detection, so the report event may carry it.
+        reportable = true,
         label = 'Shots Fired From a Vehicle',
         code = '10-13',
         priority = 1,
@@ -54,6 +58,8 @@ Config.Alerts = {
     },
 
     meleeAttack = {
+        -- Raised by client detection, so the report event may carry it.
+        reportable = true,
         label = 'Fight In Progress',
         code = '10-10',
         priority = 2,
@@ -64,6 +70,8 @@ Config.Alerts = {
     },
 
     vehicleTheft = {
+        -- Raised by client detection, so the report event may carry it.
+        reportable = true,
         label = 'Vehicle Theft In Progress',
         code = '10-35',
         priority = 2,
@@ -74,6 +82,8 @@ Config.Alerts = {
     },
 
     explosion = {
+        -- Raised by client detection, so the report event may carry it.
+        reportable = true,
         label = 'Explosion Reported',
         code = '10-80',
         priority = 1,
@@ -85,6 +95,11 @@ Config.Alerts = {
 
     -- Raised by a player deliberately rather than by detection, so it always
     -- goes through. 911 is what makes ps-mdt offer a response box.
+    --
+    -- NOT `reportable`. It has its own event with its own validation, and
+    -- leaving it reachable from the detection report meant any client could
+    -- raise a priority 1 call at will, bypassing the 911 path's message
+    -- handling entirely.
     emergencyCall = {
         label = 'Emergency Call',
         code = '911',

@@ -29,6 +29,38 @@ local cooldowns = {}
 -- Helpers
 -- ---------------------------------------------------------------------------
 
+---Makes a string safe to hand to ps-mdt.
+---
+---ps-mdt builds its call list by INTERPOLATING these fields into an HTML string
+---and appending it (`ui/app.js:4448`, `:4454`, `:4589`, `:4595`), not with
+---textContent. A comment in this file used to claim the opposite, which is how
+---this went unnoticed. The 911 message is free text typed by a player, so
+---without this a player could type markup into a 911 call and run script in the
+---MDT of every officer who opened it.
+---
+---Angle brackets are STRIPPED rather than entity-encoded, deliberately. Encoding
+---is correct for the interpolated context but shows up as a literal `&amp;` in
+---any consumer that uses textContent, which som-dispatch's own NUI will. Nobody
+---needs a `<` in a 911 call, so removing them is safe in both places at once.
+---@param value any
+---@param maxLength number
+---@return string|nil
+local function sanitise(value, maxLength)
+    if type(value) ~= 'string' then return nil end
+
+    local clean = value
+        :gsub('[<>]', '')
+        -- Control characters, which serve no purpose in a call and can break
+        -- the JSON boundary on the way out.
+        :gsub('%c', ' ')
+        :gsub('%s+', ' ')
+        :gsub('^%s*(.-)%s*$', '%1')
+
+    if clean == '' then return nil end
+
+    return clean:sub(1, maxLength or 160)
+end
+
 ---@param source number
 ---@param alertType string
 ---@return boolean whether this player may raise this alert right now
@@ -125,6 +157,21 @@ function Dispatch.Create(source, alertType, extra)
     local id = nextId
     nextId = nextId + 1
 
+    -- Which services this call belongs to, and the state of each.
+    --
+    -- Per service state on ONE record, rather than a queue per job. An incident
+    -- is one incident: "PD cleared, EMS still transporting" has to be
+    -- expressible, and two records with two numbers for one shooting cannot say
+    -- it. This is the field that makes adding EMS a config change later rather
+    -- than a second dispatch system.
+    local services = {}
+
+    for _, job in ipairs(def.jobs or {}) do
+        services[job] = { status = 'open', closedAt = nil, disposition = nil }
+    end
+
+    local message = sanitise(extra.message, 160) or def.label
+
     -- The shape below is dictated by ps-mdt's UI, not chosen. See
     -- som-dispatch/README.md: `origin` is what SetNewWaypoint reads, and a call
     -- missing `jobs` throws in its renderer because that dereference has no
@@ -135,8 +182,8 @@ function Dispatch.Create(source, alertType, extra)
         priority = def.priority or 2,
         dispatchCode = def.code,
         code = def.code,
-        dispatchMessage = extra.message or def.label,
-        message = extra.message or def.label,
+        dispatchMessage = message,
+        message = message,
 
         -- Milliseconds. ps-mdt compares this against Date.now() and hides
         -- anything older than ten minutes, so seconds would hide every call.
@@ -149,17 +196,26 @@ function Dispatch.Create(source, alertType, extra)
         job = def.jobs,
         jobs = def.jobs,
 
+        -- SOM's own. ps-mdt never reads it, so it costs nothing there, and it
+        -- is what a close verb and a future EMS view key off.
+        services = services,
+        status = 'open',
+
         units = {},
         responses = {},
 
-        firstStreet = extra.street,
-        street = extra.street,
-        plate = extra.plate,
-        model = extra.model,
-        weapon = extra.weapon,
+        -- Every one of these reaches ps-mdt's interpolated markup, so every one
+        -- is sanitised. `street` and `weapon` come from the client, `plate` and
+        -- `model` from a vehicle a player controls, and `information` embeds a
+        -- character name chosen at creation.
+        firstStreet = sanitise(extra.street, 64),
+        street = sanitise(extra.street, 64),
+        plate = sanitise(extra.plate, 12),
+        model = sanitise(extra.model, 32),
+        weapon = sanitise(extra.weapon, 48),
         gender = player and player.charinfo and player.charinfo.gender or nil,
-        information = extra.information,
-        automaticGunfire = extra.automatic,
+        information = sanitise(extra.information, 160),
+        automaticGunfire = extra.automatic == true,
 
         alertType = alertType,
         blip = def.blip,
@@ -186,7 +242,18 @@ RegisterNetEvent('som-dispatch:server:report', function(alertType, extra)
     local source = source
 
     if type(alertType) ~= 'string' then return end
-    if not Config.Alerts[alertType] then return end
+
+    local def = Config.Alerts[alertType]
+    if not def then return end
+
+    -- Only alerts the DETECTION path is allowed to raise.
+    --
+    -- Without this, membership of Config.Alerts was the whole check, so a client
+    -- could fire this event with 'emergencyCall' and raise a priority 1 call at
+    -- its own position with no cooldown shared with the real 911 path. Anything
+    -- a server-side mechanic owns (a bank alarm, an officer down, a store
+    -- robbery) must never be reachable from here.
+    if not def.reportable then return end
 
     local player = core:getPlayer(source)
     if not player then return end
@@ -274,11 +341,77 @@ publish('GetDispatchCalls', function()
     return calls
 end)
 
+---The catch-all other resources call.
+---
+---SERVER side only. A resource calling this has already been trusted by being
+---started, so it may name the alert definition and supply coordinates. The
+---definition still decides priority, routing and the blip: a caller may say
+---WHAT happened, never who hears about it or how loudly.
+---
+---It used to hard-code `emergencyCall` and keep only message and coords, which
+---meant every integration collapsed into a 911 and ps-mdt's own eleven field
+---payload was thrown away.
 publish('CustomAlert', function(data)
     if type(data) ~= 'table' then return end
-    Dispatch.Create(nil, 'emergencyCall', {
-        message = data.message or data.dispatchMessage,
-        coords = data.coords,
+
+    -- Named definition if the caller has one, 911 otherwise. Never a definition
+    -- the caller invented.
+    local alertType = type(data.alert) == 'string' and Config.Alerts[data.alert]
+        and data.alert or 'emergencyCall'
+
+    local coords = data.coords
+
+    if type(coords) == 'table' and coords.x and coords.y then
+        coords = vector3(coords.x + 0.0, coords.y + 0.0, (coords.z or 0.0) + 0.0)
+    else
+        coords = nil
+    end
+
+    return Dispatch.Create(nil, alertType, {
+        message = data.message or data.dispatchMessage or data.description,
+        information = data.description or data.information,
+        coords = coords,
+        street = data.street or data.firstStreet,
+        plate = data.plate,
+        model = data.model or data.vehicle,
+        weapon = data.weapon,
+        automatic = data.automaticGunfire == true,
+    })
+end)
+
+-- ---------------------------------------------------------------------------
+-- The CLIENT half of the ps-dispatch surface
+--
+-- ps-mdt calls exports['ps-dispatch']:CustomAlert from the CLIENT
+-- (client/main.lua:1132) for its traffic stop alert, and cdn-fuel expects a
+-- client surface too. Nothing answered there, so those calls error.
+--
+-- A client caller is NOT trusted the way a server one is. This event takes the
+-- text and nothing else: coordinates come from the caller's own ped inside
+-- Dispatch.Create, the definition is fixed, and the same cooldown applies as a
+-- typed 911. The worst a forged call can do is announce itself where it stands.
+-- ---------------------------------------------------------------------------
+
+RegisterNetEvent('som-dispatch:server:customAlert', function(payload)
+    local source = source
+
+    if type(payload) ~= 'table' then return end
+
+    local player = core:getPlayer(source)
+    if not player then return end
+
+    -- Only jobs that respond may raise one of these, because every current
+    -- client caller is an on-duty tool: a traffic stop, a plate scan.
+    local job = player.job and player.job.name
+    if not job or not Config.RespondingJobs[job] then return end
+
+    if not offCooldown(source, 'emergencyCall') then return end
+
+    Dispatch.Create(source, 'emergencyCall', {
+        message = sanitise(payload.message or payload.dispatchMessage, 120),
+        information = sanitise(payload.description, 160),
+        street = sanitise(payload.street, 64),
+        plate = sanitise(payload.plate, 12),
     })
 end)
 
