@@ -33,10 +33,27 @@
     --som-card: rgba(25, 25, 35, 0.95);
     --som-card-hover: rgba(35, 35, 50, 0.95);
 
-    /* Text */
+    /* Text
+     *
+     * The two lower steps were raised after "most text is not readable" was
+     * reported across several screens at once. They were #777 and #555, which
+     * against the surfaces actually in use (#0d0a13 on the armoury panel,
+     * #06050a on the phone screen) come out at roughly 4.6:1 and 2.6:1. The
+     * mute step in particular was below the 4.5:1 floor at every size it was
+     * used at, and it is used for section notes, hints, captions and
+     * descriptions, which is to say for most of the small text on the server.
+     *
+     * These land near 6.6:1 and 4.9:1 on the same surfaces. Still clearly a
+     * hierarchy below --som-text, still visibly secondary, and now legible on a
+     * monitor that is not in a dark room.
+     *
+     * Fixed HERE rather than per screen deliberately. Every som-* NUI reads
+     * these, so an override in one stylesheet would have fixed one screen and
+     * left the rest, and the next screen written would have inherited the
+     * problem again. */
     --som-text: #e0e0e0;
-    --som-text-dim: #777;
-    --som-text-mute: #555;
+    --som-text-dim: #9a9aa5;
+    --som-text-mute: #85858f;
 
     /* Status */
     --som-danger: #e74c3c;

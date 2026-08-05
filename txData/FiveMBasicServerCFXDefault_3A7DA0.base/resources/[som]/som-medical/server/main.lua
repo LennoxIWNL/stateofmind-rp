@@ -62,7 +62,7 @@ function Medical.Down(source, cause)
     core:setMetadata(source, 'downed', true)
     publish(source, true, since)
 
-    TriggerClientEvent('som-medical:client:down', source, since)
+    TriggerClientEvent('som-medical:client:down', source, since, 0)
     TriggerEvent('som:server:playerDowned', source, cid, cause)
 
     return true
@@ -205,5 +205,10 @@ AddEventHandler('som:server:playerLoaded', function(source, player)
     core:setMetadata(source, 'downed', true)
     publish(source, true, entry.since)
 
-    TriggerClientEvent('som-medical:client:down', source, entry.since)
+    -- Elapsed is sent, not just `since`. The client has no server clock, so
+    -- without this a player who reconnects while down watches their countdown
+    -- restart at two minutes while the server, which counts from the original
+    -- `since`, would have let them up immediately.
+    TriggerClientEvent('som-medical:client:down', source, entry.since,
+        os.time() - entry.since)
 end)

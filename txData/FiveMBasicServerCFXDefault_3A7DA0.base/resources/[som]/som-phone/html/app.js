@@ -406,8 +406,12 @@ const bannersEl = document.getElementById('banners');
  *
  * Deliberately a named constant: messages and calls will want their own values
  * (a call has to stay until answered), and hunting for a magic 5000 in the
- * middle of a function is how those end up inconsistent. */
-const BANNER_HOLD_MS = 6500;
+ * middle of a function is how those end up inconsistent.
+ *
+ * Was 6500, which is roughly twice as long as it takes to read a line like
+ * "Purchase  -$1,450". A banner that is still there after you have finished
+ * with it stops reading as an alert and starts reading as clutter. */
+const BANNER_HOLD_MS = 4900;
 
 function banner(title, text, iconName) {
     const node = el('div', 'banner');

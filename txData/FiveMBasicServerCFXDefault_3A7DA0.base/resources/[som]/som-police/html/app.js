@@ -71,6 +71,10 @@ function renderRow(entry, free) {
     row.type = 'button';
     // So the row that was drawn from can be found again after the redraw.
     row.dataset.item = entry.item;
+
+    // Art FIRST and underneath everything, filling the tile. It used to sit in
+    // a 74px strip above the text, which cropped tall silhouettes and left the
+    // product as the smallest thing on its own tile.
     row.appendChild(itemArt(entry.item));
 
     // Quantity is worth saying only when it is not one. "Single item" on every
@@ -99,14 +103,22 @@ function renderRow(entry, free) {
 
     row.classList.add(free ? 'row--issue' : blocked ? 'row--blocked' : 'row--buy');
 
+    // Both of these float on top of the art as chips with their own contrast,
+    // so neither needs the art to be dark where it happens to land.
     row.append(el('span', 'row__mark', free ? '✓' : blocked ? '✕' : '+'));
+    row.append(el('span', 'row__price', free ? 'Issued' : money(entry.price)));
+
+    // The name band. Blurred and darkened behind the words only, rather than a
+    // panel the art has to live above: the goods stay the biggest thing on the
+    // tile and the label is still readable over whatever is behind it.
+    const meta = el('div', 'tile__meta');
 
     const body = el('div', 'row__body');
     body.append(el('span', 'row__name', entry.label));
     if (reason) body.append(el('span', 'row__sub', reason));
-    row.append(body);
 
-    row.append(el('span', 'row__price', free ? 'Issued' : money(entry.price)));
+    meta.append(body);
+    row.append(meta);
 
     row.addEventListener('click', async () => {
         row.disabled = true;

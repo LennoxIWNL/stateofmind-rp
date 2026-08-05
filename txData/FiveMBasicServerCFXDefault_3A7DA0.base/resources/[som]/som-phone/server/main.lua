@@ -231,7 +231,8 @@ end)
 -- player applies here exactly as it does there.
 -- ---------------------------------------------------------------------------
 
--- pending[source][label] = { out = number, inn = number, outCount, inCount }
+-- pending[source][account .. '|' .. label] = { account, label, out, inn,
+--                                              outCount, inCount }
 --
 -- Money out and money in are accumulated SEPARATELY rather than summed into one
 -- signed total. Summing looked tidier and was wrong: som-police charges for an
@@ -240,7 +241,33 @@ end)
 -- zero and the banner read "+$0 (2)". som-rentals has the same charge-then-
 -- refund pair. Partial offsets were worse, silently hiding two real movements
 -- behind one misleading number.
+--
+-- Keyed by ACCOUNT as well as label now that cash alerts too. Keying by label
+-- alone would merge a cash purchase and a card purchase of the same kind into
+-- one line, and then have to pick one of the two tags to put on it.
 local pending = {}
+
+---Thousands separators.
+---
+---The aggregation comment upstream has always claimed the banner reads
+---"Purchase  -$1,450". It read "-$1450": the amount went through %s as a raw
+---number. Every other money string a player sees on this server is grouped.
+---@param amount number
+---@return string
+local function comma(amount)
+    local whole = ('%d'):format(math.floor(tonumber(amount) or 0))
+    local out = whole:reverse():gsub('(%d%d%d)', '%1,'):reverse()
+
+    -- The reverse-and-group leaves a leading comma on exact multiples of three
+    -- digits, so 1000 comes back as ",1,000".
+    return (out:gsub('^,', ''))
+end
+
+---@param reason string
+local function debugDrop(source, reason)
+    if not Config.CardAlerts or not Config.CardAlerts.debug then return end
+    print(('[som-phone] card alert for %s dropped: %s'):format(source, reason))
+end
 
 -- A monotonic token per scheduled flush rather than a boolean. Server ids are
 -- recycled on reconnect, so a timer armed for a player who then disconnects
@@ -262,19 +289,21 @@ local function flushCardAlerts(source, token)
 
     if not mine then return end
 
-    for label, entry in pairs(mine) do
+    for _, entry in pairs(mine) do
+        local tag = entry.tag and ('  %s'):format(entry.tag) or ''
+
         -- One line per direction, so a charge and a refund under one label are
         -- both stated instead of cancelling.
         if entry.out > 0 then
             local times = entry.outCount > 1 and ('  (%d)'):format(entry.outCount) or ''
             exports['som-phone']:notifyApp(source, 'bank',
-                ('%s  -$%s%s'):format(label, entry.out, times))
+                ('%s  -$%s%s%s'):format(entry.label, comma(entry.out), tag, times))
         end
 
         if entry.inn > 0 then
             local times = entry.inCount > 1 and ('  (%d)'):format(entry.inCount) or ''
             exports['som-phone']:notifyApp(source, 'bank',
-                ('%s  +$%s%s'):format(label, entry.inn, times))
+                ('%s  +$%s%s%s'):format(entry.label, comma(entry.inn), tag, times))
         end
     end
 end
@@ -283,7 +312,8 @@ AddEventHandler('som:server:moneyChanged', function(source, _, account, delta, _
     local cfg = Config.CardAlerts
     if not cfg or not cfg.enabled then return end
 
-    if not cfg.accounts[account] then return end
+    local rule = cfg.accounts[account]
+    if not rule then return end
 
     delta = tonumber(delta) or 0
     if math.abs(delta) < (cfg.minAmount or 1) then return end
@@ -297,10 +327,14 @@ AddEventHandler('som:server:moneyChanged', function(source, _, account, delta, _
     -- custody would contradict that outright.
     if Config.RequireItem and GetResourceState('ox_inventory') == 'started' then
         local count = exports.ox_inventory:GetItemCount(source, Config.Item)
-        if not count or count < 1 then return end
+        if not count or count < 1 then
+            debugDrop(source, ('no %s in inventory'):format(Config.Item))
+            return
+        end
     end
 
     local label = Bank.StatementLabel and Bank.StatementLabel(reason) or 'Transaction'
+    local key = ('%s|%s'):format(account, label)
 
     local mine = pending[source]
 
@@ -309,11 +343,15 @@ AddEventHandler('som:server:moneyChanged', function(source, _, account, delta, _
         pending[source] = mine
     end
 
-    local entry = mine[label]
+    local entry = mine[key]
 
     if not entry then
-        entry = { out = 0, inn = 0, outCount = 0, inCount = 0 }
-        mine[label] = entry
+        entry = {
+            label = label,
+            tag = rule.tag,
+            out = 0, inn = 0, outCount = 0, inCount = 0,
+        }
+        mine[key] = entry
     end
 
     if delta < 0 then

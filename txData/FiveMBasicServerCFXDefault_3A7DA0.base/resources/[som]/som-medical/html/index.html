@@ -12,23 +12,29 @@
     <div id="down" class="down" hidden>
         <div class="down__vignette"></div>
 
+        <!-- A card, not loose text on the world.
+             Text over gameplay is only readable when the gameplay behind it is
+             not. The vignette darkens the edges of the screen; this darkens the
+             specific rectangle the words are in. -->
         <div class="down__panel">
-            <div class="down__state">DOWN</div>
-            <p class="down__note">You cannot move. You can still speak.</p>
+            <div class="down__card">
+                <div class="down__state">DOWN</div>
+                <p class="down__note">You cannot move. You can still speak, and you can look around.</p>
 
-            <div class="down__wait" id="wait">
-                <span class="down__waitlabel">Waiting for medical</span>
-                <span class="down__clock" id="clock">0:00</span>
-            </div>
-
-            <div class="down__action hidden" id="action">
-                <div class="down__hold">
-                    <div class="down__holdfill" id="holdfill"></div>
+                <div class="down__timer">
+                    <span class="down__timerlabel" id="timerlabel">Treatment available in</span>
+                    <span class="down__clock" id="clock">2:00</span>
                 </div>
-                <p class="down__prompt">
-                    Hold <span class="som-key">E</span> for hospital treatment
+
+                <div class="down__action hidden" id="action">
+                    <div class="down__hold">
+                        <div class="down__holdfill" id="holdfill"></div>
+                    </div>
+                    <p class="down__prompt">
+                        Hold <span class="som-key">E</span> for hospital treatment
+                    </p>
                     <span class="down__fee" id="fee"></span>
-                </p>
+                </div>
             </div>
         </div>
     </div>

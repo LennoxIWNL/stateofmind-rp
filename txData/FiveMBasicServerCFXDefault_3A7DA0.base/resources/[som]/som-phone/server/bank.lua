@@ -47,6 +47,10 @@ local STATEMENT_LABELS = {
     ['vehicle-rental-deposit'] = 'Rental deposit',
     ['vehicle-rental-refund']  = 'Deposit returned',
     ['rental-deposit']         = 'Rental deposit',
+    -- som-medical's hospital fee. Absent until now, so the one transaction the
+    -- handover notes said should read "Hospital treatment" was the one reading
+    -- "Transaction" on both the banner and the statement.
+    ['hospital-treatment']     = 'Hospital treatment',
 }
 
 -- Reasons that carry an id, matched on their prefix.

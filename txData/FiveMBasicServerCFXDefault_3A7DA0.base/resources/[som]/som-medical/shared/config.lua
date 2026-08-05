@@ -28,6 +28,48 @@ Config.DownedHealth = 150
 -- a free killstreak, and "no second death" stops meaning anything.
 Config.InvincibleWhileDown = true
 
+-- The pose.
+--
+-- Replaces the ragdoll placeholder. Ragdoll needed no dict and could not fail
+-- to stream, which is why it shipped first, but it also let the body slide,
+-- settle into geometry and read as a physics glitch rather than as a person.
+--
+-- `missarmenian2` / `drunk_loop` is a looping, full body, face up collapse. It
+-- is stock GTA V and is already used on this server by dpemotes' "passout", so
+-- it is known present rather than assumed.
+--
+-- flag 1 is repeat ONLY. Deliberately not 49: 49 carries 16 (player retains
+-- movement) and 32 (cancellable), which are the two bits that let a player walk
+-- out of their own down animation.
+Config.DownAnim = {
+    dict = 'missarmenian2',
+    clip = 'drunk_loop',
+    flag = 1,
+
+    -- Gentle the first time, so it reads as collapsing.
+    blendIn = 2.0,
+
+    -- Instant on every re-assert after that. A player who cancels the emote is
+    -- put back with no visible travel, which is what makes spamming it pointless
+    -- rather than merely difficult.
+    reblendIn = 8.0,
+
+    blendOut = 4.0,
+}
+
+-- How far the body may drift from where it fell before it is put back.
+--
+-- The exploit this closes is the one most servers running animated downs have:
+-- the emote cancel keybind clears the task, and RegisterKeyMapping commands are
+-- NOT stopped by DisableControlAction, so the player gets a frame or two of
+-- control. Spammed, that is a walk. Re-asserting the animation every frame
+-- takes the animation back; this takes the ground back.
+--
+-- Loose enough that ordinary animation root motion and a nudge from a passing
+-- car do not fight it, tight enough that no sequence of cancels adds up to
+-- travel.
+Config.AnchorRadius = 0.75
+
 -- ---------------------------------------------------------------------------
 -- Getting up again
 -- ---------------------------------------------------------------------------
@@ -51,9 +93,14 @@ Config.ForceRespawnAfter = 600
 -- medics to call.
 Config.RespawnFee = 350
 
--- Where the fee is taken from, in order. Cash first, so a player with money in
--- their pocket does not go into bank debt for it.
-Config.FeeAccounts = { 'cash', 'bank' }
+-- Where the fee is taken from, in order.
+--
+-- Bank only, and deliberately not cash first. A hospital bill is a bill: it
+-- arrives on the card, and som-phone's card alerts are configured for the bank
+-- account, so charging cash produced a silent deduction with nothing on the
+-- phone to explain it. Billing the card is what makes the notification and the
+-- statement line exist at all.
+Config.FeeAccounts = { 'bank' }
 
 -- A player who cannot pay is still treated. The debt is not pursued, because a
 -- player stuck on the floor because they are broke is a player who logs off.

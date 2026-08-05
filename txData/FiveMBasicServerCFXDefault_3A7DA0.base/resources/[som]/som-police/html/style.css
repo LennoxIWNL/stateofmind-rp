@@ -248,7 +248,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
  * its proportions instead of the tiles stretching on a wide screen. */
 .list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(126px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
     gap: 8px;
     padding-bottom: 10px;
 }
@@ -260,7 +260,16 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
    carry the state, exactly as .cert does, rather than opacity alone: a dimmed
    row reads as broken, a marked one reads as unavailable. */
 
-/* Tile: art on top, name and meta beneath, price pinned to the corner.
+/* Tile: the goods fill it, the words float on top of them.
+ *
+ * The previous version stacked a 74px art strip above a text block. Two things
+ * were wrong with that. The strip cropped anything tall, which is most long
+ * guns, so the product was shown cut off on its own tile. And the art was the
+ * smallest element on a tile whose entire purpose is to show the art.
+ *
+ * Now the image fills the tile and the label sits over it behind its own blur.
+ * Nothing is cropped, the product is the biggest thing on the card, and the text
+ * carries its own contrast instead of borrowing it from the panel.
  *
  * The left rule is kept from the certification card language but runs along the
  * BOTTOM here, because on a tall tile a left rule reads as a stray line while a
@@ -269,11 +278,16 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     position: relative;
     display: flex;
     flex-direction: column;
+    /* The band sits at the bottom whatever the art does. */
+    justify-content: flex-end;
     align-items: stretch;
     gap: 0;
     width: 100%;
+    /* Fixed, so a grid of tiles is a grid and not a ragged column of boxes
+       sized by whichever image happened to load. */
+    height: 142px;
     text-align: left;
-    padding: 0 0 9px;
+    padding: 0;
     border-radius: 12px;
     overflow: hidden;
     background: rgba(255, 255, 255, 0.035);
@@ -282,36 +296,54 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     transition: var(--som-transition);
 }
 
-/* Rigid, and it clips.
+/* The full tile, behind everything.
  *
- * `height` alone was not enough. The tile is a flex column, and a flex item
- * defaults to min-height:auto, which lets its content win: tall item art grew
- * the box and spilled over the name underneath it. flex-basis with no grow and
- * no shrink pins the height, min-height:0 stops the content overriding it, and
- * overflow:hidden means a stray oversized image is cropped rather than printed
- * across the label. */
+ * Bottom padding keeps the silhouette clear of the name band, so the two
+ * overlap by design rather than the art hiding under the words. Not clickable:
+ * the button underneath owns the click and an absolutely positioned child would
+ * otherwise swallow it in some CEF builds. */
 .tile__art {
-    position: relative;
-    flex: 0 0 74px;
-    min-height: 0;
+    position: absolute;
+    inset: 0;
     display: grid;
     place-items: center;
-    overflow: hidden;
+    padding: 10px 10px 42px;
     background:
-        radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.09), transparent 68%);
-    padding: 8px;
+        radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.10), transparent 70%);
+    pointer-events: none;
 }
 
-/* Explicit width and height rather than max-*, so the box decides the size and
-   the image fits inside it. Contain rather than cover, because a weapon
-   silhouette cropped to fill a square stops reading as that weapon. */
+/* max-* rather than width/height at 100%.
+ *
+ * With explicit 100% the image is stretched to the box and then contained back
+ * down, which is the same result for a big image and an upscaled blur for a
+ * small one. Bounding it instead means art is shown at its own size until it is
+ * too big to fit, and only then scaled, so nothing is ever cropped and nothing
+ * is ever soft. */
 .tile__art img {
     display: block;
-    width: 100%;
-    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
     object-fit: contain;
     /* Lifts the flat inventory art off the dark panel. */
-    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.55));
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6));
+}
+
+/* The name band.
+ *
+ * A dark fill AND a blur, in that order of importance. Blur alone inherits the
+ * brightness of what it blurs, so a band over pale art is a pale band with white
+ * text on it. The fill guarantees the contrast; the blur is what stops it
+ * reading as a bar stuck across the picture. */
+.tile__meta {
+    position: relative;
+    z-index: 1;
+    padding: 7px 10px 8px;
+    background: rgba(10, 8, 15, 0.66);
+    backdrop-filter: blur(10px) saturate(115%);
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 /* Above the art, so nothing can ever print over the name again. */
@@ -371,37 +403,65 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .row--buy .row__mark { color: var(--som-pink-light); }
 .row--blocked .row__mark { color: rgba(255, 255, 255, 0.3); }
 
-.row__body { padding: 0 10px; min-width: 0; }
+.row__body { padding: 0; min-width: 0; }
 
-.row__name { display: block; font-size: 0.83rem; font-weight: 600; }
+.row__name {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.25;
+    color: #fff;
+    /* Two lines then an ellipsis. A weapon label is one or two words and the
+       band has room for both; anything longer is a config mistake and should
+       not be allowed to grow the tile. */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
 
 .row__sub {
     display: block;
-    margin-top: 1px;
-    font-size: 0.72rem;
+    margin-top: 2px;
+    font-size: 0.68rem;
     line-height: 1.3;
-    color: var(--som-text-mute);
+    color: rgba(255, 255, 255, 0.62);
 }
 
-.row--blocked .row__name { color: var(--som-text-dim); }
+.row--blocked .row__name { color: rgba(255, 255, 255, 0.72); }
 
+/* The price is a chip on the art now, opposite the mark.
+ *
+ * In the band it competed with the name for a 130px line and one of them always
+ * lost. Up here it is read at a glance, which is how a price is read. */
 .row__price {
-    padding: 3px 10px 0;
-    font-size: 0.8rem;
+    position: absolute;
+    top: 6px;
+    left: 7px;
+    z-index: 1;
+    padding: 3px 7px;
+    border-radius: 7px;
+    font-size: 0.72rem;
     font-weight: 650;
     font-family: var(--som-font-mono);
     color: var(--som-pink-light);
+    background: rgba(10, 8, 15, 0.7);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .row--issue .row__price {
-    font-size: 0.68rem;
+    font-size: 0.62rem;
     font-family: var(--som-font);
-    letter-spacing: 0.06em;
+    font-weight: 700;
+    letter-spacing: 0.07em;
     text-transform: uppercase;
-    color: var(--som-text-dim);
+    color: #fff;
+    background: var(--som-pink-a45);
+    border-color: var(--som-pink);
 }
 
-.row--blocked .row__price { color: var(--som-text-mute); }
+.row--blocked .row__price { color: rgba(255, 255, 255, 0.55); }
 
 .list__empty {
     padding: 14px 0;

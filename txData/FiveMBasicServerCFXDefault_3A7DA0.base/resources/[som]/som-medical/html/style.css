@@ -4,7 +4,17 @@
  * can last minutes, so it must not shout: no flashing, no red wash, no timer
  * counting down in a huge font. A vignette, a word, and a clock.
  *
- * Colours come from som-assets/tokens.css. Nothing is redefined here.
+ * READABILITY is the constraint that beats restraint, though, and the first
+ * version lost that argument. Text sat directly on gameplay, so how legible it
+ * was depended entirely on what the player happened to have fallen in front of:
+ * fine on asphalt at night, invisible on a pale wall at midday. The words now
+ * sit on a card that carries its own contrast.
+ *
+ * Colours come from som-assets/tokens.css, with ONE deliberate exception. The
+ * token ramp's dim and mute steps (#777 and #555) are tuned for text on a solid
+ * panel, and this panel is translucent over a moving image, where they read as
+ * grey on grey. The mid tones here are white at an alpha instead, which stays
+ * legible whatever is behind it. Brand and status colours are still tokens.
  */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -38,15 +48,32 @@ body {
 .down__panel {
     position: absolute;
     left: 50%;
-    bottom: 12vh;
+    bottom: 10vh;
     transform: translateX(-50%);
-    width: min(420px, 78vw);
-    text-align: center;
+    width: min(430px, 82vw);
     animation: risein 700ms cubic-bezier(.16, 1, .3, 1) both;
 }
 
+/* The card.
+ *
+ * blur AND a dark fill, not one or the other. Blur alone still takes the
+ * brightness of whatever is behind it, so a card over a white wall is a white
+ * card with white text on it. The fill sets the floor; the blur is what stops
+ * it looking like a rectangle stuck on the screen. */
+.down__card {
+    padding: 20px 24px 22px;
+    text-align: center;
+    border-radius: 16px;
+    background: rgba(10, 8, 15, 0.82);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow:
+        0 20px 50px rgba(0, 0, 0, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
 .down__state {
-    font-size: 1.55rem;
+    font-size: 1.6rem;
     font-weight: 800;
     letter-spacing: 0.42em;
     /* Indented by the tracking, or the letter-spacing pushes it off centre. */
@@ -56,40 +83,59 @@ body {
 }
 
 .down__note {
-    margin-top: 4px;
-    font-size: 0.78rem;
-    color: var(--som-text-dim);
+    margin-top: 6px;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: rgba(255, 255, 255, 0.66);
 }
 
-.down__wait {
+/* The clock.
+ *
+ * It counts DOWN, in both phases, because a number going up answers "how long
+ * have I been here", which the player can feel, and a number going down answers
+ * "how much longer", which they cannot. */
+.down__timer {
     margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: center;
     gap: 10px;
 }
 
-.down__waitlabel {
-    font-size: 0.7rem;
+.down__timerlabel {
+    font-size: 0.68rem;
     text-transform: uppercase;
-    letter-spacing: 0.09em;
-    color: var(--som-text-mute);
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.5);
 }
 
 .down__clock {
     font-family: var(--som-font-mono);
-    font-size: 0.9rem;
+    font-size: 1.05rem;
     font-weight: 650;
-    color: var(--som-text);
+    /* Or the whole line shuffles sideways every time a digit changes width. */
+    font-variant-numeric: tabular-nums;
+    color: #fff;
 }
 
-.down__action { margin-top: 16px; animation: fadein 420ms ease both; }
+/* The last thirty seconds before the player is moved whether they chose it or
+   not. Colour only, no flashing: this is a warning, not an alarm. */
+.down__clock.is-urgent { color: var(--som-pink-light); }
+
+.down__action {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    animation: fadein 420ms ease both;
+}
 
 /* The hold bar. Deliberately thin: it is a confirmation, not an achievement. */
 .down__hold {
     height: 3px;
     width: 190px;
-    margin: 0 auto 9px;
+    margin: 0 auto 10px;
     border-radius: 2px;
     background: rgba(255, 255, 255, 0.14);
     overflow: hidden;
@@ -105,16 +151,16 @@ body {
 }
 
 .down__prompt {
-    font-size: 0.78rem;
-    color: var(--som-text-dim);
+    font-size: 0.84rem;
+    color: rgba(255, 255, 255, 0.82);
 }
 
 .down__fee {
     display: block;
-    margin-top: 3px;
+    margin-top: 5px;
     font-family: var(--som-font-mono);
-    font-size: 0.72rem;
-    color: var(--som-text-mute);
+    font-size: 0.74rem;
+    color: rgba(255, 255, 255, 0.5);
 }
 
 @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }

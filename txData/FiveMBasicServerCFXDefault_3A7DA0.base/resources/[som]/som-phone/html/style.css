@@ -92,9 +92,14 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
      * something with weight being raised in a hand.
      *
      * transform-origin at the bottom is what makes the tilt pivot around the
-     * hand rather than around the middle of the screen. */
+     * hand rather than around the middle of the screen.
+     *
+     * 300ms, the same as the stow. Taking the phone out and putting it away are
+     * the same gesture in two directions, and at 520ms out against 300ms back
+     * the pair read as two different animations that happened to be on the same
+     * object. Matching them is what makes it feel like one device. */
     transform-origin: 50% 130%;
-    animation: rise 520ms cubic-bezier(.17, .84, .29, 1.02) both;
+    animation: rise 300ms cubic-bezier(.17, .84, .29, 1.02) both;
 }
 
 /* The reverse, so putting it away is as deliberate as taking it out. Dropping

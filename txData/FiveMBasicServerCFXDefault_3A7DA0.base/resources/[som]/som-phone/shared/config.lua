@@ -175,8 +175,24 @@ Config.Themes = {
 Config.CardAlerts = {
     enabled = true,
 
-    -- Accounts that count as a card. Keys are som-core account names.
-    accounts = { bank = true },
+    -- Accounts that produce an alert, and how each is tagged on the line.
+    -- Keys are som-core account names.
+    --
+    -- CASH IS HERE NOW, and this is the fix for "no notification when I buy
+    -- from the armoury". Bank only was defensible as fiction, since a card
+    -- alert is a card's business, and it was wrong in practice: som-core's
+    -- payable order is { 'cash', 'bank' } and every shop defaults to the first
+    -- account holding anything, so the ordinary case, paying with money in your
+    -- pocket, produced no notification at all. The alert is really "your money
+    -- moved", and cash moving is money moving.
+    --
+    -- A cash line is tagged so the two are still distinguishable. A bank line
+    -- is not, because it is the default and tagging it would put a word on
+    -- every alert to no purpose.
+    accounts = {
+        bank = { tag = nil },
+        cash = { tag = 'Cash' },
+    },
 
     -- Milliseconds.
     --
@@ -192,6 +208,14 @@ Config.CardAlerts = {
     -- Movements smaller than this are ignored entirely. Stops rounding and
     -- one dollar adjustments buzzing a phone.
     minAmount = 1,
+
+    -- Prints the reason an alert was dropped.
+    --
+    -- Every gate below this line is silent by design, and the phone item check
+    -- in particular looks exactly like a broken notification: no phone in the
+    -- bag means no banner, correctly, and nothing anywhere says so. Turn this on
+    -- when an alert that should have arrived did not.
+    debug = false,
 }
 
 Config.Sounds = {

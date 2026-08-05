@@ -13,6 +13,10 @@ local isDown = false
 local downSince = 0
 local watching = false
 
+-- Where the body fell. Everything that tries to move it is measured against
+-- this, so a cancelled animation cannot become a step.
+local anchor = nil
+
 -- ---------------------------------------------------------------------------
 -- Reporting a death
 --
@@ -41,17 +45,55 @@ end)
 -- Being down
 -- ---------------------------------------------------------------------------
 
+-- Controls that survive being down.
+--
+-- LOOK_LR and LOOK_UD are the reason this is a list rather than a single key:
+-- a player pinned on the floor with a frozen camera is looking at whatever the
+-- fall happened to leave them pointing at, for up to ten minutes. Being able to
+-- turn and watch what is happening to you is most of what makes the state
+-- bearable, and it grants no ability to act.
+local ALLOWED = {
+    1,      -- INPUT_LOOK_LR
+    2,      -- INPUT_LOOK_UD
+    249,    -- INPUT_PUSH_TO_TALK
+    46,     -- INPUT_TALK
+}
+
+---Puts the down animation back on the ped, and keeps it there.
+---
+---Called every frame on purpose. The dict is requested rather than waited on,
+---so a slow stream costs a few frames of ragdoll instead of a hung thread.
+---@param ped number
+---@param first boolean whether this is the collapse rather than a re-assert
+local function ensureAnim(ped, first)
+    local anim = Config.DownAnim
+    if not anim or not anim.dict then return end
+
+    if IsEntityPlayingAnim(ped, anim.dict, anim.clip, 3) then return end
+
+    if not HasAnimDictLoaded(anim.dict) then
+        RequestAnimDict(anim.dict)
+        return
+    end
+
+    TaskPlayAnim(ped, anim.dict, anim.clip,
+        first and (anim.blendIn or 2.0) or (anim.reblendIn or 8.0),
+        anim.blendOut or 4.0,
+        -1, anim.flag or 1, 0, false, false, false)
+end
+
 ---Holds the ped on the floor.
 ---
----Ragdoll rather than an animation, deliberately for now: it needs no dict to
----stream, it cannot fail to load, and it reads unambiguously as incapacitated.
----A proper down animation is a polish pass, recorded in the roadmap, and it
----changes nothing about the state machine when it lands.
+---Per frame, which the no-busy-loop rule in CLAUDE.md exempts for exactly this
+---reason: control disabling and animation re-assertion only work if they happen
+---every frame. Anything slower IS the exploit window.
 local function holdDown()
     if watching then return end
     watching = true
 
     CreateThread(function()
+        local first = true
+
         while isDown do
             local ped = cache.ped
 
@@ -66,35 +108,77 @@ local function holdDown()
                 SetEntityInvincible(ped, true)
             end
 
-            if not IsPedRagdoll(ped) then
-                SetPedToRagdoll(ped, 2000, 2000, 0, false, false, false)
+            -- Ragdoll is now the enemy rather than the presentation. A car
+            -- clipping the body, an explosion nearby or a stray shove would
+            -- otherwise knock the ped out of the animation, and the recovery
+            -- from a ragdoll is a stand up, which is a free revive.
+            SetPedCanRagdoll(ped, false)
+
+            ensureAnim(ped, first)
+            first = false
+
+            -- Put back where they fell.
+            --
+            -- The animation itself has a little root motion and a passing
+            -- vehicle has a lot, but the case this exists for is the emote
+            -- cancel keybind: RegisterKeyMapping commands are dispatched from
+            -- the raw key, NOT through the control system, so DisableControl
+            -- does not touch them. dpemotes binds X to cancelemote, which calls
+            -- ClearPedTasks. Without this, spamming X is a walk.
+            if anchor then
+                local at = GetEntityCoords(ped)
+
+                if #(at - anchor) > (Config.AnchorRadius or 0.75) then
+                    SetEntityCoordsNoOffset(ped, anchor.x, anchor.y, anchor.z,
+                        false, false, false)
+                end
             end
 
-            -- Everything except talking. Movement, combat, entering vehicles
-            -- and the weapon wheel are all gone; there is no crawl to enable.
+            -- Everything except looking and talking. Movement, combat,
+            -- entering vehicles and the weapon wheel are all gone; there is no
+            -- crawl to enable.
             DisableAllControlActions(0)
+
+            for i = 1, #ALLOWED do
+                EnableControlAction(0, ALLOWED[i], true)
+            end
+
             EnableControlAction(0, Config.RespawnKey, true)
-            -- Push to talk and the radio stay live, or being able to speak
-            -- would be a promise the controls break.
-            EnableControlAction(0, 249, true)   -- INPUT_PUSH_TO_TALK
-            EnableControlAction(0, 46, true)    -- INPUT_TALK
+
+            -- Belt to the controls' braces. Aim and fire have their own path
+            -- that a disabled control does not always close.
+            DisablePlayerFiring(cache.playerId, true)
 
             Wait(0)
         end
 
         -- Handed back exactly what was taken.
-        SetEntityInvincible(cache.ped, false)
-        ClearPedTasksImmediately(cache.ped)
+        local ped = cache.ped
+
+        SetEntityInvincible(ped, false)
+        SetPedCanRagdoll(ped, true)
+        ClearPedTasksImmediately(ped)
+
+        anchor = nil
         watching = false
     end)
 end
 
 ---@param since number server epoch seconds
-RegisterNetEvent('som-medical:client:down', function(since)
+---@param elapsed number|nil seconds already spent down, non-zero only for a
+---       player who reconnected while down. Derived on the server, because the
+---       client has no server clock to subtract `since` from.
+RegisterNetEvent('som-medical:client:down', function(since, elapsed)
     if isDown then return end
 
     isDown = true
     downSince = GetGameTimer()
+
+    -- Asked for before the resurrect so it has the fade and the resurrect frame
+    -- to stream in. holdDown re-requests if it is not ready.
+    if Config.DownAnim and Config.DownAnim.dict then
+        RequestAnimDict(Config.DownAnim.dict)
+    end
 
     -- Resurrected IN PLACE, immediately.
     --
@@ -112,6 +196,11 @@ RegisterNetEvent('som-medical:client:down', function(since)
     NetworkResurrectLocalPlayer(at.x, at.y, at.z, heading, true, false)
     SetEntityHealth(cache.ped, Config.DownedHealth)
 
+    -- Read after the resurrect, not before: the resurrect is what settles the
+    -- ped, and anchoring to a pre-resurrect coordinate would have the hold loop
+    -- fighting the engine over the first half metre.
+    anchor = GetEntityCoords(cache.ped)
+
     holdDown()
 
     SendNUIMessage({
@@ -121,6 +210,7 @@ RegisterNetEvent('som-medical:client:down', function(since)
             forcedAfter = Config.ForceRespawnAfter,
             fee = Config.RespawnFee,
             holdMs = Config.RespawnHoldMs,
+            elapsed = tonumber(elapsed) or 0,
         },
     })
 
@@ -131,7 +221,13 @@ RegisterNetEvent('som-medical:client:revive', function()
     if not isDown then return end
 
     isDown = false
+    anchor = nil
+
+    -- Restored here as well as in the hold loop's tail. The loop is mid Wait(0)
+    -- when this fires, so relying on it alone leaves a frame in which the player
+    -- is up, invincible and unable to ragdoll.
     SetEntityInvincible(cache.ped, false)
+    SetPedCanRagdoll(cache.ped, true)
     ClearPedTasksImmediately(cache.ped)
     SetEntityHealth(cache.ped, Config.RespawnHealth or 150)
 
@@ -164,7 +260,10 @@ local function requestRespawn()
     while not IsScreenFadedOut() do Wait(0) end
 
     isDown = false
+    anchor = nil
+
     SetEntityInvincible(cache.ped, false)
+    SetPedCanRagdoll(cache.ped, true)
     ClearPedTasksImmediately(cache.ped)
 
     -- Resurrect BEFORE moving, or the ped is placed and then reset to where it
@@ -181,9 +280,13 @@ local function requestRespawn()
     Wait(400)
     DoScreenFadeIn(800)
 
+    -- The AMOUNT is deliberately not repeated here. The fee is billed to the
+    -- card, so som-phone's card alert states it, in the app that took it, with
+    -- the same label the statement will carry. Saying it twice in two places in
+    -- two formats is how a number starts looking like two numbers.
     if res.charged and res.charged > 0 then
         TriggerEvent('som:client:notify',
-            ('Treated at %s. $%s.'):format(res.label, res.charged), 'inform', 7000)
+            ('Treated at %s. Billed to your card.'):format(res.label), 'inform', 7000)
     else
         TriggerEvent('som:client:notify',
             ('Treated at %s. Nothing to collect.'):format(res.label), 'inform', 7000)
@@ -236,5 +339,6 @@ AddEventHandler('onResourceStop', function(resource)
     if not isDown then return end
 
     SetEntityInvincible(cache.ped, false)
+    SetPedCanRagdoll(cache.ped, true)
     ClearPedTasksImmediately(cache.ped)
 end)
