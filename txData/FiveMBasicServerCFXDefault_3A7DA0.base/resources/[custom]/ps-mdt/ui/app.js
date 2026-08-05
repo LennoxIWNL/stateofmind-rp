@@ -60,6 +60,34 @@ const DojJobs = {
 // offline fallback in server/dbm.lua.
 const licenseTypesGlobal = ["driver", "business", "weapon", "pilot"];
 
+// Trumbowyg fallback.
+//
+// Every report and BOLO box is a Trumbowyg editor, and Trumbowyg, its four
+// plugins and its stylesheet all arrive from remote CDNs (dashboard.html lines
+// 18 to 25). When any of that does not arrive, `$(...).trumbowyg` is not a
+// function, the call throws, and the plain textarea underneath is left showing:
+// a grey rectangle, because ps-mdt paints it #cecece4b and ships no editor CSS
+// of its own.
+//
+// Declared only when the real plugin is absent, so a working CDN is untouched.
+// Reports save either way, since the save path reads $("#reportdetail").val(),
+// the textarea, and never the editor.
+//
+// The permanent fix is to vendor Trumbowyg into ui/ and stop depending on the
+// network at all. This keeps the feature usable until then.
+if (typeof $ !== "undefined" && !$.fn.trumbowyg) {
+  console.warn(
+    "[ps-mdt] Trumbowyg did not load. Report boxes fall back to plain textareas."
+  );
+
+  $.fn.trumbowyg = function (method, value) {
+    if (method === "html") {
+      return value === undefined ? this.val() : this.val(value);
+    }
+    return this;
+  };
+}
+
 const MONTH_NAMES = [
   "January",
   "February",

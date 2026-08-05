@@ -1460,9 +1460,26 @@ Ordered. Item 1 blocks three separate symptoms and should be first.
    description, and `mdt_convictions` already stores charges, fine, sentence and
    `guilty` (the plea). It was unreachable only because of item 1, which is now
    fixed, so this stays a do-not-build.
-3. **Report box is a grey rectangle and will not accept typing.** Untraced.
-   First check whether the textarea carries `disabled` in `ui/dashboard.html`
-   the way `.manage-profile-info` does.
+3. **Report box is a grey rectangle and will not accept typing.** Traced, and a
+   fallback is in. It is **not** `disabled`: that attribute appears only on
+   `.manage-profile-info` and `.impound-plate`, never on `#reportdetail`. The
+   box is a **Trumbowyg** editor, and Trumbowyg, its four plugins and its
+   stylesheet all come from remote CDNs (`ui/dashboard.html:18-25`), as do
+   jQuery, jQuery UI, Leaflet and Font Awesome. ps-mdt ships no editor CSS of
+   its own and paints the bare textarea `#cecece4b`, so a grey rectangle that
+   will not take typing is exactly what a failed `$(...).trumbowyg()` leaves
+   behind.
+
+   `ui/app.js` now declares a fallback `$.fn.trumbowyg` **only when the real
+   plugin is missing**, so all twelve call sites keep working and the box
+   degrades to a plain but usable textarea. Reports save either way: the save
+   path reads `$("#reportdetail").val()`, the textarea, never the editor.
+
+   Still to confirm in game, and worth doing with the NUI console open: if the
+   warning `[ps-mdt] Trumbowyg did not load` appears, the CDN is the cause and
+   the permanent fix is to vendor Trumbowyg into `ui/`. If the box is now a
+   working plain textarea with no warning, the cause is something else and the
+   fallback has masked it, so check there too.
 4. **Custom progress bar.** Approach confirmed by the owner: build one component
    in `som-ui` in the existing pink and dark language, then shim
    `lib.progressBar` to it. ox_lib's UI is a compiled React bundle, so it cannot
