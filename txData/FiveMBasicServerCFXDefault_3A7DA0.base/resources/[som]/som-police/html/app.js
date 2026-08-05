@@ -40,11 +40,38 @@ function toast(text) {
  * State is carried by the left rule and the mark, the way the certification
  * card does it, rather than by opacity. A dimmed row reads as broken; a marked
  * one reads as unavailable, which is what it is. */
+/* Item art, from ox_inventory's own image set.
+ *
+ * A shop that shows the goods reads as a shop; a list of names and prices reads
+ * as a config file. The path matches the inventory:imagepath convar, so an item
+ * looks the same in the armoury as it does in the bag it lands in, which is the
+ * whole point of not shipping a second icon set.
+ *
+ * A missing image hides itself and the tile falls back to its initial, rather
+ * than showing a broken-image glyph. */
+function itemArt(item) {
+    const figure = el('div', 'tile__art');
+    const img = document.createElement('img');
+
+    img.src = `nui://ox_inventory/web/images/${item}.png`;
+    img.alt = '';
+    img.loading = 'lazy';
+    img.addEventListener('error', () => {
+        img.remove();
+        figure.classList.add('is-blank');
+        figure.textContent = item.replace(/^weapon_|^ammo-/, '').charAt(0).toUpperCase();
+    });
+
+    figure.appendChild(img);
+    return figure;
+}
+
 function renderRow(entry, free) {
-    const row = el('button', 'row');
+    const row = el('button', 'row tile');
     row.type = 'button';
     // So the row that was drawn from can be found again after the redraw.
     row.dataset.item = entry.item;
+    row.appendChild(itemArt(entry.item));
 
     // Quantity is worth saying only when it is not one. "Single item" on every
     // row was noise that pushed the useful line out of view.

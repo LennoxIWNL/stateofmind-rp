@@ -237,62 +237,125 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     color: var(--som-text-dim);
 }
 
+/* A grid of goods, not a list of names.
+ *
+ * The single biggest reason the old armoury read as a config screen was that it
+ * showed no product: an item was a line of text with a number beside it. Art
+ * comes from ox_inventory's own image set, so a carbine looks the same here as
+ * it does in the bag it lands in.
+ *
+ * auto-fill with a minimum rather than a fixed column count, so the panel keeps
+ * its proportions instead of the tiles stretching on a wide screen. */
 .list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(126px, 1fr));
+    gap: 8px;
     padding-bottom: 10px;
 }
+
+/* The empty-state note spans the grid rather than sitting in one cell. */
+.list__empty { grid-column: 1 / -1; }
 
 /* Rows are the certification row, made interactive. The left rule and the mark
    carry the state, exactly as .cert does, rather than opacity alone: a dimmed
    row reads as broken, a marked one reads as unavailable. */
 
+/* Tile: art on top, name and meta beneath, price pinned to the corner.
+ *
+ * The left rule is kept from the certification card language but runs along the
+ * BOTTOM here, because on a tall tile a left rule reads as a stray line while a
+ * bottom rule reads as a status bar. */
 .row {
+    position: relative;
     display: flex;
-    align-items: center;
-    gap: 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
     width: 100%;
     text-align: left;
-    padding: 10px 12px;
-    border-radius: 10px;
+    padding: 0 0 9px;
+    border-radius: 12px;
+    overflow: hidden;
     background: rgba(255, 255, 255, 0.035);
-    border-left: 3px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 3px solid rgba(255, 255, 255, 0.12);
     transition: var(--som-transition);
+}
+
+.tile__art {
+    display: grid;
+    place-items: center;
+    height: 74px;
+    background:
+        radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.09), transparent 68%);
+    /* The art is the product shot. Contain rather than cover, because a weapon
+       silhouette cropped to fill a square stops reading as that weapon. */
+    padding: 8px;
+}
+
+.tile__art img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    /* Lifts the flat inventory art off the dark panel. */
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.55));
+}
+
+/* Fallback when an item has no image, which several currently do not. A single
+   letter reads as deliberate; a broken image icon reads as a bug. */
+.tile__art.is-blank {
+    font-family: var(--som-font);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.22);
 }
 
 .row--issue {
     background: var(--som-pink-a16);
-    border-left-color: var(--som-pink);
+    border-bottom-color: var(--som-pink);
 }
 
-.row--buy { border-left-color: var(--som-pink-a45); }
+.row--buy { border-bottom-color: var(--som-pink-a45); }
 
 .row--blocked {
-    border-left-color: rgba(255, 255, 255, 0.1);
+    border-bottom-color: rgba(255, 255, 255, 0.1);
     cursor: not-allowed;
 }
 
+.row--blocked .tile__art { opacity: 0.45; }
+
+/* Lifts rather than slides. A tile that shifts sideways in a grid nudges the
+   eye along the row; one that rises reads as being picked up. */
 .row:hover:not(:disabled) {
     background: var(--som-card-hover);
-    transform: translateX(2px);
+    border-color: var(--som-pink-a45);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
 }
 
 .row:disabled { cursor: not-allowed; }
 
+/* The mark becomes a corner badge on a tile: a glyph in a text row has space
+   beside it, a glyph above a product shot does not. */
 .row__mark {
-    flex: 0 0 auto;
-    width: 15px;
-    text-align: center;
+    position: absolute;
+    top: 6px;
+    right: 7px;
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.55);
+    font-size: 0.62rem;
     font-weight: 700;
-    line-height: 1.4;
 }
 
 .row--issue .row__mark { color: var(--som-pink-light); }
 .row--buy .row__mark { color: var(--som-pink-light); }
 .row--blocked .row__mark { color: rgba(255, 255, 255, 0.3); }
 
-.row__body { flex: 1; min-width: 0; }
+.row__body { padding: 0 10px; min-width: 0; }
 
 .row__name { display: block; font-size: 0.83rem; font-weight: 600; }
 
@@ -307,7 +370,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .row--blocked .row__name { color: var(--som-text-dim); }
 
 .row__price {
-    flex-shrink: 0;
+    padding: 3px 10px 0;
     font-size: 0.8rem;
     font-weight: 650;
     font-family: var(--som-font-mono);
@@ -337,16 +400,16 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .row.is-taken { animation: som-taken 700ms ease both; }
 
 @keyframes som-taken {
-    0%   { background: var(--som-pink-a45); transform: translateX(6px); }
-    40%  { background: var(--som-pink-a25); transform: translateX(0); }
+    0%   { background: var(--som-pink-a45); transform: translateY(-6px) scale(1.03); }
+    40%  { background: var(--som-pink-a25); transform: translateY(0) scale(1); }
     100% { background: rgba(255, 255, 255, 0.035); }
 }
 
 .row--issue.is-taken { animation: som-taken-issue 700ms ease both; }
 
 @keyframes som-taken-issue {
-    0%   { background: var(--som-pink-a45); transform: translateX(6px); }
-    40%  { background: var(--som-pink-a30); transform: translateX(0); }
+    0%   { background: var(--som-pink-a45); transform: translateY(-6px) scale(1.03); }
+    40%  { background: var(--som-pink-a30); transform: translateY(0) scale(1); }
     100% { background: var(--som-pink-a16); }
 }
 

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>som-medical</title>
+    <link rel="stylesheet" href="https://cfx-nui-som-assets/tokens.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Never takes NUI focus. A downed player still needs to talk, and the
+         only input this reacts to is read in Lua, not here. -->
+    <div id="down" class="down" hidden>
+        <div class="down__vignette"></div>
+
+        <div class="down__panel">
+            <div class="down__state">DOWN</div>
+            <p class="down__note">You cannot move. You can still speak.</p>
+
+            <div class="down__wait" id="wait">
+                <span class="down__waitlabel">Waiting for medical</span>
+                <span class="down__clock" id="clock">0:00</span>
+            </div>
+
+            <div class="down__action hidden" id="action">
+                <div class="down__hold">
+                    <div class="down__holdfill" id="holdfill"></div>
+                </div>
+                <p class="down__prompt">
+                    Hold <span class="som-key">E</span> for hospital treatment
+                    <span class="down__fee" id="fee"></span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
