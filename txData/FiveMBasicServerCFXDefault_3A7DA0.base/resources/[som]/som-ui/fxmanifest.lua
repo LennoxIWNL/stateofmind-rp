@@ -14,16 +14,18 @@ shared_scripts {
 client_scripts {
     'client/notify.lua',
     'client/progress.lua',
+    'client/contextui.lua',
     'client/feedback.lua',
 }
 
--- client/progressbar.lua is deliberately NOT in client_scripts. It is loaded by
--- consumers with '@som-ui/client/progressbar.lua' so that it runs inside the
--- calling resource, where it can yield and where its `lib` table is the
--- caller's own. See the header of that file.
+-- client/progressbar.lua and client/context.lua are deliberately NOT in
+-- client_scripts. They are loaded by consumers with
+-- '@som-ui/client/<file>.lua' so that they run inside the calling resource,
+-- where their `lib` table is the caller's own and where the callbacks they hold
+-- actually live. See the header of each file.
 --
--- It MUST still appear in files{} below, or the client never receives it and
--- every consumer fails to start on a missing include. ox_lib lists its own
+-- They MUST still appear in files{} below, or the client never receives them
+-- and every consumer fails to start on a missing include. ox_lib lists its own
 -- init.lua for exactly this reason.
 
 ui_page 'html/index.html'
@@ -34,6 +36,8 @@ files {
     'html/app.js',
     -- Fetched by consumers as '@som-ui/client/progressbar.lua'.
     'client/progressbar.lua',
+    -- Fetched by consumers as '@som-ui/client/context.lua'.
+    'client/context.lua',
 }
 
 dependencies {

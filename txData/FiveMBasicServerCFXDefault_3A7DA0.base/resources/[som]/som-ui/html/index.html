@@ -25,6 +25,28 @@
         </div>
     </div>
 
+    <!-- Context menus, replacing ox_lib's. Unlike the progress bar this DOES
+         take NUI focus, because a menu is something you click. The backdrop is
+         part of the menu rather than always present, so nothing on this page
+         intercepts a click at any other time. -->
+    <div id="context" class="context" hidden>
+        <div class="context__backdrop" id="context-backdrop"></div>
+
+        <div class="context__panel" role="dialog" aria-modal="true">
+            <header class="context__head">
+                <button class="context__back" id="context-back" type="button"
+                        aria-label="Back" hidden>&#8249;</button>
+
+                <h1 class="context__title" id="context-title"></h1>
+
+                <button class="context__close" id="context-close" type="button"
+                        aria-label="Close">&#10005;</button>
+            </header>
+
+            <div class="context__body" id="context-options"></div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

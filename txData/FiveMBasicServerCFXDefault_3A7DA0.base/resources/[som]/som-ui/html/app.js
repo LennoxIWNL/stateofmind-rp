@@ -175,9 +175,190 @@ function progressStop(cancelled) {
     }, 180);
 }
 
+// ---------------------------------------------------------------------------
+// Context menus
+//
+// Render only, exactly like the progress bar. This page decides nothing about
+// what a row means: it draws what it is told and posts back the row id it was
+// given. The resource that owns the menu resolves that id against the real
+// options table, re-checks that the row is selectable, and runs the callback.
+//
+// So an edited copy of this file buys a player rows it can click and a server
+// that ignores them.
+// ---------------------------------------------------------------------------
+
+const RESOURCE = window.location.hostname.replace('cfx-nui-', '');
+
+const context = document.getElementById('context');
+const contextTitle = document.getElementById('context-title');
+const contextOptions = document.getElementById('context-options');
+const contextBack = document.getElementById('context-back');
+const contextClose = document.getElementById('context-close');
+const contextBackdrop = document.getElementById('context-backdrop');
+
+let contextCanClose = true;
+
+function postNui(endpoint, body) {
+    return fetch(`https://${RESOURCE}/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+        body: JSON.stringify(body ?? {}),
+    }).catch(() => {});
+}
+
+function ctxEl(tag, cls, text) {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    // textContent, never innerHTML. Menu titles carry player names, plate
+    // numbers and typed fine reasons.
+    if (text !== undefined && text !== null) node.textContent = text;
+    return node;
+}
+
+function contextRow(option) {
+    const selectable = option.selectable === true;
+
+    // A button when it does something, a div when it does not. Read-only rows
+    // are a real case (the ID check and the plate lookup are facts with nothing
+    // to press) and rendering them as buttons that ignore the click is how a
+    // menu starts feeling broken.
+    const row = ctxEl(selectable ? 'button' : 'div', 'ctx');
+    if (selectable) row.type = 'button';
+
+    row.classList.add(selectable ? 'ctx--action' : 'ctx--info');
+    if (option.disabled) row.classList.add('is-disabled');
+
+    // The icon NAME, not a glyph. SOM has no licensed icon set yet, and the
+    // accent rule below stands in for one. When a set lands this attribute is
+    // the hook: one rule here lights every menu on the server at once.
+    if (option.icon) row.dataset.icon = option.icon;
+
+    const rule = ctxEl('span', 'ctx__rule');
+    if (option.iconColor) rule.style.background = option.iconColor;
+    row.append(rule);
+
+    const body = ctxEl('div', 'ctx__body');
+    body.append(ctxEl('span', 'ctx__title', option.title || ''));
+
+    if (option.description) {
+        body.append(ctxEl('span', 'ctx__desc', option.description));
+    }
+
+    if (Array.isArray(option.metadata) && option.metadata.length) {
+        const meta = ctxEl('div', 'ctx__meta');
+
+        option.metadata.forEach((entry) => {
+            const line = ctxEl('span', 'ctx__metaline');
+            line.append(ctxEl('span', 'ctx__metalabel', entry.label || ''));
+            if (entry.value !== undefined && entry.value !== null) {
+                line.append(ctxEl('span', 'ctx__metavalue', entry.value));
+            }
+            meta.append(line);
+        });
+
+        body.append(meta);
+    }
+
+    if (typeof option.progress === 'number') {
+        const track = ctxEl('div', 'ctx__track');
+        const fill = ctxEl('div', 'ctx__fill');
+        fill.style.width = `${Math.max(0, Math.min(100, option.progress))}%`;
+        track.append(fill);
+        body.append(track);
+    }
+
+    row.append(body);
+
+    if (option.image) {
+        const img = document.createElement('img');
+        img.className = 'ctx__image';
+        img.src = option.image;
+        img.alt = '';
+        img.addEventListener('error', () => img.remove());
+        row.append(img);
+    }
+
+    if (option.arrow) row.append(ctxEl('span', 'ctx__arrow', '›'));
+
+    if (selectable && !option.disabled) {
+        row.addEventListener('click', () => postNui('context:select', { id: option.id }));
+    }
+
+    return row;
+}
+
+function contextShow(data) {
+    const d = data || {};
+
+    contextCanClose = d.canClose !== false;
+
+    contextTitle.textContent = d.title || '';
+    contextBack.hidden = d.back !== true;
+    contextClose.hidden = !contextCanClose;
+
+    const frag = document.createDocumentFragment();
+    const options = Array.isArray(d.options) ? d.options : [];
+
+    options.forEach((option) => frag.append(contextRow(option)));
+
+    if (!options.length) {
+        frag.append(ctxEl('p', 'ctx__empty', 'Nothing here.'));
+    }
+
+    contextOptions.replaceChildren(frag);
+    // Reset between menus, or a submenu opens already scrolled to wherever the
+    // parent was.
+    contextOptions.scrollTop = 0;
+
+    // Replay the entrance on every show, including a submenu replacing its
+    // parent, so moving between menus reads as movement.
+    context.hidden = false;
+    context.classList.remove('is-open');
+    void context.offsetWidth;
+    context.classList.add('is-open');
+}
+
+function contextHide() {
+    context.hidden = true;
+    context.classList.remove('is-open');
+    contextOptions.replaceChildren();
+}
+
+contextClose.addEventListener('click', () => postNui('context:close'));
+contextBack.addEventListener('click', () => postNui('context:back'));
+
+// Clicking off the menu closes it, which is what every menu on every other
+// server does and what a player will try first.
+contextBackdrop.addEventListener('click', () => postNui('context:close'));
+
+document.addEventListener('keydown', (event) => {
+    if (context.hidden) return;
+
+    if (event.key === 'Escape') {
+        // Posted even when canClose is false. The Lua side refuses it there,
+        // because the rule belongs with the menu and not with the page.
+        postNui('context:close');
+        return;
+    }
+
+    if (event.key === 'Backspace' && !contextBack.hidden) {
+        postNui('context:back');
+    }
+});
+
 window.addEventListener('message', (event) => {
     const data = event.data;
     if (!data) return;
+
+    if (data.action === 'context:show') {
+        contextShow(data.data);
+        return;
+    }
+
+    if (data.action === 'context:hide') {
+        contextHide();
+        return;
+    }
 
     if (data.action === 'notify') {
         if (typeof data.message !== 'string') return;

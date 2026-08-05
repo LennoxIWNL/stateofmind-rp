@@ -13,9 +13,12 @@ shared_scripts {
 }
 
 client_scripts {
-    -- Replaces lib.progressBar with som-ui's. Client only, so it cannot go in
-    -- shared_scripts, and first, so every file below sees the replacement.
+    -- Replaces lib.progressBar and lib.registerContext with som-ui's. Client
+    -- only, so neither can go in shared_scripts, and first, so every file below
+    -- sees the replacement. Between them these cover the plate lookup, the
+    -- impound reason list, the fleet, the ID check and the fine presets.
     '@som-ui/client/progressbar.lua',
+    '@som-ui/client/context.lua',
     -- duty first: stations, custody and keybinds all read Duty.IsOnDuty().
     'client/duty.lua',
     'client/armoury.lua',

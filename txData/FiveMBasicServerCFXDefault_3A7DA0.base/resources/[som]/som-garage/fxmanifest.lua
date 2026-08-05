@@ -13,6 +13,10 @@ shared_scripts {
 }
 
 client_scripts {
+    -- Replaces lib.registerContext with som-ui's, which is what takes the mod
+    -- bay's four menus off ox_lib's stock UI. Client only, so it cannot go in
+    -- shared_scripts, and first, so every file below sees the replacement.
+    '@som-ui/client/context.lua',
     -- preview first: garage.lua calls into it.
     'client/preview.lua',
     'client/garage.lua',
@@ -41,4 +45,7 @@ dependencies {
     'som-core',
     'som-interact',
     'som-assets',
+    -- The context menu shim is loaded from it at start time, so its absence
+    -- must be a loud failure rather than a nil call later.
+    'som-ui',
 }

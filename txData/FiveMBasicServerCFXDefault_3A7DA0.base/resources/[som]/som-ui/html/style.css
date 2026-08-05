@@ -24,6 +24,12 @@ body {
     width: 22vw;
     min-width: 260px;
     max-width: 380px;
+    /* Above the context backdrop so a notification arriving mid-menu is still
+       readable, and transparent to the mouse so it can never eat a click meant
+       for the menu underneath it. This page only receives clicks at all while a
+       context menu holds focus, which is exactly when that matters. */
+    z-index: 70;
+    pointer-events: none;
 }
 
 .notification {
@@ -253,4 +259,265 @@ body {
 @keyframes som-progress-out {
     from { opacity: 1; transform: translateY(0); }
     to   { opacity: 0; transform: translateY(10px); }
+}
+
+/* ---------------------------------------------------------------------------
+   Context menus
+   ---------------------------------------------------------------------------
+   Replaces ox_lib's, which is a compiled React bundle and cannot be restyled.
+   Doing this one surface removes stock UI from vehicle inspection, plate flags,
+   the impound list and the mod bay at once, and every menu written after it is
+   SOM by default.
+
+   Centred rather than ox_lib's top right corner. These are not tooltips: they
+   are the impound list, the fleet, the mod bay. They are the thing the player
+   is doing, so they belong where the player is looking, and centring puts them
+   in the same language as the armoury and the certification card.
+
+   Row shape is the certification card's: a left rule that carries state, a
+   title, a description under it. That is deliberate. It is the same component
+   in a different frame, and reusing it is what stops SOM growing a second
+   visual vocabulary for lists.
+   --------------------------------------------------------------------------- */
+
+.context {
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    display: grid;
+    place-items: center;
+    font-family: var(--som-font);
+    color: var(--som-text);
+}
+
+.context[hidden] { display: none; }
+
+.context__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transition: opacity 160ms ease;
+}
+
+.context.is-open .context__backdrop { opacity: 1; }
+
+.context__panel {
+    position: relative;
+    z-index: 60;
+    width: 420px;
+    max-width: 86vw;
+    max-height: 74vh;
+    display: flex;
+    flex-direction: column;
+    border-radius: 16px;
+    overflow: hidden;
+    /* The armoury and certification card gradient, stop for stop. Three panels
+       that are nearly the same read as a mistake; three that are identical read
+       as a product. */
+    background: linear-gradient(170deg, #1a1524 0%, #0d0a13 68%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 28px 60px rgba(0, 0, 0, 0.7);
+}
+
+.context.is-open .context__panel {
+    animation: som-ctx-in 260ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+.context__head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 16px 14px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.context__title {
+    flex: 1;
+    min-width: 0;
+    font-size: 1rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.context__back,
+.context__close {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--som-text);
+    font: inherit;
+    font-size: 0.95rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: var(--som-transition);
+}
+
+.context__back[hidden],
+.context__close[hidden] { display: none; }
+
+.context__back:hover,
+.context__close:hover {
+    background: var(--som-pink-a25);
+    border-color: var(--som-pink);
+}
+
+.context__close { font-size: 0.75rem; }
+
+.context__body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.context__body::-webkit-scrollbar { width: 4px; }
+.context__body::-webkit-scrollbar-thumb { background: var(--som-pink-a45); border-radius: 2px; }
+
+/* Rows */
+
+.ctx {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    gap: 11px;
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: var(--som-transition);
+}
+
+/* The left rule, standing in for an icon.
+ *
+ * SOM has no licensed icon set yet and inventing one a name at a time is what
+ * produced the mixed set already on the server, so the icon NAME is carried on
+ * the row as data-icon and this rule holds its place. When a real set lands,
+ * this is where it goes and no call site changes. */
+.ctx__rule {
+    flex: 0 0 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.14);
+    transition: var(--som-transition);
+}
+
+.ctx--action { cursor: pointer; }
+.ctx--action .ctx__rule { background: var(--som-pink-a45); }
+
+.ctx--action:hover {
+    background: var(--som-card-hover);
+    border-color: var(--som-pink-a45);
+}
+
+.ctx--action:hover .ctx__rule { background: var(--som-pink); }
+
+.ctx--action:active { transform: scale(0.995); }
+
+/* Information, not a control. Flat and unhoverable on purpose: som-police's ID
+   check and plate lookup are three facts each, and rendering them as buttons
+   that ignore the click is how a menu starts feeling broken. */
+.ctx--info { cursor: default; }
+
+.ctx.is-disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.ctx__body { flex: 1; min-width: 0; }
+
+.ctx__title {
+    display: block;
+    font-size: 0.86rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.ctx__desc {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.74rem;
+    line-height: 1.35;
+    color: var(--som-text-dim);
+}
+
+.ctx__meta {
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ctx__metaline {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 0.72rem;
+}
+
+.ctx__metalabel { color: var(--som-text-mute); }
+
+.ctx__metavalue {
+    font-family: var(--som-font-mono);
+    color: var(--som-text);
+}
+
+.ctx__track {
+    margin-top: 7px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+}
+
+.ctx__fill {
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--som-pink-dark), var(--som-pink));
+}
+
+.ctx__image {
+    flex: 0 0 auto;
+    align-self: center;
+    width: 38px;
+    height: 38px;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.ctx__arrow {
+    flex: 0 0 auto;
+    align-self: center;
+    font-size: 1rem;
+    line-height: 1;
+    color: var(--som-text-mute);
+    transition: var(--som-transition);
+}
+
+.ctx--action:hover .ctx__arrow { color: var(--som-pink-light); }
+
+.ctx__empty {
+    padding: 18px 0;
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--som-text-mute);
+}
+
+@keyframes som-ctx-in {
+    from { opacity: 0; transform: translateY(14px) scale(0.985); }
+    to   { opacity: 1; transform: none; }
 }
