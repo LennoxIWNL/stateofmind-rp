@@ -29,26 +29,50 @@ function toast(text) {
     setTimeout(() => node.remove(), 3200);
 }
 
-/* One row. `free` items are department issue: no price, and affordability
- * never applies to them. */
+/* One row. `free` items are department issue: no price, and affordability never
+ * applies to them.
+ *
+ * State is carried by the left rule and the mark, the way the certification
+ * card does it, rather than by opacity. A dimmed row reads as broken; a marked
+ * one reads as unavailable, which is what it is. */
 function renderRow(entry, free) {
     const row = el('button', 'row');
     row.type = 'button';
 
-    const left = el('div');
-    left.append(
-        el('div', 'row__name', entry.label),
-        el('div', 'row__sub', entry.count > 1 ? `${entry.count} issued` : 'Single item'));
+    // Quantity is worth saying only when it is not one. "Single item" on every
+    // row was noise that pushed the useful line out of view.
+    const qty = entry.count > 1 ? `${entry.count} per draw` : '';
 
-    row.append(left, el('span', 'row__price', free ? 'Issued' : money(entry.price)));
+    let blocked = false;
+    let reason = qty;
 
     if (!free) {
         // Unaffordable ON THE SELECTED ACCOUNT rather than hidden. Switching
         // account re-renders, so the list answers "can I pay for this with what
         // I just picked" instead of quietly hiding the item.
         const selected = state.payment.find((p) => p.account === state.account);
-        if (!selected || selected.balance < entry.price) row.disabled = true;
+
+        if (!selected || selected.balance < entry.price) {
+            blocked = true;
+            row.disabled = true;
+            // Says WHICH account is short, because the fix is usually to switch
+            // rather than to earn. The old version disabled the row silently.
+            reason = selected
+                ? `Not enough on ${selected.label.toLowerCase()}`
+                : 'No payment method';
+        }
     }
+
+    row.classList.add(free ? 'row--issue' : blocked ? 'row--blocked' : 'row--buy');
+
+    row.append(el('span', 'row__mark', free ? '✓' : blocked ? '✕' : '+'));
+
+    const body = el('div', 'row__body');
+    body.append(el('span', 'row__name', entry.label));
+    if (reason) body.append(el('span', 'row__sub', reason));
+    row.append(body);
+
+    row.append(el('span', 'row__price', free ? 'Issued' : money(entry.price)));
 
     row.addEventListener('click', async () => {
         row.disabled = true;
@@ -65,14 +89,29 @@ function renderRow(entry, free) {
     return row;
 }
 
-function render() {
-    const issueFrag = document.createDocumentFragment();
-    state.issue.forEach((entry) => issueFrag.appendChild(renderRow(entry, true)));
-    document.getElementById('issue').replaceChildren(issueFrag);
+function fillList(id, entries, free) {
+    const frag = document.createDocumentFragment();
 
-    const personalFrag = document.createDocumentFragment();
-    state.personal.forEach((entry) => personalFrag.appendChild(renderRow(entry, false)));
-    document.getElementById('personal').replaceChildren(personalFrag);
+    entries.forEach((entry) => frag.appendChild(renderRow(entry, free)));
+
+    // An empty section with no explanation looks like a failed load. Personal
+    // equipment can legitimately be empty when nothing is affordable or the
+    // officer holds no certifications.
+    if (!entries.length) {
+        frag.appendChild(el('p', 'list__empty', 'Nothing stocked for you here.'));
+    }
+
+    document.getElementById(id).replaceChildren(frag);
+}
+
+function render() {
+    fillList('issue', state.issue, true);
+    fillList('personal', state.personal, false);
+
+    // What this officer can actually draw, which is not the length of the
+    // config: the server filters by certification and rank before sending.
+    document.getElementById('stock-count').textContent =
+        state.issue.length + state.personal.length;
 }
 
 /* Cash or card. The options and balances come from som-core, so every shop
@@ -186,7 +225,9 @@ window.addEventListener('message', (event) => {
             account: (payment.find((p) => p.balance > 0) || payment[0] || {}).account,
         };
 
-        document.getElementById('title').textContent = d.label || 'Armoury';
+        // The station name, under the fixed "Armoury" title. The badge carries
+        // the department, so the heading no longer has to.
+        document.getElementById('title').textContent = d.label || 'Mission Row';
 
         renderPayment();
         render();

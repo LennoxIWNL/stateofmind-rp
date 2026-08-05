@@ -35,42 +35,90 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 .panel {
     position: relative;
-    width: 480px;
+    width: 460px;
     max-height: 82vh;
     display: flex;
     flex-direction: column;
-    border-radius: 18px;
+    /* Same radius and gradient stop as .card. The two were 18px/65% against
+       16px/68%, which is close enough to look like a mistake rather than a
+       choice when you see them one after the other. */
+    border-radius: 16px;
     overflow: hidden;
-    background: linear-gradient(170deg, #1a1524 0%, #0d0a13 65%);
+    background: linear-gradient(170deg, #1a1524 0%, #0d0a13 68%);
     border: 1px solid rgba(255, 255, 255, 0.12);
     box-shadow: 0 28px 60px rgba(0, 0, 0, 0.7);
     animation: rise 260ms cubic-bezier(.16, 1, .3, 1) both;
 }
 
+/* Head: the certification card's head, so the two read as one product. */
+
 .panel__head {
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 20px 22px 16px;
+    align-items: center;
+    gap: 13px;
+    padding: 18px 20px 15px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.panel__title {
-    font-size: 18px;
-    font-weight: 650;
-    letter-spacing: -0.01em;
+.panel__badge {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 11px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    background: var(--som-pink-a25);
+    border: 1px solid var(--som-pink-a45);
+    color: #fff;
 }
+
+.panel__ident { min-width: 0; }
+
+.panel__title { font-size: 1rem; font-weight: 650; letter-spacing: -0.01em; }
 
 .panel__sub {
-    margin-top: 4px;
-    font-size: 11.5px;
+    margin-top: 1px;
+    font-size: 0.74rem;
     color: var(--som-text-dim);
-    max-width: 230px;
-    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-/* Payment switcher */
+/* How many items are actually available to this officer, which is not the
+   length of the config: the server filters by certification and rank before
+   the list is ever sent. */
+.panel__count {
+    margin-left: auto;
+    flex-shrink: 0;
+    font-family: var(--som-font-mono);
+    font-size: 0.9rem;
+    font-weight: 650;
+    color: var(--som-pink-light);
+}
+
+/* Payment switcher.
+   On its own row rather than crammed into the header, because it is a control
+   and the header is identity. */
+
+.panel__pay {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.panel__paylabel {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--som-text-mute);
+}
 
 .pay {
     display: flex;
@@ -79,11 +127,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 }
 
 .pay__opt {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 7px 11px;
-    border-radius: 10px;
+    padding: 6px 14px;
+    border-radius: 999px;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.09);
     transition: var(--som-transition);
@@ -98,34 +143,48 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 }
 
 .pay__label {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
     color: var(--som-text-dim);
 }
 
 .pay__opt.is-active .pay__label { color: #fff; }
 
-.pay__value {
-    font-size: 12px;
-    font-weight: 600;
-    font-family: var(--som-font-mono);
-}
+/* Sections.
+   One scroll container around both, so a long personal list does not scroll
+   independently of a short issue list. */
 
-/* Sections */
-
-.section {
-    padding: 14px 22px 4px;
+.panel__body {
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
 }
 
+.panel__body::-webkit-scrollbar { width: 4px; }
+.panel__body::-webkit-scrollbar-thumb { background: var(--som-pink-a45); border-radius: 2px; }
+
+.section { padding: 14px 20px 4px; }
+
 .section__title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-size: 10.5px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--som-text-mute);
     margin-bottom: 8px;
+}
+
+.section__note {
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--som-text-dim);
 }
 
 .list {
@@ -135,45 +194,91 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     padding-bottom: 10px;
 }
 
+/* Rows are the certification row, made interactive. The left rule and the mark
+   carry the state, exactly as .cert does, rather than opacity alone: a dimmed
+   row reads as broken, a marked one reads as unavailable. */
+
 .row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    gap: 10px;
     width: 100%;
     text-align: left;
-    padding: 11px 14px;
-    border-radius: 12px;
-    background: var(--som-card);
-    border: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.035);
+    border-left: 3px solid rgba(255, 255, 255, 0.12);
     transition: var(--som-transition);
+}
+
+.row--issue {
+    background: var(--som-pink-a16);
+    border-left-color: var(--som-pink);
+}
+
+.row--buy { border-left-color: var(--som-pink-a45); }
+
+.row--blocked {
+    border-left-color: rgba(255, 255, 255, 0.1);
+    cursor: not-allowed;
 }
 
 .row:hover:not(:disabled) {
     background: var(--som-card-hover);
-    border-color: var(--som-pink-a45);
     transform: translateX(2px);
 }
 
-.row:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+.row:disabled { cursor: not-allowed; }
+
+.row__mark {
+    flex: 0 0 auto;
+    width: 15px;
+    text-align: center;
+    font-weight: 700;
+    line-height: 1.4;
 }
 
-.row__name { font-size: 13.5px; font-weight: 550; }
+.row--issue .row__mark { color: var(--som-pink-light); }
+.row--buy .row__mark { color: var(--som-pink-light); }
+.row--blocked .row__mark { color: rgba(255, 255, 255, 0.3); }
+
+.row__body { flex: 1; min-width: 0; }
+
+.row__name { display: block; font-size: 0.83rem; font-weight: 600; }
 
 .row__sub {
-    margin-top: 2px;
-    font-size: 11px;
-    color: var(--som-text-dim);
+    display: block;
+    margin-top: 1px;
+    font-size: 0.72rem;
+    line-height: 1.3;
+    color: var(--som-text-mute);
 }
 
+.row--blocked .row__name { color: var(--som-text-dim); }
+
 .row__price {
-    font-size: 13px;
+    flex-shrink: 0;
+    font-size: 0.8rem;
     font-weight: 650;
     font-family: var(--som-font-mono);
     color: var(--som-pink-light);
-    flex-shrink: 0;
+}
+
+.row--issue .row__price {
+    font-size: 0.68rem;
+    font-family: var(--som-font);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--som-text-dim);
+}
+
+.row--blocked .row__price { color: var(--som-text-mute); }
+
+.list__empty {
+    padding: 14px 0;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--som-text-mute);
 }
 
 /* Footer */
@@ -183,13 +288,9 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 22px 18px;
+    gap: 12px;
+    padding: 13px 20px 17px;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.note {
-    font-size: 11px;
-    color: var(--som-text-mute);
 }
 
 .btn {

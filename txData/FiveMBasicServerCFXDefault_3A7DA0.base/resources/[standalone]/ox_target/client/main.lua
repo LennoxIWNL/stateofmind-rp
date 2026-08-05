@@ -28,6 +28,20 @@ local menuChanged
 local menuHistory = {}
 local nearbyZones
 
+-- SOM PATCH. som-ui replaced ox_lib's progress bar, so ox_lib's own progress
+-- state is permanently empty and lib.progressActive() below always returns
+-- false. This asks the resource that actually knows. Returns false when som-ui
+-- is absent, so ox_target still runs standalone.
+local function somProgressActive()
+    if GetResourceState('som-ui') ~= 'started' then return false end
+
+    local ok, result = pcall(function()
+        return exports['som-ui']:progressActive()
+    end)
+
+    return ok and result == true
+end
+
 -- Toggle ox_target, instead of holding the hotkey
 -- SOM: how far the eye reaches, in metres. Stock is a hardcoded 20, which
 -- lit up interactions from across a car park and made the eye feel like a
@@ -179,7 +193,14 @@ local function startTargeting()
     end)
 
     while state.isActive() do
-        if not state.isNuiFocused() and lib.progressActive() then
+        -- SOM PATCH. som-ui replaced ox_lib's progress bar, so lib.progressActive
+        -- here resolves through to exports.ox_lib:progressActive() and reads
+        -- ox_lib's own state, which is now permanently false. Without the second
+        -- check the eye stays openable throughout a search or a cuffing, and the
+        -- officer can start a second interaction on top of the first.
+        --
+        -- Guarded on the resource being started so ox_target still runs standalone.
+        if not state.isNuiFocused() and (lib.progressActive() or somProgressActive()) then
             state.setActive(false)
             break
         end

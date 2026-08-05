@@ -1354,6 +1354,7 @@ upgrade of these resources drops them, so this table is the re-apply list.
 | `ox_doorlock` | `use_experimental_fxv2_oal` commented out | Suspected cause of the manifest and streaming faults; the texture dict still never loaded with it on |
 | `ox_doorlock` | Texture dict awaited before the lock sprite draws | Stock requested it once and drew regardless, rendering a white square forever |
 | `ox_target` | Reach set through the `ox_target:maxDistance` convar, dots restyled to SOM pink | Stock hardcodes a much longer reach and gives the dot no hover state |
+| `ox_target` | `somProgressActive()` added at `client/main.lua:35` and checked alongside `lib.progressActive()` at `:203` | som-ui replaced ox_lib's progress bar, and `lib.progressActive` is not in ox_lib's `imports/`, so ox_target's call resolves to `exports.ox_lib:progressActive()` and reads ox_lib's own state, which is now permanently false. Without this the eye stays openable throughout a search or a cuffing. Guarded on som-ui being started, so ox_target still runs standalone |
 
 ### 16.3 Bugs found and their real causes
 
@@ -1573,8 +1574,31 @@ Ordered. Item 1 blocks three separate symptoms and should be first.
    pending a decision.
 
    None of this has been run. It is structurally checked only, see 16.9.
-5. **Armoury UI redesign.** Owner called the current one cheap looking. Rebuild
-   against the same language as the certifications card in `som-police/html`.
+5. ~~**Armoury UI redesign.**~~ **DONE, not yet seen in game.** Rebuilt against
+   the certifications card in the same page, which is the part of som-police the
+   owner liked. Pure UI: `html/index.html`, `style.css` and `app.js` only, no
+   Lua touched and no change to the server payload, because everything needed
+   was already being sent.
+
+   What changed and why:
+
+   - The head is now the card's head: badge, title, station name, and a count of
+     what this officer can actually draw. That count is not the length of the
+     config, because the server filters by certification and rank before
+     sending, so it answers a real question.
+   - Rows are the certification row made interactive. The left rule and a mark
+     carry the state (`✓` issued, `+` buyable, `✕` blocked) instead of opacity
+     alone, which read as broken rather than unavailable.
+   - A blocked row now says **which account is short**, since the fix is usually
+     to switch rather than to earn. Previously it just went dim.
+   - Payment moved out of the header onto its own row. The header is identity,
+     the switcher is a control, and cramming both made the top look busy.
+   - Empty sections say so. Personal equipment is legitimately empty when
+     nothing is affordable, and a blank panel looked like a failed load.
+   - `.panel` and `.card` were 18px/65% against 16px/68% on radius and gradient
+     stop. Close enough to look like a mistake, now identical.
+   - Dead `.pay__value` rule removed. It was styled and never rendered; the
+     decision not to show balances in the switcher is deliberate and stands.
 6. **Vehicle inspection menus** (check plate, flag plate, impound) are still
    `lib.registerContext` and look like stock FiveM. They should move to the
    certifications card pattern, as should the mod bay menus in
