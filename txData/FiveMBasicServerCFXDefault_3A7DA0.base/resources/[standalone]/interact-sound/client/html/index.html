@@ -1,23 +1,60 @@
 <html>
     <head>
-        <!-- Need to include jQuery! -->
-        <script src="nui://game/ui/jquery.js" type="text/javascript"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.1.1/howler.min.js" type="text/javascript"></script>
         <script>
+            /* PATCHED for State of Mind RP.
+             *
+             * This page used to pull jQuery from nui://game/ui/jquery.js and
+             * howler.min.js from cdnjs. It used neither of jQuery's features,
+             * and the CDN made every sound on the server depend on the game
+             * client being able to reach cloudflare at the moment the NUI
+             * loaded. That is the same failure ps-mdt hit with Trumbowyg, and
+             * it fails the same silent way: Howl is undefined, the handler
+             * throws, and nothing ever plays with no error a player can see.
+             *
+             * The Audio element does everything this page used Howler for, and
+             * it is part of the browser.
+             *
+             * Validation is duplicated here from the server on purpose. The
+             * server is the authority and does the real checking; this stops a
+             * malformed message reaching a URL at all, and stops an out of
+             * range volume throwing, which would leave the player with the
+             * previous sound still playing and no way to stop it. */
+
             var audioPlayer = null;
-            // Listen for NUI Messages.
-            window.addEventListener('message', function(event) {
-                // Check for playSound transaction
-                if (event.data.transactionType == "playSound") {
-				
-                  if (audioPlayer != null) {
+
+            /* Must match the server's safeSound pattern. Anything with a slash,
+             * a dot or a colon in it could leave ./sounds/. */
+            var SAFE_NAME = /^[A-Za-z0-9_-]{1,48}$/;
+
+            function clampVolume(value) {
+                var volume = Number(value);
+                if (!isFinite(volume)) return 0.3;
+                if (volume < 0) return 0;
+                if (volume > 1) return 1;
+                return volume;
+            }
+
+            window.addEventListener('message', function (event) {
+                var data = event.data;
+                if (!data || data.transactionType !== 'playSound') return;
+
+                var file = data.transactionFile;
+                if (typeof file !== 'string' || !SAFE_NAME.test(file)) return;
+
+                if (audioPlayer) {
                     audioPlayer.pause();
-                  }
+                    audioPlayer = null;
+                }
 
-                  audioPlayer = new Howl({src: ["./sounds/" + event.data.transactionFile + ".ogg"]});
-                  audioPlayer.volume(event.data.transactionVolume);
-                  audioPlayer.play();
+                audioPlayer = new Audio('./sounds/' + file + '.ogg');
+                audioPlayer.volume = clampVolume(data.transactionVolume);
 
+                /* A missing file rejects the promise. Swallowed rather than
+                 * left unhandled, so one absent .ogg does not fill the console
+                 * and hide something that matters. */
+                var played = audioPlayer.play();
+                if (played && typeof played.catch === 'function') {
+                    played.catch(function () {});
                 }
             });
         </script>
