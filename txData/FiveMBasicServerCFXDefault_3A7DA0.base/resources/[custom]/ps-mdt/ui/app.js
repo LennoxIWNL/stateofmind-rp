@@ -51,6 +51,15 @@ const DojJobs = {
   ['judge']: true
 }
 
+// Read by the profile page and the profile search whenever a character holds no
+// licences, and declared nowhere upstream. Every read was a ReferenceError that
+// aborted the render, so a search that returned rows drew nothing.
+//
+// SOM's Config.DefaultMetadata.licenses is empty, so every character takes that
+// branch and the search never worked for anyone. These four keys match the
+// offline fallback in server/dbm.lua.
+const licenseTypesGlobal = ["driver", "business", "weapon", "pilot"];
+
 const MONTH_NAMES = [
   "January",
   "February",
@@ -265,7 +274,7 @@ $(document).ready(() => {
     let propertyHTML = '<div style="color: #fff; text-align:center;">No Properties</div>';
 
     // convert key value pair object of licenses to array
-    let licenses = Object.entries(result.licences);
+    let licenses = Object.entries(result.licences || {});
 
     if (licenses.length == 0 || licenses.length == undefined) {
       var licenseTypes = licenseTypesGlobal;
@@ -5580,7 +5589,7 @@ function searchProfilesResults(result) {
     let convictions = "red-tag";
 
     let licences = "";
-    let licArr = Object.entries(value.licences);
+    let licArr = Object.entries(value.licences || {});
 
     if (licArr.length == 0 || licArr.length == undefined) {
       var licenseTypes = licenseTypesGlobal;

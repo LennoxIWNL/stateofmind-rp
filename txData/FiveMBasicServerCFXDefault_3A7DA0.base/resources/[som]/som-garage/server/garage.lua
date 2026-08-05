@@ -444,6 +444,22 @@ local function registerRadial()
         visible = 'som-garage.hasModBayNear',
     })
 
+    -- Storing has the same problem the mod bay had: its only entry point was the
+    -- eye, and the eye cannot be used from a driver's seat, so putting a car
+    -- away meant getting out first and nothing said so.
+    --
+    -- In the `vehicle` section rather than `self`, so it appears when seated or
+    -- standing beside a car and never on an empty street.
+    exports['som-radial']:register({
+        id = 'garage.store',
+        section = 'vehicle',
+        label = 'Store Vehicle',
+        icon = 'garage',
+        order = 50,
+        export = 'som-garage.storeNearest',
+        visible = 'som-garage.canStoreNear',
+    })
+
     exports['som-radial']:register({
         id = 'garage.open',
         section = 'self',

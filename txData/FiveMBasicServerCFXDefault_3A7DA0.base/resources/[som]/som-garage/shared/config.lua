@@ -138,31 +138,23 @@ Config.Fleets = {
     lspd = {
         platePrefix = 'LSPD',
 
-        -- origen_police only.
+        -- Deliberately empty, pending a replacement pack.
         --
-        -- TIG-PACK was dropped: its models do not spawn at all, so an officer
-        -- picking one got nothing and the pool silently lost a slot. ex-cars
-        -- went earlier for broken liveries and misaligned headlights.
+        -- The origen_police models were pulled at the owner's request. Emptying
+        -- this list is now enough to empty the motor pool: retireFleet() in
+        -- server/fleet.lua deletes the rows for any model that is no longer
+        -- listed here, so no orphans are left holding plates.
         --
-        -- No vanilla models here either. A shared department garage full of
-        -- base-game cruisers next to custom ones looks like an oversight, and
-        -- the transport van and helicopter belong at the helipad rather than in
-        -- the motor pool list.
-        vehicles = {
-            { model = 'polbuffalo4', label = 'Buffalo STX',   count = 3, price = 50000 },
-            { model = 'polcaracara', label = 'Caracara 4x4',  count = 2, price = 65000 },
-            { model = 'poldom',      label = 'Dominator',     count = 2, price = 55000 },
-
-            -- Pursuit rated. The two quickest models in the pack.
-            {
-                model = 'polcomet', label = 'Interceptor Comet',
-                count = 2, price = 95000, cert = 'cert.interceptor',
-            },
-            {
-                model = 'polvstr', label = 'Interceptor Vectre',
-                count = 2, price = 95000, cert = 'cert.interceptor',
-            },
-        },
+        -- Putting a model back is one line. seedFleet() creates the rows on the
+        -- next boot, and raising `count` later tops them up.
+        --
+        -- Previously listed, kept as a record of what the pool was:
+        --   polbuffalo4  Buffalo STX        count 3  price 50000
+        --   polcaracara  Caracara 4x4       count 2  price 65000
+        --   poldom       Dominator          count 2  price 55000
+        --   polcomet     Interceptor Comet  count 2  price 95000  cert.interceptor
+        --   polvstr      Interceptor Vectre count 2  price 95000  cert.interceptor
+        vehicles = {},
     },
 }
 

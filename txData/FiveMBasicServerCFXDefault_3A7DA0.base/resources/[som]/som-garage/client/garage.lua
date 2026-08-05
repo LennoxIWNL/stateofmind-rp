@@ -75,15 +75,17 @@ end
 
 ---The garage the player is standing at, if any, and if they may use it.
 ---
----Shared by the radial's visibility check and by openNearest, so the button
----appearing and the button working can never disagree.
+---Shared by the radial's visibility checks and by the two radial actions, so a
+---button appearing and that button working can never disagree.
+---
+---`fromVehicle` decides whether the driver's seat counts. Opening the garage
+---refuses it: the F1 wheel would otherwise suggest parking a car by opening a
+---menu that lists the car you are sitting in. Storing one requires it, because
+---the seat is exactly where you are when you want to put a car away.
+---@param fromVehicle boolean|nil
 ---@return string|nil garage id
-local function nearestGarage()
-    -- Not while driving. The garage is a place you walk up to, and offering it
-    -- from the driver's seat means the F1 wheel suggests parking a car by
-    -- opening a menu that lists the car you are sitting in. Storing one has its
-    -- own eye option on the zone, which is where that belongs.
-    if cache.vehicle then return nil end
+local function nearestGarage(fromVehicle)
+    if cache.vehicle and not fromVehicle then return nil end
 
     local here = GetEntityCoords(cache.ped)
     local job, gang = core:getJob(), core:getGang()
@@ -250,6 +252,39 @@ local function store(garageId)
     if not handle(res) then return end
     TriggerEvent('som:client:notify', 'Vehicle stored', 'success')
 end
+
+---Whether the radial should offer storing a vehicle.
+---
+---Storing was reachable only from the eye on the garage zone, and ox_target
+---does not work from a driver's seat, so the only way to put a car away was to
+---get out of it first. Nothing said so, and the feature read as missing. Same
+---defect the mod bay had, same fix.
+---
+---The driver's seat is allowed here, unlike hasGarageNear. The radial's own
+---`vehicle` section already requires a car seated or within 4m, so this only has
+---to answer the garage half.
+exports('canStoreNear', function()
+    if not nearestGarage(true) then return false end
+
+    local vehicle = cache.vehicle
+        or lib.getClosestVehicle(GetEntityCoords(cache.ped), 8.0, false)
+
+    return vehicle ~= nil and vehicle ~= 0
+end)
+
+---Stores at whichever garage the player is at. The radial entry point.
+---
+---store() already handled both cases, sitting in the car and standing beside
+---it. Only the way in was missing.
+exports('storeNearest', function()
+    local id = nearestGarage(true)
+
+    if not id then
+        return TriggerEvent('som:client:notify', 'No garage here', 'error')
+    end
+
+    store(id)
+end)
 
 -- ---------------------------------------------------------------------------
 -- Zones and blips

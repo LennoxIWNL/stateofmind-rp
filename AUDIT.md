@@ -1346,6 +1346,7 @@ upgrade of these resources drops them, so this table is the re-apply list.
 | `ps-mdt` | `client/main.lua` accepts `som-dispatch` as a framework | `provide` does not make `GetResourceState` report the provided name as started |
 | `ps-mdt` | Certifications panel appended to `ui/app.js`, `ui/dashboard.html`, `ui/style.css`, `client/main.lua` | Append-only, so a fault breaks the panel and nothing else. The two NUI callbacks use `QBCore.Functions.TriggerCallback`, since ps-mdt does not load ox_lib |
 | `ps-mdt` | Record deletion moved from police grade 4 to grades 5 and 6, on four permission tables | Grade 4 was the Chief under the old ladder and is a Sergeant under ours |
+| `ps-mdt` | `licenseTypesGlobal` declared in `ui/app.js`, and both readers of `.licences` given a `\|\| {}` guard | The constant is read at `app.js:280` and `:5595` and **declared nowhere upstream**. This is what broke the person search. See 16.3 |
 | `ox_inventory` | MRPD locker and `PoliceArmoury` removed from `data/stashes.lua` and `data/shops.lua` | They duplicated som-police's, and ox's armoury stocked no IFAK, armour or radio. This was the real cause of the "empty armoury", not som-police config |
 | `ox_inventory` | `ammo-taser` added, `WEAPON_STUNGUN` given `ammoname` | The stock stungun had no ammo type and fired forever |
 | `ox_doorlock` | `server/framework/som-compat.lua` added, listed first in `server/utils.lua` | Without it `GetPlayer` is nil and every door refuses silently |
@@ -1392,7 +1393,21 @@ Recorded because in every one of these the obvious diagnosis was wrong.
   third argument is ped-only.
 - **ox_target cannot be used from a driver's seat**, which made the mod bay
   unreachable when it was on the eye. It is on the radial now, with the zone
-  kept for anyone standing beside a car.
+  kept for anyone standing beside a car. Storing a vehicle had the identical
+  defect and now has a radial entry too.
+- **The MDT person search was a JavaScript ReferenceError, not a query.**
+  `/mdtsearch lennox test` proved the SQL: the view held the row, `JSON_VALUE`
+  read it, and ps-mdt's own query returned it. The fault was `searchProfilesResults`
+  in `ui/app.js` reading `licenseTypesGlobal`, a constant referenced twice and
+  **defined nowhere in the resource**, on the branch taken when a character holds
+  no licences. som-core's `Config.DefaultMetadata.licenses` is `{}`, so every
+  character takes that branch and the throw aborted the render before a single
+  row was appended. Rows were always returned; nothing ever drew them. This is
+  why it looked like an empty result rather than a crash.
+
+  The lesson worth keeping: the diagnostic that separated "no rows" from "rows
+  not rendered" was worth more than any amount of reading the SQL, because the
+  SQL was never wrong.
 
 ### 16.4 The compatibility view layer
 
@@ -1436,16 +1451,15 @@ idempotent.
 
 Ordered. Item 1 blocks three separate symptoms and should be first.
 
-1. **MDT person search returns nothing.** This blocks Officers Involved,
-   Civilians Involved, and charges, because a charge attaches to a criminal you
-   have to search for first. `/mdtsearch <name>` was added specifically to tell
-   the two possible causes apart: "the view returns no rows" and "the UI will
-   not render rows it was handed" need completely different fixes. Get that
-   output before writing anything.
+1. ~~**MDT person search returns nothing.**~~ **DONE.** It was the UI branch, not
+   the view. Cause and fix in 16.3 and 16.2. Officers Involved, Civilians
+   Involved and charges should all be reachable now, and all three still need
+   testing in game.
 2. **Do not build a charges system.** ps-mdt already ships `Config.PenalCode`
    with 181 charges carrying class, penal code number, months, fine, colour and
    description, and `mdt_convictions` already stores charges, fine, sentence and
-   `guilty` (the plea). It is unreachable only because of item 1.
+   `guilty` (the plea). It was unreachable only because of item 1, which is now
+   fixed, so this stays a do-not-build.
 3. **Report box is a grey rectangle and will not accept typing.** Untraced.
    First check whether the textarea carries `disabled` in `ui/dashboard.html`
    the way `.manage-profile-info` does.
@@ -1479,27 +1493,29 @@ Ordered. Item 1 blocks three separate symptoms and should be first.
 
 Added after the list above was first written, and 13 and 14 are quick:
 
-13. **Empty the PD motor pool.** Every model currently in `Config.Fleets.lspd`
-    comes out, and the rows with it. `som_vehicles` rows for the pool are
-    created on first boot and topped up when `count` rises, but nothing removes
-    a row when a model leaves the config, so clearing the list alone leaves
-    orphan rows that still occupy plates and still appear in the list. The
-    fleet seeder needs a retire path, not just a top-up path.
-14. **Storing a vehicle has no radial entry.** `store()` in
-    `som-garage/client/garage.lua:235` already handles both cases correctly, in
-    the car or standing beside it, but its only entry point is the ox_target
-    eye, and **ox_target does not work from a driver's seat**. So the only way
-    to store is to get out first, which is not obvious and reads as the feature
-    being missing. This is the same defect the mod bay had, and the same fix:
-    register `garage.store` on the radial with a `hasGarageNear` visibility
-    check.
-15. **Replace the police fleet with something that sounds and drives right.**
-    See 16.7: the silence is a config bug and should be fixed and re-judged
-    before any pack is replaced, because a silent car is not evidence of a bad
-    model.
-16. **Lore-friendly NPC traffic.** Research task. Note the constraint in 16.8:
-    a new vehicle pack cannot be installed by Claude, only recommended and then
-    wired up.
+13. ~~**Empty the PD motor pool.**~~ **DONE.** `retireFleet()` in
+    `som-garage/server/fleet.lua` runs at boot between reclaim and seed, and
+    deletes any pool row whose model is no longer configured. It sweeps the
+    DATABASE rather than looping `Config.Fleets`, so deleting a whole fleet
+    block retires its rows too instead of orphaning them where no loop reaches.
+    Only `owner_group IS NOT NULL AND citizenid IS NULL` is touched, which is
+    exactly what the seeder creates, so a bought vehicle is never retired.
+    `Config.Fleets.lspd.vehicles` is now `{}`, with the old list kept in a
+    comment. Ordering matters: reclaim marks everything garaged first, so
+    nothing deleted can be a car somebody is driving.
+14. ~~**Storing a vehicle has no radial entry.**~~ **DONE.** `garage.store` is on
+    the radial in the `vehicle` section, so it appears seated or standing beside
+    a car and never on an empty street. `nearestGarage()` took a `fromVehicle`
+    parameter rather than being reused as-is: it returns nil from a driver's
+    seat by design, which is the exact state storing needs, so `hasGarageNear`
+    could not have served as the visibility check. New exports `canStoreNear`
+    and `storeNearest`. The eye on the zone is kept.
+15. **Replace the police fleet.** The audio half is **DONE**, see 16.7. Judge the
+    pack again with sound before choosing a replacement. Research and
+    recommendation still owed, then the owner installs and Claude wires up
+    `Config.Fleets`, `som.cfg` and the meta.
+16. **Lore-friendly NPC traffic.** Research task, not started. Note the
+    constraint in 16.8.
 
 Deferred, previously agreed: officer map blips with callsigns, an F1 panic
 button with sound, the gang and boss laptop app, an end-of-phase coherency pass
@@ -1509,42 +1525,66 @@ across every UI, and anticheat tuning.
 
 | Pack | State |
 |---|---|
-| `origen_police` | In use, ensured individually at `som.cfg:239` because dev mode skips the `[assets-streams]` group. Rear lights sit wrong on some models, which is a model defect and not config. Its `carcols.meta` loads correctly, and the `*.xml`, `*.dat` and `*.ytyp` manifest warnings are dead globs matching nothing |
-| `ex-cars` police pack | Dropped. Broken liveries, misaligned headlights, 365MB |
-| `TIG-PACK` | Dropped. The models do not spawn at all |
-| `rd-vehicleconfig`, `ro-VehicleConfig` | Declare roughly 400 models with no stream folder. Those models do not exist |
+| `origen_police` | On disk and started. Audio now fixed, see below. Rear lights sit wrong on some models, which is a model defect and not config. Its `carcols.meta` loads correctly, and the `*.xml`, `*.dat` and `*.ytyp` manifest warnings are dead globs matching nothing. No longer in any fleet: `Config.Fleets.lspd.vehicles` is empty |
+| `ex-cars` police pack | Judged unfit for broken liveries and misaligned headlights, but now STARTED, because `ensure [assets-streams]` is a group ensure and cannot skip a member. 365MB every client downloads. Nothing references it |
+| `TIG-PACK` | Models do not spawn. Also started now, for the same reason. Harmless, still downloaded |
+| `rd-vehicleconfig`, `ro-VehicleConfig` | Declare roughly 400 models with no stream folder, so those models still do not exist. But `rd-vehicleconfig/handling.meta` holds **598 entries and now loads**, overriding vanilla handling for real base game cars server wide. If ordinary traffic starts handling oddly, look here first |
+| `karma_visuals` | Now started. Replaces `vehicles.meta` for 299 vanilla models and carries its own timecycle, weather, water and popcycle. A global visual change. Also the reference that identified the empty-audio mechanism |
+
+**`ensure [assets-streams]` is now active** at the owner's request, so the whole
+group loads: roughly 5GB, a much longer boot, and a large first download per
+client. A group ensure is all or nothing. To drop any member, move its folder
+out of `[assets-streams]`; it cannot be excluded from the config.
 
 Vanilla police models were removed from the shared garage at the owner's
 request. Liveries and mod bay changes now persist per vehicle, and
 `Config.ResetPoolProps` is off so pool cars keep what was set on them.
 
-**The police cars are silent because their audio is unset, not because the
-models are bad.** `<audioNameHash />` is **empty** in four of the six
-`data/<model>/vehicles.meta` files:
+**The police cars were silent because their audio was unset, not because the
+models are bad.** Fixed. `karma_visuals/vehicles.meta` is a 299 model vanilla
+dump in which every base game car carries `<audioNameHash />` empty, which
+proves the mechanism: an empty hash means *fall back to the model name*, so
+`polcaracara` asked the engine for a bank called `polcaracara`, which does not
+exist, and got silence.
 
-| Model | `audioNameHash` | Result |
+The base model behind each was identified by matching `fMass` and gear count
+against `rd-vehicleconfig/handling.meta`, a 598 entry vanilla handling table
+already on disk, rather than by guessing from the name:
+
+| Model | Was | Now | How the base was identified |
+|---|---|---|---|
+| `polcaracara` | empty | `caracara2` | mass 2480 matches CARACARA2 exactly |
+| `polvstr` | empty | `vstr` | mass 1878 and 7 gears match VSTR exactly |
+| `polcomet` | empty | `comet6` | mass 1550 matches COMET6 exactly. comet3/4/5 are 1200/1150/1500 |
+| `polvigero2` | empty | `vigero2` | by name. VIGERO2 is absent from the dump |
+| `poldom` | `tamustanggt50p` | `dominator` | mass 1670 and 5 gears against DOMINATOR 1669/5. Was pointed at a Mustang addon bank that is not installed |
+| `polbuffalo4` | `schafter4` | `buffalo4` | by name. DLC era, absent from the dump |
+
+**If `polbuffalo4` is the one that goes silent, revert that line to `schafter4`.**
+It was the only model with working sound before this change, because `schafter4`
+is a real base game bank, just the wrong car. The other five could only improve.
+`buffalo4`, `caracara2`, `comet6`, `vigero2` and `vstr` are DLC cars whose
+vanilla `vehicles.meta` lives inside `update.rpf`, which is binary and cannot be
+read from this repo, so those five rest on the model name fallback convention
+rather than on a direct read. Thirty seconds of listening settles each one.
+
+**Handling is not broken, it is tuned hot and uniformly.** Every model has a
+`handling.meta` with a matching `<handlingName>`, so nothing is missing. Against
+the vanilla values the pack raises the same three fields on all six:
+
+| Field | origen | vanilla |
 |---|---|---|
-| `polcaracara` | empty | silent |
-| `polcomet` | empty | silent |
-| `polvstr` | empty | silent |
-| `polvigero2` | empty | silent |
-| `poldom` | `tamustanggt50p` | an addon bank from a Mustang pack that is not installed here, so also silent |
-| `polbuffalo4` | `schafter4` | a real base-game bank, so this one has sound |
+| `fBrakeForce` | 1.00 to 1.50 | 0.40 to 0.60 |
+| `fInitialDriveForce` | 0.245 to 0.350 | 0.180 to 0.255 |
+| `fInitialDriveMaxFlatVel` | 200 to 250 | 175 to 177 |
 
-That pattern is decisive: an empty hash produces no engine audio no matter how
-good the model is. The fix is to set each one to the audio name of the vanilla
-vehicle the model is derived from, read out of the game's own `vehicles.meta`
-rather than guessed, and `poldom` repointed off the missing addon bank.
+`polcaracara` is a 2.5 tonne 4x4 carrying a 250 top speed figure. That is an
+arcade pursuit tune applied across the board, not a defect, so whether it is
+wrong is the owner's call and not a bug to fix.
 
-Handling is a separate question and unproven. Every model does have a
-`handling.meta` with a matching `<handlingName>`, so handling entries exist and
-the complaint is about the values in them, not a missing entry. Those are worth
-reading against the base model's vanilla handling before concluding the pack is
-at fault.
-
-**Judge the pack again after the audio is fixed.** Deciding to replace six
-models on the evidence of a blank config field would be replacing them for the
-wrong reason.
+**Judge the pack again now that the audio is fixed.** Deciding to replace six
+models on the evidence of a blank config field would have been replacing them
+for the wrong reason.
 
 ### 16.8 Constraint on any vehicle pack work
 
@@ -1554,10 +1594,12 @@ CLAUDE.md. Installing a vehicle pack is therefore **the owner's step**, and the
 most any session can do is research and recommend one, then wire up the config,
 `som.cfg` and the `.meta` files once the files are on disk.
 
-`.meta` files are text and may be edited. Note though that
-`[assets-streams]` is **gitignored** (`.gitignore:75`), so meta edits inside it
-are not version controlled and cannot be recovered from history. Back them up
-by hand before editing.
+`.meta` files are text and may be edited. `[assets-streams]` is **gitignored**
+(`.gitignore:75`), so anything inside it is invisible to git by default. The six
+`origen_police` `vehicles.meta` files were force added with `git add -f` and are
+now tracked individually, so those edits ARE in history and can be recovered.
+The binary streams around them stay ignored, which is the point: never
+`git add` the directory, only named text files inside it.
 
 ### 16.9 Not verified
 

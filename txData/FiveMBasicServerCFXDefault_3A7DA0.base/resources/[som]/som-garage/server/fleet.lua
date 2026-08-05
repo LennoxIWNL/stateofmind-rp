@@ -49,6 +49,64 @@ local function seedFleet(fleetId, fleet)
     end
 end
 
+---Pool rows whose model is no longer configured are deleted.
+---
+---seedFleet only ever counts up, so taking a model out of Config.Fleets left its
+---rows behind: still holding plates, still listed at the garage, and no longer
+---spawnable once the pack that supplied the model goes. Emptying the config list
+---without this does not empty the motor pool.
+---
+---Driven by what is in the DATABASE rather than by looping Config.Fleets, so
+---deleting an entire fleet block retires its rows too instead of orphaning them
+---where no loop would ever reach.
+---
+---Only pool rows are touched. `owner_group IS NOT NULL AND citizenid IS NULL` is
+---exactly the set seedFleet creates: Vehicles.Create is the only path in the
+---codebase that mints a row, and its only other caller sets citizenid. A vehicle
+---an officer bought is never retired here, whatever happens to the config.
+local function retireFleet()
+    local rows = MySQL.query.await([[
+        SELECT id, model, owner_group FROM som_vehicles
+        WHERE owner_group IS NOT NULL AND citizenid IS NULL
+    ]]) or {}
+
+    if #rows == 0 then return end
+
+    local configured = {}
+
+    for fleetId, fleet in pairs(Config.Fleets) do
+        configured[fleetId] = {}
+        for _, entry in ipairs(fleet.vehicles or {}) do
+            configured[fleetId][entry.model] = true
+        end
+    end
+
+    local doomed, counts = {}, {}
+
+    for _, row in ipairs(rows) do
+        local fleet = configured[row.owner_group]
+
+        if not fleet or not fleet[row.model] then
+            doomed[#doomed + 1] = row.id
+            counts[row.model] = (counts[row.model] or 0) + 1
+        end
+    end
+
+    if #doomed == 0 then return end
+
+    -- One statement, so an emptied fleet cannot end up half retired if the
+    -- server dies mid-boot.
+    local placeholders = ('?,'):rep(#doomed - 1) .. '?'
+
+    MySQL.update.await(
+        ('DELETE FROM som_vehicles WHERE id IN (%s)'):format(placeholders), doomed)
+
+    for model, count in pairs(counts) do
+        print(('[som-garage] retired %d x %s: no longer in any fleet.')
+            :format(count, model))
+    end
+end
+
 ---Every vehicle marked `out` is put back.
 ---
 ---A restart destroys every spawned entity, so a row still marked `out`
@@ -92,12 +150,18 @@ CreateThread(function()
     -- flagged out does not get topped up with duplicates.
     reclaimVehicles()
 
+    -- Then retire, so a car deleted here cannot be one somebody is driving:
+    -- reclaim has just marked every row garaged, and no entity exists yet at
+    -- this point in the boot.
+    retireFleet()
+
     for fleetId, fleet in pairs(Config.Fleets) do
         seedFleet(fleetId, fleet)
     end
 end)
 
 exports('reclaimVehicles', reclaimVehicles)
+exports('retireFleet', retireFleet)
 
 -- ---------------------------------------------------------------------------
 -- Buying
