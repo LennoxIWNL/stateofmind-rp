@@ -1764,3 +1764,254 @@ The binary streams around them stay ignored, which is the point: never
   server, and `node --check` on the JavaScript.
 - Everything in 16.1 has been exercised by hand in game except jail,
   deployables and evidence, which are not built.
+
+---
+
+## 17. Feature gap register
+
+Cross-referenced against **140 distinct sources**: 22 public roleplay servers,
+16 server templates, 20 frameworks and 82 free resource bundles. Five feature
+domains were surveyed and **104 gaps** recorded. **76 are missing outright and
+28 are partial.** By how common they are across the surveyed servers: 51 are
+near universal, 45 are common, 8 are differentiators.
+
+**The honest read.** SOM is further along than a typical build at this stage in
+exactly one half of the problem and barely started in the other. The framework
+layer is genuinely strong: server-authoritative money with a full ledger, a
+single mint path for vehicles, a compat layer that lets preserved third-party
+resources run untouched, a radial that cannot be told to fire an arbitrary
+event, and a dispatch that refuses client-authored calls. Several surveyed
+servers, including well known ones, do worse on every one of those.
+
+The content layer is where the work is. There is no death or downed state, so a
+shooting has no consequence. There is no route for a civilian to own a vehicle,
+so personal garages are empty by construction. There is no housing, no drugs, no
+robberies, no freelance job loop, and no way to get a job without a staff member
+typing `/setjob`. **32 player-facing capabilities exist today**, and most of them
+are police or framework.
+
+So "very little done" is wrong, but "very little a player can DO" is right. That
+is a normal consequence of having built the authority layer first, which was the
+correct order, and it does mean the visible surface lags a long way behind the
+foundation.
+
+**One domain was not surveyed.** Social and world systems (phone apps, clothing,
+gyms, casinos, activities, HUD, admin tooling) hit the session limit and never
+ran, as did the automated synthesis. This register was assembled by hand from
+the five domains that completed. Treat social and world as unknown rather than
+empty.
+
+### 17.1 How to read this
+
+- **How common**: near universal means nearly every surveyed server has it;
+  common means most do; differentiator means few do and it would stand out.
+- **SOM status**: strict. A resource existing but the capability not being
+  reachable by a player counts as missing or partial, not present.
+- **Effort**: small is under a day, medium one to three days, large about a
+  week, epic multiple weeks.
+- **Free option** names a genuinely free or open source resource. Paid and
+  escrowed scripts were excluded from sourcing entirely.
+
+Only gaps are listed. Anything SOM fully has is absent from these tables, which
+is why the police section looks thin relative to how much police work exists.
+
+### 17.2 The critical path
+
+Not everything, just the ordered sequence that unblocks the most.
+
+1. **Death and downed state.** Epic, and it is the single next thing to build.
+   Nothing on this server currently has stakes: you cannot be killed, revived or
+   hospitalised. It blocks EMS, revive, injuries, the morgue, jail intake, five
+   dispatch call types including officer down, r14-evidence's value, and the
+   entire consequence side of every crime feature below it. Every other item
+   competes for second place; this one has no substitute.
+2. **Vehicle keys and hotwiring.** Medium. Turns vehicle theft from taking a car
+   into a crime, and is the precondition for boosting and for a chop shop
+   meaning anything.
+3. **A dealership.** Large. Until a civilian can own a car, personal garages,
+   insurance, player-to-player sale and the whole vehicle economy are empty.
+4. **Getting a job without staff.** Medium. Everything in the economy domain is
+   gated behind a human typing `/setjob` today.
+5. **One freelance earning loop.** Medium for the first one. A new player
+   currently has no way to earn anything at all.
+
+### 17.3 Cheap wins, disproportionate value
+
+Twenty-seven gaps are small. These are the ones where the ratio is best, several
+because the work is already done and only needs wiring:
+
+| Gap | Why it is cheap |
+|---|---|
+| Fuel stations | `cdn-fuel` is already in the repo and simply not started |
+| Lockpick and hack minigame | `ox_lib` skillcheck is already installed |
+| Clothing shops and barbers as places | som-appearance is built; it needs som-interact zones |
+| Custom loading screen | The `loadingscreen` resource already exists |
+| Spawn point selection on login | Small, and it is the first thing a player ever sees |
+| Cash withdrawal from the bank | Bank money cannot currently become cash |
+| Suppressing vanilla NPC police | Small, and vanilla wanted stars undermine every police feature |
+| Police patrol vehicles | The fleet system works; `Config.Fleets.lspd` is deliberately empty pending a pack |
+| Photo on ID cards | `screenshot-basic` is already started |
+| Money visible without opening the phone | Needs a HUD, which does not exist yet |
+
+### 17.4 Emergency services (30 gaps)
+
+| Feature | How common | SOM | Effort | Free option |
+|---|---|---|---|---|
+| Death and downed state | near universal | missing | epic | qbx_medical (GPL) |
+| Revive and medical treatment | near universal | missing | large | build on the above |
+| Ambulance job and hospital | near universal | missing | large | qb-ambulancejob |
+| Jail and serving a sentence | near universal | missing | large | qb-prison |
+| Police patrol vehicles | near universal | missing | small | build, fleet exists |
+| Evidence and forensics | near universal | missing | medium | r14-evidence, already on disk |
+| Officer blips, callsigns, panic | near universal | missing | medium | build |
+| Working service radio | near universal | partial | medium | pma-voice channels exist |
+| Dispatch as a real system | near universal | partial | medium | in progress |
+| Calling 911 from the phone | near universal | partial | medium | build in som-phone |
+| Warrants and wanted status | near universal | partial | medium | ps-mdt ships warrants |
+| Citations from the MDT charge list | common | partial | small | build |
+| Booking a prisoner (mugshot) | common | missing | medium | MugShotBase64 |
+| ANPR and speed radar | common | missing | medium | wk_wars2x (MIT) |
+| Police deployables | common | missing | medium | free spike strips |
+| Limb injuries and wound effects | common | missing | medium | qb-ambulancejob |
+| Air support | common | partial | medium | free helicam |
+| K9 unit | common | missing | medium | v-k9 |
+| Fire and rescue | common | missing | large | qb-firefighterjob |
+| Holding cells, bail, transport | common | missing | medium | qb-prison |
+| More than one agency and station | common | missing | medium | build, som-police is configurable |
+| CCTV | common | missing | medium | qb-policejob camera code |
+| SWAT and tactical kit | common | missing | medium | qb-policejob stormram |
+| AI medic fallback | common | missing | small | build |
+| Courts and DOJ | differentiator | missing | large | qb-doj |
+| Morgue, coroner, permadeath | differentiator | missing | medium | build |
+| Bodycam and dashcam | differentiator | missing | medium | ps-mdt v3 |
+| Ankle monitor and parole | differentiator | missing | small | qb-policejob |
+| Weapon serial registry, ballistics | differentiator | missing | medium | ps-mdt firearm registry |
+
+### 17.5 Vehicles and property (22 gaps)
+
+| Feature | How common | SOM | Effort | Free option |
+|---|---|---|---|---|
+| Dealership, any route to owning a car | near universal | missing | large | qb-vehicleshop |
+| Vehicle keys, lockpicking, hotwiring | near universal | missing | medium | qbx_vehiclekeys |
+| Fuel and refuelling | near universal | missing | small | cdn-fuel, on disk |
+| Housing and apartments | near universal | missing | epic | ps-housing |
+| Mechanic shop and repair | near universal | missing | large | jim-mechanic |
+| Vehicle HUD, speedo, fuel gauge | near universal | missing | medium | build som-hud |
+| Job and emergency fleets with real cars | near universal | partial | small | build |
+| Paid customisation shop | near universal | partial | medium | jim-mechanic catalogue |
+| Player to player vehicle sale | common | missing | medium | qb-vehiclesales |
+| Impound release fee for civilians | common | partial | small | build |
+| Furniture and decoration | common | missing | large | ps-housing |
+| Property storage and house garage | common | missing | medium | ps-housing or ox_property |
+| Property rental and landlords | common | missing | medium | qbx_properties |
+| Racing | common | missing | medium | qb-streetraces |
+| DMV and driving test | common | missing | medium | qb-cityhall |
+| Vehicle registration and plate ownership | common | partial | small | build on som-police plate flags |
+| Vehicle insurance | common | missing | medium | free QBCore insurance |
+| Businesses as property, boss menu | common | missing | large | qb-management |
+| Garage coverage and types | common | partial | medium | qbx_garages |
+| Chop shop | common | missing | medium | elixir-ui chopshop, on disk |
+| Tow truck job | common | missing | medium | qb-towjob |
+| Rentals surviving a restart | common | partial | small | build, persist to a table |
+
+### 17.6 Crime and illegal (23 gaps)
+
+| Feature | How common | SOM | Effort | Free option |
+|---|---|---|---|---|
+| An in-world way to sell illegal goods | near universal | partial | small | build on som-economy |
+| Drug production chain | near universal | missing | large | md-drugs |
+| Store robberies | near universal | missing | medium | qbx_storerobbery |
+| Vehicle keys, hotwiring, real theft | near universal | missing | large | qbx_vehiclekeys |
+| Jail and prison sentence | near universal | missing | large | qb-prison |
+| Suppressing vanilla NPC police | near universal | missing | small | qbx_smallresources |
+| Gang org: boss menu, ranks, stash | near universal | partial | medium | qb-management |
+| ATM robberies | near universal | missing | small | free ATM robbery scripts |
+| Bank and jewellery heists with prep | near universal | missing | epic | qb-bankrobbery, qb-jewelery |
+| Chop shop | near universal | missing | medium | free chop shop |
+| Money laundering | near universal | missing | medium | ren-laundering |
+| Lockpick and hacking minigames | near universal | partial | small | ox_lib skillcheck, installed |
+| Black market and weapon dealing | near universal | partial | medium | glow_blackmarket |
+| Police alerts for the full crime set | near universal | partial | small | build, som-dispatch exists |
+| Robbing another player | near universal | partial | medium | build, som-theft exists |
+| Boosting contracts | common | missing | large | qb-car-boost |
+| House robbery | common | missing | medium | qb-houserobbery |
+| Evidence and forensics | common | missing | medium | r14-evidence, on disk |
+| Turf and territory | common | missing | large | qb-gangs |
+| Counterfeiting | common | missing | medium | free printer scripts |
+| Bounty board | common | missing | medium | free bounty hunting |
+| Drug effects on the user | common | missing | small | md-drugs |
+| Train robbery | differentiator | missing | large | free train heist |
+
+### 17.7 Core identity and progression (11 gaps)
+
+| Feature | How common | SOM | Effort | Free option |
+|---|---|---|---|---|
+| Licence issuance and DMV testing | near universal | missing | medium | qb-cityhall |
+| Barber, clothing and tattoo shops | near universal | partial | small | build, som-appearance is done |
+| Spawn point selection on login | near universal | missing | small | qb-spawn |
+| Custom loading screen | near universal | missing | small | resource already present |
+| Character select fit for players | near universal | partial | small | build |
+| Status metadata that actually drains | near universal | partial | small | build the drain and the effects |
+| Weapon licence gating and revocation | near universal | partial | small | qb-cityhall plus existing police verbs |
+| Photo on ID cards and licences | common | missing | small | MugShotBase64 |
+| New player onboarding | common | missing | medium | free spawn tutorial |
+| Job uniforms and clothing rooms | common | missing | medium | build on som-appearance |
+| Skills, XP and reputation | common | missing | large | xperience, pn-skills |
+
+### 17.8 Economy and legal jobs (18 gaps)
+
+| Feature | How common | SOM | Effort | Free option |
+|---|---|---|---|---|
+| Bank money into cash (ATM or teller) | near universal | missing | small | build |
+| Getting a job without a staff member | near universal | missing | medium | qb-cityhall |
+| Freelance earning loops | near universal | missing | epic | qb-truckerjob, qb-garbagejob and others |
+| Buying a personal vehicle | near universal | missing | medium | qb-vehicleshop |
+| Fuel stations | near universal | missing | small | ox_fuel or cdn-fuel |
+| Boss menu for a job or business | near universal | missing | medium | qb-management |
+| Somewhere to sell what you gathered | near universal | missing | medium | qb-pawnshop as a pattern |
+| Mechanic job | near universal | missing | medium | qb-mechanicjob |
+| Clothing shops and barbers as places | near universal | partial | small | build, only wiring left |
+| Money visible without the phone | near universal | missing | small | build a HUD |
+| Player-owned businesses | common | missing | large | flex-ownedshops |
+| Player to player commerce | common | missing | large | zz-marketplace |
+| Crafting | common | partial | medium | ox_inventory crafting is present |
+| Taxes | common | partial | medium | build, som-economy has the config |
+| Tow job | common | partial | medium | qb-towjob |
+| Professional whitelisted roles | common | missing | large | qb-newsjob and others |
+| Loans and credit | differentiator | missing | medium | free loans script |
+| Crypto trading | differentiator | partial | medium | qb-crypto |
+
+### 17.9 What SOM already does better than the surveyed servers
+
+Truthful, specific, and worth protecting when adding anything above.
+
+- **Money has no client-reachable event at all.** Every movement goes through
+  som-core and writes a ledger row tagged with the calling resource. Several
+  surveyed servers ship money events a client can trigger.
+- **Dispatch refuses client-authored calls.** ps-dispatch, which a large part of
+  the ecosystem runs, accepts the entire call payload from the client including
+  priority and coordinates, and its attach flow takes the unit's identity from
+  the client too. som-dispatch derives all of it server side.
+- **One mint path for vehicles.** `Vehicles.Create` is the only code that
+  creates a `som_vehicles` row, so plate uniqueness and ownership shape are
+  decided once rather than in every caller.
+- **The radial cannot fire an arbitrary event.** Entries name a validated
+  export, and job and gang filtering happens server side rather than in CSS.
+- **The progress bar is stricter than ox_lib's callers expect.** It interrupts
+  on ragdoll, cuffs, falling, swimming and death, and sets `invBusy` so a player
+  cannot eat or draw a weapon mid-action.
+- **A compat layer instead of forked third-party code.** ps-mdt, ox_doorlock and
+  ox_inventory run against som-core through som-compat and a SQL view layer, so
+  they stay upgradeable instead of becoming forks.
+- **Every diagnostic is in game.** `/mdtsearch` is the reason the MDT search bug
+  was found in one step rather than a debugging pass down the wrong path.
+
+### 17.10 Not surveyed
+
+- Social and world systems: phone apps beyond banking, social media, clothing
+  stores, gyms, casinos, activities and minigames, weather and time sync, world
+  events, HUD, scoreboard, admin tooling, anticheat tuning and logging. The
+  agent covering this hit the session limit. Assume gaps here too.
+- Everything in this register is desk research against public sources plus a
+  read of this repo. None of it has been validated by playing the surveyed
+  servers.
