@@ -13,6 +13,9 @@ shared_scripts {
 }
 
 client_scripts {
+    -- Replaces lib.progressBar with som-ui's. Client only, so it cannot go in
+    -- shared_scripts, and first, so main.lua sees the replacement.
+    '@som-ui/client/progressbar.lua',
     'client/main.lua',
 }
 
@@ -24,4 +27,5 @@ dependencies {
     'ox_lib',
     'som-core',
     'som-interact',
+    'som-ui',
 }

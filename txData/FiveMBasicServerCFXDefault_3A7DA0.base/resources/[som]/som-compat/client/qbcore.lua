@@ -117,27 +117,52 @@ end
 function QBCore.Functions.Progressbar(name, label, duration, useWhileDead, canCancel, disableControls, anim, prop, propTwo, onFinish, onCancel)
     local disable = disableControls or {}
 
+    -- `canCancel == true`, not `~= false`. qb treats a missing argument as NOT
+    -- cancellable, so `~= false` turned every caller that omitted it into a
+    -- cancellable bar, and pressing X then ran onCancel where qb ran onFinish.
+    local props
+
+    if prop and prop.model then
+        props = {
+            {
+                model = prop.model,
+                bone = prop.bone,
+                pos = prop.coords,
+                rot = prop.rotation,
+            },
+        }
+
+        -- qb's second prop. Dropping it left one hand empty on every two-prop
+        -- animation, which r14-evidence uses.
+        if propTwo and propTwo.model then
+            props[2] = {
+                model = propTwo.model,
+                bone = propTwo.bone,
+                pos = propTwo.coords,
+                rot = propTwo.rotation,
+            }
+        end
+    end
+
     local ok = lib.progressBar({
         duration = duration or 1000,
         label = label or '',
         useWhileDead = useWhileDead or false,
-        canCancel = canCancel ~= false,
+        canCancel = canCancel == true,
         disable = {
             move = disable.disableMovement,
             car = disable.disableCarMovement,
             combat = disable.disableCombat,
             mouse = disable.disableMouse,
         },
-        anim = anim and {
+        -- qb's `task` is a scenario name, which ox expresses as anim.scenario.
+        anim = anim and (anim.animDict or anim.task) and {
             dict = anim.animDict,
             clip = anim.anim,
             flag = anim.flags,
+            scenario = anim.task,
         } or nil,
-        prop = prop and prop.model and {
-            model = prop.model,
-            pos = prop.coords,
-            rot = prop.rotation,
-        } or nil,
+        prop = props,
     })
 
     if ok then

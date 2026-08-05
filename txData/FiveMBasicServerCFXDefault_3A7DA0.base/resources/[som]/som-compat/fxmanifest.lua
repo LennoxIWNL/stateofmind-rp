@@ -19,6 +19,10 @@ shared_scripts {
 }
 
 client_scripts {
+    -- Replaces lib.progressBar with som-ui's, so QBCore.Functions.Progressbar
+    -- draws the SOM bar for every preserved resource that calls it, r14-evidence
+    -- included. Client only, so it cannot go in shared_scripts.
+    '@som-ui/client/progressbar.lua',
     'client/qbcore.lua',
 }
 
@@ -31,4 +35,5 @@ dependencies {
     'ox_lib',
     'oxmysql',
     'som-core',
+    'som-ui',
 }

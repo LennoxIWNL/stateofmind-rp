@@ -13,6 +13,9 @@ shared_scripts {
 }
 
 client_scripts {
+    -- Replaces lib.progressBar with som-ui's. Client only, so it cannot go in
+    -- shared_scripts, and first, so every file below sees the replacement.
+    '@som-ui/client/progressbar.lua',
     -- duty first: stations, custody and keybinds all read Duty.IsOnDuty().
     'client/duty.lua',
     'client/armoury.lua',
@@ -49,4 +52,7 @@ dependencies {
     'som-interact',
     'som-economy',
     'som-assets',
+    -- The progress bar is loaded from it at start time, so its absence must be
+    -- a loud failure rather than a nil call later.
+    'som-ui',
 }

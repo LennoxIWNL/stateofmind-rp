@@ -1322,6 +1322,7 @@ before touching police, garage, dispatch or the MDT.
 
 | Resource | State |
 |---|---|
+| `som-ui` | Notifications, and now the progress bar that replaces ox_lib's. See 16.6 item 4 for why the shim lives where it does |
 | `som-police` | Built. Duty, armoury, custody, fines, impounds, certifications, officer keybinds, vehicle lights and siren |
 | `som-dispatch` | Built. Crime detection, call store, answers to the `ps-dispatch` export name |
 | `som-garage` | Built. `som_vehicles` authority, ghost preview, garages, PD pool, buy and refund, temporary mod bay |
@@ -1480,12 +1481,98 @@ Ordered. Item 1 blocks three separate symptoms and should be first.
    the permanent fix is to vendor Trumbowyg into `ui/`. If the box is now a
    working plain textarea with no warning, the cause is something else and the
    fallback has masked it, so check there too.
-4. **Custom progress bar.** Approach confirmed by the owner: build one component
-   in `som-ui` in the existing pink and dark language, then shim
-   `lib.progressBar` to it. ox_lib's UI is a compiled React bundle, so it cannot
-   simply be restyled. Every existing caller has to keep working: som-police
-   custody, the armoury, the mod bay, and r14-evidence later. Cancel and death
-   paths included.
+4. **Custom progress bar.** **BUILT, not yet tested in game.** One component in
+   `som-ui` in the existing dark and pink language, with `lib.progressBar`
+   shimmed to it. ox_lib's UI is a compiled React bundle and cannot be restyled,
+   which is why replacing beat theming.
+
+   The architecture is the part worth remembering, because the obvious design
+   does not work:
+
+   - `som-ui/client/progress.lua` holds the STATE and does the drawing. It is
+     the single claim: one token, one bar, client wide.
+   - `som-ui/client/progressbar.lua` holds the blocking loop and **som-ui does
+     not load it**. Consumers load it with `'@som-ui/client/progressbar.lua'` as
+     the first entry in their `client_scripts`.
+
+   Two reasons the loop has to run in the caller. ox_lib gives every resource
+   its **own** `lib` table, so overriding `lib.progressBar` from inside som-ui
+   would only ever override som-ui's own copy. And `progressBar` blocks: it
+   yields until the action finishes, and **an export cannot yield across a
+   resource boundary**, so the waiting has to happen in the caller's context.
+
+   Three traps, all of which this hit on the first attempt and all of which are
+   silent:
+
+   - **The shim must be listed in som-ui's `files{}`**, even though it is not in
+     `client_scripts`. Without that entry the client never receives the file and
+     every consumer fails to start on a missing include. ox_lib lists its own
+     `init.lua` for exactly this reason. This alone made the whole feature dead.
+   - **The state cannot live in the shim.** A local flag gives every consumer
+     its own copy, so som-police and som-compat would each believe they owned
+     the one on-screen element, and the shorter action's cleanup would tear down
+     the longer one's bar. ox_lib avoided this for free by living in one
+     resource. som-ui now holds the token and the shim asks for it.
+   - **It must be in `client_scripts`, never `shared_scripts`**, because shared
+     also loads on the server, where `cache.ped` and every native it calls do
+     not exist.
+
+   Behaviour is ported from ox_lib's `resource/interface/client/progress.lua`
+   rather than approximated, because callers depend on things that are easy to
+   miss:
+
+   - It interrupts on **ragdoll, cuffs, falling and swimming** as well as death,
+     with `allowRagdoll`, `allowCuffed`, `allowFalling`, `allowSwimming` to opt
+     out. Checking only death meant a tackled player's search still completed.
+   - It sets `LocalPlayer.state.invBusy`, which ox_inventory mirrors to block
+     item use, the inventory and the weapon loop. Without it a player could eat
+     or draw a weapon mid-search.
+   - It **queues** a second request rather than refusing it. Refusing fires
+     spurious `onCancel` callbacks in preserved resources, which share one bar
+     through som-compat.
+   - `StopAnimTask` needs a `Wait(0)` after it or the stop is itself cancelled
+     and a looping flag-49 animation outlives the bar. ox_lib carries the same
+     comment.
+   - Props go through **ox_lib's own networked prop system** by triggering
+     `ox_lib:progressProps`. Creating them locally would have made every SOM
+     prop invisible to everyone but the person holding it.
+   - Cancel is a `RegisterKeyMapping` on X, so it is rebindable, rather than a
+     polled control index.
+   - A to-be-closed guard hands the token back even if the body throws. Without
+     it one error leaves som-ui claimed forever and silently kills every
+     progress bar on the client until a restart.
+
+   Wired into som-police, som-theft and som-compat, which are the only callers.
+   som-compat matters most: it carries `QBCore.Functions.Progressbar`, so every
+   preserved resource gets the SOM bar for free, r14-evidence included.
+
+   Falls back to ox_lib's bar if som-ui is stopped, so a missing progress bar
+   cannot take custody and searches down with it.
+
+   **Two claims in the original entry were wrong.** The armoury and the mod bay
+   do NOT use a progress bar. `som-garage` contains no progress call of any
+   kind, and `som-police/client/armoury.lua` does not call one either. The only
+   callers are custody (cuff, uncuff, search), the tow in
+   `som-police/client/vehicles.lua`, som-theft, and som-compat.
+
+   Two defects in som-compat's `QBCore.Functions.Progressbar` translation were
+   found and fixed at the same time: `canCancel ~= false` inverted qb's default,
+   making every caller that omitted the argument cancellable, and `propTwo` and
+   qb's `anim.task` scenario were dropped entirely.
+
+   **Known integration gap, still open and undecided:** `ox_target` reads
+   `lib.progressActive()` to close its eye while an action runs. ox_target does
+   not load this shim, and `lib.progressActive` is not in ox_lib's `imports/`,
+   so ox_target's call resolves through to `exports.ox_lib:progressActive()` and
+   reads ox_lib's own state, which is now permanently false. The eye is
+   therefore openable during a SOM progress. `ox_inventory` had the same problem
+   and is already fixed, because it keys off `invBusy` rather than
+   `progressActive`. The remaining fix is a one line patch to
+   `ox_target/client/main.lua:182` to also check `exports['som-ui']:progressActive()`,
+   which would add a fifth row to the ox_target section of 16.2. Not done,
+   pending a decision.
+
+   None of this has been run. It is structurally checked only, see 16.9.
 5. **Armoury UI redesign.** Owner called the current one cheap looking. Rebuild
    against the same language as the certifications card in `som-police/html`.
 6. **Vehicle inspection menus** (check plate, flag plate, impound) are still

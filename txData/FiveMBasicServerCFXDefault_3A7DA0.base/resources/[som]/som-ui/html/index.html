@@ -8,6 +8,23 @@
 </head>
 <body>
     <div id="notifications" class="notifications" aria-live="polite"></div>
+
+    <!-- Progress. Hidden until a resource asks for it. Never takes NUI focus:
+         the player is mid-action and must keep control of the mouse. -->
+    <div id="progress" class="progress" hidden>
+        <div class="progress__card">
+            <div class="progress__head">
+                <span id="progress-label" class="progress__label"></span>
+                <span id="progress-cancel" class="progress__cancel">
+                    <span class="som-key">X</span> cancel
+                </span>
+            </div>
+            <div class="progress__track">
+                <div id="progress-fill" class="progress__fill"></div>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

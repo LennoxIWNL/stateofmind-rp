@@ -102,3 +102,125 @@ body {
     from { width: 100%; }
     to   { width: 0%; }
 }
+
+/* ---------------------------------------------------------------------------
+   Progress
+   ---------------------------------------------------------------------------
+   Replaces ox_lib's bar, which is a compiled React bundle and cannot be
+   restyled. Bottom centre rather than ox's, because the action being performed
+   is in front of the player and the eye is already low on the screen.
+
+   Sized in vw so it holds its proportions across resolutions, with a px floor
+   so it does not shrink to nothing on a narrow window.
+   --------------------------------------------------------------------------- */
+
+.progress {
+    position: absolute;
+    bottom: 12vh;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 26vw;
+    min-width: 300px;
+    max-width: 460px;
+}
+
+.progress[hidden] {
+    display: none;
+}
+
+.progress__card {
+    background: var(--som-card);
+    border: var(--som-border);
+    border-radius: var(--som-radius);
+    box-shadow: var(--som-shadow), var(--som-glow);
+    color: var(--som-text);
+    font-family: var(--som-font);
+    padding: 12px 14px 14px;
+    animation: som-progress-in 160ms ease forwards;
+}
+
+.progress__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 9px;
+}
+
+.progress__label {
+    font-size: 0.9rem;
+    letter-spacing: 0.01em;
+    /* A long label must not push the cancel hint off the card. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.progress__cancel {
+    flex-shrink: 0;
+    font-size: 0.72rem;
+    color: var(--som-text-dim);
+}
+
+/* Hidden by class rather than removed, so the head keeps its height and the
+   card does not resize when a cancellable action follows one that is not. */
+.progress__cancel.is-hidden {
+    visibility: hidden;
+}
+
+.progress__track {
+    height: 6px;
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress__fill {
+    height: 100%;
+    width: 0;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--som-pink-dark), var(--som-pink));
+    box-shadow: 0 0 8px var(--som-pink-a61);
+}
+
+/* Driven by animation rather than a transition, so the duration is exact and
+   the fill can be frozen mid-run by pausing it. A transition would have to be
+   re-measured to stop where it stands. */
+.progress__fill.is-running {
+    animation: som-progress-fill linear forwards;
+}
+
+.progress--cancelled .progress__fill {
+    animation-play-state: paused;
+    background: linear-gradient(90deg, var(--som-danger), var(--som-danger));
+    box-shadow: 0 0 8px rgba(231, 76, 60, 0.6);
+}
+
+.progress--cancelled .progress__card {
+    border-color: var(--som-danger);
+    box-shadow: var(--som-shadow);
+}
+
+.progress--done .progress__fill {
+    background: linear-gradient(90deg, var(--som-pink), var(--som-success));
+}
+
+.progress--leaving .progress__card {
+    animation: som-progress-out 180ms ease forwards;
+}
+
+@keyframes som-progress-fill {
+    from { width: 0%; }
+    to   { width: 100%; }
+}
+
+@keyframes som-progress-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes som-progress-out {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(10px); }
+}
