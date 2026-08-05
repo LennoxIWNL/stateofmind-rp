@@ -215,6 +215,98 @@ exports('notifyApp', function(source, appId, text)
 end)
 
 -- ---------------------------------------------------------------------------
+-- Card alerts
+--
+-- som-core fires som:server:moneyChanged on the ONE choke point every money
+-- movement passes through, so this needs no cooperation from the resources that
+-- spend money and cannot be forgotten by a new one.
+--
+-- Aggregated per player per label. Buying three things at the armoury inside the
+-- window produces one banner reading "Purchase  -$1,450  (3)" rather than three
+-- banners, which is the difference between an alert and a phone that buzzes
+-- continuously while you shop.
+--
+-- The label comes from Bank.StatementLabel, the same whitelist the statement
+-- uses. A banner is bank UI, so the rule that a raw ledger slug never reaches a
+-- player applies here exactly as it does there.
+-- ---------------------------------------------------------------------------
+
+-- pending[source][label] = { total = number, count = number }
+local pending = {}
+local flushing = {}
+
+---@param source number
+local function flushCardAlerts(source)
+    local mine = pending[source]
+
+    pending[source] = nil
+    flushing[source] = nil
+
+    if not mine then return end
+
+    for label, entry in pairs(mine) do
+        -- Sign carried explicitly. A refund and a charge under one label are
+        -- otherwise indistinguishable once summed.
+        local sign = entry.total < 0 and '-' or '+'
+        local amount = math.abs(entry.total)
+
+        -- Only when it happened more than once. "(1)" on a single purchase is
+        -- noise pretending to be information.
+        local times = entry.count > 1 and ('  (%d)'):format(entry.count) or ''
+
+        exports['som-phone']:notifyApp(source, 'bank',
+            ('%s  %s$%s%s'):format(label, sign, amount, times))
+    end
+end
+
+AddEventHandler('som:server:moneyChanged', function(source, _, account, delta, _, reason)
+    local cfg = Config.CardAlerts
+    if not cfg or not cfg.enabled then return end
+
+    if not cfg.accounts[account] then return end
+
+    delta = tonumber(delta) or 0
+    if math.abs(delta) < (cfg.minAmount or 1) then return end
+
+    source = tonumber(source)
+    if not source or source <= 0 then return end
+
+    local label = Bank.StatementLabel and Bank.StatementLabel(reason) or 'Transaction'
+
+    local mine = pending[source]
+
+    if not mine then
+        mine = {}
+        pending[source] = mine
+    end
+
+    local entry = mine[label]
+
+    if not entry then
+        entry = { total = 0, count = 0 }
+        mine[label] = entry
+    end
+
+    entry.total = entry.total + delta
+    entry.count = entry.count + 1
+
+    -- One timer per player per window, not one per movement. Without this guard
+    -- every purchase would schedule its own flush and the aggregation would
+    -- fire once per transaction anyway, which is the bug it exists to prevent.
+    if flushing[source] then return end
+
+    flushing[source] = true
+    SetTimeout(cfg.window or 4000, function() flushCardAlerts(source) end)
+end)
+
+-- A player who leaves mid-window has nothing to be told and no client to tell.
+AddEventHandler('playerDropped', function()
+    local source = source
+    pending[source] = nil
+    flushing[source] = nil
+end)
+
+-- ---------------------------------------------------------------------------
 -- Testing the notification peek
 --
 -- A phone notification is hard to exercise deliberately: the real ones fire on

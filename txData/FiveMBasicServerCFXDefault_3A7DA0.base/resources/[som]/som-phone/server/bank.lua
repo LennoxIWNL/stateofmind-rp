@@ -45,6 +45,15 @@ local STATEMENT_PREFIXES = {
     ['bill-auto'] = 'Automatic collection',
     ['license']   = 'Licence fee',
     ['licence']   = 'Licence fee',
+    -- som-garage and som-rentals carry the plate or model after the colon,
+    -- which is exactly the kind of detail that must not reach a statement.
+    ['vehicle']          = 'Vehicle purchase',
+    ['vehicle-sale']     = 'Vehicle sale',
+    ['vehicle-buyback']  = 'Vehicle buyback',
+    ['vehicle-refund']   = 'Vehicle refund',
+    ['rental']           = 'Vehicle rental',
+    ['rental-deposit']   = 'Rental deposit',
+    ['impound']          = 'Impound fee',
 }
 
 local unknownReasons = {}
@@ -70,6 +79,12 @@ local function statementLabel(reason)
 
     return 'Transaction'
 end
+
+-- Exposed so the card alert in server/main.lua uses the SAME whitelist as the
+-- statement. Two mappings would drift, and a banner is bank UI: the rule that a
+-- raw ledger slug never reaches a player applies to it exactly as it does to the
+-- statement behind it. bank.lua loads first, so this is set before main.lua runs.
+Bank.StatementLabel = statementLabel
 
 ---Generates a shareable account number for a character, once.
 ---@param player table som-core player

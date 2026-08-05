@@ -160,6 +160,33 @@ Config.Themes = {
 -- `set` and `name` map to PlaySoundFrontend(-1, name, set, true).
 -- ---------------------------------------------------------------------------
 
+-- ---------------------------------------------------------------------------
+-- Card alerts
+--
+-- A banner when money moves on an account the player carries as a card. Cash is
+-- deliberately excluded: cash changing hands is physical and visible, and a
+-- phone alert for it would be noise.
+--
+-- `window` is the aggregation window. Buying three things at the armoury inside
+-- it produces ONE banner reading "Purchase  -$1,450  (3)", not three banners.
+-- Without this, a shop with a fast list is a phone that buzzes continuously.
+-- ---------------------------------------------------------------------------
+
+Config.CardAlerts = {
+    enabled = true,
+
+    -- Accounts that count as a card. Keys are som-core account names.
+    accounts = { bank = true },
+
+    -- Milliseconds. Long enough to catch a shopping run, short enough that the
+    -- alert still feels like a response to what you just did.
+    window = 4000,
+
+    -- Movements smaller than this are ignored entirely. Stops rounding and
+    -- one dollar adjustments buzzing a phone.
+    minAmount = 1,
+}
+
 Config.Sounds = {
     enabled = true,
 

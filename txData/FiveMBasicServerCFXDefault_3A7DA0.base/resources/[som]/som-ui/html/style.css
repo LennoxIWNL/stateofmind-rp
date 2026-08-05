@@ -79,6 +79,36 @@ body {
 .notification--info { border-left-color: var(--som-pink); }
 .notification--info .notification__icon { color: var(--som-pink); }
 
+/* Repeat counter.
+ *
+ * An identical notification arriving again increments this rather than stacking
+ * a second card. Absent entirely on the first one: a "1" badge is noise
+ * pretending to be information. */
+.notification__count {
+    flex-shrink: 0;
+    align-self: center;
+    min-width: 20px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--som-pink-a25);
+    border: 1px solid var(--som-pink-a45);
+    color: #fff;
+    font-family: var(--som-font-mono);
+    font-size: 0.7rem;
+    font-weight: 650;
+    text-align: center;
+}
+
+/* Pulses on each increment, so a repeat that arrives while you are already
+   looking at the card is still visible as a new event. */
+.notification__count.is-bumped { animation: som-count-bump 260ms ease; }
+
+@keyframes som-count-bump {
+    0%   { transform: scale(1); }
+    45%  { transform: scale(1.28); background: var(--som-pink); }
+    100% { transform: scale(1); }
+}
+
 .notification__timer {
     position: absolute;
     bottom: 0;
