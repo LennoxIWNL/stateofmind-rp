@@ -50,11 +50,27 @@ local STATEMENT_LABELS = {
 }
 
 -- Reasons that carry an id, matched on their prefix.
+--
+-- The entries below duplicate several names in the exact table above ON
+-- PURPOSE. An audit of what the codebase actually emits found that `fine`,
+-- `paycheck`, `salary` and `commission` are ALWAYS written with an id or a job
+-- appended (`fine:%d`, `paycheck:%s`), so the exact entries never matched a
+-- single real transaction and every fine on the server read as "Transaction".
+-- Both shapes are now covered so it does not matter which a caller uses.
 local STATEMENT_PREFIXES = {
     ['bill']      = 'Bill payment',
     ['bill-auto'] = 'Automatic collection',
     ['license']   = 'Licence fee',
     ['licence']   = 'Licence fee',
+    ['fine']         = 'Fine',
+    ['fine-revenue'] = 'Fine revenue',
+    ['fine-tax']     = 'Fine tax',
+    ['paycheck']     = 'Wages',
+    ['salary']       = 'Wages',
+    ['appearance']   = 'Appearance',
+    ['seizure']      = 'Seized',
+    ['admin']        = 'Adjustment',
+    ['subsidy']      = 'Department issue',
     -- som-garage and som-rentals carry the plate or model after the colon,
     -- which is exactly the kind of detail that must not reach a statement.
     ['vehicle']          = 'Vehicle purchase',
@@ -126,12 +142,19 @@ local function statementLabel(reason)
         if STATEMENT_PREFIXES[prefix] then return STATEMENT_PREFIXES[prefix] end
     end
 
-    -- Logged once each, so a missing label is visible in the console without
-    -- flooding it, and never visible to the player.
-    if not unknownReasons[reason] then
-        unknownReasons[reason] = true
+    -- Logged once per PREFIX, not once per reason.
+    --
+    -- Keyed on the whole string, an unmapped `fine:%d` inserted a new permanent
+    -- entry and printed a new console line for every fine ever issued, because
+    -- the id is an auto-increment. The cache was only ever exercised by exactly
+    -- the slugs whose cardinality is unbounded, which is the opposite of what
+    -- it was for.
+    local key = prefix or reason
+
+    if not unknownReasons[key] then
+        unknownReasons[key] = true
         print(('[som-phone] no statement label for reason "%s", showing "Transaction"')
-            :format(reason))
+            :format(key))
     end
 
     return 'Transaction'

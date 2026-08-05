@@ -231,31 +231,51 @@ end)
 -- player applies here exactly as it does there.
 -- ---------------------------------------------------------------------------
 
--- pending[source][label] = { total = number, count = number }
+-- pending[source][label] = { out = number, inn = number, outCount, inCount }
+--
+-- Money out and money in are accumulated SEPARATELY rather than summed into one
+-- signed total. Summing looked tidier and was wrong: som-police charges for an
+-- armoury item and then refunds the identical amount milliseconds later if
+-- ox_inventory has no room, always inside the same window, so the two netted to
+-- zero and the banner read "+$0 (2)". som-rentals has the same charge-then-
+-- refund pair. Partial offsets were worse, silently hiding two real movements
+-- behind one misleading number.
 local pending = {}
-local flushing = {}
+
+-- A monotonic token per scheduled flush rather than a boolean. Server ids are
+-- recycled on reconnect, so a timer armed for a player who then disconnects
+-- would otherwise fire against whoever inherited the id, clear their guard, and
+-- leave two timers racing until every movement flushed on its own.
+local flushToken = {}
+local nextToken = 0
 
 ---@param source number
-local function flushCardAlerts(source)
+---@param token number
+local function flushCardAlerts(source, token)
+    -- Not ours any more. The player this was armed for has gone.
+    if flushToken[source] ~= token then return end
+
     local mine = pending[source]
 
     pending[source] = nil
-    flushing[source] = nil
+    flushToken[source] = nil
 
     if not mine then return end
 
     for label, entry in pairs(mine) do
-        -- Sign carried explicitly. A refund and a charge under one label are
-        -- otherwise indistinguishable once summed.
-        local sign = entry.total < 0 and '-' or '+'
-        local amount = math.abs(entry.total)
+        -- One line per direction, so a charge and a refund under one label are
+        -- both stated instead of cancelling.
+        if entry.out > 0 then
+            local times = entry.outCount > 1 and ('  (%d)'):format(entry.outCount) or ''
+            exports['som-phone']:notifyApp(source, 'bank',
+                ('%s  -$%s%s'):format(label, entry.out, times))
+        end
 
-        -- Only when it happened more than once. "(1)" on a single purchase is
-        -- noise pretending to be information.
-        local times = entry.count > 1 and ('  (%d)'):format(entry.count) or ''
-
-        exports['som-phone']:notifyApp(source, 'bank',
-            ('%s  %s$%s%s'):format(label, sign, amount, times))
+        if entry.inn > 0 then
+            local times = entry.inCount > 1 and ('  (%d)'):format(entry.inCount) or ''
+            exports['som-phone']:notifyApp(source, 'bank',
+                ('%s  +$%s%s'):format(label, entry.inn, times))
+        end
     end
 end
 
@@ -271,6 +291,15 @@ AddEventHandler('som:server:moneyChanged', function(source, _, account, delta, _
     source = tonumber(source)
     if not source or source <= 0 then return end
 
+    -- The phone is an item that can be lost, stolen or confiscated, and
+    -- som-phone:server:open already refuses to open without one. A card alert
+    -- buzzing in the pocket of somebody whose phone was just taken off them in
+    -- custody would contradict that outright.
+    if Config.RequireItem and GetResourceState('ox_inventory') == 'started' then
+        local count = exports.ox_inventory:GetItemCount(source, Config.Item)
+        if not count or count < 1 then return end
+    end
+
     local label = Bank.StatementLabel and Bank.StatementLabel(reason) or 'Transaction'
 
     local mine = pending[source]
@@ -283,27 +312,38 @@ AddEventHandler('som:server:moneyChanged', function(source, _, account, delta, _
     local entry = mine[label]
 
     if not entry then
-        entry = { total = 0, count = 0 }
+        entry = { out = 0, inn = 0, outCount = 0, inCount = 0 }
         mine[label] = entry
     end
 
-    entry.total = entry.total + delta
-    entry.count = entry.count + 1
+    if delta < 0 then
+        entry.out = entry.out + math.abs(delta)
+        entry.outCount = entry.outCount + 1
+    else
+        entry.inn = entry.inn + delta
+        entry.inCount = entry.inCount + 1
+    end
 
     -- One timer per player per window, not one per movement. Without this guard
     -- every purchase would schedule its own flush and the aggregation would
     -- fire once per transaction anyway, which is the bug it exists to prevent.
-    if flushing[source] then return end
+    if flushToken[source] then return end
 
-    flushing[source] = true
-    SetTimeout(cfg.window or 4000, function() flushCardAlerts(source) end)
+    nextToken = nextToken + 1
+    local token = nextToken
+    flushToken[source] = token
+
+    SetTimeout(cfg.window or 4000, function() flushCardAlerts(source, token) end)
 end)
 
 -- A player who leaves mid-window has nothing to be told and no client to tell.
+--
+-- The armed timer cannot be cancelled, so clearing the token is what disarms
+-- it: the flush checks the token still matches before doing anything.
 AddEventHandler('playerDropped', function()
     local source = source
     pending[source] = nil
-    flushing[source] = nil
+    flushToken[source] = nil
 end)
 
 -- ---------------------------------------------------------------------------

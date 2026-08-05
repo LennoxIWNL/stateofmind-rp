@@ -509,10 +509,38 @@ document.getElementById('send-form').addEventListener('submit', async (e) => {
     }
 });
 
+/* Put the phone away, letting the stow animation finish first.
+ *
+ * Hiding immediately was half of why the open felt cheap: it appeared with an
+ * animation and then simply blinked out of existence, so the whole gesture read
+ * as a panel toggling rather than a device being pocketed.
+ *
+ * NUI focus is released by the Lua side the moment `close` is posted, so the
+ * player is back in control during the 300ms rather than waiting on it. */
+let stowTimer = null;
+
+function stow() {
+    const phone = document.querySelector('.phone');
+
+    clearTimeout(stowTimer);
+
+    if (!phone || root.classList.contains('hidden')) {
+        root.classList.add('hidden');
+        return;
+    }
+
+    phone.classList.add('is-stowing');
+
+    stowTimer = setTimeout(() => {
+        root.classList.add('hidden');
+        phone.classList.remove('is-stowing');
+    }, 300);
+}
+
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         post('close');
-        root.classList.add('hidden');
+        stow();
         return;
     }
     if (e.key === 'Enter' && locked && !e.target.matches('input, select, textarea')) unlock();
@@ -539,6 +567,13 @@ window.addEventListener('message', async (event) => {
 
         // Always opens locked. It is one click, and it is the difference
         // between a menu and something that reads as a phone.
+        // Cancel a stow in flight. Reopening within the 300ms would otherwise
+        // leave is-stowing applied and the timer would then hide the phone
+        // again a moment after it was asked to open.
+        clearTimeout(stowTimer);
+        const stowing = document.querySelector('.phone.is-stowing');
+        if (stowing) stowing.classList.remove('is-stowing');
+
         root.classList.remove('is-banners-only');
         locked = true;
         showView('lock');
@@ -566,5 +601,5 @@ window.addEventListener('message', async (event) => {
         return;
     }
 
-    if (msg.action === 'close') root.classList.add('hidden');
+    if (msg.action === 'close') stow();
 });
