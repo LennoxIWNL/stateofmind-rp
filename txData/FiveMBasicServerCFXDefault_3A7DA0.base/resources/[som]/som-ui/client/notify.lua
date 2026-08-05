@@ -12,6 +12,16 @@ local VALID_TYPES = {
     warning = true,
 }
 
+-- 18 call sites across 10 som-* resources say 'inform' rather than 'info'.
+-- Nothing looked broken, because an unknown type already falls back to 'info',
+-- which is what they all wanted. That made the fallback load bearing: changing
+-- it, or giving unknown types a distinct style, would have quietly restyled
+-- eighteen notifications at once. Named here so the intent is explicit rather
+-- than accidental.
+local ALIASES = {
+    inform = 'info',
+}
+
 local DEFAULT_DURATION = 4000
 local MAX_DURATION = 15000
 
@@ -21,6 +31,7 @@ local MAX_DURATION = 15000
 local function notify(message, notifyType, duration)
     if type(message) ~= 'string' or message == '' then return end
 
+    notifyType = ALIASES[notifyType] or notifyType
     if not VALID_TYPES[notifyType] then notifyType = 'info' end
 
     duration = tonumber(duration) or DEFAULT_DURATION

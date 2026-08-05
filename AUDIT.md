@@ -1380,6 +1380,15 @@ Recorded because in every one of these the obvious diagnosis was wrong.
   `som:client:playerLoaded` sent it. This is why ps-mdt concatenated a nil
   `job.grade.name` and sat on "Welcome, loading...". `syncState` now includes
   `label` and `gradeLabel` on both the job and gang bags, and must keep doing so.
+- **ps-mdt spells it `cid`, som-dispatch compared `citizenid`.** Only one unit
+  could ever attach to a dispatch call. ps-mdt builds its unit payload with
+  `cid` (`server/main.lua:1441` and `:1512`), so comparing `citizenid` compared
+  **nil against nil, which is true**: the first unit in the list matched
+  everybody, the second officer to attach was treated as already attached and
+  never added, and any officer detaching removed whoever happened to be first
+  rather than themselves. `unitKey()` now resolves either spelling and refuses a
+  unit with no identity, since one that cannot be identified can never detach.
+  Same class of fault as the licences spelling below, hidden the same way.
 - **qb spells it `licences`, SOM spells it `licenses`.** Only the online lookup
   broke, because the offline path had a default, which disguised a spelling
   mismatch as a database fault. `som-compat` aliases both directions.

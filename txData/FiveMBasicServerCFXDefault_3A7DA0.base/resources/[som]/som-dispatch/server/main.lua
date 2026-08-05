@@ -290,12 +290,36 @@ end)
 -- its UI, so returning the new count matters.
 -- ---------------------------------------------------------------------------
 
+---The identity of an attached unit.
+---
+---ps-mdt builds its unit payload with `cid` (server/main.lua:1441 and :1512),
+---never `citizenid`. Comparing `citizenid` therefore compared nil against nil,
+---which is TRUE, so the first unit in the list matched everybody: the second
+---officer to attach was silently treated as already attached and never added,
+---and any officer detaching removed whoever happened to be first instead of
+---themselves.
+---
+---Exactly the class of fault as the `licences` spelling in 16.3, and hidden the
+---same way, by a comparison that quietly succeeds on two nils.
+---@param unit table|nil
+---@return string|nil
+local function unitKey(unit)
+    if type(unit) ~= 'table' then return nil end
+    return unit.cid or unit.citizenid
+end
+
 AddEventHandler('dispatch:addUnit', function(callid, playerdata, cb)
     local call = calls[callid]
     if not call then return cb and cb(0) end
 
+    local key = unitKey(playerdata)
+
+    -- Without an identity there is no way to dedupe them now or remove them
+    -- later, so refuse rather than add a unit that can never detach.
+    if not key then return cb and cb(#call.units) end
+
     for _, unit in ipairs(call.units) do
-        if unit.citizenid == playerdata.citizenid then
+        if unitKey(unit) == key then
             return cb and cb(#call.units)
         end
     end
@@ -308,8 +332,11 @@ AddEventHandler('dispatch:removeUnit', function(callid, playerdata, cb)
     local call = calls[callid]
     if not call then return cb and cb(0) end
 
+    local key = unitKey(playerdata)
+    if not key then return cb and cb(#call.units) end
+
     for i, unit in ipairs(call.units) do
-        if unit.citizenid == playerdata.citizenid then
+        if unitKey(unit) == key then
             table.remove(call.units, i)
             break
         end
