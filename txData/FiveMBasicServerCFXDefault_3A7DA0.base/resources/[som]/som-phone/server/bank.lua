@@ -35,8 +35,18 @@ local STATEMENT_LABELS = {
     ['paycheck']           = 'Wages',
     ['salary']             = 'Wages',
     ['fine']               = 'Fine',
+    ['fines']              = 'Fine',
     ['tax']                = 'Tax',
     ['treasury']           = 'City treasury',
+    ['armoury-refund']     = 'Armoury refund',
+    ['vehicle-refund']     = 'Vehicle refund',
+    ['impound']            = 'Impound fee',
+    ['impounded']          = 'Impound fee',
+    ['rent']               = 'Rent',
+    ['vehicle-rental']         = 'Vehicle rental',
+    ['vehicle-rental-deposit'] = 'Rental deposit',
+    ['vehicle-rental-refund']  = 'Deposit returned',
+    ['rental-deposit']         = 'Rental deposit',
 }
 
 -- Reasons that carry an id, matched on their prefix.
@@ -54,7 +64,43 @@ local STATEMENT_PREFIXES = {
     ['rental']           = 'Vehicle rental',
     ['rental-deposit']   = 'Rental deposit',
     ['impound']          = 'Impound fee',
+    -- Detail is a citizenid on the business leg and a business name on the
+    -- employee leg. Neither belongs on a statement, so only the category shows.
+    ['commission']       = 'Commission',
+    ['seize']            = 'Seized',
+    ['evidence']         = 'Evidence',
 }
+
+-- Prefixes whose detail after the colon is an ITEM NAME, and which therefore
+-- can say what was actually bought rather than only that something was.
+--
+-- This is the difference between a statement reading "Transaction" and one
+-- reading "Armoury: Carbine Rifle". The item name is still a slug, so it is
+-- resolved through ox_inventory's own label and only shown if that lookup
+-- succeeds. An unresolved item falls back to the category, never to the slug.
+--
+-- Deliberately a whitelist of PREFIXES, not of details. `commission:` is
+-- absent because its detail is a citizenid, and `vehicle:` because its detail
+-- is a spawn name; neither is something a player should read on a statement.
+local ITEM_DETAIL_PREFIXES = {
+    ['armoury'] = 'Armoury',
+    ['subsidy'] = 'Department issue',
+    ['shop']    = 'Purchase',
+}
+
+---ox_inventory's display label for an item name.
+---@param name string
+---@return string|nil
+local function itemLabel(name)
+    if type(name) ~= 'string' or name == '' then return nil end
+    if GetResourceState('ox_inventory') ~= 'started' then return nil end
+
+    local ok, items = pcall(function() return exports.ox_inventory:Items() end)
+    if not ok or type(items) ~= 'table' then return nil end
+
+    local def = items[name]
+    return type(def) == 'table' and def.label or nil
+end
 
 local unknownReasons = {}
 
@@ -66,8 +112,19 @@ local function statementLabel(reason)
     local exact = STATEMENT_LABELS[reason]
     if exact then return exact end
 
-    local prefix = reason:match('^([%a%-]+):')
-    if prefix and STATEMENT_PREFIXES[prefix] then return STATEMENT_PREFIXES[prefix] end
+    local prefix, detail = reason:match('^([%a%-]+):(.*)$')
+
+    if prefix then
+        -- Say what was bought where the detail is safe to resolve.
+        local head = ITEM_DETAIL_PREFIXES[prefix]
+
+        if head then
+            local label = itemLabel(detail)
+            return label and ('%s: %s'):format(head, label) or head
+        end
+
+        if STATEMENT_PREFIXES[prefix] then return STATEMENT_PREFIXES[prefix] end
+    end
 
     -- Logged once each, so a missing label is visible in the console without
     -- flooding it, and never visible to the player.

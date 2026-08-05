@@ -2208,6 +2208,21 @@ alert, and a way to lose the proceeds.
 
 **Effort.** Three weeks. Epic if written rather than adopted.
 
+### 18.7b Phase 7b: Identity and continuity
+
+**Goal.** The server stops looking stale and starts looking like itself. Full
+detail in 18.12, including the inventory reskin, which is the largest unstyled
+surface on the server.
+
+Run **twice**: a first pass now at the end of phase 1 while the surface is small
+enough to fix cheaply, and a second before launch when everything exists.
+Leaving it all until the end means reconciling forty screens instead of ten.
+
+**Exit criteria.** Five screens side by side read as one product to somebody
+who has not seen the server before.
+
+**Effort.** One week for the first pass, two for the second.
+
 ### 18.8 Phase 8: Depth, then launch readiness
 
 **Goal.** The things that keep players past week two, then the things that keep
@@ -2322,3 +2337,79 @@ for every shop that follows:
 store, the mod bay, rentals, fines and bills arriving, door lock and unlock,
 custody actions, and every shop added from here. None is more than a few lines
 now that the layer exists.
+
+### 18.12 Identity and continuity: the missing phase
+
+The roadmap as first written had no phase for how the server LOOKS, and that is
+a real omission rather than a detail. The owner's assessment is that the server
+currently looks stale and has no distinction of its own, and that the leading
+servers have a wow factor this does not. Both are correct.
+
+This is not a polish pass to be tacked onto the end. Continuity is a phase with
+its own exit criteria, and it fails if it is left until last, because by then
+there are forty screens to reconcile instead of ten.
+
+**Run it twice.** Once now, at the end of phase 1, while the surface is small
+enough to fix cheaply. Once again before launch, when everything exists.
+
+#### What continuity actually means here
+
+- **One visual language, enforced.** `som-assets/tokens.css` exists and is the
+  single source of truth. Every som-* NUI already imports it. The failure mode
+  is not missing tokens, it is screens that import them and then hardcode
+  values anyway, which is how `.panel` and `.card` ended up at 18px/65% against
+  16px/68% and looked like a mistake. An audit pass over every NUI for local
+  values that should be tokens.
+- **One motion language.** Durations, easings and entrance directions currently
+  differ per screen because each was written on its own day. Pick one set, put
+  it in tokens, apply everywhere.
+- **One sound language.** Now started, see 18.11. Every screen and every action
+  either has a feedback sound or has a reason not to.
+- **One empty state, one error state, one loading state.** A blank panel that
+  looks like a failed load is a bug that appears once per screen.
+- **A brand that is not just a colour.** Pink is a palette, not an identity. A
+  logo treatment, a typographic voice, a consistent card silhouette, a login and
+  loading sequence that says which server this is.
+
+#### Named work
+
+| Item | What it is | Effort |
+|---|---|---|
+| **Full inventory reskin** | ox_inventory's stock UI is the single largest unstyled surface on the server and the one players look at most. It must be brought into the SOM language: card shape, tokens, motion, sounds. This is the highest-value visual item on the roadmap | large |
+| **Inventory icon set** | Currently a mix of realistic and cartoon, with some items missing icons entirely. See the constraint below | medium |
+| Phone visual pass | Slide-up animation, banner design, app chrome. Currently functional and plain | medium |
+| Loading screen and login sequence | First thing anyone sees, and currently the stock one | small |
+| HUD | Does not exist. Whatever is built sets the tone for everything around it | medium |
+| Motion and token audit | Every NUI, checked against tokens | medium |
+| Map, blips and waypoint styling | Coloured minimap is in; blip sprites and colours are still per-resource choices | small |
+| Character selector presentation | Works, looks plain, and is the second thing anyone sees | medium |
+| Death, arrest and jail screens | Do not exist yet. They arrive with phase 2 and must arrive already in-language | medium |
+
+#### Constraint on the icon set
+
+**Icons are binary assets and cannot be added by Claude**, exactly as vehicle
+packs cannot. The most any session can do is recommend a set and wire the config
+once the files are on disk.
+
+What is needed is a **single complete set covering every item in
+`ox_inventory/data/items.lua` plus every som-* item**, in one consistent style.
+Mixing two sets is what produces the current half-realistic half-cartoon result,
+and adding a few missing icons from a third source makes it worse rather than
+better.
+
+Sourcing rules apply as everywhere else: a freely redistributable set, or one
+whose licence permits use on a game server. Icon packs are commonly redistributed
+without a clear licence, and "found in another inventory script" is not a
+licence. This needs checking before adoption, not after.
+
+Once the files are on disk the wiring is small: ox_inventory resolves an item's
+image from its name, so a complete set in one folder needs no per-item config.
+The audit work is finding the items that have NO icon, which is a script that
+lists every item name against the icon folder and prints the misses.
+
+#### Exit criteria
+
+A screenshot of any five screens, shown side by side, reads as one product by
+somebody who has not seen the server before. No screen uses a colour, radius,
+duration or font that is not in tokens. Every action has feedback. Nothing is
+stock.
