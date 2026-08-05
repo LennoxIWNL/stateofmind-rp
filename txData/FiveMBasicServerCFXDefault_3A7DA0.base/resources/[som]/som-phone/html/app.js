@@ -532,7 +532,15 @@ function stow() {
     phone.classList.add('is-stowing');
 
     stowTimer = setTimeout(() => {
-        root.classList.add('hidden');
+        // A banner can arrive during the 300ms stow, and banners live INSIDE
+        // this root. Hiding it here would take the banner with it, which is
+        // how closing the phone started swallowing notifications.
+        if (!bannersEl.children.length) {
+            root.classList.add('hidden');
+        } else {
+            root.classList.add('is-banners-only');
+        }
+
         phone.classList.remove('is-stowing');
     }, 300);
 }
@@ -587,6 +595,12 @@ window.addEventListener('message', async (event) => {
         // Arrives whether or not the phone is open. If it is closed, the root
         // is shown in banner-only mode: no device, no focus, just the drop
         // down, and it hides itself again once the last one expires.
+        // Cancel a stow in flight, or its timer fires a moment later and
+        // hides the root this banner is being shown in.
+        clearTimeout(stowTimer);
+        const stowingPhone = document.querySelector('.phone.is-stowing');
+        if (stowingPhone) stowingPhone.classList.remove('is-stowing');
+
         if (root.classList.contains('hidden')) {
             root.classList.add('is-banners-only');
             root.classList.remove('hidden');

@@ -2572,8 +2572,7 @@ the SOM look by default rather than by remembering to.
 Not gradients. The things those servers do that SOM does not:
 
 - **Diegetic where it can be.** The phone is a phone in a hand, not a panel.
-  SOM already does this and should extend it: an ID card held up, a clipboard
-  for the MDT, a physical radio. Every screen that can be an object should be.
+  SOM already does this and should extend it: an ID card held up, a physical radio. Every screen that can be an object should be.
 - **Motion with weight.** Things arrive from somewhere and leave somewhere.
   The phone rework this session is the reference; everything else should match
   its easing and duration rather than inventing its own.
