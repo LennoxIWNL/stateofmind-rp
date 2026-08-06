@@ -143,14 +143,24 @@ end)
 AddEventHandler('gameEventTriggered', function(name, args)
     if name ~= 'CEventNetworkEntityDamage' then return end
 
-    -- args[1] victim, args[2] attacker, args[6] weapon hash.
+    -- args[1] is the victim and args[2] the attacker. Everything after that is
+    -- disputed: this file read args[6] as the weapon hash, som-medical shipped
+    -- reading it as the fatal flag and worked, and the Cfx sample and PolyZone
+    -- both read args[4] as the fatal flag. They cannot all be right.
+    --
+    -- So the argument is a hint and the PED is the truth, the same resolution
+    -- som-medical uses. Whatever the player is actually holding is not a
+    -- decoding of anything, and both candidates still have to pass the damage
+    -- type check, so a wrong guess reports nothing rather than reporting a
+    -- pistol shot as an explosion.
     local attacker = args[2]
     if attacker ~= cache.ped then return end
 
-    local weapon = args[6]
-    if not weapon then return end
+    local function explosive(weapon)
+        return weapon and weapon ~= 0 and GetWeaponDamageType(weapon) == 5
+    end
 
-    if GetWeaponDamageType(weapon) == 5 then
+    if explosive(args[6]) or explosive(GetSelectedPedWeapon(cache.ped)) then
         report('explosion', { street = streetAt(GetEntityCoords(cache.ped)) })
     end
 end)

@@ -104,11 +104,15 @@ body {
     gap: 10px;
 }
 
+/* 0.62, not 0.5. The card is translucent, so its composite depends on what is
+   behind it, and 50% white over the card sitting on snow or a blown out sky
+   lands at 4.35:1 at this size. That is exactly the case the alpha values were
+   chosen to survive, so the step that does not survive it has to move. */
 .down__timerlabel {
     font-size: 0.68rem;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.62);
 }
 
 .down__clock {
@@ -155,12 +159,14 @@ body {
     color: rgba(255, 255, 255, 0.82);
 }
 
+/* Same reason as the timer label, and it matters more here: this is the only
+   place the player is told what standing up will cost. */
 .down__fee {
     display: block;
     margin-top: 5px;
     font-family: var(--som-font-mono);
     font-size: 0.74rem;
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.62);
 }
 
 @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }

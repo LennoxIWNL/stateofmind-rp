@@ -98,6 +98,30 @@ exports('revive', Medical.Revive)
 -- Going down
 -- ---------------------------------------------------------------------------
 
+---Whether the server's own view of this player's ped says it is dead.
+---
+---Retried once, because entity health is replicated and the client reports its
+---death the instant it happens. A single check can genuinely lose that race and
+---refuse a real death, which is a far worse failure than the one it prevents.
+---A player who is not dying is still not dying 300ms later.
+---@param source number
+---@return boolean
+local function pedIsDead(source)
+    for _ = 1, 2 do
+        local ped = GetPlayerPed(source)
+
+        if ped and ped ~= 0 and GetEntityHealth(ped) <= 0 then return true end
+
+        Wait(300)
+    end
+
+    return false
+end
+
+-- In flight, so a client cannot open a hundred of these and hold the server in
+-- the Wait above.
+local reporting = {}
+
 RegisterNetEvent('som-medical:server:died', function(cause)
     local source = source
 
@@ -106,6 +130,25 @@ RegisterNetEvent('som-medical:server:died', function(cause)
 
     local player = core:getPlayer(source)
     if not player then return end
+
+    if reporting[source] then return end
+    reporting[source] = true
+
+    -- THE DEATH ITSELF IS CHECKED, not just the shape of the message.
+    --
+    -- Without this the event is a self-service invincibility button: a player
+    -- losing a firefight triggers it at full health, the client half of this
+    -- resource then holds them at 150 HP with SetEntityInvincible every frame,
+    -- and the shots that were about to kill them stop landing. They wake up at
+    -- the hospital for $350 having won the fight by declaring themselves dead.
+    local dead = pedIsDead(source)
+
+    reporting[source] = nil
+
+    if not dead then return end
+
+    -- Still connected, and still the same character, after the wait above.
+    if not core:getPlayer(source) then return end
 
     Medical.Down(source, cause and cause:sub(1, 48) or nil)
 end)
@@ -183,8 +226,18 @@ CreateThread(function()
         local limit = Config.ForceRespawnAfter or 600
         local now = os.time()
 
-        for cid, entry in pairs(downed) do
-            if now - entry.since >= limit then
+        for _, entry in pairs(downed) do
+            -- Only to a source that is still that character.
+            --
+            -- Entries survive a disconnect on purpose, so without this check a
+            -- body left by someone who logged off keeps firing at their old
+            -- server id every five seconds forever. Server ids are recycled, so
+            -- that eventually lands on somebody else: if the new holder is
+            -- themselves down and past the offer window, the callback succeeds
+            -- for them, and they are charged and teleported out of a scene
+            -- eight minutes early by a timer belonging to a player who left.
+            if entry.source and GetPlayerName(entry.source)
+                and now - entry.since >= limit then
                 -- Told to go, rather than moved from here: the client owns the
                 -- camera and the fade, and it asks for the respawn itself so
                 -- there is one code path in and not two.
@@ -196,8 +249,16 @@ end)
 
 -- A player who disconnects while down STAYS down, because the table is keyed by
 -- citizenid. Only the source is stale, so it is refreshed when they return.
-AddEventHandler('som:server:playerLoaded', function(source, player)
-    local entry = player and player.citizenid and downed[player.citizenid]
+--
+-- The second argument is a CITIZENID STRING, not a player table. som-core emits
+-- `som:server:playerLoaded(source, player.citizenid)` and its README documents
+-- exactly that. This handler took `player` and read `player.citizenid`, which on
+-- a string returns nil through the string metatable rather than erroring, so it
+-- returned on the first line every single time and did so silently. Relogging
+-- while down was therefore a free revive: no wait, no fee, and the character
+-- left marked down in the table and in the database forever.
+AddEventHandler('som:server:playerLoaded', function(source, citizenid)
+    local entry = type(citizenid) == 'string' and downed[citizenid] or nil
     if not entry then return end
 
     entry.source = source
@@ -211,4 +272,19 @@ AddEventHandler('som:server:playerLoaded', function(source, player)
     -- `since`, would have let them up immediately.
     TriggerClientEvent('som-medical:client:down', source, entry.since,
         os.time() - entry.since)
+end)
+
+-- The source goes stale the moment they leave; the ENTRY does not.
+--
+-- Clearing the source rather than the entry is the whole point: the character
+-- is still down, so they come back down, but nothing addresses their old server
+-- id in the meantime. Both the force-respawn loop and any future medic path
+-- check for a live source before using one.
+AddEventHandler('som:server:playerUnloaded', function(source, citizenid)
+    reporting[source] = nil
+
+    local entry = type(citizenid) == 'string' and downed[citizenid] or nil
+    if not entry then return end
+
+    entry.source = nil
 end)

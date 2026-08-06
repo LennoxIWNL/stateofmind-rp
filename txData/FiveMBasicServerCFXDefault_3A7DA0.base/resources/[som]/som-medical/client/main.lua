@@ -11,6 +11,12 @@ local core = exports['som-core']
 
 local isDown = false
 local downSince = 0
+
+-- Seconds already served when this client was told it was down. Non-zero only
+-- after a reconnect, and it is what makes the client agree with the server
+-- about when treatment opens rather than starting its own two minutes.
+local downElapsed = 0
+
 local watching = false
 
 -- Where the body fell. Everything that tries to move it is measured against
@@ -24,14 +30,14 @@ local anchor = nil
 -- and still misses the frame a player dies and respawns in.
 -- ---------------------------------------------------------------------------
 
-AddEventHandler('gameEventTriggered', function(name, args)
-    if name ~= 'CEventNetworkEntityDamage' then return end
-    if isDown then return end
+-- Reported once per death. Cleared when the player is back up, so a second
+-- death still reports, and set before the event is sent so the damage handler
+-- and the poll below cannot both report the same death.
+local reported = false
 
-    local victim, killer, isFatal = args[1], args[2], args[6]
-
-    if victim ~= cache.ped then return end
-    if isFatal ~= 1 then return end
+local function reportDeath()
+    if isDown or reported then return end
+    reported = true
 
     local weapon
     local ok, hash = pcall(GetPedCauseOfDeath, cache.ped)
@@ -39,6 +45,52 @@ AddEventHandler('gameEventTriggered', function(name, args)
 
     -- The server decides whether this becomes a downed state.
     TriggerServerEvent('som-medical:server:died', weapon)
+end
+
+AddEventHandler('gameEventTriggered', function(name, args)
+    if name ~= 'CEventNetworkEntityDamage' then return end
+    if isDown or reported then return end
+    if args[1] ~= cache.ped then return end
+
+    -- WHICH ARGUMENT CARRIES THE FATAL FLAG IS DISPUTED, and this file is not
+    -- going to settle it. The Cfx ped-money-drops sample and PolyZone both read
+    -- args[4]; this resource shipped reading args[6] and was confirmed working
+    -- in game; som-dispatch documents args[6] as the weapon hash. They cannot
+    -- all be right, and picking one on reasoning rather than evidence is how a
+    -- working system becomes dead code in a build bump.
+    --
+    -- So the argument is treated as a HINT and the PED is treated as the truth.
+    -- IsPedDeadOrDying is not a decoding of anything: either the ped is dead or
+    -- it is not.
+    if args[4] ~= 1 and args[6] ~= 1 and not IsPedDeadOrDying(cache.ped, true) then
+        return
+    end
+
+    reportDeath()
+end)
+
+-- The fallback the handover called for.
+--
+-- The damage event fires for damage. Drowning, a long fall, a scripted kill and
+-- anything else that empties the health bar without a damage event attached
+-- would otherwise produce the stock GTA death screen, which is precisely the
+-- vanilla behaviour som-medical exists to replace.
+--
+-- Half a second, not a frame. This is a backstop for the rare path, and the
+-- event catches the common one within the same tick.
+CreateThread(function()
+    while true do
+        Wait(500)
+
+        -- The ped is legitimately dead during character select and the switch
+        -- into the world, and reporting then would down a player who has not
+        -- spawned yet.
+        if not isDown and not reported
+            and core:isPlayerLoaded()
+            and IsPedDeadOrDying(cache.ped, true) then
+            reportDeath()
+        end
+    end
 end)
 
 -- ---------------------------------------------------------------------------
@@ -173,6 +225,7 @@ RegisterNetEvent('som-medical:client:down', function(since, elapsed)
 
     isDown = true
     downSince = GetGameTimer()
+    downElapsed = tonumber(elapsed) or 0
 
     -- Asked for before the resurrect so it has the fade and the resurrect frame
     -- to stream in. holdDown re-requests if it is not ready.
@@ -222,6 +275,9 @@ RegisterNetEvent('som-medical:client:revive', function()
 
     isDown = false
     anchor = nil
+    -- Armed again for the next death. Without this the second death of a
+    -- session is never reported and the player gets the stock death screen.
+    reported = false
 
     -- Restored here as well as in the hold loop's tail. The loop is mid Wait(0)
     -- when this fires, so relying on it alone leaves a frame in which the player
@@ -245,9 +301,19 @@ local function requestRespawn()
     if not isDown or requesting then return end
     requesting = true
 
-    local res = lib.callback.await('som-medical:server:respawn', false)
+    -- pcall, because an ox_lib callback REJECTS as well as resolves: an invalid
+    -- response, or the 300 second callback timeout, makes Citizen.Await raise.
+    -- Unwinding past the reset below would leave `requesting` stuck true, and
+    -- with it stuck the hold thread never runs and forceRespawn returns early,
+    -- so the player is pinned on the floor with no escape but a reconnect.
+    local ok, res = pcall(lib.callback.await, 'som-medical:server:respawn', false)
 
     requesting = false
+
+    if not ok then
+        TriggerEvent('som:client:notify', 'The hospital did not answer. Try again.', 'error')
+        return
+    end
 
     if not res or not res.success then
         if res and res.error then
@@ -261,6 +327,7 @@ local function requestRespawn()
 
     isDown = false
     anchor = nil
+    reported = false
 
     SetEntityInvincible(cache.ped, false)
     SetPedCanRagdoll(cache.ped, true)
@@ -298,13 +365,30 @@ RegisterNetEvent('som-medical:client:forceRespawn', function()
     CreateThread(requestRespawn)
 end)
 
+---Whether the hospital will actually take the request yet.
+---
+---Checked HERE as well as on the server, and this is not a duplicated authority
+---check: the server still refuses early requests and always will. It is that E
+---is a key people rest on, and without this the hold completed every 1.2
+---seconds for the whole two minute wait, each one earning a refusal toast and
+---an error sound, with no hold bar on screen to explain any of it. Roughly
+---ninety error notifications for holding a common key.
+---@return boolean
+local function offerOpen()
+    if not isDown then return false end
+
+    local served = downElapsed + (GetGameTimer() - downSince) / 1000
+
+    return served >= (Config.RespawnOfferedAfter or 120)
+end
+
 -- Held, not tapped, so a stray keypress cannot cash in a medic already on the
 -- way. The NUI draws the progress; this decides when it counts.
 CreateThread(function()
     local held = 0
 
     while true do
-        if isDown and not requesting then
+        if isDown and not requesting and offerOpen() then
             if IsDisabledControlPressed(0, Config.RespawnKey)
                 or IsControlPressed(0, Config.RespawnKey) then
                 held = held + 100

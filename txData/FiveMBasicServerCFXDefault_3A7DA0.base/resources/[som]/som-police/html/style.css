@@ -164,11 +164,16 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
  * they have. That was wrong in one specific way: without it there is nothing on
  * screen that visibly moves when you buy something, so a purchase and a failed
  * purchase look identical. The number changing IS the feedback. */
+/* --som-text-dim, not mute. The raised tokens were checked against the panel's
+   own surfaces, and this is the one place that is not one: .pay__opt lifts the
+   background 5% white underneath exactly this text, which drops the mute step
+   back under 4.5:1 at 11px. Dim clears it, and the active state's pink still
+   separates the selected account from the rest. */
 .pay__value {
     font-size: 11px;
     font-weight: 650;
     font-family: var(--som-font-mono);
-    color: var(--som-text-mute);
+    color: var(--som-text-dim);
 }
 
 .pay__opt.is-active .pay__value { color: var(--som-pink-light); }
@@ -524,6 +529,11 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     left: 50%;
     bottom: 74px;
     transform: translateX(-50%);
+    /* It floats over the bottom row of tiles for 3.2 seconds, and the natural
+       reaction to "no room for that" is to drop something and click the same
+       tile again. Without this it eats that click. .pay__delta already does
+       this; the omission here was inconsistent within one file. */
+    pointer-events: none;
     padding: 9px 16px;
     border-radius: 10px;
     font-size: 12px;

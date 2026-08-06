@@ -51,6 +51,17 @@ local STATEMENT_LABELS = {
     -- handover notes said should read "Hospital treatment" was the one reading
     -- "Transaction" on both the banner and the statement.
     ['hospital-treatment']     = 'Hospital treatment',
+
+    -- CASH NATIVE REASONS.
+    --
+    -- These never needed a label before, because alerts were bank only and
+    -- these only ever happen on cash. Enabling cash alerts is what routes them
+    -- through here, and with no entry each one banners as "Transaction", which
+    -- on a robbery is worse than silence: the victim gets a meaningless line
+    -- sitting next to som-theft's own toast telling them what really happened.
+    ['robbed']             = 'Cash taken',
+    ['robbery-proceeds']   = 'Cash found',
+    ['robbery-reversal']   = 'Reversal',
 }
 
 -- Reasons that carry an id, matched on their prefix.
@@ -89,6 +100,11 @@ local STATEMENT_PREFIXES = {
     ['commission']       = 'Commission',
     ['seize']            = 'Seized',
     ['evidence']         = 'Evidence',
+    -- som-economy's market credits cash with `market-sale:<item>`. Cash native,
+    -- so it reached no banner until cash alerts were enabled. The detail is an
+    -- item slug and is deliberately NOT resolved: what was sold on the illegal
+    -- market is not something to itemise on a statement.
+    ['market-sale']      = 'Sale',
 }
 
 -- Prefixes whose detail after the colon is an ITEM NAME, and which therefore
@@ -115,11 +131,19 @@ local function itemLabel(name)
     if type(name) ~= 'string' or name == '' then return nil end
     if GetResourceState('ox_inventory') ~= 'started' then return nil end
 
-    local ok, items = pcall(function() return exports.ox_inventory:Items() end)
-    if not ok or type(items) ~= 'table' then return nil end
+    -- Items(name), NOT Items()[name].
+    --
+    -- Called with no argument the export hands back the raw ItemList and leaves
+    -- the caller to index it. ox_inventory keys weapons in UPPERCASE, and the
+    -- normalisation that turns 'weapon_carbinerifle' into 'WEAPON_CARBINERIFLE'
+    -- lives inside getItem, which the raw index skips. So the previous form
+    -- missed every weapon and matched only the ammo, which is to say it missed
+    -- four of the seven items in the armoury and every one worth naming. The
+    -- statement and the banner both read "Armoury" where they should have read
+    -- "Armoury: Carbine Rifle".
+    local ok, def = pcall(function() return exports.ox_inventory:Items(name) end)
 
-    local def = items[name]
-    return type(def) == 'table' and def.label or nil
+    return ok and type(def) == 'table' and def.label or nil
 end
 
 local unknownReasons = {}
