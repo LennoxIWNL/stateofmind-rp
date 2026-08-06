@@ -2,7 +2,7 @@
 
 ## Framework
 - **QBCore v1.2.6** at `resources/[qb]/qb-core/` (uses `oxmysql` + `lua54`)
-- **ox_lib v3.14.0** at `resources/[standalone]/ox_lib/`
+- **ox_lib v3.38.0** at `resources/[standalone]/ox_lib/`
 - **oxmysql v2.7.5** at `resources/[standalone]/oxmysql/` (provides `mysql-async`)
 - **ox_doorlock v1.14.4**, **qb-target**, **qb-inventory v1.0.2**, **pma-voice**
 - DB convar: `set mysql_connection_string` in `server.cfg` (file is gitignored; see `server.cfg.example`)
@@ -23,7 +23,17 @@ All resources live under `txData/FiveMBasicServerCFXDefault_3A7DA0.base/resource
 | `[system]` | baseevents |
 | `[cfx-default]` | Stock cfx resources |
 
-**Our code** (som-* / Lennox-*): `som-banking`, `som-carcontrol`, `som-deathscreen`, `som-jobsetup`, `som-lib`, `som-lockpick`, `som-notify`, `som-playerlist`, `som-rentacar`, `som-scoreboard`, `som-spray`, `som-text`, `som-textui`, `som-zones`, `som-towtruck`, `som-neons`, `som-emotes`, `Lennox-Anticheat`, `Lennox-NUIBlocker`.
+**Our code** (som-* / Lennox-*): `som-banking`, `som-carcontrol`, `som-deathscreen`, `som-jobsetup`, `som-lib`, `som-lockpick`, `som-notify`, `som-playerlist`, `som-rentacar`, `som-scoreboard`, `som-spray`, `som-text`, `som-textui`, `som-zones`, `som-towtruck`, `som-neons`, `som-emotes`, `Lennox-Anticheat`, `Lennox-NUIBlocker`,
+plus the `[som]` framework set: `som-assets`, `som-core`, `som-ui`, `som-hud`, `som-chat`,
+`som-interact`, `som-multichar`, `som-appearance`, `som-theft`, `som-economy`,
+`som-phone`, `som-pause`, `som-id`, `som-radial`, `som-rentals`, `som-medical`,
+`som-police`, `som-dispatch`, `som-garage`, `som-compat`.
+
+**ox_lib UI shims.** `lib.progressBar` and `lib.registerContext` are replaced by
+som-ui's own. The state lives in som-ui; the shim is loaded BY each consumer as
+`'@som-ui/client/progressbar.lua'` / `'@som-ui/client/context.lua'`, first in
+its `client_scripts`. Read those files' headers before touching either, and see
+AUDIT.md 16.6 item 4 and 21.4.
 
 **Third-party** (do not rewrite; config edits only): everything in `[qb]` except `som-*`, all Overextended resources, elixir-*, jim-*, randol_*, ps-*, BakiTelli_*, kloud-*, cdn-fuel, dpemotes, PolyZone, etc.
 

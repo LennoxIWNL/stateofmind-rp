@@ -2596,3 +2596,201 @@ choices affect how premium the server FEELS out of proportion to their size:
   The same applies to the vanilla death screen (som-medical replaces it), the
   vanilla pause map, vanilla radio, and vanilla weapon wheel. Each one that
   survives tells the player they are in GTA rather than in Los Santos.
+
+---
+
+## 21. Session handoff, third pass
+
+The medical test in 19.3 was run and passed: down instead of death, voice
+alive, no movement, no second kill, hold E at two minutes, hospital, fee. So
+19.5 item 1 is closed and nothing here was blocked on it.
+
+Then the same code was reviewed adversarially, and two of the four soft spots
+19.3 listed were not the ones that were actually broken. That is the thing
+worth carrying forward: **it passed a manual test and still had two blockers.**
+
+### 21.1 What was built
+
+| Thing | Where | State |
+|---|---|---|
+| Down animation | `som-medical` | Replaces ragdoll. `missarmenian2`/`drunk_loop` |
+| Anti emote-cancel | `som-medical/client/main.lua` | Re-assert per frame plus a coordinate anchor |
+| Free camera while down | `som-medical` | Controls 1 and 2 re-enabled |
+| Downed screen | `som-medical/html` | Card, contrast, countdown in both phases |
+| Hospital billed to card | `som-medical` + `som-phone` | So the bank app can state it |
+| Armoury tiles | `som-police/html` | Art fills the tile, label on a blurred band |
+| Cash card alerts | `som-phone` | The armoury notification bug |
+| Phone timings | `som-phone/html` | Pop-up 300ms, banner hold 4900ms |
+| Text tokens | `som-assets/tokens.css` | dim and mute raised; they failed contrast |
+| interact-sound | `[standalone]/interact-sound` | Validated, and its CDN removed |
+| **Context menu shim** | `som-ui/client/context.lua` | **The 20.2 pattern, extended** |
+| **som-hud** | `som-hud` | **New. Rings, voice, vehicle panel** |
+| Feedback sweep | `som-ui/client/notify.lua` | 18.11 closed, at the notification |
+
+### 21.2 The two blockers a passing manual test did not catch
+
+Both were found by review, not by play, and neither is visible from the
+outside.
+
+- **Relogging while down was a free revive.** som-core emits
+  `som:server:playerLoaded(source, citizenid)` and its README says so.
+  som-medical's handler took a player TABLE and read `player.citizenid`.
+  Indexing a string in Lua goes through the string metatable and returns nil
+  rather than erroring, so the restore returned on its first line every single
+  time, silently. The character was also left marked down in the table and in
+  the database forever. **A handler that reads the wrong shape does not crash
+  in Lua, it just never runs.** Check the emitter, not the memory of it.
+- **`som-medical:server:died` validated its argument's type and never checked
+  that anyone had died.** Trigger it at full health mid-firefight and the
+  client half holds you at 150 HP with `SetEntityInvincible` every frame, so
+  the shots about to kill you stop landing. The server now reads its own view
+  of the ped, retried once, because entity health replicates and refusing a
+  real death is worse than the hole it closes.
+
+### 21.3 Mistakes worth not repeating
+
+- **The fatal-flag argument index is genuinely disputed and nobody should
+  settle it by reasoning.** The Cfx `ped-money-drops` sample and PolyZone both
+  read `args[4]`. som-medical shipped reading `args[6]` and was confirmed
+  working in game. som-dispatch documents `args[6]` as the weapon hash. They
+  cannot all be right. The fix in both resources is to stop caring: the
+  argument is a hint, `IsPedDeadOrDying` is the truth, and there is a 500ms
+  health poll alongside it. That also picks up drowning, falling and scripted
+  kills, which is what 19.3 predicted would be missing.
+- **A whitelist that is never reached is the same as no whitelist.**
+  `itemLabel` called `exports.ox_inventory:Items()` with no argument and
+  indexed the raw list. ox_inventory keys weapons uppercase and normalises
+  inside `getItem`, so the raw index missed every weapon and matched only ammo.
+  "Armoury: Carbine Rifle" has read "Armoury" since the feature was written.
+  This is the second time a table in this file has been built in a shape that
+  never matched what callers emit; see 19.2 on `fine:%d`.
+- **Enabling a notification channel opens it to every reason on that account.**
+  Turning on cash alerts routed `robbed`, `robbery-proceeds` and `market-sale`
+  through the statement whitelist for the first time. None had a label. On a
+  robbery a bare "Transaction" line sitting next to som-theft's own toast is
+  worse than silence.
+- **Contrast was a token problem, not a screen problem.** `--som-text-dim` and
+  `--som-text-mute` at `#777` and `#555` came out around 4.6:1 and 2.6:1 on the
+  surfaces actually in use, and mute carries most of the small text on the
+  server. Fixed at the token. Two places still needed a local fix afterwards,
+  both where an element lifts its own background: check the composite, not the
+  base.
+- **Server ids are recycled and a stale one is a live weapon.** som-medical's
+  `downed` table survives a disconnect on purpose, so a body left by someone
+  who logged off fired `forceRespawn` at their old id every five seconds
+  forever. Eventually that lands on somebody else and rips them out of a scene
+  eight minutes early, charged $350.
+
+### 21.4 The context menu shim, and what it costs to extend
+
+20.2 said this was the highest-leverage NUI work available. It is done for
+context menus, and the pattern is now proven twice.
+
+The parts that are not obvious:
+
+- **The shim runs in the consumer, the state runs in som-ui.** Same split as
+  the progress bar and for a sharper reason: an `onSelect` is a closure over
+  the calling resource's locals and cannot cross a resource boundary. So the
+  shim keeps the real menu, sends a flattened description, and resolves the row
+  id that comes back.
+- **The click comes back as a broadcast plus a token.** som-ui fires
+  `som-ui:client:context`, which every consumer with the shim loaded receives.
+  Only the one holding the live token acts. This is what avoids a registry of
+  which resource owns what.
+- **canClose and selectable are re-decided in Lua.** The page is told both so
+  it can render correctly, and neither is trusted on the way back.
+- **Icons are passed through as names onto a `data-icon` attribute and never
+  resolved.** A left accent rule holds the space. When a licensed set lands it
+  is one CSS rule and no call site changes. This is the 19.4 item 2 decision
+  kept open rather than pre-empted.
+
+`lib.inputDialog`, `lib.alertDialog` and `lib.skillCheck` are the same job
+again and each is smaller than this one was. `lib.skillCheck` matters before
+the lockpick minigame, since that is what it was going to be built on.
+
+### 21.5 som-hud
+
+New resource. Read only in the strongest sense: no server half, no net event
+in, no NUI callback, so there is nothing for a client to lie to.
+
+Bottom right, because karma-minimap owns the bottom left. Five condition rings
+and a vehicle panel. Design is subtractive: armour stands down at zero, food
+and water above 90%, engine condition until damaged, the whole HUD in the pause
+menu and while downed. Pink appears in exactly one place, the voice ring while
+transmitting, which is the only element describing something happening now
+rather than something merely true.
+
+**Deliberately absent, and not stubbed:**
+
+- **Fuel.** No fuel resource runs here. `cdn-fuel` fails at load (19.2) and
+  `ox_fuel` is not installed. `GetVehicleFuelLevel` on a vanilla vehicle does
+  not meaningfully deplete, so the gauge would sit at one number forever, which
+  teaches the player to ignore the HUD. Install `ox_fuel` and it is a few
+  lines.
+- **Seatbelt.** There is no seatbelt system on this server. That is an
+  ejection-physics feature with an indicator attached, and building only the
+  indicator would be the wrong half.
+
+### 21.6 The feedback sweep, closed
+
+18.11's remaining list was garage take and store, the mod bay, rentals, fines,
+doors and custody. Every one already ends by notifying success or failure, so
+the sound moved into `som-ui`'s notify rather than to thirty call sites.
+
+Thirty `playSound` calls next to thirty `notify` calls is a sweep the
+thirty-first feature forgets, which is how the gap opened. An action is now
+audible because it reported itself.
+
+Info stays silent. Warning borrows the error sound rather than inventing a
+second audio string. A `silent` flag exists for callers that already said it
+better; the armoury is the model, distinguishing a $95,000 rifle from a free
+bandage.
+
+**Doors were deliberately not changed.** ox_doorlock already plays positional
+lock and unlock audio from its own sound set, which is more correct than a
+frontend UI sound: a door should sound like a door in the world.
+
+### 21.7 Open decisions
+
+1. **The shop money question is still open**, and the owner does not recall
+   which screen it was. The armoury half is done and has been for two sessions.
+   If it was the ox_inventory shops, those are stock ox UI showing no balance
+   at all, and that is a reskin of ox_inventory's shop rather than a config
+   change. It is bundled with the inventory reskin in 20.3 item 1.
+2. **Icons.** Unchanged from 19.4 item 2, and now with a hook waiting for them:
+   `data-icon` on every context menu row.
+3. **`interact-sound` is patched** but is still not ensured in `som.cfg`. It
+   was patched on its own merits. `PlayOnAll` has no caller anywhere in the
+   tree and should be deleted outright if it is still unused when the resource
+   is finally started.
+4. **`ox_lib` on disk is 3.38.0**, not the 3.14.0 recorded in CLAUDE.md.
+5. **Dispatch NUI** is still the generic toast. Unchanged from 19.4 item 4.
+
+### 21.8 Next, in order
+
+1. **The rest of the ox_lib shims**, per 21.4. `skillCheck` first, because the
+   lockpick minigame is waiting on it, then `inputDialog` and `alertDialog`.
+2. **Inventory reskin**, still 20.3 item 1 and still the largest surface.
+3. **Dispatch NUI**, called out twice by the owner.
+4. The rest of phase 1's cheap wins: spawn selection, loading screen, clothing
+   and barber zones, ID photos.
+5. EMS against som-medical's existing revive contract, which is unchanged and
+   still exported.
+
+### 21.9 Things to test in game
+
+Nothing in this session has been run on a live server.
+
+- **The context menus, hardest.** Mod bay, plate lookup, impound reason, fleet,
+  ID check, fine presets. Specifically: submenus and back, opening the fine
+  input dialog from inside a menu selection, and pressing Escape. If the cursor
+  ever survives a menu closing, stop and read `som-ui/client/contextui.lua`.
+- **The down state again**, end to end, including relogging while down. That
+  path has never worked and now should.
+- **The HUD**, in and out of a vehicle, and that it stands down in the pause
+  menu and while downed.
+- **A cash purchase**, for the phone banner that was missing.
+- **Whether any feedback sound is silent.** Every string in
+  `som-ui/shared/config.lua` is believed correct and none has been heard on
+  this server. A silent one is a wrong string, not broken code, and it is a one
+  line fix there.
