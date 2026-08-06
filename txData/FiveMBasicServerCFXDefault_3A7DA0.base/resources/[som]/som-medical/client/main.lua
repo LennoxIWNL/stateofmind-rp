@@ -351,12 +351,16 @@ local function requestRespawn()
     -- card, so som-phone's card alert states it, in the app that took it, with
     -- the same label the statement will carry. Saying it twice in two places in
     -- two formats is how a number starts looking like two numbers.
+    -- 'success' rather than 'inform', so it makes a sound. Waking up in a
+    -- hospital is the resolution of the worst thing that happens in a session
+    -- and it was the one transition on this path with no audible acknowledgement
+    -- at all.
     if res.charged and res.charged > 0 then
         TriggerEvent('som:client:notify',
-            ('Treated at %s. Billed to your card.'):format(res.label), 'inform', 7000)
+            ('Treated at %s. Billed to your card.'):format(res.label), 'success', 7000)
     else
         TriggerEvent('som:client:notify',
-            ('Treated at %s. Nothing to collect.'):format(res.label), 'inform', 7000)
+            ('Treated at %s. Nothing to collect.'):format(res.label), 'success', 7000)
     end
 end
 

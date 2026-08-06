@@ -89,11 +89,26 @@ exports('contextIsOpen', isOpen)
 -- page sending an id that was never rendered resolves to nothing.
 -- ---------------------------------------------------------------------------
 
+-- The sound half of a menu interaction, completing the 18.11 sweep for the
+-- surface this file replaces. ox_lib's menus were silent, and a menu that makes
+-- no noise when you pick something is the flatness that whole section is about.
+--
+-- Picking is `select`, leaving is `back`, and both are the frontend sounds the
+-- player already associates with those actions in this game.
+local SOUNDS = {
+    select = 'select',
+    back = 'back',
+    close = 'back',
+}
+
 ---@param action string
 ---@param id any
 local function forward(action, id)
     local token = activeToken
     if not token then return end
+
+    local sound = SOUNDS[action]
+    if sound and Feedback then Feedback.play(sound) end
 
     TriggerEvent('som-ui:client:context', {
         token = token,
@@ -120,6 +135,10 @@ RegisterNUICallback('context:close', function(_, cb)
     if not activeCanClose then return end
 
     local token = activeToken
+
+    -- Not through forward(), because the menu has to come down whether or not
+    -- anything still holds the token, so the sound is played here instead.
+    if token and Feedback then Feedback.play(SOUNDS.close) end
 
     -- Hidden before the owner is told, so focus is released even if the owner
     -- has been restarted and nothing is listening for the event.

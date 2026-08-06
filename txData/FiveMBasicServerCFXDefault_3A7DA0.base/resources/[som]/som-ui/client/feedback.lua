@@ -25,6 +25,12 @@ end
 
 exports('playSound', playSound)
 
+-- Shared inside som-ui, so notify.lua can sound a notification without going
+-- back out through this resource's own export. Files in a resource share one
+-- environment, and feedback.lua loading after notify.lua does not matter: the
+-- call happens at runtime, by which point both are loaded.
+Feedback = { play = playSound }
+
 -- Server-triggered, for feedback the client cannot know it earned: a fine
 -- landing, a paycheck, a bill accepted somewhere else.
 --

@@ -25,10 +25,35 @@ local ALIASES = {
 local DEFAULT_DURATION = 4000
 local MAX_DURATION = 15000
 
+-- The sound half of a notification, by severity.
+--
+-- THIS IS THE FEEDBACK SWEEP FROM 18.11, and it is here rather than at each of
+-- the call sites on purpose. The remaining list was garage take and store, the
+-- mod bay, rentals, fines, doors and custody, and every one of those already
+-- ends by notifying success or failure. Adding playSound next to each notify
+-- would have been thirty edits that the thirty-first new feature would forget,
+-- which is precisely how the gap opened in the first place. Sounding the
+-- notification itself means an action is audible because it reported itself,
+-- and every feature written from here is covered without being told to be.
+--
+-- Info is deliberately silent. Most notifications are informational chatter and
+-- a server that pings for every line of text is worse than one that never
+-- pings at all.
+--
+-- Warning borrows the error sound. It IS the "no" sound, which is what a
+-- warning is saying, and inventing a second audio string to sit beside it would
+-- put an unverified sound on the server for a distinction nobody has asked for.
+local NOTIFY_SOUNDS = {
+    success = 'success',
+    error = 'error',
+    warning = 'error',
+}
+
 ---@param message string
 ---@param notifyType string|nil success, error, info, warning
 ---@param duration number|nil milliseconds
-local function notify(message, notifyType, duration)
+---@param silent boolean|nil suppress the sound, for callers that play their own
+local function notify(message, notifyType, duration, silent)
     if type(message) ~= 'string' or message == '' then return end
 
     notifyType = ALIASES[notifyType] or notifyType
@@ -44,6 +69,15 @@ local function notify(message, notifyType, duration)
         type = notifyType,
         duration = duration,
     })
+
+    -- `silent` is for callers that have already said it better. The armoury is
+    -- the model: it distinguishes a $95,000 rifle from a free bandage with two
+    -- different sounds, and a generic success on top would flatten a
+    -- distinction it went to some trouble to make.
+    if silent then return end
+
+    local sound = NOTIFY_SOUNDS[notifyType]
+    if sound and Feedback then Feedback.play(sound) end
 end
 
 -- One handler only. RegisterNetEvent with a function both marks the event as
@@ -51,8 +85,8 @@ end
 -- AddEventHandler made every local TriggerEvent fire twice and show duplicate
 -- notifications. This single registration already serves both local
 -- TriggerEvent and server TriggerClientEvent.
-RegisterNetEvent('som:client:notify', function(message, notifyType, duration)
-    notify(message, notifyType, duration)
+RegisterNetEvent('som:client:notify', function(message, notifyType, duration, silent)
+    notify(message, notifyType, duration, silent)
 end)
 
 exports('notify', notify)
