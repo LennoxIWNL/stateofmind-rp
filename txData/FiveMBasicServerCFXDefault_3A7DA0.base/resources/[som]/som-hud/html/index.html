@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>som-hud</title>
+    <link rel="stylesheet" href="https://cfx-nui-som-assets/tokens.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Bottom right, as a column. The minimap owns the bottom left corner and
+         a HUD that fights it for space is how both end up unreadable.
+
+         Never takes NUI focus and has no callback: there is no input here, only
+         output. -->
+    <div id="hud" class="hud" hidden>
+        <!-- Only while in a vehicle. Slides in above the rings rather than
+             appearing somewhere else on screen, so the eye does not have to go
+             looking for it. -->
+        <div id="vehicle" class="veh" hidden>
+            <div class="veh__speed">
+                <span id="speed" class="veh__value">0</span>
+                <span id="unit" class="veh__unit">mph</span>
+            </div>
+
+            <div class="veh__side">
+                <span id="gear" class="veh__gear">N</span>
+                <div class="veh__engine" id="engine-wrap">
+                    <div id="engine" class="veh__enginefill"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="rings" id="rings"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
