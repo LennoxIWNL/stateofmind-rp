@@ -26,10 +26,28 @@ client_scripts {
     -- The client half of the ps-dispatch export surface. ps-mdt calls
     -- CustomAlert from the client, where nothing answered before.
     'client/compat.lua',
+    -- Draws the feed. Purely additive: it forwards the same call record
+    -- alerts.lua already receives, so ps-mdt's dispatch tab keeps working
+    -- unchanged alongside it.
+    'client/nui.lua',
 }
 
 server_scripts {
     'server/main.lua',
+}
+
+-- Built from ui/apps/som-dispatch. Do not edit html/ by hand, it is generated.
+--
+-- The asset names are stable rather than hashed, which is what lets this glob
+-- work: vite's default hashed filenames would need this block edited on every
+-- build, and a manifest that silently stops matching serves a blank page.
+ui_page 'html/index.html'
+
+files {
+    'html/index.html',
+    'html/assets/*.js',
+    'html/assets/*.css',
+    'html/assets/*.map',
 }
 
 dependencies {
