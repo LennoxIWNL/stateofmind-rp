@@ -122,3 +122,11 @@ Desktop.ini
 txData/FiveMBasicServerCFXDefault_3A7DA0.base/resources/\[standalone\]/Lennox-DoorCreator/lennox-doorcreator-prompt.md
 CLAUDE.md
 som-framework-rebuild-prompt.md
+
+# LCPDFR police/EMS pack, dropped into the repo for wiring (plan's "yours" list).
+# Streamed binaries and livery templates are copied to the server by hand and
+# never committed. The two dlc.rpf files alone are 480MB and 295MB, and GitHub
+# hard rejects anything over 100MB, which is why this route was abandoned once
+# already. *.rpf is covered above; this covers the 96MB of sign templates,
+# ELS configs and screenshots alongside them.
+/Vehicles/
