@@ -540,6 +540,42 @@ first pass had written off as impossible against this contract.
 handler is not a context to assume that is legal in. The wardrobe state read
 answers from its own thread.
 
+### The adversarial review, and the three defects it cost
+
+Run against the throw/give paths, the wardrobe and the bridge. **Seven of its
+eleven agents died on a session limit again** (third time on this project; see
+AUDIT 21.9 and item 3 above), so it is a PARTIAL review: 2 confirmed, 6
+refuted, and one claim that came back unverified because its verifier died.
+
+All three are fixed. Each is worth keeping, because each is a class rather than
+a one-off:
+
+- **CRITICAL: the wardrobe was written against a shape this codebase never
+  produces.** `components` and `props` are **ARRAYS OF RECORDS**
+  (`{ component_id = 11, drawable, texture }`), built that way by
+  `Appearance.Get` and read that way by `ApplyApparel`, which does
+  `tonumber(c.component_id)` and **skips any record without one**. Indexing them
+  as maps keyed by id hits an array POSITION, so component 3 read component 4's
+  record, and writing a fresh `{drawable, texture}` table dropped
+  `component_id`. `removeAll` would have silently emptied a character's stored
+  appearance of every component and prop **permanently**, since `wearAll` wrote
+  the same field-less shape back. Records are mutated IN PLACE now. Props also
+  take -1 for none, not 0, since 0 is a real hat.
+- **CRITICAL, and it came from the review's FAILED half: opening a drop was
+  pickpocketing.** `openNearbyInventory` reads like the export for this and is
+  not: it is `client.openInventory('player')` (`client.lua:709`), the function
+  behind `/steal`, which opens the nearest **player's pockets**. Now
+  `openInventory('drop', id)`. The review raised it and its verifier died before
+  confirming, so it arrived as an unverified claim rather than a finding.
+  **Checking it by hand took one grep.** The failed half of a review is not the
+  same as the clean half.
+- **HIGH: nearby drops only ever saw drops it watched happen.** Drops that
+  already exist when a client connects never fire `createDrop`; the server hands
+  the set over once in the first argument of `setPlayerInventory`, and
+  ox_inventory's own client registers them by calling its local `createDrop`
+  directly rather than re-emitting. So after any relog the list was empty while
+  standing on a bag.
+
 ### The only thing deliberately not done
 
 The throw readout is a NUMBER, not a drawn arc. The arc in the reference is
