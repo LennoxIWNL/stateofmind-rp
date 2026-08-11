@@ -1,0 +1,275 @@
+# Next session handoff
+
+Everything outstanding, in the order I would do it. Prompts A and B at the
+bottom are self-contained and can be run in their own session; the numbered
+work above them is one session's worth and shares context.
+
+**Read first:** `AUDIT.md` sections 19, 20 and 21, and
+`C:\Users\tweet\.claude\plans\i-m-unifying-the-visual-crispy-crescent.md`.
+Do not re-derive what is written there.
+
+**Standing rules.** Commit AND push to main every time and verify the remote
+head matches local. Commit as Lennox only: no `Co-Authored-By` trailer and no
+mention of Claude in any commit message. Never invent a native. No em dashes.
+Never show raw ledger slugs on bank UI.
+
+**No SQL has been changed yet.** `setup.sql` is untouched, so nothing needs
+reimporting until item 2 or 3 below lands, and both of those say so explicitly.
+
+---
+
+## 1. MDT person search is broken. Fully diagnosed, just needs writing
+
+`[custom]/ps-mdt/server/main.lua:819`, and a second occurrence in the same
+file, query QBCore's stock schema, which does not exist on this server.
+
+Two independent mismatches:
+
+- **Table.** som-core stores characters in `som_characters`, not `players`.
+- **Shape.** ps-mdt expects a `charinfo` JSON blob. `som_characters` has flat
+  columns, so `json.decode(result[i].charinfo)` fails even against the right
+  table.
+
+Corrected query:
+
+```sql
+SELECT c.citizenid, c.firstname, c.lastname, c.gender, c.metadata, md.pfp
+FROM som_characters c LEFT JOIN mdt_data md ON c.citizenid = md.cid
+WHERE (LOWER(c.firstname) LIKE :firstname AND LOWER(c.lastname) LIKE :lastname)
+   OR LOWER(c.citizenid) LIKE :citizenid
+LIMIT 30
+```
+
+The result loop must read flat columns instead of decoding `charinfo`.
+
+Two things you will hit immediately after: `gender` here is a TINYINT (0/1) but
+`ProfPic()` compares it to the string `"f"`, so every profile picture falls
+back to male. And the original `AND jobtype = :jobtype` has no parentheses
+around the OR branch **and** `jobtype` is not a column on that table at all,
+which is a latent bug that shipped with ps-mdt.
+
+This is the same class as AUDIT 16.6 item 1, which fixed the Profiles search.
+This is a second, separate search that was never touched.
+
+Verify: open an Incident, click Officers Involved, Civilians Involved and
+Criminals Involved in turn, and search by both a name and a citizen ID.
+
+## 2. CitizenID becomes a counting number
+
+Currently `generateCitizenId()` in `[som]/som-core/server/characters.lua`
+produces two random uppercase letters plus eight random digits (`AB12345678`)
+into a `VARCHAR(16)`. It is to become a plain sequence: 1, 2, 3.
+
+**Do not start by editing the generator.** The generator is the smallest part
+of this. Map the blast radius first, because a citizenid is the join key for
+most of the server:
+
+- **Three foreign keys** reference `som_characters(citizenid)` in `setup.sql`
+  (`som_character_money`, `som_vehicles`, and one more, grep
+  `REFERENCES \`som_characters\``). These cascade on delete, so any migration
+  has to move parents and children together or lose rows.
+- **ox_inventory owns the `inventory` column on `som_characters`** and its som
+  bridge points `{user_table}` and `{user_column}` at that table and
+  `citizenid`. Its own tables key off the same value.
+- **ps-mdt stores `cid` as a loose string** in `mdt_data`, `mdt_convictions`,
+  `mdt_bolos` and others, with no foreign key, so nothing will stop those
+  rows being orphaned silently.
+- **som-police builds weapon serials from it**:
+  `('POL%s'):format(officer.citizenid:sub(-5):upper())`. With ids of 1, 2, 3
+  that becomes `POL1`, `POL2`, and the serial stops being unique enough to
+  trace a casing back to a weapon, which is the entire point of registering
+  them. Decide what replaces it before changing the ids, not after.
+- **Anything that DISPLAYS a citizenid** and may have assumed a fixed width:
+  som-id's ID card, the MDT, the phone.
+
+Decide and write down, before touching anything:
+
+1. Where the sequence lives. A real `AUTO_INCREMENT` column is the honest
+   answer and removes the retry loop entirely, but it changes the column type,
+   which is the migration. A counter table is the alternative and is worse.
+2. Whether ids stay `VARCHAR` holding `"7"` or become an integer type. Integer
+   is cleaner and breaks every string comparison in ps-mdt at once.
+3. What happens to existing characters. A remap table (old id to new id) driven
+   through every consumer, or accept starting fresh.
+
+**This changes `setup.sql` and needs reimporting.** Say so explicitly when it
+lands, and ship the migration as its own file rather than editing `setup.sql`
+in place, so an existing database can be moved rather than rebuilt.
+
+## 3. Task 6: charges, time and fine in the MDT
+
+The owner reports there is nowhere to add charges or set time and fine. Most of
+the storage already exists, so this is mostly UI plus one new table.
+
+- **Charges need no new table.** `mdt_convictions` already carries `charges`
+  (JSON), `fine`, `sentence`, `recfine`, `recsentence` and `guilty`. Original
+  versus reduced IS `recfine`/`recsentence` against `fine`/`sentence`, and the
+  plea is `guilty`, widened to three states (guilty, no contest, not guilty
+  pending trial) rather than gaining a column.
+- **Roles need one new table.** People are two JSON blobs (`officersinvolved`,
+  `civsinvolved`) with no per-person role and no junction table, so victim
+  versus suspect versus witness cannot be expressed. Add
+  `som_report_people (id, report_id, citizenid, role, created)`.
+
+Read ps-mdt's existing `Config.PenalCode`: 181 entries in `shared/config.lua`,
+a plain shared global already relayed to its NUI. **Do not create a second
+penal code**, and build as a new `som-charges` resource hooking in by
+export/event rather than editing ps-mdt, consistent with AUDIT 16.6 item 2.
+
+**This adds a table and needs reimporting.**
+
+## 4. Remove Reports, make Incidents the single write surface
+
+Owner's call: Incidents is where an officer writes everything. Remove the
+Reports nav item and page from ps-mdt's dashboard. Batches naturally with item
+3 because it is the same screen.
+
+## 5. Task 8: the icon audit
+
+`ifak` shows no image, and it will not be the only one. Cross-reference
+`[standalone]/ox_inventory/web/images/*` against the item keys in
+`data/items.lua` and `data/weapons.lua`.
+
+**The normalisation matters or every weapon reads as unmatched:** `items.lua`
+keys are lowercase, `weapons.lua` keys `Weapons` and `Components` in UPPERCASE
+while `Ammo` is lowercase, and the reconciliation lives in `getItem`. Use
+`exports.ox_inventory:Items(name)`, never `Items()[name]`.
+
+Deliver three lists: newly matched, still missing, and ambiguous as its own
+"needs manual review" list. Perform the renames, but only after the ambiguous
+list has been seen, since a wrong rename silently blanks an item's art
+everywhere.
+
+## 6. Task 9, the rest
+
+Done already: the PD motor pool, cert gated, on Zerofour04's pack. Still open:
+
+- Audit every vehicle add-on against what configs actually reference, and show
+  the removal list before deleting. Candidates already identified: `TIG-PACK`,
+  `c321defender`, `veh_lykan`, `tesla`, `New_Truck`, `npwpdcar`.
+- The 158 car civilian pack from `Aweetumn-LLC/FiveM-Lorefriendly-Vehicles`,
+  checking `LNWK-CARS` for a packaged bundle first.
+- A dealership. **None exists anywhere in the tree**, so the civilian pool has
+  nowhere to live until one does. It gets the shop NUI from task 3 for free.
+- NPC traffic: 15 to 20 sedate models into popgroups with weighting. No
+  handling.meta edits.
+- Streaming and memory impact, measured rather than asserted. `ex-cars` is
+  already ~97 models and `assets_vehicles` streams ~5000 `.yft` of parts.
+
+Streamed binaries stay gitignored and are copied to the server by hand. Two
+`dlc.rpf` files in the old LCPDFR pack are 479MB and 295MB, and GitHub hard
+rejects anything over 100MB, which is why that route was abandoned.
+
+## 7. Task 12: the item prop, icon and animation binder
+
+Clone `allyaminou/Ox_Inventory-ItemsTemplate`, `Andyyy7666/itemcollection` and
+`Branqueador/GGC-Weapons`. Food, drink and alcohol from allyaminou's template
+where names match ours, melee props and icons from GGC-Weapons,
+`ai.swisser.dev/fivem-inventory-icons` as a free fallback before anything is
+flagged as needing a custom icon. Check each licence before vendoring and
+record it; a pack with no licence file does not get copied in.
+
+Deliver three lists: full prop plus icon plus animation coverage, icon only,
+and still missing.
+
+## 8. Verify the attach fix actually took
+
+`callid` crossing JSON from ps-mdt's NUI arrives as a string, and Lua does not
+treat `calls["3"]` and `calls[3]` as the same key. som-dispatch's three
+handlers now coerce. If "Attached Units" is still empty after that,
+`mdt:server:attachedUnits` in ps-mdt does `calls[callid]['units']` **inside
+ps-mdt itself**, and that line needs the same coercion.
+
+---
+
+## PROMPT A: Task 10, the custom inventory
+
+Continue State of Mind RP. Read AUDIT.md sections 20 and 21, and the plan at
+`C:\Users\tweet\.claude\plans\i-m-unifying-the-visual-crispy-crescent.md`.
+Standing rules as above: push every time and verify the remote, commit as me
+only with no Claude mention, never invent a native, no em dashes.
+
+Build `som-inventory`: our own React NUI that **speaks ox_inventory's existing
+NUI message contract**, with ox_inventory's `ui_page` repointed at it. This is
+decided, do not re-open it. We are NOT forking ox_inventory: its Lua stays
+stock and upgradeable, our code lives in `[som]`, and the revert is one line.
+The same shim pattern already replaced ox_lib's progress bar and context menus,
+documented in AUDIT 16.6 item 4 and 21.4.
+
+Use the shared kit at `ui/packages/som-ui-kit` (Card, Button, IconTile,
+StatusBadge, Meter, Modal, Drawer, ContextMenu, Input, Select, Stepper, Tabs,
+plus fetchNui/useNuiEvent). Add the app under `ui/apps/som-inventory` with
+`somApp({ outDir })` from `@som/ui-kit/vite`. Colour and type come only from
+`som-assets/tokens.css`; a hex value in a component is a bug.
+
+**Order of work, and do not skip step 1:**
+
+1. Enumerate ox_inventory's NUI contract from
+   `[standalone]/ox_inventory/web/src` and its client modules: every `action`
+   it sends and every `RegisterNUICallback` it accepts. Write it into the
+   resource header the way `som-ui/client/progressbar.lua` documents its own,
+   and pin the ox_inventory version you read it from. The contract is not
+   versioned upstream, so that header is the only thing that makes a future
+   upgrade diagnosable.
+2. Build the shell and grid to **parity with stock**: move, split, stack, use,
+   shops, stashes, trunks, glovebox. Parity before any new feature.
+3. Repoint `ui_page`.
+4. Only then add the features below.
+
+Layout and feature set from the Overflow reference in the plan's "Reference
+images" section, recoloured to our tokens: clothing toggle with a native
+animation and chat commands, physics throwing with a charge bar and trajectory
+arc, drag-to-give with nearby-player highlighting, rarity tiers, side-by-side
+secondary panels with transfer-all, a drag-to-discard zone lit only while
+dragging, a cursor-anchored context menu, category tabs driven by real item
+categories, and panel animations (main from the right, secondary from the
+left).
+
+Rarity uses the accent family plus neutrals, NOT the reference's
+green/purple/orange: a screen with four unrelated hues has no accent.
+
+**The one thing worth being slow about:** every action stays server-validated.
+Give, throw, discard and transfer go through ox_inventory's existing server
+checks, or through a NEW som-inventory server event with its own validation
+where no stock path exists. The NUI never moves an item on its own authority.
+Test dupes explicitly, including disconnecting mid-drag and mid-throw.
+
+Note the item key casing trap in item 5 above.
+
+---
+
+## PROMPT B: Task 11, the custom HUD, plus task 13
+
+Continue State of Mind RP. Read AUDIT.md 21.5 and the same plan. Standing rules
+as above.
+
+Replace `[som]/som-hud` with a React build on `ui/packages/som-ui-kit`, app
+under `ui/apps/som-hud`, wired to SOM's existing player and vehicle state.
+**Read the current som-hud first**: it already solves things worth keeping,
+including that GTA player health runs 100 to 200 (so the raw value shows a
+corpse at 50%), that pma-voice's range comes from `LocalPlayer.state.proximity`
+as `{index, distance, mode}`, and that both loops must send only on change or
+the NUI feels heavy in a way profiling will not show.
+
+Feature set from the HUD reference sheets in the plan, recoloured to tokens as
+a single fixed theme with no switcher: a `/sethud` drag, scale and toggle
+editor with per-player persistence and JSON export/import; health, armour,
+hunger, thirst, oxygen and stress; digital and analog speedometers for land,
+bike and air with fuel versus electric detection; an aviation panel that
+auto-activates on a plane or helicopter and clears on exit; seatbelt with
+speed-based ejection physics configured per vehicle class; a vehicle control
+panel on a key with indicator state synced through State Bags so nearby players
+see signals; a 360 degree compass and live street plus cross-street; custom
+minimap textures; three performance modes; and pma-voice mic range and radio
+channel indicators.
+
+**Two carried constraints.** The fuel gauge is built now and wired only when a
+fuel resource exists, because none runs here (cdn-fuel fails at load, ox_fuel
+is not installed) and a gauge stuck at one number teaches players to ignore the
+HUD. And the minimap swap needs packed `.ytd` textures, which needs OpenIV or a
+texture packer that is not installed, so author the artwork and hand that one
+file back.
+
+Task 13 belongs here: source free HUD icon sets first, and author original SVG
+matching the set's style for anything missing, the way som-hud's five ring
+glyphs already are. No placeholders, no mismatched styles.
