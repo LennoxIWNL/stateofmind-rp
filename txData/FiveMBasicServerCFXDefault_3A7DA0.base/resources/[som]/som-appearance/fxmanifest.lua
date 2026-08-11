@@ -15,11 +15,17 @@ shared_scripts {
 client_scripts {
     'client/appearance.lua',
     'client/main.lua',
+    -- After main, because it calls Appearance.Apply which appearance.lua
+    -- defines and main.lua is the one that already proves is reachable.
+    'client/wardrobe.lua',
 }
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/main.lua',
+    -- Taking clothes off, asked for by the inventory. Lives here rather than in
+    -- som-inventory so there is still exactly one writer of appearance.
+    'server/wardrobe.lua',
 }
 
 ui_page 'html/index.html'

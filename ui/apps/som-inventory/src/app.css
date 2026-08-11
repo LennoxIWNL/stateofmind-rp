@@ -891,3 +891,75 @@
 }
 
 .som-panel__all:hover { background: var(--som-pink-a30); border-color: var(--som-pink); }
+
+/* --------------------------------------------------------- nearby drops --- */
+
+.som-drops {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5vh;
+}
+
+.som-drops__title {
+  font-size: 1.05vh;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--som-text-mute);
+}
+
+.som-drops__list { display: flex; gap: 0.5vh; flex-wrap: wrap; }
+
+.som-drops__item {
+  position: relative;
+  width: var(--inv-cell);
+  height: var(--inv-cell);
+  border: 1px solid var(--som-pink-a45);
+  border-radius: var(--som-radius);
+  background: var(--som-surface);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: all 130ms;
+}
+
+.som-drops__item:hover { border-color: var(--som-pink); background: var(--som-card-hover); }
+
+/* A bag shape rather than an item image: what is inside is not known here, and
+ * drawing a specific item would be a guess the player would read as fact. */
+.som-drops__bag {
+  width: 46%;
+  height: 46%;
+  border-radius: 2px 2px 5px 5px;
+  background: var(--som-pink-a45);
+  box-shadow: inset 0 -0.3vh 0 var(--som-pink-a30);
+}
+
+.som-drops__dist {
+  position: absolute;
+  bottom: 0.2vh;
+  font-family: var(--som-font-mono);
+  font-size: 0.9vh;
+  color: var(--som-text-mute);
+}
+
+/* Clothing slots are interactive now, so they stop looking disabled. */
+.som-clothing__slot {
+  cursor: pointer;
+  opacity: 1;
+  transition: all 130ms;
+}
+
+.som-clothing__slot.is-on { border-color: var(--som-pink-a45); color: var(--som-text-dim); }
+.som-clothing__slot.is-on:hover { border-color: var(--som-pink); color: var(--som-text); }
+
+/* Off reads as absent rather than as an error: nothing is wrong with having
+ * your jacket off. */
+.som-clothing__slot.is-off {
+  border-style: dashed;
+  border-color: var(--som-border);
+  color: var(--som-text-mute);
+  background: transparent;
+}
+
+.som-clothing__slot.is-off:hover { border-color: var(--som-pink-a45); color: var(--som-text-dim); }

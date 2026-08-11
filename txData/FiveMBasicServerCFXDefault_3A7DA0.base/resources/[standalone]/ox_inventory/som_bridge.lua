@@ -202,3 +202,92 @@ end)
 AddEventHandler('onResourceStop', function(resource)
     if resource == GetCurrentResourceName() then baskets = {} end
 end)
+
+-- ---------------------------------------------------------------------------
+-- Wardrobe
+--
+-- Relays only. som-appearance owns the mutation, because appearance is its data
+-- and keeping the write there means there is still exactly one writer of
+-- som_characters.appearance. It re-reads the stored record, checks the
+-- component against its own allow list and refuses anything else, so a crafted
+-- id here strips nothing.
+-- ---------------------------------------------------------------------------
+
+RegisterNUICallback('somWardrobeState', function(_, cb)
+    if GetResourceState('som-appearance') ~= 'started' then
+        return cb({ success = false, error = 'som-appearance is not running' })
+    end
+
+    -- Own thread, because lib.callback.await yields and a NUI callback handler
+    -- is not a context to assume that is legal in. cb may be answered later,
+    -- which is exactly what a thread gives us.
+    CreateThread(function()
+        cb(lib.callback.await('som-appearance:server:wardrobeState', false) or { success = false })
+    end)
+end)
+
+RegisterNUICallback('somWardrobe', function(data, cb)
+    cb(1)
+
+    if type(data) ~= 'table' then return end
+    if GetResourceState('som-appearance') ~= 'started' then return end
+
+    TriggerServerEvent('som-appearance:server:wardrobe', {
+        action = data.action,
+        kind = data.kind,
+        id = num(data.id),
+    })
+end)
+
+-- ---------------------------------------------------------------------------
+-- Items dropped nearby
+--
+-- ox_inventory keeps its drop table private to its own client.lua, so this
+-- tracks the same two events it does rather than reaching into it. That is the
+-- difference between reading a contract and reading an implementation: these
+-- two event names are the surface, and if they change this stops finding drops
+-- instead of erroring on a nil table.
+--
+-- COORDS ONLY. The CONTENTS of a drop are not read here and are not sent to the
+-- page: knowing what is inside a container you have not opened is not something
+-- the stock inventory grants, and adding it here would be a new capability
+-- rather than a new surface. The page shows that a drop is there and how far
+-- away; opening it is still ox_inventory's own path.
+-- ---------------------------------------------------------------------------
+
+local drops = {}
+
+RegisterNetEvent('ox_inventory:createDrop', function(dropId, data)
+    if type(data) ~= 'table' or not data.coords then return end
+    drops[dropId] = data.coords
+end)
+
+RegisterNetEvent('ox_inventory:removeDrop', function(dropId)
+    drops[dropId] = nil
+end)
+
+RegisterNUICallback('somNearbyDrops', function(_, cb)
+    local coords = GetEntityCoords(PlayerPedId())
+    local near = {}
+
+    for dropId, position in pairs(drops) do
+        local distance = #(coords - position)
+
+        -- Roughly the reach ox_inventory itself allows for opening a drop.
+        -- Listing one further away than it can be opened would be an offer the
+        -- player cannot take.
+        if distance <= 3.0 then
+            near[#near + 1] = { id = dropId, distance = math.floor(distance * 10) / 10 }
+        end
+    end
+
+    table.sort(near, function(a, b) return a.distance < b.distance end)
+    cb(near)
+end)
+
+--- Opens the nearest drop, through ox_inventory's OWN export, so the distance
+--- and access rules that apply to walking up to one apply here too.
+RegisterNUICallback('somOpenNearbyDrop', function(_, cb)
+    cb(1)
+    exports.ox_inventory:openNearbyInventory()
+end)

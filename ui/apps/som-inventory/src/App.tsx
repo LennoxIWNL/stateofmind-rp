@@ -30,6 +30,7 @@ import { Basket, type BasketLine } from './components/Shop'
 import { NearbyGive, type NearbyPlayer } from './components/Nearby'
 import { StatusStrip, type Status } from './components/StatusStrip'
 import { Tooltip } from './components/Tooltip'
+import { NearbyDrops } from './components/NearbyDrops'
 
 type Tab = 'inventory' | 'clothes'
 
@@ -328,6 +329,10 @@ export function App() {
         ) : (
           <Clothing weight={leftWeightMax} />
         )}
+
+        {/* Only while the inventory tab is showing and no container is open:
+            a drop on the ground is not relevant while looking at a trunk. */}
+        <NearbyDrops active={tab === 'inventory' && !state.right} />
 
         <StatusStrip status={status} />
       </div>
