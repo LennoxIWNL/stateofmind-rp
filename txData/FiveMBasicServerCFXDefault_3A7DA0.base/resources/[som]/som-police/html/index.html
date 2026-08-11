@@ -1,85 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="utf-8" />
     <title>som-police</title>
-    <link rel="stylesheet" href="https://cfx-nui-som-assets/tokens.css">
-    <link rel="stylesheet" href="https://cfx-nui-som-police/html/style.css">
-</head>
-<body>
-    <!-- The armoury and the certification card share one page, because a
-         resource may only declare one ui_page and two NUI frames fighting for
-         focus is a worse problem than one router. -->
-    <div id="root" class="root hidden">
-        <!-- Built on the certification card's language: badge, title, counter,
-             then rows whose left rule and mark carry their state. The old
-             version was a flat list of name-and-price buttons, which read as a
-             debug menu next to the card. -->
-        <section class="panel hidden" id="armoury">
-            <header class="panel__head">
-                <div class="panel__badge">LSPD</div>
-                <div class="panel__ident">
-                    <h1 class="panel__title">Armoury</h1>
-                    <p class="panel__sub" id="title">Mission Row</p>
-                </div>
-                <div class="panel__count" id="stock-count"></div>
-            </header>
-
-            <div class="panel__pay">
-                <span class="panel__paylabel">Pay with</span>
-                <div class="pay" id="pay"></div>
-            </div>
-
-            <div class="panel__body">
-                <div class="section">
-                    <h2 class="section__title">
-                        Department issue
-                        <span class="section__note">free</span>
-                    </h2>
-                    <div class="list" id="issue"></div>
-                </div>
-
-                <div class="section">
-                    <h2 class="section__title">
-                        Personal equipment
-                        <span class="section__note">charged</span>
-                    </h2>
-                    <div class="list" id="personal"></div>
-                </div>
-            </div>
-
-            <footer class="panel__foot">
-                <!-- Replaced by the last thing you drew, so the footer answers
-                     "did that work" instead of restating a rule you already
-                     read. Falls back to the hint when nothing has happened. -->
-                <span class="card__hint" id="receipt">Certification gated items appear only when you hold the certification</span>
-                <button class="btn btn--ghost" id="close" type="button">Close</button>
-            </footer>
-        </section>
-
-        <!-- Certifications. A card rather than a menu: this is something you
-             READ, and a list you arrow through implies choices that are not
-             there. -->
-        <section class="card hidden" id="certs">
-            <header class="card__head">
-                <div class="card__badge" id="cert-badge">LSPD</div>
-                <div>
-                    <h1 class="card__title">Certifications</h1>
-                    <p class="card__sub" id="cert-name">Officer</p>
-                </div>
-                <div class="card__count" id="cert-count"></div>
-            </header>
-
-            <div class="card__body" id="cert-list"></div>
-
-            <footer class="card__foot">
-                <span class="card__hint">Granted by command staff through the MDT</span>
-                <button class="btn btn--ghost" id="cert-close" type="button">Close</button>
-            </footer>
-        </section>
-    </div>
-
-    <script src="https://cfx-nui-som-police/html/app.js"></script>
-</body>
+    <link rel="stylesheet" href="https://cfx-nui-som-assets/tokens.css" />
+    <script type="module" crossorigin src="./assets/index.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
 </html>

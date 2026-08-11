@@ -40,12 +40,14 @@ server_scripts {
     'server/impound.lua',
 }
 
+-- Built from ui/apps/som-police. Do not edit html/ by hand, it is generated.
 ui_page 'html/index.html'
 
 files {
     'html/index.html',
-    'html/style.css',
-    'html/app.js',
+    'html/assets/*.js',
+    'html/assets/*.css',
+    'html/assets/*.map',
 }
 
 dependencies {
