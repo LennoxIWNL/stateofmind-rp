@@ -229,9 +229,48 @@ own name if a second camera item ever wants it.
 
 **`ammo-taser` is done** and now has art, taken from GGC-Weapons.
 
-**Still missing and live:** `rental_papers` (som-rentals) and `mdtcitation`
-(ps-mdt, wants `citation.png`). Everything else missing is unused stock or
-cosmetic weapon tints.
+### The realistic-style pass, 2026-08-11. DONE
+
+Owner: some icons were cartoon and some realistic, and all of them should be
+realistic.
+
+**The weapon set was the whole problem.** Ours was a cel-shaded cartoon pack
+with black outlines. The ItemsTemplate set is rendered and realistic. Verified
+on a pistol, a rifle, a knife and the taser before touching anything, all four
+the same, so it is one pack rather than a few odd files. **71 replaced**, plus
+`WEAPON_TACTICALRIFLE` added.
+
+**The non-weapon overlap was deliberately NOT a blanket swap**, because the
+instruction was to leave anything already realistic alone. All nine checked by
+eye: `bandage`, `black_money`, `lockpick`, `money`, `parachute`, `phone` and
+`sandwich` are already realistic photos and are untouched. Two were not:
+`cigarette` was flat cartoon, and `wallet` was a real photo of a branded
+designer wallet with a cartoon character printed on it.
+
+Fills, each checked for style before use: `rental_papers` to
+`printerdocument.png` (the folder-or-file that was asked for), `mdtcitation`
+to `heist_papers.png` (**it was pointed at `citation.png`, which does not exist
+and never has, so every citation ever issued showed the fallback**),
+`fingerprintreader` to `finger_scanner.png`, `WEAPON_TEARGAS` to the BZ gas
+canister, `cash_bag` and `inked_cash_bag` to `moneybag.png`, `gauze` and
+`bandageg` to the bandage roll, `dirty_orange` to the orange, and
+`WEAPON_BATTLERIFLE` to the military rifle.
+
+**Coverage 730 to 751 of 812.** Every fill is a `client.image` pointer, never a
+rename, so art keeps its own name and existing users are unaffected.
+
+**Of the 61 still missing, 40 are weapon tints and attachments** needing
+bespoke swatches. The other 21 are clothing slots (`tshirt`, `torso`, `arms`,
+`jeans`, `ears`, `clothing`, `glasses`), surgical tools (`surgical_tray`,
+`syringe`, `forceps`, `surgical_gloves`, `surgical_staple`), forensic kits
+(`gsrtestkit`, `dnatestkit`, `drugtestkit`, `breathalyzer`, `accesstool`),
+plus `spikespack`, `emp_ammo`, `luxuryfinish_attachment` and
+`WEAPON_SNOWLAUNCHER`. **Nothing on disk or in the three repos resembles any of
+them**, and a wrong icon is worse than none, so they need sourcing or drawing.
+
+**Known and not addressed:** cartoon icons exist outside the weapon set too.
+`advancedkit.png` is one, found while looking for something else. Nobody has
+looked at all 750 by eye. If a full sweep is wanted it is its own task.
 
 ## 6. Task 9, the rest. AUDIT DONE, see `VEHICLE-AUDIT.md`. Awaiting sign-off
 
@@ -250,15 +289,23 @@ removal list is there for sign-off. Three things change the rest of this task:
   off.** Look at that before downloading the 158-car pack, which may be
   partly or wholly redundant.
 
+**Owner's decision, 2026-08-11: KEEP EVERYTHING. The removal list is closed.**
+Groups 1 and 2 stay, `ex-cars` stays. Do not re-propose deleting any of it.
+Sound call on the evidence: none of it is ensured, so none of it costs
+streaming memory, and deleting would only have bought tidiness.
+
 Still open:
 
-- Sign-off on the removal list. Groups 1 and 2 are 476 MB and risk-free.
-- `assets_vehicles` (3.7 GB) is a tuning-parts pack, but it also carries
-  **`popgroups.ymt` and `popcycle.dat`**, which is the mechanism the NPC
-  traffic sub-task needs. Separate those out before deciding its fate.
-- A dealership. **Still none in the tree.**
+- **`ex-cars` is kept but still not ensured.** Keeping is not switching on.
+  Enabling it is one line in `som.cfg` and hands over 87 civilian vehicles, but
+  it puts 365 MB into streaming and there is nowhere to sell them from yet, so
+  it waits on the dealership.
+- A dealership. **Still none in the tree.** This is the blocker for the
+  civilian pool, not the pool itself.
 - NPC traffic: 15 to 20 sedate models into popgroups with weighting. No
-  handling.meta edits.
+  handling.meta edits. **`assets_vehicles` carries `popgroups.ymt` and
+  `popcycle.dat`**, which is the mechanism, and it is staying on disk, so the
+  files are there when this is picked up.
 
 ### The LCPDFR pack has landed, and is blocked on LICENSING not tooling
 

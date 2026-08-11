@@ -1,7 +1,25 @@
 # Vehicle add-on audit
 
-Run 2026-08-11. **Nothing has been deleted.** This is the removal list for
-sign-off, per the standing rule that it is shown before anything goes.
+Run 2026-08-11. **Nothing has been deleted, and nothing will be.**
+
+## Owner's decision, 2026-08-11: KEEP EVERYTHING
+
+Groups 1 and 2 are kept rather than removed, and `ex-cars` is kept. **This
+whole removal list is closed.** Do not re-propose it.
+
+That is a reasonable call on the evidence: the audit's own finding is that none
+of it is ensured, so none of it costs a byte of streaming memory. It is disk,
+and disk is cheap. Deleting would have bought tidiness and risked a resource
+turning out to be wanted later.
+
+**The one thing still open on `ex-cars`:** it is 87 complete civilian vehicles
+sitting on disk and NOT ensured. Keeping it is not the same as switching it on.
+Turning it on is one line in `som.cfg`, but it puts 365 MB into streaming and
+there is still no dealership for the cars to be sold from, so that is a
+separate decision and has not been taken.
+
+The rest of this file is the original audit, kept because the reasoning about
+what is and is not streaming is still the useful part.
 
 ## The finding that reframes the task
 
