@@ -30,7 +30,19 @@ server_scripts {
 
 client_script 'init.lua'
 
-ui_page 'web/build/index.html'
+-- SOM PATCH, and the ONLY edit to this resource. Two lines: this one and the
+-- web/som entries below.
+--
+-- Points at som-inventory, our own renderer, whose SOURCE lives in git at
+-- ui/apps/som-inventory and whose build lands here. Their web/build is
+-- untouched, so reverting is putting 'web/build/index.html' back.
+--
+-- It builds into THIS resource rather than a som-* one on purpose: fetchNui
+-- posts to whichever resource served the page, and a RegisterNUICallback only
+-- answers for the resource owning the frame. Served from anywhere else, all
+-- eleven callbacks in this resource would go unanswered and nothing could be
+-- moved, used or bought. Full reasoning in ui/apps/som-inventory/src/contract.ts.
+ui_page 'web/som/index.html'
 
 files {
     'client.lua',
@@ -39,6 +51,9 @@ files {
     'web/build/index.html',
     'web/build/assets/*.js',
     'web/build/assets/*.css',
+    'web/som/index.html',
+    'web/som/assets/*.js',
+    'web/som/assets/*.css',
     'web/images/*.png',
     'modules/**/shared.lua',
     'modules/**/client.lua',

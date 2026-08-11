@@ -1,0 +1,594 @@
+/*
+ * som-inventory.
+ *
+ * Structure and layout come from the reference shots. Colour does NOT: every
+ * value here is a token from som-assets/tokens.css. A hex value in this file is
+ * a bug.
+ *
+ * The references run purple/neon with green, orange and blue buttons. Four
+ * unrelated hues means nothing is the accent, so the accent family carries the
+ * emphasis and everything else is a neutral. Pink marks the one thing that
+ * matters on a row, not every row.
+ */
+
+:root {
+  --inv-cell: 5.2vh;
+  --inv-gap: 0.5vh;
+  --inv-cols: 5;
+}
+
+.som-inv {
+  position: fixed;
+  inset: 0;
+  font-family: var(--som-font);
+  color: var(--som-text);
+  user-select: none;
+  pointer-events: none;
+}
+
+.som-inv > * {
+  pointer-events: auto;
+}
+
+/* Main panel right, secondary left, as the reference has them. */
+.som-inv__main {
+  position: absolute;
+  top: 50%;
+  right: 2vw;
+  transform: translateY(-50%);
+  width: 34vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--inv-gap);
+  animation: som-in-right 220ms var(--som-transition, ease) both;
+}
+
+@keyframes som-in-right {
+  from { opacity: 0; transform: translate(2vw, -50%); }
+  to   { opacity: 1; transform: translate(0, -50%); }
+}
+
+@keyframes som-in-left {
+  from { opacity: 0; transform: translate(-2vw, -50%); }
+  to   { opacity: 1; transform: translate(0, -50%); }
+}
+
+/* ---------------------------------------------------------------- tabs --- */
+
+.som-inv__tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--inv-gap);
+}
+
+.som-inv__tab {
+  font: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 1.35vh;
+  font-weight: 700;
+  padding: 0.7vh 1.4vh;
+  border: 1px solid var(--som-border);
+  border-radius: var(--som-radius);
+  background: var(--som-card);
+  color: var(--som-text-dim);
+  cursor: pointer;
+  transition: background 140ms, color 140ms, border-color 140ms;
+}
+
+.som-inv__tab:hover { color: var(--som-text); }
+
+.som-inv__tab.is-active {
+  background: var(--som-pink-a30);
+  border-color: var(--som-pink);
+  color: var(--som-text);
+}
+
+.som-inv__esc {
+  margin-left: auto;
+  font: inherit;
+  font-size: 1.2vh;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 0.6vh 1.1vh;
+  border-radius: var(--som-radius);
+  border: 1px solid var(--som-danger);
+  background: transparent;
+  color: var(--som-danger);
+  cursor: pointer;
+}
+
+.som-inv__esc:hover { background: var(--som-danger); color: var(--som-bg-deep); }
+
+/* --------------------------------------------------------------- panel --- */
+
+.som-panel {
+  background: var(--som-bg);
+  border: 1px solid var(--som-border);
+  border-radius: var(--som-radius-lg);
+  box-shadow: var(--som-shadow);
+  padding: 1.2vh;
+  display: flex;
+  flex-direction: column;
+  gap: 1vh;
+}
+
+.som-panel--secondary {
+  position: absolute;
+  top: 50%;
+  left: 2vw;
+  transform: translateY(-50%);
+  width: 34vh;
+  animation: som-in-left 220ms var(--som-transition, ease) both;
+}
+
+.som-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 0.8vh;
+}
+
+.som-panel__icon {
+  width: 1.9vh;
+  height: 1.9vh;
+  border-radius: 3px;
+  background: var(--som-pink-a45);
+  flex: 0 0 auto;
+}
+
+.som-panel__title {
+  margin: 0;
+  font-size: 1.9vh;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.som-panel__weight {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6vh;
+  font-size: 1.2vh;
+  font-weight: 700;
+}
+
+.som-panel__kg { color: var(--som-pink-light); font-family: var(--som-font-mono); }
+
+/* Segmented rather than smooth: capacity reads as discrete, not as progress. */
+.som-panel__bar { display: flex; gap: 2px; }
+
+.som-panel__bar i {
+  width: 0.5vh;
+  height: 1.1vh;
+  border-radius: 1px;
+  background: var(--som-border);
+}
+
+.som-panel__bar i.is-on { background: var(--som-pink); }
+
+.som-panel__sub {
+  font-size: 1.15vh;
+  color: var(--som-text-mute);
+  margin-top: -0.6vh;
+}
+
+/* ---------------------------------------------------------- categories --- */
+
+.som-panel__cats { display: flex; gap: 0.5vh; flex-wrap: wrap; }
+
+.som-pill {
+  font: inherit;
+  font-size: 1.1vh;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.45vh 1vh;
+  border-radius: 999px;
+  border: 1px solid var(--som-border);
+  background: transparent;
+  color: var(--som-text-mute);
+  cursor: pointer;
+}
+
+.som-pill:hover { color: var(--som-text); }
+
+.som-pill.is-active {
+  background: var(--som-pink-a30);
+  border-color: var(--som-pink);
+  color: var(--som-text);
+}
+
+/* ----------------------------------------------------------------- grid --- */
+
+.som-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(var(--inv-cols), 1fr);
+  gap: var(--inv-gap);
+  max-height: 46vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.som-slot {
+  position: relative;
+  aspect-ratio: 1;
+  border: 1px solid var(--som-border);
+  border-radius: var(--som-radius);
+  background: var(--som-card);
+  overflow: hidden;
+  transition: border-color 120ms, background 120ms;
+}
+
+.som-slot.has-item { background: var(--som-surface); cursor: grab; }
+.som-slot.has-item:hover { border-color: var(--som-pink); background: var(--som-card-hover); }
+.som-slot.has-item:active { cursor: grabbing; }
+
+.som-slot__art {
+  position: absolute;
+  inset: 12% 12% 26% 12%;
+  width: 76%;
+  height: 62%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.som-slot__index {
+  position: absolute;
+  top: 0.3vh;
+  left: 0.4vh;
+  font-size: 0.95vh;
+  font-family: var(--som-font-mono);
+  color: var(--som-text-mute);
+  z-index: 1;
+}
+
+.som-slot__index--empty { opacity: 0.35; }
+
+.som-slot__count {
+  position: absolute;
+  top: 0.25vh;
+  right: 0.3vh;
+  min-width: 1.4vh;
+  text-align: center;
+  font-size: 0.95vh;
+  font-weight: 700;
+  padding: 0.1vh 0.35vh;
+  border-radius: 3px;
+  background: var(--som-pink-a61);
+  color: var(--som-text);
+  z-index: 1;
+}
+
+.som-slot__price {
+  position: absolute;
+  top: 0.25vh;
+  left: 0.3vh;
+  font-size: 0.95vh;
+  font-weight: 700;
+  padding: 0.1vh 0.35vh;
+  border-radius: 3px;
+  background: var(--som-success);
+  color: var(--som-bg-deep);
+  z-index: 2;
+}
+
+.som-slot__label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0.25vh 0.3vh;
+  font-size: 0.9vh;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--som-text-dim);
+  background: linear-gradient(transparent, var(--som-bg-deep) 55%);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.som-slot__durability {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 2.1vh;
+  height: 0.35vh;
+  border-radius: 2px;
+  background: var(--som-border);
+  overflow: hidden;
+}
+
+.som-slot__durability span {
+  display: block;
+  height: 100%;
+  background: var(--som-success);
+}
+
+/*
+ * Rarity, as a slot border.
+ *
+ * Accent family plus neutrals, NOT the reference's green/purple/orange. Rarity
+ * is a ranking, so it reads as one ramp getting hotter rather than as four
+ * unrelated colours competing with each other and with the accent.
+ */
+.som-slot.rarity-common    { border-color: var(--som-border); }
+.som-slot.rarity-uncommon  { border-color: var(--som-text-mute); }
+.som-slot.rarity-rare      { border-color: var(--som-pink-a45); }
+.som-slot.rarity-epic      { border-color: var(--som-pink); }
+.som-slot.rarity-legendary { border-color: var(--som-pink-light); box-shadow: 0 0 0.8vh var(--som-glow); }
+
+/* ------------------------------------------------------------ drop zone --- */
+
+.som-panel__drop {
+  border: 1px dashed var(--som-border);
+  border-radius: var(--som-radius);
+  padding: 1.1vh;
+  text-align: center;
+  font-size: 1.15vh;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--som-text-mute);
+  transition: all 160ms;
+}
+
+/* Lit only while dragging, so it is an affordance at the moment it applies
+ * rather than a permanent red bar teaching the player to ignore it. */
+.som-panel__drop.is-live {
+  border-color: var(--som-danger);
+  color: var(--som-danger);
+  background: color-mix(in srgb, var(--som-danger) 12%, transparent);
+}
+
+/* ---------------------------------------------------------------- ghost --- */
+
+.som-ghost {
+  position: fixed;
+  z-index: 60;
+  width: var(--inv-cell);
+  height: var(--inv-cell);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  border: 1px solid var(--som-pink);
+  border-radius: var(--som-radius);
+  background: var(--som-surface);
+  box-shadow: var(--som-glow-strong);
+  display: grid;
+  place-items: center;
+}
+
+.som-ghost img { width: 76%; height: 76%; object-fit: contain; }
+
+.som-ghost span {
+  position: absolute;
+  top: 0.2vh;
+  right: 0.3vh;
+  font-size: 1vh;
+  font-weight: 700;
+}
+
+/* ----------------------------------------------------------------- menu --- */
+
+.som-menu {
+  position: fixed;
+  z-index: 70;
+  width: 20vh;
+  padding: 1vh;
+  background: var(--som-bg-deep);
+  border: 1px solid var(--som-pink-a45);
+  border-radius: var(--som-radius);
+  box-shadow: var(--som-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8vh;
+}
+
+.som-menu__head { display: flex; align-items: center; gap: 0.6vh; }
+.som-menu__head img { width: 2.4vh; height: 2.4vh; object-fit: contain; }
+
+.som-menu__name {
+  font-size: 1.3vh;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.som-menu__rarity {
+  margin-left: auto;
+  font-size: 0.9vh;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.15vh 0.5vh;
+  border-radius: 3px;
+  border: 1px solid var(--som-pink-a45);
+  color: var(--som-pink-light);
+}
+
+.som-menu__stepper {
+  display: grid;
+  grid-template-columns: 2.2vh 1fr 2.2vh;
+  gap: 0.4vh;
+  align-items: center;
+}
+
+.som-menu__stepper button {
+  font: inherit;
+  font-size: 1.4vh;
+  line-height: 1;
+  padding: 0.4vh 0;
+  border: 1px solid var(--som-border);
+  border-radius: var(--som-radius);
+  background: var(--som-card);
+  color: var(--som-text);
+  cursor: pointer;
+}
+
+.som-menu__stepper button:hover { border-color: var(--som-pink); }
+
+.som-menu__stepper input {
+  font: inherit;
+  font-family: var(--som-font-mono);
+  font-size: 1.2vh;
+  text-align: center;
+  padding: 0.4vh 0;
+  border: 1px solid var(--som-border);
+  border-radius: var(--som-radius);
+  background: var(--som-card);
+  color: var(--som-text);
+  -moz-appearance: textfield;
+}
+
+.som-menu__stepper input::-webkit-outer-spin-button,
+.som-menu__stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+.som-menu__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4vh; }
+
+.som-btn {
+  font: inherit;
+  font-size: 1.1vh;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.6vh 0.4vh;
+  border-radius: var(--som-radius);
+  border: 1px solid var(--som-border);
+  background: var(--som-card);
+  color: var(--som-text-dim);
+  cursor: pointer;
+  transition: all 130ms;
+}
+
+.som-btn:hover:not(:disabled) { color: var(--som-text); border-color: var(--som-pink); }
+.som-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* One accent, used for the affirmative action only. Destructive borrows the
+ * danger token. Everything else stays neutral. */
+.som-btn--use  { background: var(--som-pink-a30); border-color: var(--som-pink); color: var(--som-text); }
+.som-btn--give { background: var(--som-pink-a16); border-color: var(--som-pink-a45); }
+.som-btn--drop { border-color: var(--som-danger); color: var(--som-danger); }
+.som-btn--drop:hover:not(:disabled) { background: var(--som-danger); color: var(--som-bg-deep); border-color: var(--som-danger); }
+
+/* -------------------------------------------------------------- hotbar --- */
+
+.som-hotbar {
+  position: fixed;
+  left: 50%;
+  bottom: 3vh;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.5vh;
+  z-index: 20;
+}
+
+.som-hotbar__slot {
+  position: relative;
+  width: 6vh;
+  height: 6vh;
+  border: 1px solid var(--som-border);
+  border-radius: var(--som-radius);
+  background: color-mix(in srgb, var(--som-bg) 82%, transparent);
+}
+
+.som-hotbar__slot.has-item { border-color: var(--som-pink-a45); }
+.som-hotbar__slot img { position: absolute; inset: 14% 14% 24% 14%; width: 72%; height: 62%; object-fit: contain; }
+.som-hotbar__key { position: absolute; top: 0.2vh; left: 0.4vh; font-size: 1vh; font-family: var(--som-font-mono); color: var(--som-text-mute); }
+.som-hotbar__count { position: absolute; top: 0.2vh; right: 0.4vh; font-size: 1vh; font-weight: 700; color: var(--som-pink-light); }
+.som-hotbar__label {
+  position: absolute; left: 0; right: 0; bottom: 0.2vh;
+  font-size: 0.8vh; text-align: center; text-transform: uppercase;
+  color: var(--som-text-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ------------------------------------------------------------ clothing --- */
+
+.som-clothing__body {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.8vh;
+  align-items: center;
+  min-height: 34vh;
+}
+
+.som-clothing__rail { display: flex; flex-direction: column; gap: 0.5vh; }
+
+.som-clothing__slot {
+  width: 4.6vh;
+  height: 4.6vh;
+  border: 1px solid var(--som-border);
+  border-radius: var(--som-radius);
+  background: var(--som-card);
+  color: var(--som-text-mute);
+  font: inherit;
+  cursor: not-allowed;
+  display: grid;
+  place-items: center;
+  opacity: 0.55;
+}
+
+.som-clothing__slot-label { font-size: 0.85vh; text-transform: uppercase; letter-spacing: 0.03em; }
+
+.som-clothing__figure {
+  height: 32vh;
+  border-radius: var(--som-radius);
+  background:
+    radial-gradient(ellipse at 50% 35%, var(--som-pink-a16), transparent 62%),
+    var(--som-card);
+  border: 1px solid var(--som-border);
+}
+
+.som-clothing__note {
+  margin: 0;
+  font-size: 1.05vh;
+  line-height: 1.4;
+  color: var(--som-text-mute);
+  text-align: center;
+}
+
+.som-clothing__footer { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5vh; }
+
+/* --------------------------------------------------------- notifications --- */
+
+.som-notify {
+  position: fixed;
+  right: 2vw;
+  bottom: 3vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5vh;
+  z-index: 50;
+}
+
+.som-notify__row {
+  display: flex;
+  align-items: center;
+  gap: 0.7vh;
+  padding: 0.7vh 1vh;
+  border: 1px solid var(--som-border);
+  border-left: 2px solid var(--som-pink);
+  border-radius: var(--som-radius);
+  background: var(--som-bg-deep);
+  animation: som-notify-in 180ms ease both;
+}
+
+@keyframes som-notify-in {
+  from { opacity: 0; transform: translateX(1vw); }
+  to   { opacity: 1; transform: none; }
+}
+
+.som-notify__row img { width: 2.6vh; height: 2.6vh; object-fit: contain; }
+.som-notify__text { display: flex; flex-direction: column; }
+.som-notify__verb { font-size: 0.95vh; text-transform: uppercase; color: var(--som-text-mute); }
+.som-notify__name { font-size: 1.2vh; font-weight: 700; }
+
+/* Scrollbars: never a default one, per AUDIT 20.4. */
+.som-panel__grid::-webkit-scrollbar { width: 0.5vh; }
+.som-panel__grid::-webkit-scrollbar-track { background: transparent; }
+.som-panel__grid::-webkit-scrollbar-thumb { background: var(--som-pink-a45); border-radius: 999px; }
+.som-panel__grid::-webkit-scrollbar-thumb:hover { background: var(--som-pink); }
