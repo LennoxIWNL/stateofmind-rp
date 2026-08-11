@@ -117,17 +117,24 @@ local function forward(action, id)
     })
 end
 
-RegisterNUICallback('context:select', function(data, cb)
+-- No colons in these names, unlike the SendNUIMessage actions above.
+--
+-- A callback name becomes the PATH of the fetch the page makes, and a stranded
+-- NUI callback here is the worst failure this resource has: the menu stops
+-- answering, and the focus it took with it never comes back, so the player can
+-- neither move nor click. Not worth finding out how each CEF build feels about
+-- a colon in a path segment.
+RegisterNUICallback('contextSelect', function(data, cb)
     cb(1)
     forward('select', type(data) == 'table' and data.id or nil)
 end)
 
-RegisterNUICallback('context:back', function(_, cb)
+RegisterNUICallback('contextBack', function(_, cb)
     cb(1)
     forward('back')
 end)
 
-RegisterNUICallback('context:close', function(_, cb)
+RegisterNUICallback('contextClose', function(_, cb)
     cb(1)
 
     -- Refused HERE, not in the page. canClose is a rule about the menu and the

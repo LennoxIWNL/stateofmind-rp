@@ -281,7 +281,7 @@ function contextRow(option) {
     if (option.arrow) row.append(ctxEl('span', 'ctx__arrow', '›'));
 
     if (selectable && !option.disabled) {
-        row.addEventListener('click', () => postNui('context:select', { id: option.id }));
+        row.addEventListener('click', () => postNui('contextSelect', { id: option.id }));
     }
 
     return row;
@@ -324,12 +324,12 @@ function contextHide() {
     contextOptions.replaceChildren();
 }
 
-contextClose.addEventListener('click', () => postNui('context:close'));
-contextBack.addEventListener('click', () => postNui('context:back'));
+contextClose.addEventListener('click', () => postNui('contextClose'));
+contextBack.addEventListener('click', () => postNui('contextBack'));
 
 // Clicking off the menu closes it, which is what every menu on every other
 // server does and what a player will try first.
-contextBackdrop.addEventListener('click', () => postNui('context:close'));
+contextBackdrop.addEventListener('click', () => postNui('contextClose'));
 
 document.addEventListener('keydown', (event) => {
     if (context.hidden) return;
@@ -337,12 +337,12 @@ document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
         // Posted even when canClose is false. The Lua side refuses it there,
         // because the rule belongs with the menu and not with the page.
-        postNui('context:close');
+        postNui('contextClose');
         return;
     }
 
     if (event.key === 'Backspace' && !contextBack.hidden) {
-        postNui('context:back');
+        postNui('contextBack');
     }
 });
 
