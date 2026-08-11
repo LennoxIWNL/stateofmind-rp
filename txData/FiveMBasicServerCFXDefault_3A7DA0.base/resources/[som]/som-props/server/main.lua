@@ -92,7 +92,18 @@ local function placeProp(src, item)
     -- never once placed.
     local model = def.models[math.random(#def.models)]
 
-    local entity = CreateObject(model, coords.x, coords.y, coords.z, true, true, false)
+    -- CreateObjectNoOffset, not CreateObject. The offsetting variant shifts the
+    -- object relative to the coordinate given, which makes ground placement
+    -- guesswork. ox_lib's own server-side prop constructor
+    -- (ox_lib/imports/prop/server.lua:22) uses NoOffset for the same reason.
+    --
+    -- The last argument is `dynamic`, and false is what makes the prop static.
+    -- That is deliberately doing the job FreezeEntityPosition would: that native
+    -- is client-only, ox_lib never calls it from its server path, and an
+    -- unverified native that silently does nothing is exactly the mistake
+    -- recorded in AUDIT 19.2. A cone that drifts is better than a nil call that
+    -- kills the rest of this function.
+    local entity = CreateObjectNoOffset(model, coords.x, coords.y, coords.z, true, true, false)
     if not entity or entity == 0 then return end
 
     local timeout = GetGameTimer() + 5000
@@ -100,8 +111,9 @@ local function placeProp(src, item)
 
     if not DoesEntityExist(entity) then return end
 
+    -- Server-safe: ox_lib calls this from its server path via
+    -- gameEntity:setHeading (imports/gameEntity/shared.lua:141).
     SetEntityHeading(entity, heading)
-    FreezeEntityPosition(entity, true)
 
     if def.avoid then
         -- Read by the client, which is the only side that can call
@@ -134,27 +146,39 @@ RegisterNetEvent('som-props:server:pickup', function(netId)
     local itemName = placed[entity]
     if not itemName then return end
 
+    -- CLAIM IMMEDIATELY, before any call below that might yield.
+    --
+    -- This is the anti-dupe line and its position is the whole point. Claiming
+    -- lower down, next to the delete, reads more naturally and is wrong: an
+    -- export or a query that yields anywhere between the read above and the
+    -- claim lets two racing pickups both pass every check and both be granted
+    -- an item. Held rather than assumed, because whether ox_inventory's
+    -- CanCarryItem yields is its business and could change under us.
+    --
+    -- Every rejection below therefore has to put the claim back.
+    placed[entity] = nil
+
+    ---@param reason? string
+    local function refuse(reason)
+        placed[entity] = itemName
+        if reason then TriggerClientEvent('som:client:notify', src, reason, 'error') end
+    end
+
     -- Rule 2. The model still has to agree with what we recorded, so a swapped
     -- or replaced entity on a reused handle cannot yield the wrong item.
     buildIndex()
-    if placeableByModel[GetEntityModel(entity)] ~= itemName then return end
+    if placeableByModel[GetEntityModel(entity)] ~= itemName then return refuse() end
 
     -- Rule 3. Distance, measured server side against the server's own view of
     -- both positions.
     local ped = GetPlayerPed(src)
-    if ped == 0 then return end
+    if ped == 0 then return refuse() end
 
-    if #(GetEntityCoords(ped) - GetEntityCoords(entity)) > PICKUP_DISTANCE then return end
+    if #(GetEntityCoords(ped) - GetEntityCoords(entity)) > PICKUP_DISTANCE then return refuse() end
 
     if not exports.ox_inventory:CanCarryItem(src, itemName, 1) then
-        TriggerClientEvent('som:client:notify', src, 'You cannot carry that', 'error')
-        return
+        return refuse('You cannot carry that')
     end
-
-    -- Claim before deleting. Two pickup events racing on one entity both pass
-    -- the checks above, so the claim is what makes only one of them pay out.
-    -- Same shape as ox_inventory's slot mutex in AUDIT 6.5 item 2.
-    placed[entity] = nil
 
     DeleteEntity(entity)
     exports.ox_inventory:AddItem(src, itemName, 1)

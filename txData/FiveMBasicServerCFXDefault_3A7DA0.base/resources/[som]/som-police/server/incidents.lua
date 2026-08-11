@@ -38,6 +38,10 @@ end
 local function incidentId(id)
     id = tonumber(id)
     if not id or id ~= id or id < 1 or id % 1 ~= 0 then return nil end
+    -- Bounded to INT UNSIGNED. Past that MySQL errors on the out-of-range value
+    -- rather than simply not matching, which turns a junk id into a thrown
+    -- query instead of an empty result.
+    if id > 4294967295 then return nil end
     return id
 end
 
@@ -178,10 +182,28 @@ RegisterNetEvent('mdt:server:deleteIncidents', function(id)
     local incident = incidentId(id)
     if not incident then return end
 
-    -- Deliberately does NOT check who fired this. It is ps-mdt's own event and
-    -- ps-mdt does its own permission check before deleting the incident. The
-    -- worst a forged call achieves is orphaning role rows for an incident that
-    -- still exists, which is a cleanup, not a leak: no incident data is
-    -- readable or writable through this path.
-    MySQL.query.await('DELETE FROM som_incident_people WHERE incident_id = ?', { incident })
+    -- This event is ps-mdt's, and ANY client can fire it with ANY id. ps-mdt
+    -- checks rank before it deletes the incident, but this handler is a second,
+    -- separate listener on the same event and gets no such protection: deleting
+    -- unconditionally here would let any player wipe the role assignments off
+    -- any incident in the database, which is real data loss even though no
+    -- incident data is readable through this path.
+    --
+    -- Rather than duplicating ps-mdt's permission table, which would then have
+    -- to be kept in step with it, the disappearance of the incident IS the
+    -- authorisation. If ps-mdt refused the delete, the row is still there and
+    -- nothing happens here.
+    --
+    -- The wait is because both handlers are on one event with no ordering
+    -- guarantee, so this has to look after ps-mdt has had its turn.
+    CreateThread(function()
+        Wait(3000)
+
+        local stillThere = MySQL.scalar.await(
+            'SELECT 1 FROM mdt_incidents WHERE id = ?', { incident }
+        )
+        if stillThere then return end
+
+        MySQL.query.await('DELETE FROM som_incident_people WHERE incident_id = ?', { incident })
+    end)
 end)

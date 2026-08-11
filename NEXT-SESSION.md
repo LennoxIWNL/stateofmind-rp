@@ -154,6 +154,38 @@ says so rather than pretending. That avoids a fragile pending-flush path.
 
 **This adds a table. `setup.sql` needs reimporting.** It is idempotent.
 
+### Review status of som-props and the roles code: SELF-REVIEWED ONLY
+
+**A four-lens adversarial review was launched and all four agents died on a
+session limit before returning anything.** It reported zero findings, which
+means "nothing was reviewed", not "nothing was found". This is the second time
+this has happened on this project; AUDIT 21.9 records the same thing killing
+the review of the context menu shim and som-hud.
+
+A manual review was done instead and found four real defects, all now fixed:
+
+- **`FreezeEntityPosition` is client-only** and was being called server-side.
+  ox_lib never calls it from its server path and instead passes `dynamic =
+  false` to the constructor, which is what actually makes a prop static.
+  ps-mdt does call it server-side, but this session has shown ps-mdt is not a
+  correctness signal. Same class as the `SetDispatchServiceActive` mistake in
+  AUDIT 19.2.
+- **`CreateObject` was the wrong constructor.** ox_lib's server-side prop
+  helper uses `CreateObjectNoOffset`, because the offsetting variant shifts the
+  object relative to the coordinate given and makes ground placement guesswork.
+- **The anti-dupe claim sat below a call that can yield.** It is now taken
+  immediately after the ownership read, with every rejection path restoring it.
+  Claiming next to the delete reads more naturally and is wrong.
+- **`mdt:server:deleteIncidents` was a griefing vector.** Any client can fire
+  ps-mdt's event with any id; ps-mdt checks rank before deleting the incident,
+  but our second listener on the same event got no such protection and would
+  have wiped the role rows off any incident. It now treats the incident's
+  actual disappearance as the authorisation, rather than duplicating ps-mdt's
+  permission table.
+
+**Still worth running the review properly when limits allow.** Nothing here has
+been run on a live server.
+
 ## 4. Remove Reports, make Incidents the single write surface. DONE
 
 Owner's call: Incidents is where an officer writes everything.
