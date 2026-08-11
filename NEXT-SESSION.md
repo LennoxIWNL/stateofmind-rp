@@ -484,23 +484,43 @@ on the AUDIT 16.2 re-apply list.
   Two pay buttons rather than a toggle, so the account that pays is an explicit
   choice made at the moment of paying.
 
-### Still not built
+### Also built, via the bridge
 
-- **Clothing.** ox_inventory's contract has no worn-clothing surface at all, and
-  **`som-appearance` exposes `getAppearance` and `applyToPed` but no setter**, so
-  there is nothing to write worn state through. That makes this AUDIT 4a work
-  rather than inventory work. The tab renders the silhouette and both rails and
-  says on screen that it is not wired.
-- **The bottom status strip** (health, armour, hunger, thirst). **Not in any of
-  the seven inbound messages**, so it needs som-hud's state or a new message.
-  Do not fake it.
-- **`ITEMS DROPPED NEARBY`** as an inline section. Stock opens a drop as its own
-  inventory instead, so showing it inline needs a new message carrying nearby
-  drop contents.
-- Cart persistence across a close, which belongs in client Lua keyed by shop id
-  since the page is destroyed on close. Transfer-all on a secondary panel. The
-  hover tooltip.
-- The throw trajectory is a NUMBER, not a drawn arc. The arc in the reference is
+The bridge is a CLIENT script, which turned out to unblock three things the
+first pass had written off as impossible against this contract.
+
+- **The bottom status strip.** Not in ox_inventory's contract and never will
+  be, but it does not have to be: the bridge reads the ped itself and pushes a
+  `somStatus` message into the same frame. Two things copied from som-hud
+  rather than rediscovered: **GTA player health runs 100 to 200**, so the raw
+  value shows a corpse at 50%, and it **sends only on change**, because a
+  payload per tick makes the NUI feel heavy in a way profiling will not show.
+  Armour at zero stands the row down rather than showing an empty bar.
+- **The hover tooltip**, on the stock `getItemData`, fetched on hover rather
+  than held for the whole grid. Only prints metadata keys the server named in
+  `displayMetadata`; anything else is an internal key and printing it raw is
+  how a UI leaks implementation. Suppressed mid-drag.
+- **Take all** on a container, one `swapItems` per item into whatever is free,
+  so the server decides each and a full inventory stops accepting part way.
+  Not offered on shops, where taking is buying.
+- **Basket persistence** across a close, held in the bridge keyed by shop id
+  because the page is destroyed when the inventory closes. Still never an
+  authority: checkout replays every line through stock `buyItem`.
+
+### Still not built, and the reasons are structural
+
+- **Clothing.** Two separate gaps, not one. ox_inventory's contract carries no
+  worn state, AND **`som-appearance` exposes `getAppearance` and `applyToPed`
+  but no setter**, so there is nothing to write through even with a bridge.
+  This is AUDIT 4a work. The tab renders the silhouette and both rails and says
+  on screen that it is not wired, which is honest rather than decorative.
+- **`ITEMS DROPPED NEARBY` as an inline section.** Stock opens a drop as its
+  own right-hand inventory, which already works. Showing it inline as well
+  needs the bridge to enumerate nearby drops, and ox_inventory keeps its drop
+  table private to its own `client.lua`. Reachable, but it means reading their
+  internals rather than a contract, so it is the one place left where the cost
+  is a maintenance liability rather than a morning's work.
+- The throw readout is a NUMBER, not a drawn arc. The arc in the reference is
   drawn in the world, which is client Lua: the page has no camera to project
   against.
 
