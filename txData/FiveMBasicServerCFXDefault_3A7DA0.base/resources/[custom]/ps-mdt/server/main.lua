@@ -247,7 +247,14 @@ QBCore.Functions.CreateCallback('mdt:server:SearchProfile', function(source, cb,
     if Player then
         local JobType = GetJobType(Player.PlayerData.job.name)
         if JobType ~= nil then
-            local people = MySQL.query.await("SELECT p.citizenid, p.charinfo, md.pfp, md.fingerprint FROM players p LEFT JOIN mdt_data md on p.citizenid = md.cid WHERE LOWER(CONCAT(JSON_VALUE(p.charinfo, '$.firstname'), ' ', JSON_VALUE(p.charinfo, '$.lastname'))) LIKE :query OR LOWER(`charinfo`) LIKE :query OR LOWER(`citizenid`) LIKE :query OR LOWER(md.fingerprint) LIKE :query AND jobtype = :jobtype LIMIT 20", { query = string.lower('%'..sentData..'%'), jobtype = JobType })
+            -- `gender` is selected because ProfPic is called with `data.gender`
+            -- below and the stock SELECT never returned that column, so every
+            -- search result showed the male placeholder regardless.
+            -- `AND jobtype = :jobtype` removed for the reason given on the
+            -- incident person search further down this file: it gated the
+            -- fingerprint branch alone on a LEFT JOINed column belonging to the
+            -- notes, not to the person.
+            local people = MySQL.query.await("SELECT p.citizenid, p.charinfo, JSON_VALUE(p.charinfo, '$.gender') AS gender, md.pfp, md.fingerprint FROM players p LEFT JOIN mdt_data md on p.citizenid = md.cid WHERE LOWER(CONCAT(JSON_VALUE(p.charinfo, '$.firstname'), ' ', JSON_VALUE(p.charinfo, '$.lastname'))) LIKE :query OR LOWER(p.`charinfo`) LIKE :query OR LOWER(p.`citizenid`) LIKE :query OR LOWER(md.fingerprint) LIKE :query LIMIT 20", { query = string.lower('%'..sentData..'%') })
             local citizenIds = {}
             local citizenIdIndexMap = {}
             if not next(people) then cb({}) return end
@@ -806,27 +813,31 @@ RegisterNetEvent('mdt:server:incidentSearchPerson', function(query)
         if Player then
             local JobType = GetJobType(Player.PlayerData.job.name)
             if JobType == 'police' or JobType == 'doj' or JobType == 'ambulance' then
-                local function ProfPic(gender, profilepic)
-                    if profilepic then return profilepic end;
-                    if gender == "f" then return "img/female.png" end;
-                    return "img/male.png"
-                end
-
                 local firstname, lastname = query:match("^(%S+)%s*(%S*)$")
                 firstname = firstname or query
                 lastname = lastname or query
 
-                local result = MySQL.query.await("SELECT p.citizenid, p.charinfo, p.metadata, md.pfp from players p LEFT JOIN mdt_data md on p.citizenid = md.cid WHERE (LOWER(JSON_UNQUOTE(JSON_EXTRACT(`charinfo`, '$.firstname'))) LIKE :firstname AND LOWER(JSON_UNQUOTE(JSON_EXTRACT(`charinfo`, '$.lastname'))) LIKE :lastname) OR LOWER(`citizenid`) LIKE :citizenid AND `jobtype` = :jobtype LIMIT 30", {
+                -- `jobtype` lives on mdt_data and records which department wrote
+                -- a person's MDT notes. It does not describe the person, and the
+                -- join is a LEFT JOIN, so for anyone without an mdt_data row it
+                -- is NULL and the comparison is never true. AND also binds
+                -- tighter than OR, so stock parsed as
+                -- `(first AND last) OR (citizenid AND jobtype)`: searching by
+                -- citizen ID returned only people who already had MDT notes,
+                -- which is nobody until an officer has written some. Filter
+                -- removed and the OR branch parenthesised.
+                local result = MySQL.query.await("SELECT p.citizenid, p.charinfo, p.metadata, md.pfp from players p LEFT JOIN mdt_data md on p.citizenid = md.cid WHERE (LOWER(JSON_UNQUOTE(JSON_EXTRACT(p.`charinfo`, '$.firstname'))) LIKE :firstname AND LOWER(JSON_UNQUOTE(JSON_EXTRACT(p.`charinfo`, '$.lastname'))) LIKE :lastname) OR LOWER(p.`citizenid`) LIKE :citizenid LIMIT 30", {
                     firstname = string.lower('%' .. firstname .. '%'),
                     lastname = string.lower('%' .. lastname .. '%'),
-                    citizenid = string.lower('%' .. query .. '%'),
-                    jobtype = JobType
-                })
+                    citizenid = string.lower('%' .. query .. '%')
+                }) or {}
 
                 local data = {}
                 for i=1, #result do
-                    local charinfo = json.decode(result[i].charinfo)
-                    local metadata = json.decode(result[i].metadata)
+                    -- som_characters.metadata is nullable, and json.decode(nil)
+                    -- throws, which would abort the whole render mid-loop.
+                    local charinfo = result[i].charinfo and json.decode(result[i].charinfo) or {}
+                    local metadata = result[i].metadata and json.decode(result[i].metadata) or {}
                     data[i] = {
                         id = result[i].citizenid,
                         firstname = charinfo.firstname,

@@ -29,9 +29,13 @@ function PermCheck(src, PlayerData)
 	return result
 end
 
+-- SOM stores gender as a TINYINT (0 male, 1 female) where qb used "m"/"f".
+-- It arrives here as a number through the `players` view's JSON_OBJECT and as a
+-- string through JSON_VALUE, so all three encodings are accepted. Comparing
+-- against "f" alone matched nothing and every profile fell back to male.
 function ProfPic(gender, profilepic)
 	if profilepic then return profilepic end;
-	if gender == "f" then return "img/female.png" end;
+	if gender == 1 or gender == "1" or gender == "f" then return "img/female.png" end;
 	return "img/male.png"
 end
 
