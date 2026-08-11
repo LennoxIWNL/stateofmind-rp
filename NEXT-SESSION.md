@@ -405,6 +405,86 @@ one and that the list is not empty.
 
 ---
 
+## 9. Task 10, the inventory. PARITY BUILT, features partly. NOT TESTED
+
+Reference images received from the owner 2026-08-11 (eight in-game shots: shop
+with basket, inventory alone, dumpster, items-dropped-nearby, context menu,
+category filter with hotbar, clothing tab, nearby-player highlight).
+
+**Source** `ui/apps/som-inventory`. **Build lands in**
+`[standalone]/ox_inventory/web/som/`. Typechecks and builds clean.
+
+### The three contract findings, which are the durable part
+
+Step 1 was done first and is pinned in `src/contract.ts` against **v2.45.0**.
+Re-enumerate after any ox_inventory upgrade; nothing upstream is versioned.
+
+- **`move`, `swap`, `stack` and `give` are NOT NUI actions.** They read like
+  them and appear as `action = '...'` in `modules/inventory/server.lua`, but
+  they are the SERVER HOOK payload's action field. Listeners for them never
+  fire.
+- **`setInventoryVisible` is a dead listener.** The stock React app waits for
+  it and **no Lua in ox_inventory ever sends it** (zero hits across every
+  `.lua`). `setupInventory` is what opens the UI. Waiting for the former is an
+  inventory that never opens.
+- **`refreshSlots` carries `items` as EITHER one payload OR an array**, from
+  two different call sites in `client.lua`. Treating it as always an array
+  drops every single-item refresh silently.
+
+### Why the build lands inside ox_inventory, which looks backwards
+
+`fetchNui` posts to whichever resource served the page, and a
+`RegisterNUICallback` only answers for the resource owning the frame. Served
+from a `som-*` resource, **all eleven of ox_inventory's callbacks would go
+unanswered** and nothing could be moved, used or bought. There is no forwarding
+trick. The source stays in git; only the output goes there. Their `web/build`
+is untouched and the revert is one `ui_page` line.
+
+### Built
+
+Move, split (shift-drag and the menu), stack, use, give, drop-to-world, shops,
+crafting, stashes, trunks, glovebox. Secondary panel left and main panel right
+with their entry animations, derived category pills, a drop zone lit only while
+dragging, a cursor-anchored context menu with the quantity stepper, the
+detached hotbar, item notifications, and rarity as a single accent ramp.
+
+Dragging is pointer events, not react-dnd: a fixed grid needs a hit test and a
+ghost, pointer capture survives the cursor leaving the window, and a drag
+ending outside the panel is exactly the drop-to-world case.
+
+### NOT built, and why. None of it is a stock capability
+
+**Everything below needs the same missing piece: a `som-inventory` server event
+with its own validation, plus a small bridge file added to ox_inventory to
+register the extra NUI callbacks.** The page cannot reach a som resource's
+callbacks directly, for the frame-ownership reason above. Build the bridge
+once and all of these unblock together.
+
+- **Throw.** No stock callback. Deliberately not shown as a button rather than
+  shipped dead.
+- **Clothing.** ox_inventory's contract has no worn-clothing surface at all:
+  nothing inbound carries it, nothing outbound changes it. The tab renders the
+  silhouette and both rails and **says on screen that it is not wired**.
+- **Drag-to-give with nearby-player highlighting.** Give works through the
+  stock callback; targeting a specific nearby player does not exist stock.
+- **The shop basket** from reference image 1. A shop currently renders as the
+  secondary grid and buys on drag, which is stock behaviour. The three-panel
+  SHOP / BASKET / inventory layout with the cash and bank chips and the
+  Bank/Cash footer is not built.
+- **`ITEMS DROPPED NEARBY`** as an inline section inside the panel.
+- **The bottom status strip** (health, armour, hunger, thirst). **The data is
+  not in ox_inventory's NUI contract**, so it has to come from som-hud's state
+  or a new message. Do not fake it.
+- Transfer-all on a secondary panel, and the hover tooltip.
+
+### NOTHING HERE HAS BEEN RUN
+
+Not once. It typechecks and builds, and that is all that is known. First test
+should be: open the inventory, confirm it appears at all, then move an item
+between two slots and confirm it survives a reopen.
+
+---
+
 ## Before EITHER prompt below: ask for the reference images
 
 **Owner's instruction, 2026-08-11.** Both prompts below describe their layout
