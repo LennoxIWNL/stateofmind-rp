@@ -122,13 +122,37 @@ item 2 predicted.
 add button, search a citizen, then right click their holder to add a charge and
 set the fine and sentence.
 
-The one genuinely missing piece is **per-person roles**. `officersinvolved` and
-`civsinvolved` are JSON blobs with no role field, so victim versus suspect
-versus witness cannot be expressed. That still needs a table, and it should key
-on the INCIDENT, not on a report, because item 4 removes reports. Not built
-yet, and it is small.
+### Per-person roles: BUILT
 
-**No SQL changed. Nothing needs reimporting for this item.**
+The one genuinely missing piece. `officersinvolved` and `civsinvolved` are JSON
+blobs of **display strings with no citizen id**, so not only is there no role
+field, the person's identity is gone the moment they become a tag and cannot be
+recovered by reopening the incident. That is why the panel does not read those
+tags.
+
+- **`som_incident_people`** in `setup.sql`, keyed on the INCIDENT (not a report,
+  since item 4 removed reports). Five roles as an ENUM: victim, suspect,
+  witness, complainant, reporting. UNIQUE on (incident_id, citizenid), so
+  assignment is an upsert and one person holds one role.
+- **No foreign key onto `mdt_incidents`**, deliberately: nothing in ps-mdt's
+  schema has one, and that table can be dropped and recreated by its own SQL on
+  upgrade. Rows are cleaned by a listener on `mdt:server:deleteIncidents`
+  instead. **Note the plural** in that event name; the singular would have
+  registered and never fired.
+- **`som-police/server/incidents.lua`** owns it. Three ox_lib callbacks, job
+  re-checked server side on every read and write, role validated against the
+  server's own list, and the citizen id checked against `som_characters` before
+  insert so a typo or a crafted id cannot hold a role.
+- **ps-mdt is append-only**: three NUI relays at the end of `client/main.lua`
+  and a self-contained panel at the end of `ui/app.js` and `ui/style.css`, the
+  same shape as the certifications panel. It injects its own markup and polls
+  the incident id rather than hooking ps-mdt's three separate paths for setting
+  it, which is the trade the certs panel already documents.
+
+**Roles need the incident saved first.** A new incident has id 0 and the panel
+says so rather than pretending. That avoids a fragile pending-flush path.
+
+**This adds a table. `setup.sql` needs reimporting.** It is idempotent.
 
 ## 4. Remove Reports, make Incidents the single write surface. DONE
 
@@ -166,14 +190,16 @@ Three things worth carrying forward:
 - **One rename performed**, `at_muzzle_precision'.png` to
   `at_muzzle_precision.png`, a stray apostrophe. Not a judgement call.
 
-**Still needs your call before anything else is renamed:** `nikon` has no art,
-`camera.png` is orphan, and pairing them is probably right but is still a guess
-about intent. Section B of `ICON-AUDIT.md`.
+**`nikon` is done.** The owner approved the pairing, so it now carries
+`client = { image = 'camera.png' }` rather than the file being renamed. Same
+pattern `ifaks` already uses, and it is non-destructive: `camera.png` keeps its
+own name if a second camera item ever wants it.
 
-**The three missing icons that are live on this server** are `ammo-taser`
-(ours, added per AUDIT 16.2 and shipped with no art), `rental_papers`
-(som-rentals) and `mdtcitation` (ps-mdt, wants `citation.png`). Everything else
-missing is either unused stock or cosmetic weapon tints.
+**`ammo-taser` is done** and now has art, taken from GGC-Weapons.
+
+**Still missing and live:** `rental_papers` (som-rentals) and `mdtcitation`
+(ps-mdt, wants `citation.png`). Everything else missing is unused stock or
+cosmetic weapon tints.
 
 ## 6. Task 9, the rest. AUDIT DONE, see `VEHICLE-AUDIT.md`. Awaiting sign-off
 
@@ -216,7 +242,33 @@ Extracting the `.rpf` to loose files is exactly that and is the only way to
 make it stream in FiveM, so this is not an OpenIV problem to solve. Ask the
 author (BlueGhost, LCPDFR) for a FiveM release. Nothing has been extracted.
 
-## 7. Task 12: the item binder. LICENCES CHECKED, nothing vendored, needs a call
+## 7. Task 12: the item binder. DONE. Owner accepted the licences
+
+Owner's call, 2026-08-11: the missing licence is acceptable, take what benefits
+us from all three. What that turned out to be, and what it deliberately was not:
+
+**Taken:**
+- **`som-props`**, a new resource. The 8 placeable prop items (cones, barriers,
+  worklights) and their icons, adapted from itemcollection. All vanilla models,
+  so it streams nothing. **Its Lua was NOT taken**, for cause: see
+  `som-props/README.md`. Its pickup event took a model name from the client and
+  handed over the matching item, skipping the entity lookup entirely, so
+  sending it in a loop minted unlimited items.
+- **`ammo-taser` art** from GGC-Weapons, the one image of 122 that covered
+  anything on the missing list, and it happens to be an item we added ourselves
+  and shipped blank.
+- **`sandwich`** gained a client block. It had none, so eating it did nothing.
+  Values matched to `burger`, NOT to the template, whose sandwich quenched
+  thirst.
+- **`data/animations.lua` extended from 2 entries to 11.** That file already
+  was the prop and animation binder this task asked for.
+
+**Not taken, and why:** GGC-Weapons' 115 models and 25 weapon icons. We have
+none of those weapons, so vendoring 492 MB of AGPL content would be a new
+weapon roster decision rather than a binder. Available if wanted, as its own
+call.
+
+## 7b. Original licence findings, kept for the record
 
 All three repos cloned and inspected. **Nothing has been copied into the tree**,
 because two of the three need a decision from the owner and the third is

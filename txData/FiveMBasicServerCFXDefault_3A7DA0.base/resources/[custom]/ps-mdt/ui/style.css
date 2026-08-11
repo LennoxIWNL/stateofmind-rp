@@ -6894,3 +6894,145 @@ input[type="range"].vehicle-info-points-input::-moz-range-track {
  * reachable once the entry is gone. So this hides a surface, it does not
  * delete data, and reverting it restores the feature whole. */
 .nav-item[data-page=".reports-page-container"] { display: none; }
+
+/* ---------------------------------------------------------------------------
+ * SOM addition: per-person roles on an incident.
+ *
+ * Matched to the Officers / Civilians / Criminals blocks it sits under rather
+ * than styled fresh, so it reads as one more section of the same form. Same
+ * hairline border, same pink radial on the heading, same grey add button.
+ * ------------------------------------------------------------------------- */
+
+.som-roles-title {
+    background: radial-gradient(rgba(255, 105, 180, 0.55) 0%, rgba(255, 105, 180, 0.22) 100%);
+    color: white;
+    font-size: 18px;
+    font-weight: bolder;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    text-align: center;
+    margin: auto;
+    margin-top: 15px;
+    margin-bottom: 0px;
+    margin-right: 0px;
+    width: 95%;
+    align-items: center;
+    user-select: none;
+}
+
+.som-roles-add {
+    background-color: #909296;
+    color: white;
+    font-size: 18px;
+    font-weight: bolder;
+    padding-top: 7.25px;
+    padding-bottom: 7.25px;
+    margin: auto;
+    margin-top: 15px;
+    margin-bottom: 0px;
+    margin-left: 5px;
+    margin-right: 0px;
+    width: 10%;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+}
+
+.som-roles-add:hover { background-color: #a5a7ab; }
+
+.som-roles-holder {
+    overflow: auto;
+    margin: auto;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    width: 95%;
+    max-height: 16vh;
+    user-select: none;
+}
+
+/* Says what to do next rather than showing an empty box that looks broken. */
+.som-roles-hint {
+    color: #c1c2c5;
+    font-size: 13px;
+    font-weight: normal;
+    text-align: center;
+    margin: 10px auto 0 auto;
+    width: 95%;
+}
+
+.som-roles-empty {
+    color: #909296;
+    font-size: 13px;
+    font-weight: normal;
+    text-align: center;
+    padding: 8px 0;
+}
+
+.som-roles-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    margin-bottom: 5px;
+    background-color: rgba(255, 255, 255, 0.04);
+    border-left: 2px solid rgba(255, 105, 180, 0.55);
+}
+
+.som-roles-name {
+    flex: 1 1 auto;
+    color: white;
+    font-size: 14px;
+    font-weight: bolder;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The id is the thing an officer copies into another screen, so it stays
+ * readable rather than being decoration. */
+.som-roles-cid {
+    color: #909296;
+    font-size: 12px;
+    font-weight: normal;
+}
+
+.som-roles-select {
+    flex: 0 0 auto;
+    background-color: #2b2c30;
+    color: white;
+    border: 1px solid #c1c2c55d;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 3px 6px;
+    cursor: pointer;
+    outline: none;
+}
+
+.som-roles-select:focus { border-color: rgba(255, 105, 180, 0.7); }
+
+.som-roles-remove {
+    flex: 0 0 auto;
+    color: #909296;
+    font-size: 14px;
+    padding: 2px 5px;
+    cursor: pointer;
+}
+
+.som-roles-remove:hover { color: #ff6b6b; }
+
+/* The box itself, matched to .associated-incidents-tags-container above it. */
+.som-roles-container {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #c1c2c55d;
+    color: white;
+    font-size: 18px;
+    font-weight: bolder;
+    margin: auto;
+    margin-top: 10px;
+    margin-bottom: 0px;
+    width: 94%;
+    height: fit-content;
+    align-items: center;
+    user-select: none;
+}

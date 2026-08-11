@@ -599,6 +599,41 @@ CREATE TABLE IF NOT EXISTS `som_police_plates` (
   KEY `idx_plate_active` (`plate`, `cleared_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Per-person roles on an MDT incident.
+--
+-- ps-mdt stores the people on an incident as two JSON blobs of DISPLAY STRINGS
+-- (`officersinvolved`, `civsinvolved`). There is no citizen id in them and no
+-- per-person field, so victim versus suspect versus witness cannot be
+-- expressed, and the person's identity is lost the moment they become a tag.
+-- This is the junction table that fixes it.
+--
+-- `incident_id` refers to `mdt_incidents(id)` with NO foreign key, on purpose
+-- and for two reasons: nothing else in ps-mdt's schema carries one, and that
+-- table belongs to a preserved third-party resource that may be dropped and
+-- recreated by its own SQL on upgrade. A constraint pointing into it would turn
+-- their migration into our outage. Rows are therefore cleaned by the delete
+-- path in som-police rather than by a cascade.
+--
+-- `role` is an ENUM rather than a VARCHAR so an unknown role is refused by the
+-- database as well as by the server. The server validates against the same list
+-- before it ever reaches here; this is the second lock, not the first.
+--
+-- UNIQUE on (incident_id, citizenid) makes assignment an upsert: one person
+-- holds one role per incident, and setting it again moves it rather than
+-- stacking a second row.
+CREATE TABLE IF NOT EXISTS `som_incident_people` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `incident_id` INT UNSIGNED NOT NULL,
+  `citizenid`   VARCHAR(16) NOT NULL,
+  `role`        ENUM('victim','suspect','witness','complainant','reporting') NOT NULL DEFAULT 'witness',
+  `added_by`    VARCHAR(16) DEFAULT NULL,
+  `created`     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_incident_person` (`incident_id`, `citizenid`),
+  KEY `idx_incident` (`incident_id`),
+  KEY `idx_citizen` (`citizenid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ===========================================================================
 --  8. PRESERVED THIRD PARTY
 --

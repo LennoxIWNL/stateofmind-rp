@@ -38,6 +38,7 @@ server_scripts {
     'server/vehicles.lua',
     'server/fines.lua',
     'server/impound.lua',
+    'server/incidents.lua',
 }
 
 -- Built from ui/apps/som-police. Do not edit html/ by hand, it is generated.

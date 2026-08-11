@@ -1205,3 +1205,61 @@ RegisterNUICallback('somSetCert', function(data, cb)
         granted = data.granted == true,
     })
 end)
+
+-- ---------------------------------------------------------------------------
+-- SOM addition: per-person roles on an incident.
+--
+-- Same shape and same reasoning as the certifications relay above: appended so
+-- it cannot disturb anything before it, and routed through
+-- QBCore.Functions.TriggerCallback because ps-mdt does not load ox_lib and
+-- `lib` is nil in this file. som-compat backs that shim.
+--
+-- ps-mdt keeps the people on an incident as display strings with no citizen id,
+-- so it has nowhere to put a role. som-police owns the junction table. These
+-- three are pure relays and decide nothing: som-police re-checks the calling
+-- officer's job on every read and every write, and validates the role against
+-- its own list, so a crafted NUI message gains nothing.
+-- ---------------------------------------------------------------------------
+
+RegisterNUICallback('somGetIncidentPeople', function(data, cb)
+    if GetResourceState('som-police') ~= 'started' then
+        return cb({ success = false, error = 'som-police is not running' })
+    end
+
+    if type(data) ~= 'table' then return cb({ success = false, error = 'invalid request' }) end
+
+    QBCore.Functions.TriggerCallback('som-police:server:incidentPeople', function(res)
+        cb(res or { success = false, error = 'no response' })
+    end, { incidentId = data.incidentId })
+end)
+
+RegisterNUICallback('somSetIncidentRole', function(data, cb)
+    if GetResourceState('som-police') ~= 'started' then
+        return cb({ success = false, error = 'som-police is not running' })
+    end
+
+    if type(data) ~= 'table' then return cb({ success = false, error = 'invalid request' }) end
+
+    QBCore.Functions.TriggerCallback('som-police:server:setIncidentRole', function(res)
+        cb(res or { success = false, error = 'no response' })
+    end, {
+        incidentId = data.incidentId,
+        citizenid = data.citizenid,
+        role = data.role,
+    })
+end)
+
+RegisterNUICallback('somRemoveIncidentPerson', function(data, cb)
+    if GetResourceState('som-police') ~= 'started' then
+        return cb({ success = false, error = 'som-police is not running' })
+    end
+
+    if type(data) ~= 'table' then return cb({ success = false, error = 'invalid request' }) end
+
+    QBCore.Functions.TriggerCallback('som-police:server:removeIncidentPerson', function(res)
+        cb(res or { success = false, error = 'no response' })
+    end, {
+        incidentId = data.incidentId,
+        citizenid = data.citizenid,
+    })
+end)
