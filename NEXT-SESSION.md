@@ -452,30 +452,57 @@ Dragging is pointer events, not react-dnd: a fixed grid needs a hit test and a
 ghost, pointer capture survives the cursor leaving the window, and a drag
 ending outside the panel is exactly the drop-to-world case.
 
-### NOT built, and why. None of it is a stock capability
+### The bridge, and the three features that needed it. BUILT
 
-**Everything below needs the same missing piece: a `som-inventory` server event
-with its own validation, plus a small bridge file added to ox_inventory to
-register the extra NUI callbacks.** The page cannot reach a som resource's
-callbacks directly, for the frame-ownership reason above. Build the bridge
-once and all of these unblock together.
+`som-inventory` is a **server-only resource**: no client script, no `ui_page`.
+The page is served by ox_inventory, so a callback registered in som-inventory is
+unreachable from it however it is written. The bridge is
+**`ox_inventory/som_bridge.lua`, a NEW file** (not an edit to theirs) that
+registers the extra NUI callbacks and relays them. It and the `ui_page` line are
+on the AUDIT 16.2 re-apply list.
 
-- **Throw.** No stock callback. Deliberately not shown as a button rather than
-  shipped dead.
-- **Clothing.** ox_inventory's contract has no worn-clothing surface at all:
-  nothing inbound carries it, nothing outbound changes it. The tab renders the
-  silhouette and both rails and **says on screen that it is not wired**.
-- **Drag-to-give with nearby-player highlighting.** Give works through the
-  stock callback; targeting a specific nearby player does not exist stock.
-- **The shop basket** from reference image 1. A shop currently renders as the
-  secondary grid and buys on drag, which is stock behaviour. The three-panel
-  SHOP / BASKET / inventory layout with the cash and bank chips and the
-  Bank/Cash footer is not built.
-- **`ITEMS DROPPED NEARBY`** as an inline section inside the panel.
-- **The bottom status strip** (health, armour, hunger, thirst). **The data is
-  not in ox_inventory's NUI contract**, so it has to come from som-hud's state
-  or a new message. Do not fake it.
-- Transfer-all on a secondary panel, and the hover tooltip.
+- **Throw.** Hold to charge, release to throw. The page sends a slot and a 0..1
+  charge; the server re-reads the slot, re-reads the ped, clamps the charge and
+  computes the landing point itself. **It removes the item BEFORE creating the
+  drop**, because the other order creates a drop and then discovers the item was
+  already gone, which is what a duplication bug looks like from outside. A
+  thrown item becomes a real ox_inventory drop via `CustomDrop`, so it is
+  pickupable by anyone and no second item-holding concept enters the codebase.
+  12m at full charge with a per-player cooldown, deliberately: an underarm toss
+  across a room, not a way to move contraband down a street without walking it.
+- **Drag-to-give to a NAMED player**, which stock `giveItem` cannot express: it
+  gives to whoever the client decided was in front of it. Distance measured
+  server side between both peds, target must be loaded, `CanCarryItem` checked
+  first, and **the item goes back if the add fails after the remove succeeded**.
+  The nearby list is client-derived and read only: it answers what to draw, not
+  what is allowed.
+- **The shop basket needed no bridge and no new server code**, which is the good
+  result here. It is staging, not state: lines live on the page and checkout
+  replays them through ox_inventory's **own `buyItem`** one line at a time, so
+  the server re-prices and re-validates each exactly as for a stock drag-to-buy.
+  Sequential rather than parallel because ox_inventory holds a per-slot mutex.
+  Two pay buttons rather than a toggle, so the account that pays is an explicit
+  choice made at the moment of paying.
+
+### Still not built
+
+- **Clothing.** ox_inventory's contract has no worn-clothing surface at all, and
+  **`som-appearance` exposes `getAppearance` and `applyToPed` but no setter**, so
+  there is nothing to write worn state through. That makes this AUDIT 4a work
+  rather than inventory work. The tab renders the silhouette and both rails and
+  says on screen that it is not wired.
+- **The bottom status strip** (health, armour, hunger, thirst). **Not in any of
+  the seven inbound messages**, so it needs som-hud's state or a new message.
+  Do not fake it.
+- **`ITEMS DROPPED NEARBY`** as an inline section. Stock opens a drop as its own
+  inventory instead, so showing it inline needs a new message carrying nearby
+  drop contents.
+- Cart persistence across a close, which belongs in client Lua keyed by shop id
+  since the page is destroyed on close. Transfer-all on a secondary panel. The
+  hover tooltip.
+- The throw trajectory is a NUMBER, not a drawn arc. The arc in the reference is
+  drawn in the world, which is client Lua: the page has no camera to project
+  against.
 
 ### NOTHING HERE HAS BEEN RUN
 
