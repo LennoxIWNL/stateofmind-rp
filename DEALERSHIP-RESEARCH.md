@@ -93,16 +93,24 @@ A dealership is that flow with a catalogue, a showroom and a sales floor on top.
    the RP version.
 3. **Showroom vehicles**, server-owned state, swap requests validated and
    re-broadcast by the server rather than relayed from a client.
-4. **Financing through the ledger and the phone**, not through columns on the
-   vehicle. A payment becomes a `som_phone_bills` row with `auto_collect`,
-   which already works and already notifies.
+4. **Financing through the ledger and a phone app**, not through columns on the
+   vehicle. **Owner's direction, 2026-08-11: this is the `Properties` app in
+   `som-phone`**, and it is named Properties rather than Finance because
+   **Phase 7 extends it to housing**. One place a player sees everything they
+   own and everything they owe. A car payment becomes a `som_phone_bills` row
+   with `auto_collect`, which already works and already notifies, and missed
+   payments drive repossession, so the app is also where a player sees it
+   coming rather than logging in to an empty garage.
 5. **Test drive with a server-side timer** and a server-side despawn, plus the
-   existing distance checks.
-6. **The shop NUI from task 3 for free**, which the plan already noted: the
-   armoury grid, basket and Bank/Cash footer are the same screen.
+   existing distance checks. Owner confirmed test drives are wanted.
+6. **A browsable catalogue.** Owner confirmed. The shop NUI from task 3 comes
+   free here: the armoury grid, basket and Bank/Cash footer are the same
+   screen.
 
-**Open question worth settling before I build:** whether the first dealership is
-free-use (buy from a terminal, available immediately) or managed (needs a player
-on duty). Managed is better RP and worse for an empty server. The honest answer
-is probably both, with free-use on a limited cheap range and managed for
-everything else, but that is a design call rather than a technical one.
+Recorded in `AUDIT.md` 18.4, with the housing half in 18.7.
+
+**Open question, still unanswered:** whether the first dealership is free-use
+(buy from a terminal, works on an empty server) or managed (needs a player on
+duty, better roleplay). My recommendation is both, with free-use on a limited
+cheap range so a new player is never stuck, and managed for everything else.
+That is a design call, not a technical one, and it does not block starting.

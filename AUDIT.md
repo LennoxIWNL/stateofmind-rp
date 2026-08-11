@@ -2139,7 +2139,38 @@ empty by construction.
 
 - **Vehicle keys, lockpicking and hotwiring.** Turns theft from taking a car
   into a crime.
-- **A dealership.** New and used, with a test drive and a finance option.
+- **A dealership.** `som-dealership`, researched in `DEALERSHIP-RESEARCH.md`.
+  Built on `som-garage/server/fleet.lua`'s existing purchase flow, which is
+  already correct: the client sends a model name and never a price, the server
+  re-resolves the entry, distance is checked server side, a failed row write
+  refunds in full, and the selling business is credited so a sale moves money
+  rather than minting it. Owner's direction:
+  - **A browsable catalogue.** Cars are looked at before they are bought, with
+    the shop NUI from the task 3 grid. Listed stock is limited to models that
+    actually stream, or the shop sells cars that will not load.
+  - **Test drives.** Time limited, with the despawn enforced SERVER side. The
+    reference scripts lean on the client for it, and a test drive a player can
+    keep is a free car.
+  - **Financing**, with a down payment and a term. The finance clock runs on
+    PLAYTIME rather than wall clock, copied from qbx_vehicleshop and the one
+    genuinely good idea in it: a player who does not log in for a week should
+    not return to a repossession.
+  - **Free-use and managed shops.** Managed, where a real player hands the car
+    over, is the roleplay version and matches 10.1's direction of turning
+    commands into physical acts.
+- **`som-phone`: the Properties app.** Owner's direction, and the reason
+  financing is NOT a set of columns on the vehicle row the way both reference
+  scripts do it. **Vehicle finance payments are bills, and bills are paid in the
+  phone.** The app is introduced here for cars and **extended in Phase 7 to
+  cover housing**, which is why it is called Properties rather than Finance:
+  one place a player goes to see everything they are paying off and everything
+  they own.
+  - The machinery already exists and does not need inventing:
+    `som_phone_bills` carries `auto_collect` and `due_at`, and
+    `som_transactions` is a real queryable ledger. Storing a balance in a
+    column on the vehicle is the mistake 8.5 records against `som-banking`.
+  - Missed payments drive repossession, so the app is also where a player sees
+    it coming rather than logging in to an empty garage.
 - Fuel, resolving the cdn-fuel or ox_fuel decision recorded in 17.3.
 - Mechanic shop, repair and a paid customisation catalogue.
 - Vehicle HUD: speedometer, fuel and indicators.
@@ -2199,12 +2230,18 @@ alert, and a way to lose the proceeds.
 **Goal.** Somewhere to live and somewhere to keep things.
 
 - Housing and apartments, purchase and rental.
+- **The Properties phone app, extended.** It is built in Phase 4 for vehicle
+  finance (18.4) and named Properties rather than Finance precisely so this
+  phase extends it rather than adding a second app beside it. Rent, mortgage
+  payments and the list of what a player owns all land here, next to the car
+  payments already there. Same `som_phone_bills` machinery, same ledger.
 - Property storage, wardrobes and house garages.
 - Furniture and decoration.
 - Landlord relations.
 - Businesses as property.
 
-**Exit criteria.** A player has an address, storage and a reason to defend both.
+**Exit criteria.** A player has an address, storage and a reason to defend both,
+and one app that tells them everything they own and everything they owe.
 
 **Effort.** Three weeks. Epic if written rather than adopted.
 
