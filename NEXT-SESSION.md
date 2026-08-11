@@ -54,47 +54,44 @@ This is a second, separate search that was never touched.
 Verify: open an Incident, click Officers Involved, Civilians Involved and
 Criminals Involved in turn, and search by both a name and a citizen ID.
 
-## 2. CitizenID becomes a counting number
+## 2. CitizenID becomes a counting number. DROPPED, do not restart it
 
-Currently `generateCitizenId()` in `[som]/som-core/server/characters.lua`
-produces two random uppercase letters plus eight random digits (`AB12345678`)
-into a `VARCHAR(16)`. It is to become a plain sequence: 1, 2, 3.
+Mapped, costed, put to the owner, and **cancelled by the owner on 2026-08-11.**
+Do not reopen this without a fresh instruction.
 
-**Do not start by editing the generator.** The generator is the smallest part
-of this. Map the blast radius first, because a citizenid is the join key for
-most of the server:
+The handoff scoped it as "three foreign keys". That was wrong by an order of
+magnitude. The real surface:
 
-- **Three foreign keys** reference `som_characters(citizenid)` in `setup.sql`
-  (`som_character_money`, `som_vehicles`, and one more, grep
-  `REFERENCES \`som_characters\``). These cascade on delete, so any migration
-  has to move parents and children together or lose rows.
-- **ox_inventory owns the `inventory` column on `som_characters`** and its som
-  bridge points `{user_table}` and `{user_column}` at that table and
-  `citizenid`. Its own tables key off the same value.
-- **ps-mdt stores `cid` as a loose string** in `mdt_data`, `mdt_convictions`,
-  `mdt_bolos` and others, with no foreign key, so nothing will stop those
-  rows being orphaned silently.
-- **som-police builds weapon serials from it**:
-  `('POL%s'):format(officer.citizenid:sub(-5):upper())`. With ids of 1, 2, 3
-  that becomes `POL1`, `POL2`, and the serial stops being unique enough to
-  trace a casing back to a weapon, which is the entire point of registering
-  them. Decide what replaces it before changing the ids, not after.
-- **Anything that DISPLAYS a citizenid** and may have assumed a fixed width:
-  som-id's ID card, the MDT, the phone.
+- **14 SOM tables carry `citizenid`**, and only three of them have a foreign
+  key (`som_character_money`, `som_vehicles`, `som_licenses`). The other
+  eleven cascade nothing, so a renumber orphans them silently rather than
+  failing loudly: `som_transactions`, `som_bank_access`, `som_fines`,
+  `som_job_applications`, `som_turf_events`, `som_market_sales`,
+  `som_phone_accounts`, `som_phone_settings`, `som_appearance_log`,
+  `som_police_custody`, `som_police_impound`.
+- **312 references across 13 `som-*` resources**, led by som-core (88),
+  som-police (64), som-phone (50) and som-garage (38).
+- **ps-mdt's `cid` columns have no constraint** (`mdt_data` VARCHAR(20),
+  `mdt_convictions` varchar(50)).
+- **ox_inventory keys every per-player stash as `stashname:citizenid`** in the
+  `owner` column of its own table (`modules/inventory/server.lua:195`, and the
+  table is created at `modules/mysql/server.lua:64`). A renumber orphans every
+  owned stash. The handoff missed this.
+- **Weapon serials are already engraved into item metadata**
+  (`som-police/server/main.lua:370`). No migration reaches an item sitting in
+  someone's bag, so old serials would keep pointing at ids that no longer
+  exist. The handoff missed this too.
 
-Decide and write down, before touching anything:
+**The owner's actual problem was ergonomic, not structural:** typing
+`AB12345678` into the MDT or a form is painful. That is worth remembering,
+because it does not require renumbering the primary key. Adding a
+`citizen_no INT AUTO_INCREMENT UNIQUE` column to `som_characters` and
+displaying that on the ID card, the MDT and the phone solves the stated pain
+with no join changes, no orphans and no FK churn, and it is reversible. It was
+offered and declined for now. If the complaint resurfaces, that is the cheap
+answer and this section is the reason not to do the expensive one.
 
-1. Where the sequence lives. A real `AUTO_INCREMENT` column is the honest
-   answer and removes the retry loop entirely, but it changes the column type,
-   which is the migration. A counter table is the alternative and is worse.
-2. Whether ids stay `VARCHAR` holding `"7"` or become an integer type. Integer
-   is cleaner and breaks every string comparison in ps-mdt at once.
-3. What happens to existing characters. A remap table (old id to new id) driven
-   through every consumer, or accept starting fresh.
-
-**This changes `setup.sql` and needs reimporting.** Say so explicitly when it
-lands, and ship the migration as its own file rather than editing `setup.sql`
-in place, so an existing database can be moved rather than rebuilt.
+**No SQL changed. Nothing needs reimporting for this item.**
 
 ## 3. Task 6: charges, time and fine in the MDT
 
