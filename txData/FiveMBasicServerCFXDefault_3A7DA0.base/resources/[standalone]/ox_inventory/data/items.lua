@@ -928,6 +928,10 @@ return {
 		stack = false,
 		close = true,
 		description = 'A vehicle rental agreement',
+		-- A stack of document folders. Owner asked specifically for a folder or
+		-- file for this one. Pointed at rather than renamed, so the art keeps
+		-- its own name for whatever already uses it.
+		client = { image = 'printerdocument.png' },
 	},
 
 	-- SOM PATCH: identity documents are shown to players nearby by som-id.
@@ -2025,6 +2029,8 @@ return {
 		weight = 200,
 		stack = false,
 		description = 'A Pro Tech mobile fingerprint reader that looks like it\'s seen better days, currently stuck in french.',
+		-- A real biometric fingerprint terminal, which is what this is.
+		client = { image = 'finger_scanner.png' },
 	},
 
 	['sdcard'] = {
@@ -2116,13 +2122,17 @@ return {
 	['bandageg'] = {
 		label = 'Bandage',
 		weight = 500,
-		description = 'edit here',
+		description = 'A rolled bandage',
+		client = { image = 'bandage.png' },
 	},
 
 	['gauze'] = {
 		label = 'Gauze',
 		weight = 500,
-		description = 'edit here',
+		description = 'Sterile gauze roll',
+		-- Our bandage art is a realistic gauze roll already, so this is the
+		-- closest honest match rather than a new asset.
+		client = { image = 'bandage.png' },
 	},
 
 	['tape'] = {
@@ -2677,6 +2687,7 @@ return {
 		label = 'Dirty Orange',
 		weight = 350,
 		description = 'The talking orange!',
+		client = { image = 'orange.png' },
 	},
 
 	['trowel'] = {
@@ -3950,6 +3961,7 @@ return {
 		weight = 1000,
 		close = false,
 		description = 'Bag full of un-inked cash',
+		client = { image = 'moneybag.png' },
 	},
 
 	['inked_cash_bag'] = {
@@ -3957,6 +3969,10 @@ return {
 		weight = 1000,
 		close = false,
 		description = 'Bag full of useless inked cash.',
+		-- Same bag as cash_bag on purpose. Inked money is only distinguishable
+		-- once it is out of the bag, so two different bags would be telling the
+		-- player something the character cannot see.
+		client = { image = 'moneybag.png' },
 	},
 
 	['limeysdonut'] = {
@@ -4376,8 +4392,11 @@ return {
 		weight = 1000,
 		stack = false,
 		description = 'Citation from a police officer!',
+		-- Was pointed at citation.png, which does not exist and never has, so
+		-- every citation issued has shown the fallback. heist_papers.png is a
+		-- realistic printed form, which is what a citation is.
 		client = {
-			image = 'citation.png'
+			image = 'heist_papers.png'
 		},
 	},
 

@@ -5,6 +5,11 @@ return {
 			weight = 3300,
 			durability = 0.03,
 			ammoname = 'ammo-rifle2',
+			-- No battle rifle art exists. The military rifle is the closest
+			-- real weapon in the set, and a plausible rifle beats the blank
+			-- fallback. NOT the WEAPON_BAT.png the name-matching kept
+			-- suggesting, which is a baseball bat.
+			client = { image = 'WEAPON_MILITARYRIFLE.png' },
 		},
 
 		['WEAPON_SNOWLAUNCHER'] = {
