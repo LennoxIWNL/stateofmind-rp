@@ -41,6 +41,7 @@ export type PanelCtx = {
   setDrag: (d: DragState | null) => void
   isShopSide: boolean
   addToBasket: (line: { slot: number; name: string; count: number; price: number }) => void
+  setHover: (h: { slot: Slot; x: number; y: number } | null) => void
 }
 
 /**
@@ -129,6 +130,13 @@ function SlotCell({ slot, invType, ctx, onDragStart }: SlotCellProps) {
         if (ctx.isShopSide && invType !== 'player') return
         ctx.useSlot(slot)
       }}
+      onPointerEnter={(e) => {
+        // Suppressed mid-drag: a tooltip under the ghost is in the way of the
+        // thing the player is actually doing.
+        if (!has || ctx.drag) return
+        ctx.setHover({ slot, x: e.clientX, y: e.clientY })
+      }}
+      onPointerLeave={() => ctx.setHover(null)}
     >
       {has && (
         <>
@@ -286,7 +294,33 @@ export function InventoryPanel({ side, inventory, ctx }: PanelProps) {
       </header>
 
       {side === 'secondary' && (
-        <div className="som-panel__sub">{countOf(inventory)} items</div>
+        <div className="som-panel__subrow">
+          <span className="som-panel__sub">{countOf(inventory)} items</span>
+          {inventory.type !== 'shop' && inventory.type !== 'crafting' && (
+            <button
+              className="som-panel__all"
+              onClick={() => {
+                // One swapItems per item, into whatever is free. The server
+                // decides each one, so a full player inventory simply stops
+                // accepting part way rather than needing a capacity check here.
+                const empties = ctx.state.left.items.filter((s) => !s.name).map((s) => s.slot)
+                let next = 0
+                for (const item of inventory.items) {
+                  if (!item.name) continue
+                  const target = empties[next++]
+                  if (target === undefined) break
+                  ctx.swap(
+                    { type: inventory.type, slot: item.slot },
+                    { type: 'player', slot: target },
+                    item.count || 1,
+                  )
+                }
+              }}
+            >
+              Take all
+            </button>
+          )}
+        </div>
       )}
 
       {categories.length > 1 && (

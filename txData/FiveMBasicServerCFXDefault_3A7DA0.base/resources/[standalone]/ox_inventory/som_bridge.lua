@@ -92,3 +92,113 @@ RegisterNUICallback('somNearbyPlayers', function(_, cb)
     table.sort(nearby, function(a, b) return a.distance < b.distance end)
     cb(nearby)
 end)
+
+-- ---------------------------------------------------------------------------
+-- The bottom status strip
+--
+-- ox_inventory's NUI contract carries no player condition at all, so the strip
+-- in the reference cannot be built from the seven inbound messages. It CAN be
+-- built here: this file is a client script, so it can read the ped and push its
+-- own message into the same frame.
+--
+-- The two things worth copying from som-hud rather than rediscovering:
+--
+--   * GTA player health runs 100 to 200, not 0 to 100. Sending the raw value
+--     shows a corpse at 50% and a healthy player at 100%.
+--   * Send only on CHANGE. A payload every tick makes the NUI feel heavy in a
+--     way profiling will not show, because the cost is in the bridge and the
+--     render, not in the Lua.
+-- ---------------------------------------------------------------------------
+
+local somOpen = false
+local lastStatus = {}
+
+local function healthPercent(ped)
+    local max = GetEntityMaxHealth(ped)
+    local floor = 100
+    if max <= floor then return 0 end
+
+    local value = (GetEntityHealth(ped) - floor) / (max - floor) * 100
+    if value < 0 then return 0 end
+    if value > 100 then return 100 end
+    return math.floor(value + 0.5)
+end
+
+---Hunger and thirst live on som-core metadata. Guarded on the resource being
+---started so ox_inventory still runs standalone without it.
+local function need(key)
+    if GetResourceState('som-core') ~= 'started' then return 100 end
+
+    local value = tonumber(exports['som-core']:getMetadata(key))
+    if not value then return 100 end
+    if value < 0 then return 0 end
+    if value > 100 then return 100 end
+    return math.floor(value + 0.5)
+end
+
+local function statusChanged(a, b)
+    for key, value in pairs(b) do
+        if a[key] ~= value then return true end
+    end
+    return false
+end
+
+--- The page tells us when it is on screen, so the poll below only runs while
+--- something is actually looking at it.
+RegisterNUICallback('somInventoryOpen', function(data, cb)
+    cb(1)
+    somOpen = type(data) == 'table' and data.open == true
+    if not somOpen then lastStatus = {} end
+end)
+
+CreateThread(function()
+    while true do
+        Wait(somOpen and 500 or 1500)
+
+        if somOpen then
+            local ped = PlayerPedId()
+
+            local payload = {
+                health = healthPercent(ped),
+                armour = math.floor(GetPedArmour(ped) + 0.5),
+                hunger = need('hunger'),
+                thirst = need('thirst'),
+            }
+
+            if statusChanged(lastStatus, payload) then
+                lastStatus = payload
+                SendNUIMessage({ action = 'somStatus', data = payload })
+            end
+        end
+    end
+end)
+
+-- ---------------------------------------------------------------------------
+-- Basket persistence
+--
+-- The page is destroyed when the inventory closes, so a basket that should
+-- survive a close and reopen cannot live there. It lives here, keyed by shop
+-- id, and is handed back when the same shop is opened again.
+--
+-- It is a CONVENIENCE AND NEVER AN AUTHORITY. Checkout replays each line
+-- through ox_inventory's own buyItem, which re-prices and re-validates every
+-- one, so a basket restored from here buys exactly what a freshly built one
+-- would.
+-- ---------------------------------------------------------------------------
+
+local baskets = {}
+
+RegisterNUICallback('somBasketSave', function(data, cb)
+    cb(1)
+    if type(data) ~= 'table' or type(data.shop) ~= 'string' then return end
+    baskets[data.shop] = type(data.lines) == 'table' and data.lines or nil
+end)
+
+RegisterNUICallback('somBasketLoad', function(data, cb)
+    if type(data) ~= 'table' or type(data.shop) ~= 'string' then return cb({}) end
+    cb(baskets[data.shop] or {})
+end)
+
+AddEventHandler('onResourceStop', function(resource)
+    if resource == GetCurrentResourceName() then baskets = {} end
+end)

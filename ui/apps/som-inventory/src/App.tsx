@@ -28,6 +28,8 @@ import { ItemNotifications, type Notification } from './components/Notifications
 import { ThrowCharge } from './components/Throw'
 import { Basket, type BasketLine } from './components/Shop'
 import { NearbyGive, type NearbyPlayer } from './components/Nearby'
+import { StatusStrip, type Status } from './components/StatusStrip'
+import { Tooltip } from './components/Tooltip'
 
 type Tab = 'inventory' | 'clothes'
 
@@ -42,6 +44,8 @@ export function App() {
   const [throwing, setThrowing] = useState<Slot | null>(null)
   const [basket, setBasket] = useState<BasketLine[]>([])
   const [nearby, setNearby] = useState<NearbyPlayer[]>([])
+  const [status, setStatus] = useState<Status | null>(null)
+  const [hover, setHover] = useState<{ slot: Slot; x: number; y: number } | null>(null)
   const notifyId = useRef(0)
 
   // -------------------------------------------------------------------------
@@ -79,6 +83,7 @@ export function App() {
     setDrag(null)
     setMenu(null)
     setThrowing(null)
+    setHover(null)
     setTab('inventory')
     // The basket is staging, and the page is destroyed on close. Surviving a
     // reopen is a client Lua job keyed by shop id, not this component's.
@@ -86,6 +91,10 @@ export function App() {
   })
 
   useNuiEvent(INBOUND.toggleHotbar, () => setHotbar((on) => !on))
+
+  // NOT part of ox_inventory's contract. Pushed by som_bridge.lua, which is a
+  // client script and can read the ped. See components/StatusStrip.
+  useNuiEvent<Status>('somStatus', (data) => setStatus(data))
 
   useNuiEvent<InboundItemNotify>(INBOUND.itemNotify, (payload) => {
     // A TUPLE, not an object: [item, text, count?].
@@ -105,6 +114,33 @@ export function App() {
   useEffect(() => {
     void fetchNui(OUTBOUND.uiLoaded, {})
   }, [])
+
+  // The bridge only polls condition while something is looking at it.
+  useEffect(() => {
+    void fetchNui('somInventoryOpen', { open: visible })
+  }, [visible])
+
+  // The basket survives a close because it lives in the bridge keyed by shop
+  // id, not here: this page is destroyed when the inventory closes.
+  const shopId = state.right && (state.right.type === 'shop' || state.right.type === 'crafting')
+    ? state.right.id
+    : null
+
+  useEffect(() => {
+    if (!shopId) return
+    let alive = true
+    void fetchNui<BasketLine[]>('somBasketLoad', { shop: shopId }, []).then((lines) => {
+      if (alive && Array.isArray(lines)) setBasket(lines)
+    })
+    return () => {
+      alive = false
+    }
+  }, [shopId])
+
+  useEffect(() => {
+    if (!shopId) return
+    void fetchNui('somBasketSave', { shop: shopId, lines: basket })
+  }, [shopId, basket])
 
   // -------------------------------------------------------------------------
   // Outbound
@@ -249,7 +285,7 @@ export function App() {
   const leftWeightMax = state.left?.maxWeight || 0
 
   const value = useMemo(
-    () => ({ state, swap, useSlot, giveSlot, buy, setMenu, drag, setDrag, isShopSide, addToBasket }),
+    () => ({ state, swap, useSlot, giveSlot, buy, setMenu, drag, setDrag, isShopSide, addToBasket, setHover }),
     [state, swap, useSlot, giveSlot, buy, drag, isShopSide, addToBasket],
   )
 
@@ -292,6 +328,8 @@ export function App() {
         ) : (
           <Clothing weight={leftWeightMax} />
         )}
+
+        <StatusStrip status={status} />
       </div>
 
       {isShopSide && (
@@ -329,6 +367,8 @@ export function App() {
           }}
         />
       )}
+
+      {hover && !drag && <Tooltip slot={hover.slot} state={state} x={hover.x} y={hover.y} />}
 
       <ItemNotifications list={notifications} state={state} />
     </div>
