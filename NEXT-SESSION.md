@@ -655,6 +655,53 @@ Note the item key casing trap in item 5 above.
 
 ---
 
+## PROMPT B PREP: what the current som-hud already solves
+
+Read 2026-08-12, before any rebuild. 732 lines across client, html and config.
+**Do not rediscover any of this.** Each item below is a bug that was already
+found and closed once.
+
+**The architectural property worth preserving above all else.** som-hud is read
+only in the strongest sense: **no NUI callback, no net event in, no server
+half.** It watches natives and som-core's client mirror and describes what it
+sees, so there is nothing in it for a client to lie to. Task 11 adds `/sethud`
+with persistence, which breaks that: the moment it accepts a layout it has an
+inbound surface. Keep that surface to layout ONLY, never to values, and
+validate it server side if it persists per player.
+
+- **GTA player health runs 100 to 200, not 0 to 100.** `healthPercent` maps it.
+  The raw value shows a corpse at 50% and a healthy player at 100%. This has now
+  been copied into som_bridge.lua as well; if the formula ever changes, both
+  need it.
+- **Both loops send only on CHANGE**, and the comment explaining why is worth
+  keeping: a HUD posting an identical payload ten times a second is the easiest
+  way to make a NUI feel heavy, and it is **invisible in profiling** because
+  each individual message is tiny.
+- **`invalidate()` on player load, metadata change and resource start.** Without
+  it, a change that happens WHILE THE HUD IS HIDDEN is compared against the
+  value from before it was hidden and suppressed as identical, so the HUD comes
+  back showing a stale number until something else moves. This is subtle and
+  will not show up in casual testing.
+- **Two loops at different rates**, vehicle 100ms and status 500ms, because the
+  two halves change at very different speeds.
+- **The som-medical check is wrapped in pcall.** A som-medical restart would
+  otherwise take the HUD down with it every time that resource is reloaded.
+- **Passengers get the vehicle panel too.** Watching the speed of the car you
+  are being driven in is exactly as useful as watching your own.
+- **The design is subtractive**, and that is a deliberate stance rather than an
+  omission: armour stands down at zero, needs hide above 90%, the whole HUD
+  hides in the pause menu and while downed. A permanently full gauge teaches
+  players to stop reading the row it sits in.
+- **Pink appears in exactly ONE place**, the voice ring while transmitting,
+  because it is the only element describing something happening now rather than
+  something merely true. The new HUD has far more elements; that ratio is the
+  thing to preserve, not the specific ring.
+- pma-voice range comes from `LocalPlayer.state.proximity` as
+  `{ index, distance, mode }`, read from the statebag rather than guessed, so it
+  survives the ranges being reconfigured.
+
+---
+
 ## PROMPT B: Task 11, the custom HUD, plus task 13
 
 Continue State of Mind RP. Read AUDIT.md 21.5 and the same plan. Standing rules
