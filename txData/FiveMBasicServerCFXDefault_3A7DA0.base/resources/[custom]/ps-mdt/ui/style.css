@@ -6881,3 +6881,16 @@ input[type="range"].vehicle-info-points-input::-moz-range-track {
 /* Read-only for anyone below the granting rank: no button, no pointer, so it
  * never looks like something that failed to work. */
 .som-cert:not(.som-cert--editable) .som-cert__action { display: none; }
+
+/* SOM: Incidents is the single write surface for an officer, so Reports is
+ * removed from the navigation. The nav markup is repeated once per page
+ * container (12 copies carry data-page, and the shell nav's plain entry is
+ * deleted in dashboard.html), so this is one rule rather than 12 deletions,
+ * which also makes it one line to re-apply after a ps-mdt upgrade.
+ *
+ * The page container, its handlers and mdt_reports are all left intact. The
+ * nav was the only route in: the other two call sites are a click on a row
+ * inside the Reports page itself and the nav loader's own fetch, neither
+ * reachable once the entry is gone. So this hides a surface, it does not
+ * delete data, and reverting it restores the feature whole. */
+.nav-item[data-page=".reports-page-container"] { display: none; }

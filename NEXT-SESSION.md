@@ -93,33 +93,59 @@ answer and this section is the reason not to do the expensive one.
 
 **No SQL changed. Nothing needs reimporting for this item.**
 
-## 3. Task 6: charges, time and fine in the MDT
+## 3. Charges, time and fine in the MDT. ALREADY BUILT, do not build som-charges
 
-The owner reports there is nowhere to add charges or set time and fine. Most of
-the storage already exists, so this is mostly UI plus one new table.
+**Do not build `som-charges`. AUDIT 16.6 item 2 was right and this section was
+wrong to contradict it.** The entire charging system already ships in ps-mdt
+and is complete. Verified by reading it, 2026-08-11:
 
-- **Charges need no new table.** `mdt_convictions` already carries `charges`
-  (JSON), `fine`, `sentence`, `recfine`, `recsentence` and `guilty`. Original
-  versus reduced IS `recfine`/`recsentence` against `fine`/`sentence`, and the
-  plea is `guilty`, widened to three states (guilty, no contest, not guilty
-  pending trial) rather than gaining a column.
-- **Roles need one new table.** People are two JSON blobs (`officersinvolved`,
-  `civsinvolved`) with no per-person role and no junction table, so victim
-  versus suspect versus witness cannot be expressed. Add
-  `som_report_people (id, report_id, citizenid, role, created)`.
+- `getPenalCode` (`ui/app.js:4706`) renders all 181 offences grouped under the
+  10 `Config.PenalCodeTitles`, each carrying class, penal code number, months,
+  fine, colour and description.
+- Right-clicking a person's holder (`ui/app.js:1776`) opens that picker and
+  appends the charge as a tag.
+- Each person on an incident gets a card (`ui/app.js:4865-4894`) with
+  **Recommended Fine, Fine, Recommended Sentence, Sentence**, Warrant, Guilty,
+  Processed and Associated toggles, and Jail, Fine and Community Service
+  buttons.
+- It all saves to `mdt_convictions`, which already has `charges`, `fine`,
+  `sentence`, `recfine`, `recsentence` and `guilty`.
 
-Read ps-mdt's existing `Config.PenalCode`: 181 entries in `shared/config.lua`,
-a plain shared global already relayed to its NUI. **Do not create a second
-penal code**, and build as a new `som-charges` resource hooking in by
-export/event rather than editing ps-mdt, consistent with AUDIT 16.6 item 2.
+**Why the owner could not find it.** The charges card only exists for a person
+who has been added to the incident, and every one of the six person-add buttons
+routes through the single search fixed in item 1. Searching by citizen ID
+returned nothing, so nobody could be added, so no card and no charges. Fixing
+the search is what makes this reachable. That is exactly the chain AUDIT 16.6
+item 2 predicted.
 
-**This adds a table and needs reimporting.**
+**Test it rather than build it:** open an incident, click the Associated tags
+add button, search a citizen, then right click their holder to add a charge and
+set the fine and sentence.
 
-## 4. Remove Reports, make Incidents the single write surface
+The one genuinely missing piece is **per-person roles**. `officersinvolved` and
+`civsinvolved` are JSON blobs with no role field, so victim versus suspect
+versus witness cannot be expressed. That still needs a table, and it should key
+on the INCIDENT, not on a report, because item 4 removes reports. Not built
+yet, and it is small.
 
-Owner's call: Incidents is where an officer writes everything. Remove the
-Reports nav item and page from ps-mdt's dashboard. Batches naturally with item
-3 because it is the same screen.
+**No SQL changed. Nothing needs reimporting for this item.**
+
+## 4. Remove Reports, make Incidents the single write surface. DONE
+
+Owner's call: Incidents is where an officer writes everything.
+
+Done as one deleted line in `ui/dashboard.html` plus one rule at the end of
+`ui/style.css`. The nav markup is repeated once per page container, so 12 of
+the 13 copies carry `data-page` and fall to a single attribute selector rather
+than 12 separate deletions. That also makes it one line to re-apply after a
+ps-mdt upgrade, so it goes on the AUDIT 16.2 list as such.
+
+The page container, its handlers and the `mdt_reports` table are all left
+intact. The nav was the only way in: the only other two call sites are a click
+on a row inside the Reports page itself and the nav loader's own fetch, neither
+reachable once the entry is gone. Nothing in the JS `.show()`s it either, since
+that only ever targets specific nav classes and Reports has none. So this hides
+a surface rather than deleting data, and reverting restores it whole.
 
 ## 5. Task 8: the icon audit
 
