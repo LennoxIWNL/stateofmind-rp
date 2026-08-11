@@ -1,0 +1,108 @@
+/* The rental counter.
+ *
+ * The armoury's card grid with the tile swapped for a vehicle card: a wider
+ * aspect, because a car photographed side on is landscape and cropping it into
+ * a square tile is what makes rental UIs look like item shops.
+ */
+
+body { margin: 0; background: transparent; overflow: hidden; }
+
+.shell {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.45);
+  animation: som-fade 160ms ease both;
+}
+
+.rentals { width: 720px; max-height: 82vh; }
+
+.head__title { font-size: 1rem; font-weight: 600; }
+.head__sub { margin-top: 1px; font-size: 0.74rem; color: var(--som-text-dim); }
+.hint { font-size: 0.7rem; color: var(--som-text-mute); }
+
+.pay { display: flex; gap: 7px; }
+.pay__value { margin-left: 7px; font-size: 0.72rem; opacity: 0.85; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.empty { grid-column: 1 / -1; padding: 22px 0; text-align: center; font-size: 0.78rem; color: var(--som-text-mute); }
+
+.veh {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 3px solid var(--som-pink-a45);
+  transition: var(--som-transition);
+}
+
+.veh:hover {
+  background: var(--som-card-hover);
+  border-color: var(--som-pink-a45);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
+}
+
+.veh.is-blocked { border-bottom-color: rgba(255, 255, 255, 0.1); }
+.veh.is-blocked:hover { transform: none; box-shadow: none; }
+.veh.is-blocked .veh__art { opacity: 0.4; }
+
+.veh__art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 96px;
+  padding: 8px;
+  background: radial-gradient(circle at 50% 60%, rgba(255, 255, 255, 0.09), transparent 70%);
+}
+
+.veh__art img {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.6));
+}
+
+/* Under the image, so it only shows when the art is missing. */
+.veh__plate {
+  position: absolute;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.veh__body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 11px 0;
+}
+
+.veh__name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.veh__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 11px 11px;
+}
+
+.veh__price { font-size: 0.95rem; font-weight: 650; color: var(--som-pink-light); }

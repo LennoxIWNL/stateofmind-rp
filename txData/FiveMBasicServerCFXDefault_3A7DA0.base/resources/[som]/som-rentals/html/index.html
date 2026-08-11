@@ -1,35 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="utf-8" />
     <title>som-rentals</title>
-    <link rel="stylesheet" href="https://cfx-nui-som-assets/tokens.css">
-    <link rel="stylesheet" href="https://cfx-nui-som-rentals/html/style.css">
-</head>
-<body>
-    <div id="root" class="root hidden">
-        <section class="panel">
-            <header class="panel__head">
-                <div>
-                    <h1 class="panel__title" id="title">Vehicle Rental</h1>
-                    <p class="panel__sub">Deposit refunded on return</p>
-                </div>
-                <!-- Cash or card. The same control belongs on every shop, so
-                     the options and balances come from som-core rather than
-                     being decided here. -->
-                <div class="pay" id="pay"></div>
-            </header>
-
-            <div class="list" id="list"></div>
-
-            <footer class="panel__foot">
-                <span class="note" id="deposit-note"></span>
-                <button class="btn" id="close" type="button">Close</button>
-            </footer>
-        </section>
-    </div>
-
-    <script src="https://cfx-nui-som-rentals/html/app.js"></script>
-</body>
+    <link rel="stylesheet" href="https://cfx-nui-som-assets/tokens.css" />
+    <script type="module" crossorigin src="./assets/index.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
 </html>

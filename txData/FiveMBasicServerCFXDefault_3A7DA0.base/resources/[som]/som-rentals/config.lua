@@ -58,12 +58,18 @@ Config.Locations = {
 
         blip = { sprite = 326, colour = 5, scale = 0.7 },
 
+        -- `class` is shown on the card and is a LABEL, not a lookup.
+        --
+        -- GTA's own GetVehicleClassFromName would give a number, but only once
+        -- the model is loaded, and a rental counter should not stream five
+        -- vehicles just to draw five words. Written here so the card can say
+        -- what kind of thing it is without loading anything.
         vehicles = {
-            { model = 'blista',  label = 'Blista',       price = 120 },
-            { model = 'panto',   label = 'Panto',        price = 90 },
-            { model = 'asea',    label = 'Asea',         price = 140 },
-            { model = 'rumpo',   label = 'Rumpo Van',    price = 220 },
-            { model = 'faggio',  label = 'Faggio Sport', price = 60 },
+            { model = 'blista',  label = 'Blista',       class = 'Compact',   price = 120 },
+            { model = 'panto',   label = 'Panto',        class = 'Compact',   price = 90 },
+            { model = 'asea',    label = 'Asea',         class = 'Sedan',     price = 140 },
+            { model = 'rumpo',   label = 'Rumpo Van',    class = 'Van',       price = 220 },
+            { model = 'faggio',  label = 'Faggio Sport', class = 'Motorcycle', price = 60 },
         },
     },
 }

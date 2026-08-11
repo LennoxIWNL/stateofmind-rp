@@ -1,0 +1,6 @@
+import { somApp } from '@som/ui-kit/vite'
+
+export default somApp({
+  outDir: '../../../txData/FiveMBasicServerCFXDefault_3A7DA0.base/resources/[som]/som-rentals/html',
+  port: 5175,
+})

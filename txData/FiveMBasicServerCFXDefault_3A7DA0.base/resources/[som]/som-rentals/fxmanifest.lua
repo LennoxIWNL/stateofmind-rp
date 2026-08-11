@@ -23,10 +23,12 @@ server_scripts {
 
 ui_page 'html/index.html'
 
+-- Built from ui/apps/som-rentals. Do not edit html/ by hand, it is generated.
 files {
     'html/index.html',
-    'html/style.css',
-    'html/app.js',
+    'html/assets/*.js',
+    'html/assets/*.css',
+    'html/assets/*.map',
 }
 
 dependencies {
