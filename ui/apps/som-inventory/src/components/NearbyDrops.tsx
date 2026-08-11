@@ -48,7 +48,7 @@ export function NearbyDrops({ active }: { active: boolean }) {
           <button
             key={d.id}
             className="som-drops__item"
-            onClick={() => void fetchNui('somOpenNearbyDrop', {})}
+            onClick={() => void fetchNui('somOpenNearbyDrop', { id: d.id })}
           >
             <span className="som-drops__bag" aria-hidden="true" />
             <span className="som-drops__dist">{d.distance}m</span>

@@ -262,6 +262,26 @@ RegisterNetEvent('ox_inventory:createDrop', function(dropId, data)
     drops[dropId] = data.coords
 end)
 
+--- Drops that ALREADY EXISTED when this client connected.
+---
+--- They never fire createDrop. The server hands the whole set over once, in the
+--- first argument of setPlayerInventory (server.lua:64), and ox_inventory's own
+--- client.lua registers them by calling its local createDrop directly rather
+--- than re-emitting the event. Listening only for createDrop therefore finds
+--- nothing a player did not watch happen, which means every drop on the ground
+--- is invisible after a relog or an ox_inventory restart.
+RegisterNetEvent('ox_inventory:setPlayerInventory', function(currentDrops)
+    if type(currentDrops) ~= 'table' then return end
+
+    -- Replaced rather than merged: this message IS the full current set, so
+    -- anything held from a previous session is stale by definition.
+    drops = {}
+
+    for dropId, data in pairs(currentDrops) do
+        if type(data) == 'table' and data.coords then drops[dropId] = data.coords end
+    end
+end)
+
 RegisterNetEvent('ox_inventory:removeDrop', function(dropId)
     drops[dropId] = nil
 end)
@@ -285,9 +305,21 @@ RegisterNUICallback('somNearbyDrops', function(_, cb)
     cb(near)
 end)
 
---- Opens the nearest drop, through ox_inventory's OWN export, so the distance
---- and access rules that apply to walking up to one apply here too.
-RegisterNUICallback('somOpenNearbyDrop', function(_, cb)
+--- Opens a specific drop by id, through ox_inventory's own openInventory.
+---
+--- NOT `openNearbyInventory`, which reads like the right export and is not:
+--- it is `client.openInventory('player')` (client.lua:709), the function behind
+--- the /steal command, which opens the nearest PLAYER'S POCKETS. Wiring the
+--- drop button to it would have turned picking up a bag into pickpocketing
+--- whoever was standing closest.
+---
+--- The id comes from the page, which is why nothing here trusts it: the server
+--- distance-gates every drop open of its own accord, so a forged id opens
+--- nothing that walking up to it would not have.
+RegisterNUICallback('somOpenNearbyDrop', function(data, cb)
     cb(1)
-    exports.ox_inventory:openNearbyInventory()
+
+    if type(data) ~= 'table' or type(data.id) ~= 'string' then return end
+
+    exports.ox_inventory:openInventory('drop', data.id)
 end)

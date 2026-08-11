@@ -8,18 +8,37 @@
 --
 -- HOW REMOVING WORKS, AND WHY IT IS NOT DESTRUCTIVE.
 --
--- A removed garment is moved into an `appearance.hidden` map rather than
--- overwritten, and the live component is set to the nude drawable:
+-- A removed garment is copied into an `appearance.hidden` map and the live
+-- record is set to the nude drawable IN PLACE:
 --
---   components[11] = { drawable = 0,  texture = 0 }        <- what is worn now
---   hidden['11']   = { drawable = 15, texture = 2 }        <- what was taken off
+--   hidden['component:11'] = { drawable = 15, texture = 2 }  <- what came off
 --
--- So the original is never lost, wearing it again is a move back, and
--- `Appearance.Apply` needs no changes at all: it applies components as stored,
--- which are already nude. `hidden` is an extra key that every other reader,
--- including any fivem-appearance compatible tool, ignores.
+-- So the original is never lost, wearing it again is a copy back, and
+-- `Appearance.Apply` needs no changes: it applies components as stored, which
+-- are already nude. `hidden` is an extra key every other reader ignores,
+-- including any fivem-appearance compatible tool.
+--
+-- THE SHAPE. `components` and `props` are ARRAYS OF RECORDS, not maps keyed by
+-- id:
+--
+--   components = { { component_id = 11, drawable = 15, texture = 2 }, ... }
+--   props      = { { prop_id = 0,       drawable = 4,  texture = 0 }, ... }
+--
+-- built that way by `Appearance.Get` and `Appearance.Default`
+-- (client/appearance.lua:39, 250) and read that way by `ApplyApparel`, which
+-- does `tonumber(c.component_id)` and SKIPS any record without one.
+--
+-- That matters more than it looks. An earlier version of this file indexed
+-- `list[id]`, which on an array hits a POSITION, so component 3 read the record
+-- for component 4, and writing a fresh `{drawable, texture}` table dropped
+-- `component_id` and made the entry invisible to ApplyApparel forever. Records
+-- are therefore MUTATED IN PLACE below, never replaced, which is what keeps the
+-- id attached.
 
-local NUDE = { drawable = 0, texture = 0 }
+-- Components use 0 for bare. Props use -1 for none: ApplyApparel clamps a prop
+-- to a -1 floor and calls ClearPedProp for it, where 0 would be a real hat.
+local NUDE_COMPONENT = 0
+local NUDE_PROP = -1
 
 ---Component ids this is willing to touch, built from config rather than
 ---hardcoded, so adding a slot to Config.Components is the only edit needed.
@@ -60,28 +79,48 @@ local function key(id, kind)
     return ('%s:%d'):format(kind, id)
 end
 
+---Finds a record in the array by its id field.
+---
+---A linear scan, because these arrays are at most eleven entries and a map
+---built per call would cost more than it saved.
+---@param list table|nil
+---@param kind 'component'|'prop'
+---@param id number
+---@return table|nil record
+local function findRecord(list, kind, id)
+    if type(list) ~= 'table' then return nil end
+
+    local field = kind == 'prop' and 'prop_id' or 'component_id'
+
+    for _, entry in ipairs(list) do
+        if type(entry) == 'table' and tonumber(entry[field]) == id then return entry end
+    end
+
+    return nil
+end
+
 ---@param appearance table
 ---@param kind 'component'|'prop'
 ---@param id number
 ---@return boolean changed
 local function removeOne(appearance, kind, id)
     local list = kind == 'component' and appearance.components or appearance.props
-    if type(list) ~= 'table' then return false end
-
-    local worn = list[tostring(id)] or list[id]
-    if type(worn) ~= 'table' then return false end
+    local record = findRecord(list, kind, id)
+    if not record then return false end
 
     appearance.hidden = appearance.hidden or {}
     local k = key(id, kind)
 
     -- Already off. Removing twice must not overwrite the record of what was
-    -- originally worn with the nude value we just wrote.
+    -- originally worn with the nude value written the first time.
     if appearance.hidden[k] then return false end
 
-    appearance.hidden[k] = { drawable = worn.drawable, texture = worn.texture }
+    appearance.hidden[k] = { drawable = record.drawable, texture = record.texture }
 
-    local nude = { drawable = NUDE.drawable, texture = NUDE.texture }
-    if list[tostring(id)] ~= nil then list[tostring(id)] = nude else list[id] = nude end
+    -- IN PLACE. Replacing the table would drop component_id/prop_id and make
+    -- the entry invisible to ApplyApparel.
+    record.drawable = kind == 'prop' and NUDE_PROP or NUDE_COMPONENT
+    record.texture = 0
 
     return true
 end
@@ -98,12 +137,13 @@ local function wearOne(appearance, kind, id)
     if type(stashed) ~= 'table' then return false end
 
     local list = kind == 'component' and appearance.components or appearance.props
-    if type(list) ~= 'table' then return false end
+    local record = findRecord(list, kind, id)
+    if not record then return false end
 
-    local restored = { drawable = stashed.drawable, texture = stashed.texture }
-    if list[tostring(id)] ~= nil then list[tostring(id)] = restored else list[id] = restored end
-
+    record.drawable = stashed.drawable
+    record.texture = stashed.texture
     appearance.hidden[k] = nil
+
     return true
 end
 
