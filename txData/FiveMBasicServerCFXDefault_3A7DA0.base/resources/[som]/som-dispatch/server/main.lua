@@ -441,8 +441,16 @@ local function unitKey(unit)
     return unit.cid or unit.citizenid
 end
 
+-- callid arrives from ps-mdt's NUI, which means it has crossed JSON and comes
+-- back a STRING. Lua does not treat calls["3"] and calls[3] as the same key, so
+-- without this coercion every attach, detach and response silently addressed a
+-- call that did not exist and returned as if nothing was wrong.
+local function callById(id)
+    return calls[tonumber(id) or id]
+end
+
 AddEventHandler('dispatch:addUnit', function(callid, playerdata, cb)
-    local call = calls[callid]
+    local call = callById(callid)
     if not call then return cb and cb(0) end
 
     local key = unitKey(playerdata)
@@ -462,7 +470,7 @@ AddEventHandler('dispatch:addUnit', function(callid, playerdata, cb)
 end)
 
 AddEventHandler('dispatch:removeUnit', function(callid, playerdata, cb)
-    local call = calls[callid]
+    local call = callById(callid)
     if not call then return cb and cb(0) end
 
     local key = unitKey(playerdata)
@@ -479,7 +487,7 @@ AddEventHandler('dispatch:removeUnit', function(callid, playerdata, cb)
 end)
 
 AddEventHandler('dispatch:sendCallResponse', function(src, callid, message, time, cb)
-    local call = calls[callid]
+    local call = callById(callid)
     if not call then return cb and cb(false) end
 
     local player = core:getPlayer(src)

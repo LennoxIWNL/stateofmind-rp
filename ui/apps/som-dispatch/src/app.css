@@ -11,7 +11,16 @@
  * tokens.css, pink on dark, with the priority carrying the only status colour.
  */
 
-body {
+/* html AND body, not just body.
+ *
+ * CEF paints the root element's background before the body's, so a page that
+ * only clears body still renders an opaque black rectangle over the game. That
+ * is what the first build did: the feed looked correct and sat in a black box
+ * the width of its column. #root needs it too, since vite's mount point is a
+ * third element between the two. */
+html,
+body,
+#root {
   margin: 0;
   background: transparent;
   overflow: hidden;
@@ -20,10 +29,17 @@ body {
   pointer-events: none;
 }
 
+/* TOP RIGHT.
+ *
+ * This moved from the left once it replaced the generic toast rather than
+ * sitting alongside it. The right is where notifications on this server have
+ * always appeared, so dispatch traffic showing up on the opposite side read as
+ * a second, unrelated system. som-ui's own notifications share this corner and
+ * stack below, which is correct: they are the same kind of thing. */
 .dispatch {
   position: fixed;
   top: 2vh;
-  left: 1.4vw;
+  right: 1.4vw;
   width: 21vw;
   min-width: 250px;
   max-width: 340px;
@@ -119,12 +135,15 @@ body {
 
 .dispatch__detail { font-family: var(--som-font-mono); }
 
+/* Enters and leaves to the RIGHT, matching the side it now lives on. A card
+   that slides in from the left while sitting on the right edge reads as
+   arriving from somewhere it never was. */
 @keyframes dispatch-in {
-  from { opacity: 0; transform: translateX(-22px); }
+  from { opacity: 0; transform: translateX(22px); }
   to { opacity: 1; transform: none; }
 }
 
 @keyframes dispatch-out {
   from { opacity: 1; transform: none; max-height: 200px; }
-  to { opacity: 0; transform: translateX(-22px); max-height: 0; padding-top: 0; padding-bottom: 0; }
+  to { opacity: 0; transform: translateX(22px); max-height: 0; padding-top: 0; padding-bottom: 0; }
 }
