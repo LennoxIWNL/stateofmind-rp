@@ -30,8 +30,16 @@ server_scripts {
 
 client_script 'init.lua'
 
--- SOM PATCH, and the ONLY edit to this resource. Two lines: this one and the
--- web/som entries below.
+-- SOM PATCH. som_bridge.lua is a NEW file, not an edit to any of theirs. It
+-- registers the extra NUI callbacks the renderer needs for throwing and for
+-- giving to a named nearby player, which ox_inventory has no stock path for,
+-- and relays them to som-inventory's validated server events. It has to live in
+-- THIS resource because the page is served from this origin and a
+-- RegisterNUICallback only answers for the resource owning the frame.
+client_script 'som_bridge.lua'
+
+-- SOM PATCH. Points at our renderer. Their web/build is untouched, so the
+-- revert is putting 'web/build/index.html' back on the line below.
 --
 -- Points at som-inventory, our own renderer, whose SOURCE lives in git at
 -- ui/apps/som-inventory and whose build lands here. Their web/build is

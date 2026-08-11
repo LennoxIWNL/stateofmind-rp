@@ -1,10 +1,12 @@
 /**
  * The cursor-anchored slot menu.
  *
- * Every action here has a STOCK ox_inventory path behind it. Throw is
- * deliberately absent: it has no stock callback, so it needs a som-inventory
- * server event with its own validation before it can exist as a button. A
- * button that silently does nothing is worse than one that is not there yet.
+ * Use, Drop, Split and Give run on STOCK ox_inventory callbacks.
+ *
+ * Throw does not: ox_inventory has no such path. It goes through the bridge to
+ * som-inventory's own validated server event, which re-reads the slot, clamps
+ * the charge and decides the landing point itself. The button holds to charge
+ * and throws on release, so it is a press rather than a click.
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -29,9 +31,10 @@ type Props = {
     to: { type: InventoryType | 'newdrop'; slot: number },
     count: number,
   ) => void
+  onThrow: (slot: Slot) => void
 }
 
-export function SlotContextMenu({ target, state, onClose, onUse, onGive, onSwap }: Props) {
+export function SlotContextMenu({ target, state, onClose, onUse, onGive, onSwap, onThrow }: Props) {
   const { slot, invType } = target
   const total = slot.count || 1
   const [count, setCount] = useState(1)
@@ -146,6 +149,19 @@ export function SlotContextMenu({ target, state, onClose, onUse, onGive, onSwap 
         {invType === 'player' && (
           <button className="som-btn som-btn--give" onClick={() => act(() => onGive(slot))}>
             Give
+          </button>
+        )}
+        {invType === 'player' && (
+          <button
+            className="som-btn som-btn--throw"
+            /* Press and hold. The charge component listens for the release, so
+               this only has to start it. */
+            onPointerDown={() => {
+              onThrow(slot)
+              onClose()
+            }}
+          >
+            Throw
           </button>
         )}
       </div>

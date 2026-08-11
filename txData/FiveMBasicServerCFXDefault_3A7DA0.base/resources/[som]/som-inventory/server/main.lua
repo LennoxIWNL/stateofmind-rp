@@ -1,0 +1,175 @@
+-- som-inventory: the things ox_inventory's NUI contract cannot do.
+--
+-- Throwing and giving to a NAMED nearby player have no stock callback, so they
+-- land here rather than being bolted onto ox_inventory's Lua. Everything the
+-- page can reach through the bridge arrives HERE first and is decided HERE.
+--
+-- THE PAGE IS NEVER AN AUTHORITY. It sends a slot and a power, and that is the
+-- whole of what it is trusted with. This file re-reads the slot from
+-- ox_inventory, re-reads both players' positions from the server's own view,
+-- and computes the landing point itself. A crafted payload buys a different
+-- number in one of those two fields and nothing else.
+
+local core = exports['som-core']
+local ox = exports.ox_inventory
+
+local Config = {
+    -- How far a throw carries at full charge. Short on purpose: this is an
+    -- underarm toss to somebody across a room, not a delivery mechanism for
+    -- moving contraband across a street without walking it.
+    minDistance = 2.0,
+    maxDistance = 12.0,
+    -- Giving needs the two of you close enough to be having a conversation.
+    -- Matches som-gangboss-app's MaxHireDistance precedent: a transfer is a
+    -- physical act.
+    giveDistance = 3.0,
+    -- One throw per this many ms, per player. Without it the charge bar is a
+    -- suggestion and the event is a firehose.
+    throwCooldown = 900,
+}
+
+local lastThrow = {}
+
+---@param source number
+---@return table|nil player
+local function loaded(source)
+    local player = core:getPlayer(source)
+    if not player then return nil end
+    return player
+end
+
+---Distance between two players, measured from the SERVER's own view of both
+---peds rather than from anything either client claimed.
+---@return number
+local function distanceBetween(a, b)
+    local pedA, pedB = GetPlayerPed(a), GetPlayerPed(b)
+    if not pedA or pedA == 0 or not pedB or pedB == 0 then return math.huge end
+    return #(GetEntityCoords(pedA) - GetEntityCoords(pedB))
+end
+
+---Re-reads a slot from ox_inventory. Never trusts a name sent by the page.
+---@param source number
+---@param slot any
+---@return table|nil
+local function slotOf(source, slot)
+    slot = tonumber(slot)
+    if not slot or slot ~= slot or slot < 1 or slot % 1 ~= 0 then return nil end
+
+    local item = ox:GetSlot(source, slot)
+    if not item or not item.name then return nil end
+
+    return item
+end
+
+-- ---------------------------------------------------------------------------
+-- Throwing
+-- ---------------------------------------------------------------------------
+
+---The page asks to throw the item in a slot at a charge level.
+---
+---What actually happens: the server removes the item, works out where it lands
+---from its own view of the player, and creates a REAL ox_inventory drop there.
+---So a thrown item is a drop like any other, pickupable by anyone, and no new
+---item-holding concept enters the codebase.
+RegisterNetEvent('som-inventory:server:throw', function(data)
+    local src = source
+    if type(data) ~= 'table' then return end
+
+    local player = loaded(src)
+    if not player then return end
+
+    local now = GetGameTimer()
+    if lastThrow[src] and now - lastThrow[src] < Config.throwCooldown then return end
+
+    local item = slotOf(src, data.slot)
+    if not item then return end
+
+    -- Power is a 0..1 charge from the page. Clamped rather than validated
+    -- away, because the only thing it can buy is distance and the range is
+    -- already bounded at both ends.
+    local power = tonumber(data.power) or 0
+    if power ~= power then power = 0 end
+    power = math.max(0, math.min(1, power))
+
+    local ped = GetPlayerPed(src)
+    if not ped or ped == 0 then return end
+
+    local coords = GetEntityCoords(ped)
+    local heading = GetEntityHeading(ped)
+    local rad = math.rad(heading)
+    local distance = Config.minDistance + (Config.maxDistance - Config.minDistance) * power
+
+    local landing = vector3(
+        coords.x - math.sin(rad) * distance,
+        coords.y + math.cos(rad) * distance,
+        coords.z - 0.9
+    )
+
+    -- Remove FIRST and only drop if the removal succeeded. The other order
+    -- creates the drop and then discovers the item was already gone, which is
+    -- the whole of how a duplication bug looks from the outside.
+    local removed = ox:RemoveItem(src, item.name, 1, item.metadata, item.slot)
+    if not removed then return end
+
+    lastThrow[src] = now
+
+    ox:CustomDrop('Thrown', {
+        { name = item.name, count = 1, metadata = item.metadata },
+    }, landing)
+end)
+
+-- ---------------------------------------------------------------------------
+-- Giving to a named nearby player
+-- ---------------------------------------------------------------------------
+
+---ox_inventory's own `giveItem` gives to whoever the CLIENT decided was in
+---front of it. This exists so the page can drag onto a specific person and have
+---the server agree that person is real, close, and loaded.
+RegisterNetEvent('som-inventory:server:giveTo', function(data)
+    local src = source
+    if type(data) ~= 'table' then return end
+
+    local target = tonumber(data.target)
+    if not target or target ~= target or target % 1 ~= 0 then return end
+    if target == src then return end
+
+    if not loaded(src) or not loaded(target) then return end
+
+    if distanceBetween(src, target) > Config.giveDistance then
+        TriggerClientEvent('som:client:notify', src, 'They are too far away', 'error')
+        return
+    end
+
+    local item = slotOf(src, data.slot)
+    if not item then return end
+
+    local count = tonumber(data.count) or 1
+    if count ~= count or count < 1 or count % 1 ~= 0 then return end
+    count = math.min(count, item.count or 1)
+
+    if not ox:CanCarryItem(target, item.name, count) then
+        TriggerClientEvent('som:client:notify', src, 'They cannot carry that', 'error')
+        return
+    end
+
+    -- Same ordering rule as the throw: take before giving, and give nothing if
+    -- the take failed.
+    if not ox:RemoveItem(src, item.name, count, item.metadata, item.slot) then return end
+
+    if not ox:AddItem(target, item.name, count, item.metadata) then
+        -- Put it back rather than destroy it. Failing to hand something over is
+        -- not a reason for it to stop existing.
+        ox:AddItem(src, item.name, count, item.metadata)
+        return
+    end
+
+    local label = ox:Items(item.name)
+    label = label and label.label or item.name
+
+    TriggerClientEvent('som:client:notify', src, ('Gave %sx %s'):format(count, label), 'success')
+    TriggerClientEvent('som:client:notify', target, ('Received %sx %s'):format(count, label), 'success')
+end)
+
+AddEventHandler('playerDropped', function()
+    lastThrow[source] = nil
+end)

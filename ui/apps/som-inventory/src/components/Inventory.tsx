@@ -40,6 +40,7 @@ export type PanelCtx = {
   drag: DragState | null
   setDrag: (d: DragState | null) => void
   isShopSide: boolean
+  addToBasket: (line: { slot: number; name: string; count: number; price: number }) => void
 }
 
 /**
@@ -203,10 +204,18 @@ export function InventoryPanel({ side, inventory, ctx }: PanelProps) {
       if (!toSlot || !toType) return
       if (toType === drag.from.type && toSlot === drag.from.slot) return
 
-      // Dragging OUT of a shop is a purchase, not a move, and goes down a
-      // different callback with its own server-side pricing.
+      // Dragging OUT of a shop stages a basket line rather than buying on the
+      // spot. Checkout replays each line through ox_inventory's own buyItem, so
+      // the server still prices and validates every one of them; the basket is
+      // only a chance to change your mind before paying.
       if (drag.from.type === 'shop' || drag.from.type === 'crafting') {
-        ctx.buy(drag.from, { type: toType, slot: toSlot }, drag.count)
+        const price = (drag.item as { price?: number }).price
+        ctx.addToBasket({
+          slot: drag.from.slot,
+          name: drag.item.name || '',
+          count: drag.count,
+          price: typeof price === 'number' ? price : 0,
+        })
         return
       }
 

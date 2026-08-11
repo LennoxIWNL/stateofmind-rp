@@ -25,6 +25,9 @@ import { SlotContextMenu, type MenuTarget } from './components/ContextMenu'
 import { Hotbar } from './components/Hotbar'
 import { Clothing } from './components/Clothing'
 import { ItemNotifications, type Notification } from './components/Notifications'
+import { ThrowCharge } from './components/Throw'
+import { Basket, type BasketLine } from './components/Shop'
+import { NearbyGive, type NearbyPlayer } from './components/Nearby'
 
 type Tab = 'inventory' | 'clothes'
 
@@ -36,6 +39,9 @@ export function App() {
   const [menu, setMenu] = useState<MenuTarget | null>(null)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [hotbar, setHotbar] = useState(false)
+  const [throwing, setThrowing] = useState<Slot | null>(null)
+  const [basket, setBasket] = useState<BasketLine[]>([])
+  const [nearby, setNearby] = useState<NearbyPlayer[]>([])
   const notifyId = useRef(0)
 
   // -------------------------------------------------------------------------
@@ -72,7 +78,11 @@ export function App() {
     setVisible(false)
     setDrag(null)
     setMenu(null)
+    setThrowing(null)
     setTab('inventory')
+    // The basket is staging, and the page is destroyed on close. Surviving a
+    // reopen is a client Lua job keyed by shop id, not this component's.
+    setBasket([])
   })
 
   useNuiEvent(INBOUND.toggleHotbar, () => setHotbar((on) => !on))
@@ -175,13 +185,72 @@ export function App() {
     [],
   )
 
+  /**
+   * Checkout replays the basket through ox_inventory's OWN buyItem, one line at
+   * a time. So the server re-prices and re-validates every line exactly as it
+   * does for a stock drag-to-buy, and a doctored basket buys nothing extra.
+   *
+   * Sequential rather than parallel on purpose: ox_inventory holds a per-slot
+   * mutex, and firing every line at once is the shape that trips it.
+   */
+  const checkout = useCallback(
+    async (_account: 'bank' | 'cash') => {
+      const shop = state.right
+      if (!shop) return
+
+      const empties = state.left.items.filter((s) => !s.name).map((s) => s.slot)
+      let next = 0
+
+      for (const line of basket) {
+        const target = empties[next++]
+        if (target === undefined) break
+        await buy({ type: shop.type, slot: line.slot }, { type: 'player', slot: target }, line.count)
+      }
+
+      setBasket([])
+    },
+    [basket, buy, state.left.items, state.right],
+  )
+
+  const addToBasket = useCallback((line: BasketLine) => {
+    setBasket((lines) => {
+      const found = lines.find((l) => l.slot === line.slot)
+      if (found) return lines.map((l) => (l.slot === line.slot ? { ...l, count: l.count + line.count } : l))
+      return [...lines, line]
+    })
+  }, [])
+
+  const giveTo = useCallback((slot: Slot, target: number, count: number) => {
+    void fetchNui('somGiveTo', { slot: slot.slot, target, count })
+  }, [])
+
+  // Nearby players, refreshed while a drag is live. Read only: this decides
+  // what to highlight, never whether the give is allowed.
+  useEffect(() => {
+    if (!visible || !drag) {
+      setNearby([])
+      return
+    }
+    let alive = true
+    const poll = async () => {
+      const list = await fetchNui<NearbyPlayer[]>('somNearbyPlayers', {}, [])
+      if (alive) setNearby(Array.isArray(list) ? list : [])
+    }
+    void poll()
+    const id = setInterval(poll, 700)
+    return () => {
+      alive = false
+      clearInterval(id)
+    }
+  }, [visible, drag])
+
   const isShopSide = state.right?.type === 'shop' || state.right?.type === 'crafting'
 
   const leftWeightMax = state.left?.maxWeight || 0
 
   const value = useMemo(
-    () => ({ state, swap, useSlot, giveSlot, buy, setMenu, drag, setDrag, isShopSide }),
-    [state, swap, useSlot, giveSlot, buy, drag, isShopSide],
+    () => ({ state, swap, useSlot, giveSlot, buy, setMenu, drag, setDrag, isShopSide, addToBasket }),
+    [state, swap, useSlot, giveSlot, buy, drag, isShopSide, addToBasket],
   )
 
   if (!visible) {
@@ -225,6 +294,16 @@ export function App() {
         )}
       </div>
 
+      {isShopSide && (
+        <Basket
+          lines={basket}
+          state={state}
+          shopType={state.right!.type}
+          onChange={setBasket}
+          onCheckout={checkout}
+        />
+      )}
+
       {menu && (
         <SlotContextMenu
           target={menu}
@@ -233,6 +312,21 @@ export function App() {
           onUse={useSlot}
           onGive={giveSlot}
           onSwap={swap}
+          onThrow={setThrowing}
+        />
+      )}
+
+      {throwing && (
+        <ThrowCharge slot={throwing} state={state} onDone={() => setThrowing(null)} />
+      )}
+
+      {drag && nearby.length > 0 && (
+        <NearbyGive
+          nearby={nearby}
+          onGive={(target) => {
+            if (drag) giveTo(drag.item, target, drag.count)
+            setDrag(null)
+          }}
         />
       )}
 
