@@ -175,25 +175,46 @@ about intent. Section B of `ICON-AUDIT.md`.
 (som-rentals) and `mdtcitation` (ps-mdt, wants `citation.png`). Everything else
 missing is either unused stock or cosmetic weapon tints.
 
-## 6. Task 9, the rest
+## 6. Task 9, the rest. AUDIT DONE, see `VEHICLE-AUDIT.md`. Awaiting sign-off
 
-Done already: the PD motor pool, cert gated, on Zerofour04's pack. Still open:
+The add-on audit is complete and in `VEHICLE-AUDIT.md`. **Nothing deleted**, the
+removal list is there for sign-off. Three things change the rest of this task:
 
-- Audit every vehicle add-on against what configs actually reference, and show
-  the removal list before deleting. Candidates already identified: `TIG-PACK`,
-  `c321defender`, `veh_lykan`, `tesla`, `New_Truck`, `npwpdcar`.
-- The 158 car civilian pack from `Aweetumn-LLC/FiveM-Lorefriendly-Vehicles`,
-  checking `LNWK-CARS` for a packaged bundle first.
-- A dealership. **None exists anywhere in the tree**, so the civilian pool has
-  nowhere to live until one does. It gets the shop NUI from task 3 for free.
+- **Only 6 of 22 vehicle resources are ensured.** ~4.7 GB sits on disk and never
+  loads. Verified: the only group ensures in `som.cfg` are `[anticheats]` and
+  `[voice]`, so an unnamed resource does not start. **Nothing on the removal
+  list is costing any streaming memory**, so the memory worry was misplaced and
+  the real budget is ~349 MB with plenty of headroom.
+- **Every model our configs reference resolves to an ensured resource.** The PD
+  fleet is correctly wired, checked model by model, and som-rentals is entirely
+  vanilla. No dangling references.
+- **`ex-cars` is 87 complete civilian vehicles already on disk, just switched
+  off.** Look at that before downloading the 158-car pack, which may be
+  partly or wholly redundant.
+
+Still open:
+
+- Sign-off on the removal list. Groups 1 and 2 are 476 MB and risk-free.
+- `assets_vehicles` (3.7 GB) is a tuning-parts pack, but it also carries
+  **`popgroups.ymt` and `popcycle.dat`**, which is the mechanism the NPC
+  traffic sub-task needs. Separate those out before deciding its fate.
+- A dealership. **Still none in the tree.**
 - NPC traffic: 15 to 20 sedate models into popgroups with weighting. No
   handling.meta edits.
-- Streaming and memory impact, measured rather than asserted. `ex-cars` is
-  already ~97 models and `assets_vehicles` streams ~5000 `.yft` of parts.
 
-Streamed binaries stay gitignored and are copied to the server by hand. Two
-`dlc.rpf` files in the old LCPDFR pack are 479MB and 295MB, and GitHub hard
-rejects anything over 100MB, which is why that route was abandoned.
+### The LCPDFR pack has landed, and is blocked on LICENSING not tooling
+
+871 MB is at `Vehicles/`, now gitignored (the 96 MB of templates beside the
+archives were untracked and unignored, one `git add -A` from a rejected push).
+
+It is the **LSPDFR/singleplayer build, not a FiveM release**. All 38 vehicles
+are sealed in two `dlc.rpf` files, the install path is `dlcpacks` plus a
+`dlclist.xml` edit, and the lighting is ELS VCF XML with no ELS resource here.
+
+**Its terms say "Do not rip, modify, or alter the contents of this archive."**
+Extracting the `.rpf` to loose files is exactly that and is the only way to
+make it stream in FiveM, so this is not an OpenIV problem to solve. Ask the
+author (BlueGhost, LCPDFR) for a FiveM release. Nothing has been extracted.
 
 ## 7. Task 12: the item prop, icon and animation binder
 
