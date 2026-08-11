@@ -1416,7 +1416,10 @@ RegisterNetEvent('mdt:server:setWaypoint', function(callid)
 		if callid then
 			if isDispatchRunning then
 				local calls = exports['ps-dispatch']:GetDispatchCalls()
-				TriggerClientEvent('mdt:client:setWaypoint', src, calls[callid])
+				-- Same string-versus-number key as mdt:server:attachedUnits.
+				-- This one passed nil rather than erroring, so it failed as a
+				-- waypoint that silently never set.
+				TriggerClientEvent('mdt:client:setWaypoint', src, calls[tonumber(callid) or callid])
 			end
 		end
 	end
@@ -1472,7 +1475,17 @@ RegisterNetEvent('mdt:server:attachedUnits', function(callid)
 		if callid then
 			if isDispatchRunning then
 				local calls = exports['ps-dispatch']:GetDispatchCalls()
-				TriggerClientEvent('mdt:client:attachedUnits', src, calls[callid]['units'], callid)
+				-- callid crosses JSON from this resource's own NUI and comes
+				-- back a STRING. som-dispatch keys its call store by number and
+				-- Lua does not treat calls["3"] and calls[3] as the same key,
+				-- so the raw index missed every time and then threw indexing
+				-- nil, which is why Attached Units rendered empty. The guard is
+				-- separate from the coercion: callid arrives from a client, so
+				-- an id for a call that has since closed must return quietly
+				-- rather than error in the server console.
+				local call = calls[tonumber(callid) or callid]
+				if not call then return end
+				TriggerClientEvent('mdt:client:attachedUnits', src, call['units'], callid)
 			end
 		end
 	end
@@ -1584,7 +1597,11 @@ RegisterNetEvent('mdt:server:getCallResponses', function(callid)
 	if IsPoliceOrEms(Player.PlayerData.job.name) then
 		if isDispatchRunning then
 			local calls = exports['ps-dispatch']:GetDispatchCalls()
-			TriggerClientEvent('mdt:client:getCallResponses', src, calls[callid]['responses'], callid)
+			-- Same string-versus-number key and the same nil index as
+			-- mdt:server:attachedUnits above.
+			local call = calls[tonumber(callid) or callid]
+			if not call then return end
+			TriggerClientEvent('mdt:client:getCallResponses', src, call['responses'], callid)
 		end
 	end
 end)

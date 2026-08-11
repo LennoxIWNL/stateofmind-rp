@@ -207,17 +207,42 @@ record it; a pack with no licence file does not get copied in.
 Deliver three lists: full prop plus icon plus animation coverage, icon only,
 and still missing.
 
-## 8. Verify the attach fix actually took
+## 8. Verify the attach fix actually took. DONE, and the prediction was right
 
-`callid` crossing JSON from ps-mdt's NUI arrives as a string, and Lua does not
-treat `calls["3"]` and `calls[3]` as the same key. som-dispatch's three
-handlers now coerce. If "Attached Units" is still empty after that,
-`mdt:server:attachedUnits` in ps-mdt does `calls[callid]['units']` **inside
-ps-mdt itself**, and that line needs the same coercion.
+som-dispatch's own coercion was already correct (`callById` at
+`server/main.lua:449`). The predicted second half was real: **three** handlers
+inside ps-mdt still indexed the call store with the raw string.
+
+- `mdt:server:attachedUnits` (`:1467`) and `mdt:server:getCallResponses`
+  (`:1595`) went further than returning nothing. `calls["3"]` is nil, so
+  `nil['units']` **threw**, which is why Attached Units rendered empty rather
+  than showing a short list.
+- `mdt:server:setWaypoint` (`:1411`) passed nil instead, so it failed as a
+  waypoint that silently never set.
+- `mdt:server:setDispatchWaypoint` (`:1514`) was already correct and is left
+  alone. It is the model the other three now follow.
+
+Each also gained a nil guard, separate from the coercion and worth keeping:
+`callid` arrives from a client, so an id for a call that has since closed has
+to return quietly rather than error in the server console.
+
+Goes on the AUDIT 16.2 re-apply list.
+
+**Still worth testing in game**, since none of this has been run: attach two
+officers to one call, detach one, and confirm the remaining unit is the right
+one and that the list is not empty.
 
 ---
 
-## PROMPT A: Task 10, the custom inventory
+## Before EITHER prompt below: ask for the reference images
+
+**Owner's instruction, 2026-08-11.** Both prompts below describe their layout
+by pointing at reference images in the plan's "Reference images" section. Those
+images are not in the repo and cannot be read from the plan text alone.
+
+**Stop and ask the owner for the HUD and inventory reference images before
+starting either reskin.** Do not begin building from the written description
+and do not infer the layout. This applies to task 10, task 11 and task 13.
 
 Continue State of Mind RP. Read AUDIT.md sections 20 and 21, and the plan at
 `C:\Users\tweet\.claude\plans\i-m-unifying-the-visual-crispy-crescent.md`.
