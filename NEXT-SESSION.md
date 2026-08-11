@@ -216,17 +216,36 @@ Extracting the `.rpf` to loose files is exactly that and is the only way to
 make it stream in FiveM, so this is not an OpenIV problem to solve. Ask the
 author (BlueGhost, LCPDFR) for a FiveM release. Nothing has been extracted.
 
-## 7. Task 12: the item prop, icon and animation binder
+## 7. Task 12: the item binder. LICENCES CHECKED, nothing vendored, needs a call
 
-Clone `allyaminou/Ox_Inventory-ItemsTemplate`, `Andyyy7666/itemcollection` and
-`Branqueador/GGC-Weapons`. Food, drink and alcohol from allyaminou's template
-where names match ours, melee props and icons from GGC-Weapons,
-`ai.swisser.dev/fivem-inventory-icons` as a free fallback before anything is
-flagged as needing a custom icon. Check each licence before vendoring and
-record it; a pack with no licence file does not get copied in.
+All three repos cloned and inspected. **Nothing has been copied into the tree**,
+because two of the three need a decision from the owner and the third is
+excluded by this plan's own rule.
 
-Deliver three lists: full prop plus icon plus animation coverage, icon only,
-and still missing.
+| Repo | Licence | Contents | Verdict |
+|---|---|---|---|
+| `Andyyy7666/itemcollection` | **NONE** | 8 images | **Excluded.** No licence file means all rights reserved, and the rule here is that a pack with no licence does not get copied in |
+| `allyaminou/Ox_Inventory-ItemsTemplate` | **GPL-3.0** | 20 items, 96 images, 3 MB | Owner's call. Copyleft |
+| `Branqueador/GGC-Weapons` | **AGPL-3.0** | 115 weapon models, 26 images, 492 MB | Owner's call, and the harder one. **AGPL's network clause** is a real question for a game server, which is precisely a piece of software users interact with over a network |
+
+**The yield is much smaller than this plan assumed, which is the important
+part.** Measured rather than estimated:
+
+- Of the **122 images** across all three repos, exactly **one**
+  (`WEAPON_TACTICALRIFLE.png`) covers anything on the 67-item missing list from
+  `ICON-AUDIT.md`.
+- `Ox_Inventory-ItemsTemplate` carries only **20 items**, of which **9 match
+  ours** by name: `sandwich`, `burger`, `phone`, `wallet`, `bandage`,
+  `parachute`, `lockpick`, `money`, `black_money`. Those 9 are the real prize,
+  since they would gain prop and animation bindings.
+
+So the honest trade is: **492 MB of AGPL content for melee props, and a GPL
+repo for 9 items' worth of prop and animation bindings.** That is worth doing
+only if the copyleft terms are acceptable, and that is not my call to make.
+
+Clones are in the session scratchpad, not the repo. `ai.swisser.dev` was not
+reached, and should be checked as a free fallback before anything is flagged as
+needing custom art.
 
 ## 8. Verify the attach fix actually took. DONE, and the prediction was right
 
