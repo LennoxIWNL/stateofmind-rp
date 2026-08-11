@@ -25,16 +25,29 @@ Config.InventoryForWeaponsImages = "qb-inventory"
 Config.Fuel = "cdn-fuel"
 
 -- Google Docs Link
+-- SOPs, rendered live in the MDT's SOP tab.
+--
+-- ps-mdt already points an iframe at whatever URL sits here, so the SOPs
+-- live-update by definition: the panel shows the document itself, not a
+-- snapshot taken at build time. No API, no service account, no poller.
+--
+-- /preview, NOT /edit?usp=sharing. The edit URL renders the full Docs editor
+-- chrome inside the panel and asks anyone without edit rights to sign in.
+-- /preview is the read-only view of the same live document.
+--
+-- THE DOCUMENT MUST BE LINK-VIEWABLE or published to web. If it is restricted,
+-- every officer sees a Google sign-in page instead of the SOPs, and it will
+-- look like the MDT is broken rather than like a share setting.
 Config.sopLink = {
-    ['police'] = 'https://docs.google.com/document/d/1BAxifsch6yuOKBVLIpNKU4nc_bItYz_RNJS9KUNKQqo/edit?usp=sharing',
-    ['ambulance'] = 'https://docs.google.com/document/d/1BAxifsch6yuOKBVLIpNKU4nc_bItYz_RNJS9KUNKQqo/edit?usp=sharing',
-    ['bcso'] = 'https://docs.google.com/document/d/1BAxifsch6yuOKBVLIpNKU4nc_bItYz_RNJS9KUNKQqo/edit?usp=sharing',
-    ['doj'] = 'https://docs.google.com/document/d/1BAxifsch6yuOKBVLIpNKU4nc_bItYz_RNJS9KUNKQqo/edit?usp=sharing',
-    ['sast'] = 'https://docs.google.com/document/d/1BAxifsch6yuOKBVLIpNKU4nc_bItYz_RNJS9KUNKQqo/edit?usp=sharing',
-    ['sasp'] = 'https://docs.google.com/document/d/1BAxifsch6yuOKBVLIpNKU4nc_bItYz_RNJS9KUNKQqo/edit?usp=sharing',
-    ['doc'] = 'https://docs.google.com/document/d/1BAxifsch6yuOKBVLIpNKU4nc_bItYz_RNJS9KUNKQqo/edit?usp=sharing',
-    ['lssd'] = 'https://docs.google.com/document/d/1BAxifsch6yuOKBVLIpNKU4nc_bItYz_RNJS9KUNKQqo/edit?usp=sharing',
-    ['sapr'] = 'https://docs.google.com/document/d/1BAxifsch6yuOKBVLIpNKU4nc_bItYz_RNJS9KUNKQqo/edit?usp=sharing',
+    ['police'] = 'https://docs.google.com/document/d/184jVat-N-dfjp81egFve4KHye8p7u33_zpJO9ts2Q5A/preview',
+    ['ambulance'] = 'https://docs.google.com/document/d/184jVat-N-dfjp81egFve4KHye8p7u33_zpJO9ts2Q5A/preview',
+    ['bcso'] = 'https://docs.google.com/document/d/184jVat-N-dfjp81egFve4KHye8p7u33_zpJO9ts2Q5A/preview',
+    ['doj'] = 'https://docs.google.com/document/d/184jVat-N-dfjp81egFve4KHye8p7u33_zpJO9ts2Q5A/preview',
+    ['sast'] = 'https://docs.google.com/document/d/184jVat-N-dfjp81egFve4KHye8p7u33_zpJO9ts2Q5A/preview',
+    ['sasp'] = 'https://docs.google.com/document/d/184jVat-N-dfjp81egFve4KHye8p7u33_zpJO9ts2Q5A/preview',
+    ['doc'] = 'https://docs.google.com/document/d/184jVat-N-dfjp81egFve4KHye8p7u33_zpJO9ts2Q5A/preview',
+    ['lssd'] = 'https://docs.google.com/document/d/184jVat-N-dfjp81egFve4KHye8p7u33_zpJO9ts2Q5A/preview',
+    ['sapr'] = 'https://docs.google.com/document/d/184jVat-N-dfjp81egFve4KHye8p7u33_zpJO9ts2Q5A/preview',
 }
 
 -- Google Docs Link

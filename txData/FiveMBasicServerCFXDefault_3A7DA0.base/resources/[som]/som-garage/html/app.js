@@ -34,6 +34,30 @@ function toast(text) {
 }
 
 /* A condition bar. body and engine arrive as percentages already. */
+/* The vehicle shot on a list row.
+ *
+ * Same treatment as the shop card: contained rather than cropped, lifted off
+ * the panel with a drop shadow, and keyed by SPAWN NAME so one folder in
+ * som-assets serves the garage, the rental counter and anything else that has
+ * to draw a car.
+ *
+ * A missing file is expected while the set is filled in, so the image removes
+ * itself and the plate underneath shows through. A broken-image glyph on every
+ * row would read as the garage being broken. */
+function thumb(model) {
+    const wrap = el('div', 'row__thumb');
+    wrap.append(el('span', 'row__thumbplate', String(model || '').toUpperCase()));
+
+    const img = document.createElement('img');
+    img.src = `https://cfx-nui-som-assets/img/vehicles/${model}.png`;
+    img.alt = '';
+    img.loading = 'lazy';
+    img.addEventListener('error', () => img.remove());
+
+    wrap.appendChild(img);
+    return wrap;
+}
+
 function meter(label, value) {
     const wrap = el('div', 'meter');
     wrap.append(el('span', 'meter__label', label));
@@ -78,6 +102,8 @@ function renderOwned(filter) {
         const row = el('div', 'row');
         if (v.locked) row.classList.add('is-locked');
         if (v.id === selectedId) row.classList.add('is-selected');
+
+        row.appendChild(thumb(v.model));
 
         const head = el('div', 'row__head');
         head.append(
@@ -147,6 +173,8 @@ function renderBuy(filter) {
     rows.forEach((v) => {
         const row = el('button', 'row');
         row.type = 'button';
+
+        row.appendChild(thumb(v.model));
 
         const head = el('div', 'row__head');
         head.append(el('span', 'row__name', v.label || v.model),

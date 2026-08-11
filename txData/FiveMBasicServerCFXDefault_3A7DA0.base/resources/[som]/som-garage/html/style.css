@@ -132,11 +132,52 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     position: relative;
     width: 100%;
     text-align: left;
-    padding: 12px 14px;
+    /* Left padding makes room for the thumbnail, which is positioned rather
+       than placed in flow. Positioning it means neither of the two list
+       renderers had to be restructured to add it. */
+    padding: 12px 14px 12px 104px;
     border-radius: 12px;
     background: var(--som-card);
     border: 1px solid rgba(255, 255, 255, 0.07);
     transition: var(--som-transition);
+}
+
+/* The vehicle shot. Same treatment as the shop card: contained rather than
+   cropped, because a car cropped to fill a box stops reading as that car. */
+.row__thumb {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 80px;
+    height: 46px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: radial-gradient(circle at 50% 60%, rgba(255, 255, 255, 0.08), transparent 72%);
+    pointer-events: none;
+}
+
+.row__thumb img {
+    position: relative;
+    z-index: 1;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
+}
+
+/* Underneath, so it only shows when the art is absent. */
+.row__thumbplate {
+    position: absolute;
+    font-family: var(--som-font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.2);
+    text-align: center;
+    line-height: 1.1;
+    padding: 0 4px;
+    overflow: hidden;
 }
 
 .row { cursor: pointer; }
