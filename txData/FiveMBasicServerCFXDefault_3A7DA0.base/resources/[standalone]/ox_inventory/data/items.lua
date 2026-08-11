@@ -1025,6 +1025,18 @@ return {
 		label = 'Sandwich',
 		weight = 200,
 		description = 'Nice bread for your stomach',
+		-- Had no client block at all, so eating it did nothing: no animation,
+		-- no prop, and no effect on hunger. Matched to burger's values rather
+		-- than inventing a second tier for food.
+		--
+		-- The reference template had this feeding THIRST, which is a mistake in
+		-- that template and is not copied.
+		client = {
+			status = { hunger = 200000 },
+			anim = 'eating',
+			prop = 'sandwich',
+			usetime = 2500,
+		},
 	},
 
 	['water_bottle'] = {
@@ -1971,6 +1983,10 @@ return {
 		weight = 1000,
 		stack = false,
 		description = 'Caught in 4K',
+		-- Points at the existing camera art rather than renaming the file, the
+		-- same way ifaks points at ifak.png. Non-destructive: camera.png stays
+		-- available under its own name if a second camera item ever wants it.
+		client = { image = 'camera.png' },
 	},
 
 	['gsrtestkit'] = {
@@ -4363,5 +4379,93 @@ return {
 		client = {
 			image = 'citation.png'
 		},
+	},
+
+	-- ---------------------------------------------------------------------
+	-- Placeable scene props. Cones, barriers and worklights an officer puts
+	-- down to close a road or light a scene.
+	--
+	-- Item definitions and icons adapted from Andyyy7666/itemcollection. Its
+	-- placement Lua was NOT used: its pickup event trusted a model name sent
+	-- by the client and handed out a free item for it, with no distance check
+	-- and no proof the entity existed. som-props reimplements both halves with
+	-- the server deciding. See som-props/README.md.
+	--
+	-- `placeable` is read by som-props, not by ox_inventory. Every model is
+	-- vanilla GTA, so none of this streams anything.
+	--
+	-- The `client.anim` is the same clip som-props plays on pickup, so putting
+	-- one down and taking it back look like one act.
+	-- ---------------------------------------------------------------------
+	['prop_cone_small'] = {
+		label = 'Traffic Cone',
+		weight = 1800,
+		description = 'Small traffic cone',
+		placeable = { models = { `prop_mp_cone_02`, `prop_mp_cone_03`, `prop_roadcone02a`, `prop_roadcone02b`, `prop_roadcone02c` }, avoid = true },
+		client = { anim = 'placing', usetime = 900, disable = { move = true, car = true, combat = true }, cancel = true },
+		server = { export = 'som-props.use' },
+	},
+
+	['prop_cone_large'] = {
+		label = 'Traffic Cone',
+		weight = 1800,
+		description = 'Large traffic cone',
+		placeable = { models = { `prop_mp_cone_01`, `prop_roadcone01a`, `prop_roadcone01b`, `prop_roadcone01c` }, avoid = true },
+		client = { anim = 'placing', usetime = 900, disable = { move = true, car = true, combat = true }, cancel = true },
+		server = { export = 'som-props.use' },
+	},
+
+	['prop_police_barrier'] = {
+		label = 'Police Barrier',
+		weight = 1800,
+		description = 'DO NOT CROSS. POLICE DEPT.',
+		placeable = { models = { `prop_barrier_work05` }, avoid = true },
+		client = { anim = 'placing', usetime = 900, disable = { move = true, car = true, combat = true }, cancel = true },
+		server = { export = 'som-props.use' },
+	},
+
+	['prop_barrier_small'] = {
+		label = 'Work Barrier',
+		weight = 1800,
+		description = 'Small work barrier',
+		placeable = { models = { `prop_barrier_work01a` }, avoid = true },
+		client = { anim = 'placing', usetime = 900, disable = { move = true, car = true, combat = true }, cancel = true },
+		server = { export = 'som-props.use' },
+	},
+
+	['prop_barrier_medium'] = {
+		label = 'Work Barrier',
+		weight = 1800,
+		description = 'Medium work barrier',
+		placeable = { models = { `prop_barrier_work06a` }, avoid = true },
+		client = { anim = 'placing', usetime = 900, disable = { move = true, car = true, combat = true }, cancel = true },
+		server = { export = 'som-props.use' },
+	},
+
+	['prop_barrier_large'] = {
+		label = 'Work Barrier',
+		weight = 1800,
+		description = 'Large work barrier',
+		placeable = { models = { `prop_mp_barrier_02b` }, avoid = true },
+		client = { anim = 'placing', usetime = 900, disable = { move = true, car = true, combat = true }, cancel = true },
+		server = { export = 'som-props.use' },
+	},
+
+	['prop_worklight_small'] = {
+		label = 'Worklight',
+		weight = 1800,
+		description = 'Small worklight',
+		placeable = { models = { `prop_worklight_02a` }, avoid = true },
+		client = { anim = 'placing', usetime = 900, disable = { move = true, car = true, combat = true }, cancel = true },
+		server = { export = 'som-props.use' },
+	},
+
+	['prop_worklight_large'] = {
+		label = 'Worklight',
+		weight = 1800,
+		description = 'Large worklight',
+		placeable = { models = { `prop_worklight_03b` }, avoid = true },
+		client = { anim = 'placing', usetime = 900, disable = { move = true, car = true, combat = true }, cancel = true },
+		server = { export = 'som-props.use' },
 	},
 }
