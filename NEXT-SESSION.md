@@ -147,21 +147,33 @@ reachable once the entry is gone. Nothing in the JS `.show()`s it either, since
 that only ever targets specific nav classes and Reports has none. So this hides
 a surface rather than deleting data, and reverting restores it whole.
 
-## 5. Task 8: the icon audit
+## 5. Task 8: the icon audit. DONE, see `ICON-AUDIT.md`
 
-`ifak` shows no image, and it will not be the only one. Cross-reference
-`[standalone]/ox_inventory/web/images/*` against the item keys in
-`data/items.lua` and `data/weapons.lua`.
+Full result in `ICON-AUDIT.md` at the repo root. Summary: 804 registered items,
+**730 already resolve**, 0 case-only mismatches, 7 ambiguous (all false
+positives, nothing renamed), 67 with no art, 42 orphan files.
 
-**The normalisation matters or every weapon reads as unmatched:** `items.lua`
-keys are lowercase, `weapons.lua` keys `Weapons` and `Components` in UPPERCASE
-while `Ammo` is lowercase, and the reconciliation lives in `getItem`. Use
-`exports.ox_inventory:Items(name)`, never `Items()[name]`.
+Three things worth carrying forward:
 
-Deliver three lists: newly matched, still missing, and ambiguous as its own
-"needs manual review" list. Perform the renames, but only after the ambiguous
-list has been seen, since a wrong rename silently blanks an item's art
-everywhere.
+- **The casing trap did not bite.** The weapon art on disk is already uppercase
+  and matches the keys, so there were zero case-only mismatches. The resolution
+  rule is `` `${imagepath}/${itemName}.png` `` at
+  `web/src/helpers/index.ts:156-159`, with the name used verbatim and never
+  lowercased. That is written down at the top of `ICON-AUDIT.md`.
+- **`ifak` was the wrong lead and is already fixed.** The item is `ifaks` and
+  carries an explicit `image = 'ifak.png'` pointing at art that exists.
+  Whatever the owner saw, it was not that.
+- **One rename performed**, `at_muzzle_precision'.png` to
+  `at_muzzle_precision.png`, a stray apostrophe. Not a judgement call.
+
+**Still needs your call before anything else is renamed:** `nikon` has no art,
+`camera.png` is orphan, and pairing them is probably right but is still a guess
+about intent. Section B of `ICON-AUDIT.md`.
+
+**The three missing icons that are live on this server** are `ammo-taser`
+(ours, added per AUDIT 16.2 and shipped with no art), `rental_papers`
+(som-rentals) and `mdtcitation` (ps-mdt, wants `citation.png`). Everything else
+missing is either unused stock or cosmetic weapon tints.
 
 ## 6. Task 9, the rest
 
