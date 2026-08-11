@@ -39,6 +39,9 @@ Config.Certifications = {
     ['cert.interceptor'] = { label = 'Interceptor',       description = 'Pursuit rated vehicles' },
     ['cert.helicopter']  = { label = 'Air Support',       description = 'Helipad access' },
     ['cert.audit']       = { label = 'Financial Audit',   description = 'Audit a citizen through the phone' },
+    ['cert.detective']   = { label = 'Detective',         description = 'Unmarked units' },
+    ['cert.motorcycle']  = { label = 'Motor Officer',     description = 'Police motorcycle' },
+    ['cert.swat']        = { label = 'SWAT',              description = 'Armoured units' },
     -- Reserved. Gates nothing yet, and is listed so it can be granted and
     -- tracked before the feature that reads it exists.
     ['cert.k9']          = { label = 'K9 Handler',        description = 'Reserved for K9' },
@@ -187,12 +190,43 @@ Config.Armoury = {
 Config.Vehicles = {
     -- Only used when som-garage is NOT running; it owns the motor pool
     -- otherwise. Kept in step with som-garage's fleet.
+    -- MISSION ROW's motor pool. LSPD only.
+    --
+    -- Sheriff units are deliberately absent: this is a city police station, and
+    -- the Zerofour04 pack's Sheriff-Cars and Sheriff-High-Speed-Unit resources
+    -- were not installed at all rather than installed and hidden, so there is
+    -- no way for them to leak into the list later.
+    --
+    -- Also absent: `policeold1`, which is a period cruiser rather than active
+    -- fleet, and `gatorfire`, which is a beach unit and belongs at Vespucci
+    -- rather than downtown.
+    --
+    -- The pack REPLACES vanilla models rather than adding new spawn names, so
+    -- every model here exists in stock GTA and the list keeps working whether or
+    -- not the pack is streaming. That is why there is no guard around it.
     garage = {
+        -- Base patrol. No certification: an officer who can clock on can drive
+        -- a cruiser, because promotion is not a driving test.
+        { model = 'police2',     label = 'Cruiser, Buffalo' },
+        { model = 'police3',     label = 'Cruiser, Interceptor' },
+        { model = 'pranger',     label = 'Patrol SUV' },
+
+        -- The originals, kept so an existing shift is not stranded if the pack
+        -- is not streaming yet.
         { model = 'polbuffalo4', label = 'Buffalo STX' },
         { model = 'polcaracara', label = 'Caracara 4x4' },
         { model = 'poldom',      label = 'Dominator' },
         { model = 'polcomet',    label = 'Interceptor Comet',  cert = 'cert.interceptor' },
         { model = 'polvstr',     label = 'Interceptor Vectre', cert = 'cert.interceptor' },
+
+        -- Gated. Every one of these is re-checked server side on the spawn
+        -- request as well as being filtered out of the list, so hiding a row is
+        -- presentation and the refusal is the actual rule.
+        { model = 'police4',     label = 'Unmarked Cruiser',   cert = 'cert.detective' },
+        { model = 'fbi',         label = 'Unmarked Sedan',     cert = 'cert.detective' },
+        { model = 'fbi2',        label = 'Unmarked SUV',       cert = 'cert.detective' },
+        { model = 'policeb',     label = 'Police Motorcycle',  cert = 'cert.motorcycle' },
+        { model = 'pitbullbb',   label = 'SWAT Armoured',      cert = 'cert.swat' },
     },
 
     -- Vanilla, because no addon helicopter is streamed and the helipad is a
