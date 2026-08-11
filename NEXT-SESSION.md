@@ -507,22 +507,45 @@ first pass had written off as impossible against this contract.
   because the page is destroyed when the inventory closes. Still never an
   authority: checkout replays every line through stock `buyItem`.
 
-### Still not built, and the reasons are structural
+### Clothing and nearby drops. BUILT, and both landed outside som-inventory
 
-- **Clothing.** Two separate gaps, not one. ox_inventory's contract carries no
-  worn state, AND **`som-appearance` exposes `getAppearance` and `applyToPed`
-  but no setter**, so there is nothing to write through even with a bridge.
-  This is AUDIT 4a work. The tab renders the silhouette and both rails and says
-  on screen that it is not wired, which is honest rather than decorative.
-- **`ITEMS DROPPED NEARBY` as an inline section.** Stock opens a drop as its
-  own right-hand inventory, which already works. Showing it inline as well
-  needs the bridge to enumerate nearby drops, and ox_inventory keeps its drop
-  table private to its own `client.lua`. Reachable, but it means reading their
-  internals rather than a contract, so it is the one place left where the cost
-  is a maintenance liability rather than a morning's work.
-- The throw readout is a NUMBER, not a drawn arc. The arc in the reference is
-  drawn in the world, which is client Lua: the page has no camera to project
-  against.
+- **Clothing lives in `som-appearance`**, not the inventory. The inventory is
+  where a player asks, but appearance is what changes, and keeping the mutation
+  next to the data means **there is still exactly one writer of
+  `som_characters.appearance`**, which is the property that makes that
+  resource's scope system worth anything. New `server/wardrobe.lua` and
+  `client/wardrobe.lua`.
+  - **Removing is not destructive.** The garment moves into an
+    `appearance.hidden` map and the live component is set nude, so the original
+    is never overwritten and wearing it again is a move rather than a guess.
+    **`Appearance.Apply` needed no change**: it applies components as stored,
+    which are already nude, and `hidden` is an extra key every other reader
+    ignores, including any fivem-appearance compatible tool.
+  - **Hair is excluded from remove-all.** It is a component like any other and
+    stripping it would make somebody bald, which is not what taking a coat off
+    means.
+  - The rail re-reads after every change rather than flipping a local flag,
+    because the server may have refused.
+- **Nearby drops shows THAT drops are there and how far, not what is in them.**
+  Deliberate: knowing the contents of a container you have not opened is not
+  something the stock inventory grants, and reading it out would be a new
+  capability rather than a new surface. Opening goes through ox_inventory's own
+  `openNearbyInventory`, so its distance and access rules apply.
+  - It tracks `ox_inventory:createDrop` and `:removeDrop` rather than reaching
+    into ox_inventory's private drop table. If those names change it stops
+    finding drops instead of erroring on a nil table, which is the difference
+    between reading a contract and reading an implementation.
+
+**Caught while writing it:** `lib.callback.await` yields, and a NUI callback
+handler is not a context to assume that is legal in. The wardrobe state read
+answers from its own thread.
+
+### The only thing deliberately not done
+
+The throw readout is a NUMBER, not a drawn arc. The arc in the reference is
+drawn in the world, which is client Lua: the page has no camera to project
+against. Building it means a world-space trajectory preview in the bridge,
+which is a rendering feature rather than an inventory one.
 
 ### NOTHING HERE HAS BEEN RUN
 
