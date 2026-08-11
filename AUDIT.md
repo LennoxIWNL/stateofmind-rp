@@ -2781,6 +2781,16 @@ frontend UI sound: a door should sound like a door in the world.
 
 Nothing in this session has been run on a live server.
 
+**Confidence is not even across this session.** som-medical, the phone, the
+armoury and the token change were reviewed adversarially and that review found
+the two blockers in 21.2. The context menu shim and som-hud were NOT: that
+review was launched and died on a session limit before returning anything, so
+they have had structural checks only (DOM ids matched against their pages, the
+`files{}` and `client_scripts` split, no `lib.*` or `cache.*` in a resource
+that does not load ox_lib, one message listener per page, both halves of every
+NUI callback name agreeing). Treat the two of them as the least proven things
+here and give them the review before trusting them.
+
 - **The context menus, hardest.** Mod bay, plate lookup, impound reason, fleet,
   ID check, fine presets. Specifically: submenus and back, opening the fine
   input dialog from inside a menu selection, and pressing Escape. If the cursor
