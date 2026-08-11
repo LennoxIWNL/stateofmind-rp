@@ -10,6 +10,52 @@
  * see AUDIT.md section 5.
  */
 
+/* Oswald, the SOM display face.
+ *
+ * Three weights only. The family ships six; the other three were deleted
+ * because a webfont weight that nothing asks for is bytes every client
+ * downloads and never sees.
+ *
+ * Local files, never a CDN. Two resources on this server have already been
+ * broken by a NUI reaching the internet for an asset (ps-mdt's Trumbowyg,
+ * interact-sound's howler), and both failed silently, which is the worst way
+ * for a font to fail: the page renders in a fallback and nobody notices the
+ * design is gone.
+ *
+ * The paths are relative on purpose. This file is fetched as
+ * https://cfx-nui-som-assets/tokens.css, so they resolve against som-assets
+ * whichever resource did the linking.
+ *
+ * OFL.txt sits beside the files. The SIL Open Font License requires it travel
+ * with them, so it is not clutter and must not be tidied away.
+ */
+
+@font-face {
+    font-family: 'Oswald';
+    src: url('fonts/oswald/Oswald-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    /* Text is drawn in the fallback immediately and swapped when Oswald is
+       ready, rather than the UI flashing empty for a beat. */
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Oswald';
+    src: url('fonts/oswald/Oswald-SemiBold.ttf') format('truetype');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Oswald';
+    src: url('fonts/oswald/Oswald-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
 :root {
     /* Brand */
     --som-pink: #ff1493;
@@ -69,8 +115,24 @@
     --som-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
     --som-transition: 160ms ease;
 
-    /* Type */
-    --som-font: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    /* Type
+     *
+     * Oswald is CONDENSED, so it sets narrower and taller than Inter at the
+     * same size. Two consequences worth knowing before touching any layout:
+     *
+     *   - Fixed-width elements gain slack rather than overflowing, so the risk
+     *     is loose-looking panels, not clipped ones.
+     *   - It reads as a display face. It carries titles, labels and numbers
+     *     well and is harder work at small sizes than Inter was, so anything
+     *     under about 0.7rem should be checked by eye rather than assumed.
+     *
+     * The fallbacks are not decoration. If the font files fail to serve, every
+     * som-* NUI silently lands on them.
+     *
+     * Numbers stay MONO. Oswald's figures are proportional, so a counter or a
+     * balance set in it shuffles sideways as digits change width. Anything
+     * that ticks belongs in --som-font-mono. */
+    --som-font: 'Oswald', 'Inter', 'Segoe UI', system-ui, sans-serif;
     --som-font-mono: 'JetBrains Mono', 'Consolas', monospace;
 }
 
