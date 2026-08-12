@@ -194,65 +194,117 @@ RegisterNUICallback('somThrow', function(data, cb)
         playAnim(ped, 'anim@mp_snowball', 'pickup_snowball', -1, 50)
 
         local thrown, cancelled = false, false
+        local power = 0.0
+
+        -- HOISTED OUT OF THE LOOP. This was the crash: `landing` used to be
+        -- declared inside the while body as `prev`, so the throw below read it
+        -- as an undeclared GLOBAL and indexed nil. A value the loop produces
+        -- and the code after the loop consumes has to outlive the loop.
+        local landing = GetEntityCoords(ped)
+        local aimDir = GetEntityForwardVector(ped)
 
         while not thrown and not cancelled do
             Wait(0)
 
-            -- The arc, drawn from the hand to where it lands. Sampled rather
-            -- than solved: twelve points of a simple ballistic curve is enough
-            -- to read as a trajectory and costs nothing.
-            local from = GetPedBoneCoords(ped, 28422, 0.0, 0.0, 0.0)
-            local forward = GetEntityForwardVector(ped)
-            local distance = 9.0
+            -- AIMED DOWN THE CAMERA, not the ped's facing. You throw where you
+            -- are looking; using the ped's forward vector meant the arc ignored
+            -- the mouse entirely and always went straight ahead at chest level.
+            local camRot = GetGameplayCamRot(2)
+            local pitch, yaw = math.rad(camRot.x), math.rad(camRot.z)
+            local cosPitch = math.cos(pitch)
 
-            local prev = from
-            for i = 1, 12 do
-                local t = i / 12
-                local point = vector3(
-                    from.x + forward.x * distance * t,
-                    from.y + forward.y * distance * t,
-                    from.z + (2.2 * t) - (9.0 * t * t)
-                )
-                DrawLine(prev.x, prev.y, prev.z, point.x, point.y, point.z, 255, 20, 147, 180)
-                prev = point
+            aimDir = vector3(-math.sin(yaw) * cosPitch, math.cos(yaw) * cosPitch, math.sin(pitch))
+
+            -- CHARGED BY HOLDING, which is the baseball part. Held attack ramps
+            -- power over about a second; a tap is a gentle underarm toss and a
+            -- full hold is a proper throw. Distance being a decision is what
+            -- makes this feel like throwing rather than like placing.
+            if IsDisabledControlPressed(0, 24) then
+                power = math.min(1.0, power + 0.022)
+            elseif power > 0.0 then
+                thrown = true
             end
 
-            DrawMarker(28, prev.x, prev.y, prev.z, 0, 0, 0, 0, 0, 0,
+            local speed = 7.0 + (power * 15.0)
+            local from = GetPedBoneCoords(ped, 28422, 0.0, 0.0, 0.0)
+
+            -- The arc is SIMULATED with the same gravity the throw uses, so the
+            -- preview is a prediction rather than a decorative curve. Stepping
+            -- the velocity is what makes it bend correctly at every power.
+            local px, py, pz = from.x, from.y, from.z
+            local vx, vy, vz = aimDir.x * speed, aimDir.y * speed, aimDir.z * speed
+            local dt = 0.06
+            local prev = from
+
+            for _ = 1, 28 do
+                px = px + vx * dt
+                py = py + vy * dt
+                pz = pz + vz * dt
+                vz = vz - (9.81 * dt)
+
+                DrawLine(prev.x, prev.y, prev.z, px, py, pz, 255, 20, 147, 180)
+                prev = vector3(px, py, pz)
+
+                -- Stop at the ground rather than drawing through it.
+                local ground, groundZ = GetGroundZFor_3dCoord(px, py, pz, false)
+                if ground and pz <= groundZ then break end
+            end
+
+            landing = prev
+
+            DrawMarker(28, landing.x, landing.y, landing.z, 0, 0, 0, 0, 0, 0,
                 0.18, 0.18, 0.18, 255, 20, 147, 120, false, false, 2, nil, nil, false)
 
-            -- Attack throws, right click or Escape backs out. Disabled while
-            -- aiming so an unarmed swing does not go out with it.
             DisableControlAction(0, 24, true)
             DisableControlAction(0, 25, true)
             DisableControlAction(0, 140, true)
 
-            if IsDisabledControlJustPressed(0, 24) then
-                thrown = true
-            elseif IsDisabledControlJustPressed(0, 25) or IsControlJustPressed(0, 202) then
+            if IsDisabledControlJustPressed(0, 25) or IsControlJustPressed(0, 202) then
                 cancelled = true
             end
+        end
+
+        if thrown then
+            playAnim(ped, 'anim@mp_snowball', 'pickup_throw', 900, 48)
+
+            local speed = 7.0 + (power * 15.0)
+
+            -- THE PROP IS ACTUALLY THROWN rather than deleted and re-created at
+            -- a computed point. It detaches, gets its collision and opacity
+            -- back, and is given the velocity the preview was drawn from, so
+            -- what the player watched is what happens: it can clip a wall, bounce
+            -- off a car, or fall short.
+            if ghost and DoesEntityExist(ghost) then
+                DetachEntity(ghost, true, true)
+                SetEntityCollision(ghost, true, true)
+                SetEntityAlpha(ghost, 255, false)
+                SetEntityVelocity(ghost, aimDir.x * speed, aimDir.y * speed, aimDir.z * speed)
+
+                -- Let the physics run, then take where it ACTUALLY came to rest.
+                Wait(1400)
+
+                if DoesEntityExist(ghost) then
+                    landing = GetEntityCoords(ghost)
+                    DeleteEntity(ghost)
+                end
+
+                ghost = nil
+            end
+
+            TriggerServerEvent('som-inventory:server:throw', {
+                slot = slot,
+                -- Where it landed, and still only a REQUEST. The server re-reads
+                -- the player's own position and refuses anything beyond its
+                -- maximum, so a client reporting the far side of the map gets
+                -- the throw clamped rather than honoured.
+                x = landing.x, y = landing.y, z = landing.z,
+                model = model,
+            })
         end
 
         ClearPedTasks(ped)
         if ghost and DoesEntityExist(ghost) then DeleteEntity(ghost) end
         if model then SetModelAsNoLongerNeeded(model) end
-
-        if thrown then
-            -- The snowball dict again rather than an arena celebration. It is
-            -- the throw motion the game actually ships, it is already loaded
-            -- from the aim above, and the celebration anim was picked for its
-            -- name rather than for having been checked.
-            playAnim(ped, 'anim@mp_snowball', 'pickup_throw', 900, 48)
-
-            TriggerServerEvent('som-inventory:server:throw', {
-                slot = slot,
-                -- The AIM POINT, not a charge. The server re-reads the player's
-                -- position and refuses anything beyond its own maximum, so this
-                -- is a request rather than a destination.
-                x = prev.x, y = prev.y, z = prev.z,
-                model = model,
-            })
-        end
 
         aiming = false
     end)

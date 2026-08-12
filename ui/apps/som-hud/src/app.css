@@ -542,3 +542,48 @@ body,
 .hud-btn--danger { border-color: var(--som-danger); color: var(--som-danger); }
 .hud-btn--danger:hover { background: var(--som-danger); color: var(--som-bg-deep); }
 .hud-btn--save { grid-column: 1 / -1; background: var(--som-pink-a30); border-color: var(--som-pink); color: var(--som-text); }
+
+/* The voice range announcement.
+ *
+ * Cycling range had no visible effect at all: the range lived in a title
+ * attribute, so the only feedback was a tooltip nobody had open. */
+.hud-hex__label {
+  position: absolute;
+  bottom: -1.9vh;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.95vh;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--som-text);
+  background: rgba(12, 10, 16, 0.88);
+  border: 1px solid var(--som-pink-a45);
+  border-radius: 999px;
+  padding: 0.2vh 0.7vh;
+  animation: hud-voice-label 1.6s ease both;
+  pointer-events: none;
+}
+
+@keyframes hud-voice-label {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(-0.4vh); }
+  12%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+  75%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* A single pulse on the hex itself, so the change is visible even if the label
+ * is off screen behind something. */
+.hud-hex.is-announcing { animation: hud-voice-pop 420ms ease; }
+
+@keyframes hud-voice-pop {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+
+/* Talking is a live state, so it gets a steady glow rather than a one-shot. */
+.hud-hex--voice.is-live {
+  border-color: var(--som-pink);
+  box-shadow: 0 0 10px var(--som-pink-a61);
+}

@@ -22,6 +22,14 @@ Config.Interval = {
     -- at this rate would be three expensive natives for a string that changes
     -- once a block.
     heading = 60,
+    -- VOICE IS ALSO ITS OWN LOOP.
+    --
+    -- It used to ride on the player loop at 2000ms, alongside money and the
+    -- clock. Those genuinely change slowly; talking state changes several times
+    -- a sentence and the range changes the instant a key is pressed, so a two
+    -- second sample made the microphone indicator meaningless and made cycling
+    -- range look like it had not registered.
+    voice = 150,
     player  = 2000,  -- money, job, clock
 }
 

@@ -51,6 +51,17 @@ export function App() {
     setWorld((w) => (w ? { ...w, heading: d.heading } : w))
   })
   useNuiEvent<Player>(INBOUND.player, setPlayer)
+
+  /*
+   * Voice arrives on its own channel at 150ms, merged into the same Player
+   * object. It used to sit on the 2000ms player payload beside money and the
+   * clock, which is why the microphone lagged speech and cycling the range
+   * looked like it had not registered.
+   */
+  useNuiEvent<Pick<Player, 'voiceMode' | 'talking' | 'radio'>>(INBOUND.voice, (d) => {
+    if (!d) return
+    setPlayer((p) => (p ? { ...p, ...d } : p))
+  })
   useNuiEvent<{ on: boolean }>(INBOUND.seatbelt, (d) =>
     setVehicle((v) => ({ ...v, seatbelt: d?.on === true })))
 

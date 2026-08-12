@@ -262,8 +262,6 @@ CreateThread(function()
             local money = data.money or {}
             local job = core:getJob() or {}
             local gang = core:getGang() or {}
-            local mode, talking, radio = voice()
-
             local payload = {
                 cash = math.floor(tonumber(money.cash) or 0),
                 bank = math.floor(tonumber(money.bank) or 0),
@@ -274,9 +272,6 @@ CreateThread(function()
                 hour = GetClockHours(),
                 minute = GetClockMinutes(),
                 players = GetNumberOfPlayers(),
-                voiceMode = mode,
-                talking = talking,
-                radio = radio,
             }
 
             if changed(last.player, payload) then
@@ -383,6 +378,43 @@ CreateThread(function()
             if math.abs(heading - last) > 0.1 then
                 last = heading
                 SendNUIMessage({ action = 'hud:heading', heading = heading })
+            end
+        end
+    end
+end)
+
+
+-- ---------------------------------------------------------------------------
+-- Voice
+--
+-- Split off the player loop, which runs at 2000ms for money and the clock.
+-- Those change slowly. Talking state changes several times a sentence and the
+-- range changes the moment a key is pressed, so sampling both every two seconds
+-- made the microphone indicator lag behind speech and made cycling the range
+-- look like the press had not registered at all.
+--
+-- Sent on CHANGE only, so a player who is not speaking costs one comparison
+-- every 150ms and no bridge traffic.
+-- ---------------------------------------------------------------------------
+
+CreateThread(function()
+    local lastMode, lastTalking, lastRadio
+
+    while true do
+        Wait(Config.Interval.voice)
+
+        if shown then
+            local mode, talking, radio = voice()
+
+            if mode ~= lastMode or talking ~= lastTalking or radio ~= lastRadio then
+                lastMode, lastTalking, lastRadio = mode, talking, radio
+
+                SendNUIMessage({
+                    action = 'hud:voice',
+                    voiceMode = mode,
+                    talking = talking,
+                    radio = radio,
+                })
             end
         end
     end

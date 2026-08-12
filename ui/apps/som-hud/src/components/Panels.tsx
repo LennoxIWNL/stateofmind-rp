@@ -93,6 +93,46 @@ function Glyph({ name }: { name: string }) {
   )
 }
 
+/**
+ * The voice hex, which ANNOUNCES A RANGE CHANGE rather than only recording it.
+ *
+ * Cycling range used to change a tooltip nobody had open. The range is now
+ * named on screen for a moment when it changes, and the hex pulses, because a
+ * control whose only feedback is hidden behind a hover is indistinguishable
+ * from one that did not fire. That is exactly how it was reported.
+ *
+ * The label hides itself again, so this stays a notification rather than
+ * another permanent readout.
+ */
+function Voice({ player }: { player: Player }) {
+  const [announce, setAnnounce] = useState(false)
+  const first = useRef(true)
+
+  useEffect(() => {
+    // Not on mount. Announcing the range the moment the HUD appears would fire
+    // on every spawn, which is noise rather than a change.
+    if (first.current) {
+      first.current = false
+      return
+    }
+
+    setAnnounce(true)
+    const t = setTimeout(() => setAnnounce(false), 1600)
+    return () => clearTimeout(t)
+  }, [player.voiceMode])
+
+  return (
+    <div
+      className={`hud-hex hud-hex--voice ${player.talking ? 'is-live' : ''} ${announce ? 'is-announcing' : ''}`}
+      title={`Voice: ${player.voiceMode}${player.radio ? ` / radio ${player.radio}` : ''}`}
+    >
+      <span className="hud-hex__fill" style={{ height: player.talking ? '100%' : '0%' }} />
+      <Glyph name="voice" />
+      {announce && <span className="hud-hex__label">{player.voiceMode}</span>}
+    </div>
+  )
+}
+
 type Ring = { key: string; value: number; show: boolean }
 
 export function Condition({
@@ -145,15 +185,7 @@ export function Condition({
         Full when transmitting, outline when not, and the range is a title
         rather than a label: it is a thing you check, not a thing you read.
       */}
-      {player && (
-        <div
-          className={`hud-hex hud-hex--voice ${player.talking ? 'is-live' : ''}`}
-          title={`Voice: ${player.voiceMode}${player.radio ? ` / radio ${player.radio}` : ''}`}
-        >
-          <span className="hud-hex__fill" style={{ height: player.talking ? '100%' : '0%' }} />
-          <Glyph name="voice" />
-        </div>
-      )}
+      {player && <Voice player={player} />}
     </div>
   )
 }
