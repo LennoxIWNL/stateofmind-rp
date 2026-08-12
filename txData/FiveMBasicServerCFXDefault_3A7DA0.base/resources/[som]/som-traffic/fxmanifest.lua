@@ -15,11 +15,28 @@ version '0.1.0'
 -- means the models can be started without changing traffic, which is how you
 -- test a spawn.
 --
--- HOW IT WORKS. popgroups.ymt is the game's map of which vehicle models belong
--- to which ambient traffic group. `DLC_POP_GROUPS` OVERRIDES A GROUP WHOLESALE
--- BY NAME, so every group named in that file carries its full vanilla member
--- list plus our additions. Shipping a group with only our cars in it would
--- delete every vanilla car from that slice of traffic, which is the trap here.
+-- HOW IT WORKS, AND THE MISTAKE THAT EMPTIED THE ENTIRE MAP.
+--
+-- popgroups.ymt maps vehicle and ped models to ambient population groups.
+-- `DLC_POP_GROUPS` REPLACES THE WHOLE LIST. It does NOT merge, and it does not
+-- override group by group: whatever this file declares becomes the complete set
+-- of population groups the game has.
+--
+-- This file used to declare ten vehicle groups and an EMPTY <pedGroups/>. The
+-- result was a world with no pedestrians at all, no parked cars and no ambient
+-- traffic, because every group not named here had been deleted. The symptom
+-- looked like our cars failing to spawn; the cause was everything else being
+-- removed.
+--
+-- So this file carries the FULL vanilla population list, 168 ped groups and 51
+-- vehicle groups, with our cars added to ten of them. Anything omitted from
+-- here is omitted from the game.
+--
+-- The vanilla list was taken from karma_visuals' popgroups.ymt, the only
+-- XML-form copy in the tree. That mattered: assets_vehicles and
+-- qb-smallresources both ship theirs as compiled binary (PSO), which cannot be
+-- authored without OpenIV or CodeWalker. karma_visuals is not ensured, so
+-- there is no second resource competing to supply DLC_POP_GROUPS.
 --
 -- The vanilla lists were lifted from karma_visuals' popgroups.ymt, the only
 -- XML-form copy in the tree. That mattered: assets_vehicles and
