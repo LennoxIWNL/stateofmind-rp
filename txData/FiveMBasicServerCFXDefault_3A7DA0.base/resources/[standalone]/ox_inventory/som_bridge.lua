@@ -294,6 +294,27 @@ RegisterNUICallback('somInventoryOpen', function(data, cb)
     if not somOpen then lastStatus = {} end
 end)
 
+-- ESC MUST CLOSE THE INVENTORY, NOT OPEN THE PAUSE MENU.
+--
+-- NUI focus does not take the pause key from the game: CEF sees the keypress
+-- AND so does GTA, so the page closed itself and the pause menu opened behind
+-- it in the same frame.
+--
+-- Control 200 is INPUT_FRONTEND_PAUSE and 199 is its alternate. Disabled only
+-- while the inventory is actually open, and per frame because that is the only
+-- rate a disabled control holds for.
+CreateThread(function()
+    while true do
+        if somOpen then
+            DisableControlAction(0, 199, true)
+            DisableControlAction(0, 200, true)
+            Wait(0)
+        else
+            Wait(200)
+        end
+    end
+end)
+
 CreateThread(function()
     while true do
         Wait(somOpen and 500 or 1500)

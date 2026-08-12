@@ -23,12 +23,9 @@ import {
   type World,
 } from './contract'
 import {
-  Aviation, Compass, Condition, Identity, Location,
-  Money, Session, SpeedoDigital, SpeedoRing, Voice,
+  Aviation, Compass, Condition, Location, Session, SpeedoDigital, SpeedoRing,
 } from './components/Panels'
 import { Editor } from './components/Editor'
-
-const HIDE_NEEDS_ABOVE = 90
 
 export function App() {
   const [visible, setVisible] = useState(false)
@@ -75,7 +72,7 @@ export function App() {
   return (
     <div className={`hud ${editing ? 'is-editing' : ''} ${show ? '' : 'is-hidden'}`}>
       <Panel id="status" layout={layout} editing={editing} onChange={setLayout}>
-        <Condition status={editing ? PREVIEW_STATUS : status} hideAbove={HIDE_NEEDS_ABOVE} />
+        <Condition status={editing ? PREVIEW_STATUS : status} player={editing ? PREVIEW_PLAYER : player} />
       </Panel>
 
       {/* Speedometer and aviation are the same slot on the screen but never
@@ -108,20 +105,8 @@ export function App() {
         </Panel>
       )}
 
-      <Panel id="money" layout={layout} editing={editing} onChange={setLayout}>
-        <Money player={editing ? PREVIEW_PLAYER : player} />
-      </Panel>
-
       <Panel id="session" layout={layout} editing={editing} onChange={setLayout}>
         <Session player={editing ? PREVIEW_PLAYER : player} />
-      </Panel>
-
-      <Panel id="voice" layout={layout} editing={editing} onChange={setLayout}>
-        <Voice player={editing ? PREVIEW_PLAYER : player} />
-      </Panel>
-
-      <Panel id="identity" layout={layout} editing={editing} onChange={setLayout}>
-        <Identity player={editing ? PREVIEW_PLAYER : player} />
       </Panel>
 
       {editing && <Editor layout={layout} onChange={setLayout} onSave={save} />}

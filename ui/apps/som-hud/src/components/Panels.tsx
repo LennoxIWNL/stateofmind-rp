@@ -24,6 +24,7 @@ const ICONS: Record<string, string> = {
   thirst: 'M12 3s6 6.4 6 10.2A6 6 0 0 1 6 13.2C6 9.4 12 3 12 3z',
   oxygen: 'M12 3a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V7a4 4 0 0 1 4-4zM8 17h8',
   stress: 'M4 12h4l2-5 3 10 2-5h5',
+  voice: 'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM5 11a7 7 0 0 0 14 0M12 18v3',
 }
 
 function Glyph({ name }: { name: string }) {
@@ -36,16 +37,30 @@ function Glyph({ name }: { name: string }) {
 
 type Ring = { key: string; value: number; show: boolean }
 
-export function Condition({ status, hideAbove }: { status: Status | null; hideAbove: number }) {
+export function Condition({
+  status,
+  player,
+}: {
+  status: Status | null
+  player: Player | null
+}) {
   if (!status) return null
 
-  // Subtractive. Armour stands down at zero, needs above the threshold, stress
-  // below it, oxygen unless actually underwater.
+  /*
+   * Hunger and thirst are ALWAYS shown now.
+   *
+   * They used to hide above 90%, on the subtractive reasoning that a full gauge
+   * is noise. That was wrong for these two specifically: they are the only
+   * things here a player is expected to act on before they become a problem, so
+   * a row that shows them only once they are already low gives no warning at
+   * all. Armour still stands down at zero, and oxygen and stress still only
+   * appear when they mean something, because those genuinely are exceptions.
+   */
   const rings: Ring[] = [
     { key: 'health', value: status.health, show: true },
     { key: 'armour', value: status.armour, show: status.armour > 0 },
-    { key: 'hunger', value: status.hunger, show: status.hunger <= hideAbove },
-    { key: 'thirst', value: status.thirst, show: status.thirst <= hideAbove },
+    { key: 'hunger', value: status.hunger, show: true },
+    { key: 'thirst', value: status.thirst, show: true },
     { key: 'oxygen', value: status.oxygen, show: status.underwater },
     { key: 'stress', value: status.stress, show: status.stress >= 10 },
   ]
@@ -66,6 +81,21 @@ export function Condition({ status, hideAbove }: { status: Status | null; hideAb
             <Glyph name={r.key} />
           </div>
         ))}
+
+      {/*
+        Voice sits with the body, not in a chip of its own.
+        Full when transmitting, outline when not, and the range is a title
+        rather than a label: it is a thing you check, not a thing you read.
+      */}
+      {player && (
+        <div
+          className={`hud-hex hud-hex--voice ${player.talking ? 'is-live' : ''}`}
+          title={`Voice: ${player.voiceMode}${player.radio ? ` / radio ${player.radio}` : ''}`}
+        >
+          <span className="hud-hex__fill" style={{ height: player.talking ? '100%' : '0%' }} />
+          <Glyph name="voice" />
+        </div>
+      )}
     </div>
   )
 }
@@ -245,18 +275,6 @@ export function Location({ world }: { world: World | null }) {
   )
 }
 
-const money = (n: number) => `$${n.toLocaleString('en-US')}`
-
-export function Money({ player }: { player: Player | null }) {
-  if (!player) return null
-  return (
-    <div className="hud-chips">
-      <span className="hud-chip hud-chip--cash">{money(player.cash)}</span>
-      <span className="hud-chip hud-chip--bank">{money(player.bank)}</span>
-    </div>
-  )
-}
-
 export function Session({ player }: { player: Player | null }) {
   if (!player) return null
   const time = `${String(player.hour).padStart(2, '0')}:${String(player.minute).padStart(2, '0')}`
@@ -268,38 +286,3 @@ export function Session({ player }: { player: Player | null }) {
   )
 }
 
-export function Voice({ player }: { player: Player | null }) {
-  if (!player) return null
-
-  return (
-    <div className="hud-chips">
-      {/* Pink appears HERE and essentially nowhere else, because transmitting
-          is the only thing on this HUD describing something happening now
-          rather than something merely true. */}
-      <span className={`hud-chip hud-chip--voice ${player.talking ? 'is-live' : ''}`}>
-        <i className="hud-mic" aria-hidden="true" />
-        {player.voiceMode}
-      </span>
-      {player.radio !== false && player.radio !== 0 && (
-        <span className="hud-chip hud-chip--radio">#{player.radio}</span>
-      )}
-    </div>
-  )
-}
-
-export function Identity({ player }: { player: Player | null }) {
-  if (!player) return null
-
-  return (
-    <div className="hud-chips hud-chips--stack">
-      {player.job && (
-        <span className={`hud-chip hud-chip--job ${player.onduty ? 'is-onduty' : ''}`}>
-          <i>JOB</i> {player.job}{player.jobGrade ? ` ${player.jobGrade}` : ''}
-        </span>
-      )}
-      {player.gang && player.gang.toLowerCase() !== 'none' && (
-        <span className="hud-chip hud-chip--gang"><i>GANG</i> {player.gang}</span>
-      )}
-    </div>
-  )
-}

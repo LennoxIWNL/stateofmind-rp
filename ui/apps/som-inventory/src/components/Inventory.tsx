@@ -113,7 +113,9 @@ function SlotCell({ slot, invType, ctx, onDragStart }: SlotCellProps) {
 
   return (
     <div
-      className={`som-slot ${has ? 'has-item' : ''} ${rarity ? `rarity-${rarity}` : ''}`}
+      className={`som-slot ${has ? 'has-item' : ''} ${rarity ? `rarity-${rarity}` : ''} ${
+        ctx.drag && ctx.drag.from.type === invType && ctx.drag.from.slot === slot.slot ? 'is-source' : ''
+      }`}
       data-slot={slot.slot}
       data-invtype={invType}
       onPointerDown={(e) => {
@@ -140,7 +142,10 @@ function SlotCell({ slot, invType, ctx, onDragStart }: SlotCellProps) {
     >
       {has && (
         <>
-          <span className="som-slot__index">{slot.slot}</span>
+          {/* The number is a HOTBAR KEY, not a slot address, so only the five
+              slots that key actually reaches carry one. Numbering all forty
+              implied thirty-five shortcuts that do not exist. */}
+          {slot.slot <= 5 && <span className="som-slot__index">{slot.slot}</span>}
           {(slot.count || 0) > 1 && <span className="som-slot__count">{slot.count}</span>}
           {price !== undefined && <span className="som-slot__price">${price}</span>}
           {image && <img className="som-slot__art" src={image} alt="" draggable={false} />}
@@ -152,7 +157,9 @@ function SlotCell({ slot, invType, ctx, onDragStart }: SlotCellProps) {
           )}
         </>
       )}
-      {!has && <span className="som-slot__index som-slot__index--empty">{slot.slot}</span>}
+      {!has && slot.slot <= 5 && (
+        <span className="som-slot__index som-slot__index--empty">{slot.slot}</span>
+      )}
     </div>
   )
 }
@@ -342,6 +349,15 @@ export function InventoryPanel({ side, inventory, ctx }: PanelProps) {
               Take all
             </button>
           )}
+        </div>
+      )}
+
+      {/* Shop only: what the two mouse buttons do, and the money that pays.
+          Both are in the reference and neither is guessable from a grid. */}
+      {(inventory.type === 'shop' || inventory.type === 'crafting') && (
+        <div className="som-shop__hint">
+          <span><i className="is-add" />To add item</span>
+          <span><i className="is-remove" />To remove item</span>
         </div>
       )}
 

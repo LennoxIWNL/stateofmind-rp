@@ -99,16 +99,25 @@ export const OUTBOUND = {
 // ---------------------------------------------------------------------------
 
 /** Every movable panel. The id is the persistence key, so renaming one orphans a saved layout. */
+/*
+ * Money, job and gang are NOT here and are not coming back.
+ *
+ * Owner's call and it is stronger than a default: cash and bank permanently on
+ * screen turn money into a scoreboard, and the job and gang chips restate
+ * something the player already knows. Leaving them as a toggle would just be
+ * the same clutter one click away, so the panels are gone.
+ *
+ * Voice is not a panel either. It belongs in the condition row as an icon,
+ * beside the other things about the player's body, rather than as a separate
+ * chip repeating what pma-voice already draws.
+ */
 export const PANELS = [
   'status',
   'speedo',
   'aviation',
   'compass',
   'location',
-  'money',
   'session',
-  'voice',
-  'identity',
 ] as const
 
 export type PanelId = (typeof PANELS)[number]
@@ -132,19 +141,14 @@ export type Layout = Record<PanelId, PanelState> & {
  * feature makes moving between machines a normal thing to do.
  */
 export const DEFAULT_LAYOUT: Layout = {
-  status:    { x: 50, y: 94, scale: 1, on: true },
+  /* BOTTOM LEFT, not bottom centre. The inventory hotbar owns the centre and
+   * the two were sitting on top of each other. */
+  status:    { x: 14, y: 94, scale: 1, on: true },
   speedo:    { x: 88, y: 86, scale: 1, on: true },
   aviation:  { x: 12, y: 12, scale: 1, on: true },
   compass:   { x: 50, y: 3,  scale: 1, on: true },
   location:  { x: 3,  y: 82, scale: 1, on: true },
-  /* OFF by default, owner's call. Cash and bank on screen at all times turns
-   * money into a scoreboard, the job and gang chips restate something the
-   * player already knows, and the voice chip read as a stray "Normal" with no
-   * context. All four are still in the editor for anyone who wants them. */
-  money:     { x: 95, y: 10, scale: 1, on: false },
   session:   { x: 95, y: 4,  scale: 1, on: true },
-  voice:     { x: 95, y: 20, scale: 1, on: false },
-  identity:  { x: 95, y: 26, scale: 1, on: false },
   speedoStyle: 'digital',
   compassStyle: 'primary',
 }
@@ -155,8 +159,5 @@ export const PANEL_LABELS: Record<PanelId, string> = {
   aviation: 'Aviation',
   compass: 'Compass',
   location: 'Location',
-  money: 'Money',
   session: 'Players & time',
-  voice: 'Voice',
-  identity: 'Job & gang',
 }
