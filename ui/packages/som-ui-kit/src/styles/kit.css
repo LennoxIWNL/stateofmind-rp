@@ -246,7 +246,7 @@
   line-height: 1.25;
   color: #fff;
   background: rgba(10, 8, 15, 0.66);
-  backdrop-filter: blur(10px) saturate(115%);
+  /* No backdrop-filter: opaque black on a transparent NUI page. See som-dispatch's app.css. */
   border-top: 1px solid rgba(255, 255, 255, 0.07);
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -266,7 +266,7 @@
   font-weight: 650;
   background: rgba(10, 8, 15, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(8px);
+  /* No backdrop-filter: see above. */
 }
 
 .som-tile__corner { left: 6px; color: var(--som-pink-light); }
@@ -479,7 +479,7 @@
   background: rgba(14, 11, 20, 0.97);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(14px);
+  /* No backdrop-filter: see above. */
   animation: som-pop 130ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 

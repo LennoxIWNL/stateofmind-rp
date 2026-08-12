@@ -9,24 +9,24 @@
 -- ONE blip per call. The pulse is the marker.
 local blips = {}
 
--- THE MARKER IS FIVE-DISPATCH'S, EXACTLY.
+-- AN AREA, AND NOTHING ELSE.
 --
--- Corrected after checking the reference rather than assuming. An earlier
--- version here used AddBlipForRadius with its alpha walked up and down on a
--- timer, on the reasoning that GTA has no pulsing blip. That reasoning was
--- wrong: `PulseBlip` is a real native, and it is what five-dispatch uses. The
--- expanding ring on the minimap is the game drawing it, not us animating alpha.
+-- Two corrections in one, both from play testing:
 --
--- Their values, kept as they are (client.lua:50-59): sprite 161, display 4,
--- scale 1.0, short range, then PulseBlip. The only thing not taken from them is
--- the colour, which stays per alert here because our alerts carry a priority
--- and theirs do not.
-local BLIP_SPRITE = 161
-local BLIP_SCALE = 1.0
+--   * There is NO icon blip. The per-alert `sprite` in shared/config.lua is
+--     deliberately ignored: sprite 110 is a gun, so every shots-fired call put
+--     a firearm icon on the exact coordinate. That tells officers where the
+--     shooter is standing, which is information the caller never had.
+--   * The AREA is back. A radius is the whole marker, because "somewhere around
+--     here" is what a 911 call actually contains.
+--
+-- The pulse is an alpha walk rather than PulseBlip. PulseBlip is what
+-- five-dispatch calls, and it animates a coord blip's ICON; there is no icon
+-- here to animate. Walking the radius alpha is what makes an area breathe.
+local AREA_RADIUS = 80.0
 
--- PulseBlip fires ONE ring. Re-firing it keeps the call visibly live rather
--- than flashing once and then sitting there as an ordinary dot.
-local PULSE_INTERVAL = 3000
+local PULSE_MIN, PULSE_MAX, PULSE_STEP = 45, 165, 10
+local PULSE_INTERVAL = 55
 
 local pulsing = false
 
@@ -35,12 +35,21 @@ local function startPulse()
     pulsing = true
 
     CreateThread(function()
+        local alpha, direction = PULSE_MIN, 1
+
         while true do
             local any = false
+            alpha = alpha + (PULSE_STEP * direction)
+
+            if alpha >= PULSE_MAX then
+                alpha, direction = PULSE_MAX, -1
+            elseif alpha <= PULSE_MIN then
+                alpha, direction = PULSE_MIN, 1
+            end
 
             for _, entry in pairs(blips) do
-                if entry.mark and DoesBlipExist(entry.mark) then
-                    PulseBlip(entry.mark)
+                if entry.area and DoesBlipExist(entry.area) then
+                    SetBlipAlpha(entry.area, alpha)
                     any = true
                 end
             end
@@ -60,7 +69,7 @@ local function removeBlip(id)
     local entry = blips[id]
     if not entry then return end
 
-    if entry.mark and DoesBlipExist(entry.mark) then RemoveBlip(entry.mark) end
+    if entry.area and DoesBlipExist(entry.area) then RemoveBlip(entry.area) end
     blips[id] = nil
 end
 
@@ -72,27 +81,19 @@ local function addBlip(call)
     -- restart) must not leave the first orphaned on the map forever.
     removeBlip(call.id)
 
-    local mark = AddBlipForCoord(call.coords.x, call.coords.y, call.coords.z)
-    SetBlipSprite(mark, def.sprite or BLIP_SPRITE)
-    SetBlipDisplay(mark, 4)
-    SetBlipScale(mark, def.scale or BLIP_SCALE)
-    SetBlipColour(mark, def.colour or 1)
-    SetBlipAsShortRange(mark, true)
+    local area = AddBlipForRadius(call.coords.x, call.coords.y, call.coords.z, AREA_RADIUS)
+    SetBlipHighDetail(area, true)
+    SetBlipColour(area, def.colour or 1)
+    SetBlipAlpha(area, PULSE_MIN)
 
-    BeginTextCommandSetBlipName('STRING')
-    AddTextComponentSubstringPlayerName(call.dispatchMessage or 'Call')
-    EndTextCommandSetBlipName(mark)
-
-    PulseBlip(mark)
-
-    blips[call.id] = { mark = mark }
+    blips[call.id] = { area = area }
 
     startPulse()
 
     local seconds = def.duration or 300
 
-    -- Blips expire on their own. Dispatch calls that never clear turn the map
-    -- into a wall of markers within an hour.
+    -- Areas expire on their own. Calls that never clear turn the map into a
+    -- wall of circles within an hour.
     SetTimeout(seconds * 1000, function() removeBlip(call.id) end)
 end
 

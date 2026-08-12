@@ -58,7 +58,17 @@ body,
      high-priority call is the one you least want hard to read. */
   border-left: 3px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(14px);
+  /* NO backdrop-filter.
+   *
+   * THIS was the black box behind the dispatch feed, not the page background,
+   * which has been transparent all along. A backdrop-filter needs something
+   * behind it to filter, and on a transparent NUI page there is nothing, so CEF
+   * composites the backdrop as opaque black in the element's own bounds. The
+   * card looked correct sitting in a black rectangle roughly the width of the
+   * column, which is exactly what was reported twice.
+   *
+   * Any frosted-glass effect on a page that shows the game through it has the
+   * same problem. Solid rgba only. */
   animation: dispatch-in 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 

@@ -97,7 +97,17 @@ RegisterNUICallback('somThrow', function(data, cb)
     local slot = num(data.slot)
     if not slot then return end
 
-    local item = exports.ox_inventory:GetSlot(slot)
+    -- GetPlayerItems, NOT GetSlot.
+    --
+    -- GetSlot is a SERVER export and does not exist on the client, so this
+    -- returned nil every single time and the throw returned one line later
+    -- without a word. That is why throwing looked like it did nothing: the
+    -- callback fired, found no item, and gave up silently.
+    --
+    -- Same class as FreezeEntityPosition being client-only: an export existing
+    -- is not the same as it existing on the side you are calling it from.
+    local items = exports.ox_inventory:GetPlayerItems()
+    local item = items and items[slot]
     if not item or not item.name then return end
 
     local model = propFor(item.name) or `prop_cs_bandage`

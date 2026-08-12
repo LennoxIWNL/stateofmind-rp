@@ -4720,7 +4720,7 @@ window.addEventListener("message", function (event) {
       $.each(penalcode, function (index, value) {
         $.each(value, function (i, v) {
           $(`#penal-${index}`).append(`
-                    <div class="offense-item ${v.color}-penal-code" data-id="${index}.${i}" data-sentence="${v.months}" data-fine="${v.fine}" data-descr="${v.description}">
+                    <div class="offense-item ${somChargeColour(v)}-penal-code" data-id="${index}.${i}" data-sentence="${v.months}" data-fine="${v.fine}" data-descr="${v.description}">
                     <div style="display: flex; flex-direction: row; width: 100%; margin: auto; margin-top: 0vh;">
                         <div class="offense-item-offense">${v.title}</div>
                         <div class="offfense-item-name">${v.class}</div>
@@ -6049,3 +6049,29 @@ $(".map-clear").on('click', function() {
         load(value);
     }, 700);
 })();
+
+// ---------------------------------------------------------------------------
+// SOM addition: charge colour comes from the CLASS, not the data.
+//
+// Config.PenalCode carries a per-entry `color`, and it is inconsistent:
+// Felony appears as orange 42 times, red 30 and green 25; Misdemeanor is green
+// 42 times and orange 12. So the same severity was three different colours
+// depending which offence you picked, which makes the colour worse than
+// useless because it actively misleads.
+//
+// Deriving it from `class` means it can never drift again, and it is one
+// function rather than 181 data edits that the next ps-mdt upgrade would undo.
+//
+// Felony red, Misdemeanor orange, Infraction green.
+// ---------------------------------------------------------------------------
+function somChargeColour(entry) {
+    const klass = String((entry && entry.class) || '').toLowerCase();
+
+    if (klass.indexOf('felony') !== -1) return 'red';
+    if (klass.indexOf('misdemeanor') !== -1 || klass.indexOf('misdemeanour') !== -1) return 'orange';
+    if (klass.indexOf('infraction') !== -1) return 'green';
+
+    // Unknown class: fall back to whatever the data said rather than inventing
+    // a severity for it.
+    return (entry && entry.color) || 'green';
+}
