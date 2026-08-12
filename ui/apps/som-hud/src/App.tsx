@@ -20,6 +20,7 @@ import {
   type Player,
   type Status,
   type Vehicle,
+  type VoiceState,
   type World,
 } from './contract'
 import {
@@ -35,6 +36,7 @@ export function App() {
   const [vehicle, setVehicle] = useState<Vehicle>({ inVehicle: false })
   const [world, setWorld] = useState<World | null>(null)
   const [player, setPlayer] = useState<Player | null>(null)
+  const [voice, setVoice] = useState<VoiceState | null>(null)
 
   useNuiEvent<{ value: boolean }>(INBOUND.visible, (d) => setVisible(d?.value === true))
   useNuiEvent<Status>(INBOUND.status, setStatus)
@@ -53,14 +55,20 @@ export function App() {
   useNuiEvent<Player>(INBOUND.player, setPlayer)
 
   /*
-   * Voice arrives on its own channel at 150ms, merged into the same Player
-   * object. It used to sit on the 2000ms player payload beside money and the
-   * clock, which is why the microphone lagged speech and cycling the range
-   * looked like it had not registered.
+   * VOICE IS ITS OWN STATE, not merged into Player, and that is the second half
+   * of this fix.
+   *
+   * Merging looked tidy and silently dropped the message: the merge could only
+   * apply if a Player object already existed, and Player arrives on the 2000ms
+   * loop. Every voice message before the first player payload was discarded,
+   * and if hud:player never arrived at all, voice could never appear no matter
+   * how many times the range was cycled.
+   *
+   * Voice has nothing to do with money and the clock, so it has no business
+   * depending on them being present.
    */
-  useNuiEvent<Pick<Player, 'voiceMode' | 'talking' | 'radio'>>(INBOUND.voice, (d) => {
-    if (!d) return
-    setPlayer((p) => (p ? { ...p, ...d } : p))
+  useNuiEvent<VoiceState>(INBOUND.voice, (d) => {
+    if (d) setVoice(d)
   })
   useNuiEvent<{ on: boolean }>(INBOUND.seatbelt, (d) =>
     setVehicle((v) => ({ ...v, seatbelt: d?.on === true })))
@@ -93,7 +101,10 @@ export function App() {
   return (
     <div className={`hud ${editing ? 'is-editing' : ''} ${show ? '' : 'is-hidden'}`}>
       <Panel id="status" layout={layout} editing={editing} onChange={setLayout}>
-        <Condition status={editing ? PREVIEW_STATUS : status} player={editing ? PREVIEW_PLAYER : player} />
+        <Condition
+          status={editing ? PREVIEW_STATUS : status}
+          voice={editing ? PREVIEW_VOICE : voice}
+        />
       </Panel>
 
       {/* Speedometer and aviation are the same slot on the screen but never
@@ -224,6 +235,8 @@ const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n
 // something in it, and a speedometer reading 0 in a parked car gives no sense
 // of the width the number will take at speed.
 // ---------------------------------------------------------------------------
+
+const PREVIEW_VOICE: VoiceState = { voiceMode: 'Normal', talking: false, radio: false }
 
 const PREVIEW_STATUS: Status = {
   health: 82, armour: 40, hunger: 64, thirst: 55, stress: 22, oxygen: 70, underwater: true,

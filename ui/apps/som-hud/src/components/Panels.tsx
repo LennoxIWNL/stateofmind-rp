@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import type { Player, Status, Vehicle, World } from '../contract'
+import type { Player, Status, Vehicle, VoiceState, World } from '../contract'
 
 // ---------------------------------------------------------------------------
 // Condition
@@ -104,7 +104,7 @@ function Glyph({ name }: { name: string }) {
  * The label hides itself again, so this stays a notification rather than
  * another permanent readout.
  */
-function Voice({ player }: { player: Player }) {
+function Voice({ voice }: { voice: VoiceState }) {
   const [announce, setAnnounce] = useState(false)
   const first = useRef(true)
 
@@ -119,16 +119,16 @@ function Voice({ player }: { player: Player }) {
     setAnnounce(true)
     const t = setTimeout(() => setAnnounce(false), 1600)
     return () => clearTimeout(t)
-  }, [player.voiceMode])
+  }, [voice.voiceMode])
 
   return (
     <div
-      className={`hud-hex hud-hex--voice ${player.talking ? 'is-live' : ''} ${announce ? 'is-announcing' : ''}`}
-      title={`Voice: ${player.voiceMode}${player.radio ? ` / radio ${player.radio}` : ''}`}
+      className={`hud-hex hud-hex--voice ${voice.talking ? 'is-live' : ''} ${announce ? 'is-announcing' : ''}`}
+      title={`Voice: ${voice.voiceMode}${voice.radio ? ` / radio ${voice.radio}` : ''}`}
     >
-      <span className="hud-hex__fill" style={{ height: player.talking ? '100%' : '0%' }} />
+      <span className="hud-hex__fill" style={{ height: voice.talking ? '100%' : '0%' }} />
       <Glyph name="voice" />
-      {announce && <span className="hud-hex__label">{player.voiceMode}</span>}
+      {announce && <span className="hud-hex__label">{voice.voiceMode}</span>}
     </div>
   )
 }
@@ -137,10 +137,10 @@ type Ring = { key: string; value: number; show: boolean }
 
 export function Condition({
   status,
-  player,
+  voice,
 }: {
   status: Status | null
-  player: Player | null
+  voice: VoiceState | null
 }) {
   if (!status) return null
 
@@ -185,7 +185,7 @@ export function Condition({
         Full when transmitting, outline when not, and the range is a title
         rather than a label: it is a thing you check, not a thing you read.
       */}
-      {player && <Voice player={player} />}
+      {voice && <Voice voice={voice} />}
     </div>
   )
 }
@@ -361,19 +361,37 @@ export function Compass({ world, minimal }: { world: World | null; minimal: bool
   const span = minimal ? 60 : 90
   const ticks: Array<{ deg: number; offset: number; label: string }> = []
 
+  /*
+   * A LABEL ONLY AT THE EIGHT CARDINALS. Everything else is a bare tick.
+   *
+   * Every tick used to print its bearing, so thirteen three-digit numbers were
+   * competing for about 360 pixels and the strip came out as an unreadable band
+   * of digits. A compass is glanced at, and what is wanted from a glance is
+   * which way is north, not that the bearing 45 degrees to the right is 285.
+   *
+   * Ticks every 15 degrees still give the tape its sense of motion; they just
+   * stop shouting numbers. The exact bearing is a separate readout at the
+   * pointer, where there is room for it and where the eye already is.
+   */
   for (let d = -span; d <= span; d += 15) {
     const deg = (((heading + d) % 360) + 360) % 360
-    const cardinal = CARDINALS.find(([c]) => c === deg)
+
+    // Nearest 15 degree step, so a cardinal is matched despite the heading
+    // being a float from the interpolator.
+    const snapped = Math.round(deg / 15) * 15 % 360
+    const cardinal = CARDINALS.find(([c]) => c === snapped)
+
     ticks.push({
       deg,
       offset: ((d + span) / (span * 2)) * 100,
-      label: cardinal ? cardinal[1] : String(deg),
+      label: cardinal ? cardinal[1] : '',
     })
   }
 
   return (
     <div className={`hud-compass ${minimal ? 'is-minimal' : ''}`}>
       <span className="hud-compass__pointer" aria-hidden="true" />
+      <span className="hud-compass__bearing">{Math.round(heading).toString().padStart(3, '0')}</span>
       <div className="hud-compass__tape">
         {ticks.map((t, i) => (
           <span
@@ -381,7 +399,7 @@ export function Compass({ world, minimal }: { world: World | null; minimal: bool
             className={`hud-compass__tick ${CARDINALS.some(([c]) => c === t.deg) ? 'is-cardinal' : ''}`}
             style={{ left: `${t.offset}%` }}
           >
-            <b>{t.label}</b>
+            {t.label ? <b>{t.label}</b> : null}
             <i />
           </span>
         ))}

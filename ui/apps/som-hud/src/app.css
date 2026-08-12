@@ -695,3 +695,24 @@ body,
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+
+/* The exact bearing, at the pointer.
+ *
+ * This is what the numbers at every tick were trying to be. One readout where
+ * the eye already is beats thirteen competing for the same 360 pixels. */
+.hud-compass__bearing {
+  position: absolute;
+  top: -1.6vh;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--som-font-mono);
+  font-size: 1.3vh;
+  font-weight: 700;
+  color: var(--som-pink-light);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 1);
+  z-index: 3;
+}
+
+/* Ticks with no label must not reserve the label's height, or the unlabelled
+ * ones sit lower than the cardinals and the row looks broken. */
+.hud-compass__tick { justify-content: flex-end; height: 100%; }

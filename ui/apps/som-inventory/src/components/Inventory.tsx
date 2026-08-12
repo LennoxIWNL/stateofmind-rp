@@ -8,6 +8,7 @@
  * not, and a drag that ends outside the panel is exactly the drop-to-world case.
  */
 
+import { createPortal } from 'react-dom'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { Inventory, InventoryType, Slot } from '../contract'
 import { formatWeight, itemImage, labelOf, weightOf, countOf, type State } from '../state'
@@ -393,16 +394,35 @@ export function InventoryPanel({ side, inventory, ctx }: PanelProps) {
         </div>
       )}
 
-      {ghost && (
-        <div
-          ref={ghostRef}
-          className="som-ghost"
-          style={{ left: ghost.x, top: ghost.y }}
-        >
-          {ghost.image && <img src={ghost.image} alt="" draggable={false} />}
-          {ghost.count > 1 && <span>{ghost.count}</span>}
-        </div>
-      )}
+      {/*
+        THE GHOST IS PORTALLED TO document.body, and it has to be.
+
+        It is position: fixed, which normally resolves against the viewport. But
+        a fixed element resolves against the nearest ancestor carrying a
+        transform, filter or will-change instead, and this panel carries one:
+        the tab-swap animation ends on transform: translateY(0) with fill-mode
+        both, so the transform is applied forever rather than only while it
+        runs.
+
+        That turned the panel into the containing block, so the ghost's viewport
+        coordinates were reinterpreted as panel-relative and it was drawn well
+        off screen. The item looked invisible while dragging.
+
+        A portal puts it outside every transformed ancestor, so `fixed` means
+        what it says regardless of what animations the panels grow later.
+      */}
+      {ghost &&
+        createPortal(
+          <div
+            ref={ghostRef}
+            className="som-ghost"
+            style={{ left: ghost.x, top: ghost.y }}
+          >
+            {ghost.image && <img src={ghost.image} alt="" draggable={false} />}
+            {ghost.count > 1 && <span>{ghost.count}</span>}
+          </div>,
+          document.body,
+        )}
     </section>
   )
 }

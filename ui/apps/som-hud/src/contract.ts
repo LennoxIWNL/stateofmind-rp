@@ -163,3 +163,16 @@ export const PANEL_LABELS: Record<PanelId, string> = {
   location: 'Location',
   session: 'Players & time',
 }
+
+/**
+ * Voice, on its own channel and in its own state.
+ *
+ * Deliberately NOT part of Player. It updates at 150ms while Player updates at
+ * 2000ms, and merging the two meant a voice message arriving before the first
+ * player payload was thrown away.
+ */
+export type VoiceState = {
+  voiceMode: string
+  talking: boolean
+  radio: number | false
+}
