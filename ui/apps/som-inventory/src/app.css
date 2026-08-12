@@ -12,11 +12,17 @@
  */
 
 :root {
-  /* Sized off the reference shots: five columns filling a panel roughly a
-   * third of the screen height wide, so a tile reads at a glance rather than
-   * needing to be leaned into. The grid derives its cell from the panel width,
-   * so this is the one number to change. */
-  --inv-panel: 42vh;
+  /* Sized off the reference shots by measurement, not by eye.
+   *
+   * In the reference the panel spans about 45% of the screen HEIGHT, which
+   * after 1.2vh of padding either side and four 0.55vh gaps leaves five tiles
+   * of roughly 8.1vh square. That is the number worth matching, because a tile
+   * has to read at a glance from the far side of the screen.
+   *
+   * The grid derives its cell from the panel width, so THIS is the one value
+   * to change; --inv-cell below only exists for the ghost and the hotbar,
+   * which are not in the grid and so cannot inherit it. */
+  --inv-panel: 45vh;
   --inv-gap: 0.55vh;
   --inv-cols: 5;
   --inv-cell: calc((var(--inv-panel) - 2.4vh - (var(--inv-gap) * 4)) / 5);
@@ -524,12 +530,17 @@
   to   { opacity: 1; transform: translate(-50%, 0); }
 }
 
-/* Same cell as the grid, one step larger so it reads at a glance from the
- * bottom of the screen. */
+/* THE SAME CELL AS THE GRID, derived from the same variable rather than a
+ * number typed here.
+ *
+ * It was a fixed 6.2vh, which was fine when the grid cell happened to be 5.9vh
+ * and wrong the moment the panel was resized: the hotbar ended up SMALLER than
+ * the inventory it is supposed to match. Deriving it means the two can never
+ * drift again. */
 .som-hotbar__slot {
   position: relative;
-  width: 6.2vh;
-  height: 6.2vh;
+  width: var(--inv-cell);
+  height: var(--inv-cell);
   border: 1px solid var(--som-border);
   border-radius: var(--som-radius);
   background: var(--som-card);
