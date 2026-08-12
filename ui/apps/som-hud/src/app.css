@@ -78,56 +78,97 @@ body,
 
 /* ----------------------------------------------------------- condition --- */
 
-.hud-condition { display: flex; gap: 0.9vh; align-items: center; }
+.hud-condition { display: flex; gap: 1.1vh; align-items: center; }
 
 /*
- * Hexagons, per the reference sheet's top row. The fill is clipped from the
- * bottom so the shape EMPTIES like a vessel, rather than a bar sitting inside
- * an unrelated outline.
+ * THE CONDITION HEXES, rebuilt.
+ *
+ * Three things were wrong with the first version and all three are structural
+ * rather than a matter of taste.
+ *
+ * THEY WERE TOO SMALL. 3.4vh is about 37px at 1080p, which is smaller than a
+ * favicon for the primary readout of the whole HUD.
+ *
+ * THEY HAD NO EDGE. clip-path removes the border box, so `border` does nothing
+ * on a clipped shape and the hexes had no outline at all. Over a bright street
+ * a dark shape with no edge simply dissolves. The outline is now the ELEMENT'S
+ * OWN BACKGROUND with an inset pseudo-element painted over it, which is the way
+ * to get a border on a clipped shape.
+ *
+ * THE FILL WAS A SOLID BLOCK BEHIND THE ICON. At full health that is a
+ * saturated red slab with a faint glyph on top, which is exactly the muddy look
+ * being complained about. It is a gradient now, strongest at the bottom and
+ * fading out before it reaches the glyph, so the hex reads as a vessel with a
+ * level in it and the icon stays legible at every value.
  */
 .hud-hex {
+  --hex: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  --hue: var(--som-pink);
+
   position: relative;
-  width: 3.4vh;
-  height: 3.9vh;
+  width: 4.6vh;
+  height: 5.2vh;
   display: grid;
   place-items: center;
-  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
-  background: rgba(8, 6, 10, 0.86);
-  overflow: hidden;
+  clip-path: var(--hex);
+  /* This IS the outline. The inset layer below covers all but its edge. */
+  background: rgba(255, 255, 255, 0.22);
+  transition: transform 160ms ease;
+}
+
+.hud-hex::before {
+  content: '';
+  position: absolute;
+  inset: 1.5px;
+  clip-path: var(--hex);
+  background: rgba(6, 5, 9, 0.9);
 }
 
 .hud-hex__fill {
   position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  transition: height 240ms ease;
-  opacity: 0.85;
+  left: 1.5px;
+  right: 1.5px;
+  bottom: 1.5px;
+  clip-path: var(--hex);
+  transition: height 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  /* Fades out toward the top so the glyph never sits on a flat slab. */
+  background: linear-gradient(to top, var(--hue), rgba(255, 255, 255, 0) 115%);
+  opacity: 0.9;
 }
 
 .hud-hex svg {
   position: relative;
-  width: 46%;
-  height: 46%;
+  width: 44%;
+  height: 44%;
   fill: none;
-  stroke: var(--som-text);
+  stroke: #fff;
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+  /* The HUD is drawn over a live scene that can be any colour, and a shadow
+     does the work a background cannot on a thin stroked shape. */
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9));
 }
 
-/* The one place a second hue earns itself. Read together, at a glance. */
-.hud-hex--health .hud-hex__fill { background: var(--som-danger); }
-.hud-hex--armour .hud-hex__fill { background: var(--som-text-dim); }
-.hud-hex--hunger .hud-hex__fill { background: var(--som-warning); }
-.hud-hex--thirst .hud-hex__fill { background: var(--som-violet); }
-.hud-hex--oxygen .hud-hex__fill { background: var(--som-pink-light); }
-.hud-hex--stress .hud-hex__fill { background: var(--som-magenta-deep); }
+/* The one place a second hue earns itself. Read together, at a glance.
+ * Set as a variable so the fill gradient and the critical glow agree. */
+.hud-hex--health { --hue: var(--som-danger); }
+.hud-hex--armour { --hue: #6ea8ff; }
+.hud-hex--hunger { --hue: var(--som-warning); }
+.hud-hex--thirst { --hue: #35c9e8; }
+.hud-hex--oxygen { --hue: var(--som-pink-light); }
+.hud-hex--stress { --hue: var(--som-violet); }
+.hud-hex--voice  { --hue: var(--som-pink); }
 
-/* Low and critical are a pulse, not a colour change: recolouring would collide
- * with the hue that identifies which stat it is. */
-.hud-hex.is-low  { animation: hud-pulse 2.2s ease-in-out infinite; }
-.hud-hex.is-critical { animation: hud-pulse 0.9s ease-in-out infinite; }
+/* Low and critical are a PULSE, not a recolour: recolouring would collide with
+ * the hue that identifies which stat it is. Critical also lifts the outline, so
+ * it is visible in peripheral vision rather than only when looked at. */
+.hud-hex.is-low { animation: hud-pulse 2.2s ease-in-out infinite; }
+
+.hud-hex.is-critical {
+  animation: hud-pulse 0.9s ease-in-out infinite;
+  background: var(--hue);
+}
 
 @keyframes hud-pulse {
   0%, 100% { filter: none; }
@@ -269,8 +310,8 @@ body,
 
 .hud-compass {
   position: relative;
-  width: 38vh;
-  height: 4.4vh;
+  width: 34vh;
+  height: 5vh;
   /* A backing, because a tape of thin ticks over a bright sky is unreadable.
    * Faded at both ends so it still stops short of looking like a panel. */
   background: linear-gradient(90deg,
@@ -311,20 +352,36 @@ body,
   gap: 0.25vh;
 }
 
+/* SIZED TO BE READ. These were 1vh, about 11px at 1080p, in the dimmest text
+ * token there is, over a scene that is frequently bright. Intermediate degrees
+ * are support and stay quiet; the cardinals are the thing actually being read
+ * and now carry real weight. */
 .hud-compass__tick b {
   font-family: var(--som-font-mono);
-  font-size: 1vh;
-  font-weight: 400;
-  color: var(--som-text-mute);
+  font-size: 1.15vh;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
 }
 
-.hud-compass__tick i { width: 1px; height: 0.6vh; background: var(--som-border); }
+.hud-compass__tick i {
+  width: 1px;
+  height: 0.7vh;
+  background: rgba(255, 255, 255, 0.3);
+}
 
 .hud-compass__tick.is-cardinal b {
   font-family: var(--som-font);
-  font-size: 1.4vh;
+  font-size: 1.75vh;
   font-weight: 700;
-  color: var(--som-text);
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 1);
+}
+
+.hud-compass__tick.is-cardinal i {
+  height: 1vh;
+  background: var(--som-pink);
 }
 
 .hud-compass__tick.is-cardinal i { height: 0.9vh; background: var(--som-text-dim); }
@@ -586,4 +643,55 @@ body,
 .hud-hex--voice.is-live {
   border-color: var(--som-pink);
   box-shadow: 0 0 10px var(--som-pink-a61);
+}
+
+/* ---------------------------------------------------------------------------
+ * SURFACES.
+ *
+ * The digital speedometer was loose text floating on the world with no backing
+ * of its own, so its legibility depended entirely on what the player happened
+ * to be driving past. Every readable HUD gives its numbers a surface; the ones
+ * that do not are the ones that look unfinished.
+ *
+ * Kept as a soft vignette rather than a hard card, so it darkens the scene
+ * behind the digits without turning into a box.
+ * ------------------------------------------------------------------------ */
+
+.hud-speedo--digital {
+  padding: 1vh 1.4vh;
+  border-radius: var(--som-radius-lg);
+  background:
+    radial-gradient(ellipse at 70% 50%, rgba(6, 5, 9, 0.86), rgba(6, 5, 9, 0.55) 70%, transparent);
+}
+
+.hud-speedo__value,
+.hud-speedo__gear { text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95); }
+
+.hud-speedo__gear {
+  background: var(--som-pink-a30);
+  border: 1px solid var(--som-pink-a45);
+}
+
+/* The unit belongs to the number, so it sits tight against it rather than
+ * drifting off in the meta row at the same weight as everything else. */
+.hud-speedo__meta { letter-spacing: 0.1em; }
+
+.hud-location {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+
+.hud-location__street { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+
+/* A last-resort legibility floor for anything thin drawn over the world. */
+.hud-chip,
+.hud-aviation__value { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+
+/* Panels ease in rather than appearing, so the HUD arriving on spawn or coming
+ * back from the pause menu reads as a fade rather than a flash. */
+.hud-panel { animation: hud-panel-in 260ms ease both; }
+
+@keyframes hud-panel-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
