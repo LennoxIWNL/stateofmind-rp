@@ -702,6 +702,80 @@ validate it server side if it persists per player.
 
 ---
 
+## 10. Task 11, the HUD. BUILT. NOT TESTED
+
+Reference sheets received 2026-08-12 (compass, aerial speedometers, car
+speedometers, health status, two in-game shots, two editor shots).
+
+**Source** `ui/apps/som-hud`, built into the resource's `html/`. The old
+hand-written `app.js` and `style.css` are gone.
+
+### The property that survived the rewrite
+
+**The HUD half has no inbound surface at all.** It watches natives and
+som-core's client mirror and describes what it sees. The editor is the one
+exception and it accepts **LAYOUT ONLY** (positions, scales, which panels are
+on), never a value, which is why it needs no server round trip: a player editing
+their own HUD has moved their own numbers around their own screen.
+
+If task 13 or anything later adds an inbound message, keep that line.
+
+### Built
+
+- **Four loops at four rates** (vehicle 100ms, status/world 500ms, player
+  2000ms), all sending only on change, with `invalidate()` carried over.
+- **Condition** as hexagons that empty from the bottom like a vessel. Health,
+  armour, hunger, thirst, stress, oxygen. Subtractive throughout: armour stands
+  down at zero, needs above 90%, stress below 10, oxygen unless actually
+  underwater.
+- **Digital and ring speedometers**, gear, RPM segments, engine bar.
+- **Aviation tiles** (pitch, roll, alt, head, speed), auto-activating on class
+  15 or 16. **It shares a slot with the speedometer and they never appear
+  together**, decided in the Lua by class so the page does not guess.
+- **Compass tape** with a faded mask so it reads as continuing past the panel,
+  plus **street and cross-street**. `GetStreetNameAtCoord` returns two hashes
+  and the second is zero mid-block, which is what stops a stale crossing name
+  hanging around.
+- **Money, session, voice and identity chips.** Pink marks exactly one thing,
+  the live mic.
+- **`/sethud`**: drag to move, wheel to scale, toggles, style pickers, export,
+  import, reset. Layout is **percentages of the viewport, not pixels**, because
+  export/import makes sending a layout to someone else normal and pixels would
+  put half their HUD off screen.
+- **Seatbelt with ejection**, the other half AUDIT 21.5 said not to build alone.
+  The threshold is a **delta, not a speed**: braking hard from 40 is not a
+  crash, going from 40 to 5 in one frame is. Classes that cannot have a belt
+  never show the indicator.
+
+### Carried constraints, unchanged
+
+- **Fuel is built and NOT wired.** No fuel resource runs here and
+  `GetVehicleFuelLevel` on a vanilla vehicle does not meaningfully deplete, so
+  the gauge would sit at one number forever. It renders inert and says so.
+  `Config.FuelResource` is the one line to change.
+- **Minimap `.ytd` textures still need OpenIV or a packer that is not
+  installed.** Not attempted.
+
+### Not built
+
+- **Task 13, the HUD icon set.** The condition glyphs are inline SVG paths
+  authored here, matching each other. A licensed set would replace them in one
+  file.
+- **The vehicle control panel** (indicators synced through State Bags so nearby
+  players see signals) and **three performance modes**. Both are additive and
+  neither blocks the rest.
+- **Persistence is KVP, per machine rather than per character.** A trade rather
+  than an oversight: a layout tuned for an ultrawide is wrong on a laptop
+  anyway, and export covers moving one deliberately. Move it to a column on
+  `som_characters` only if the owner asks.
+
+### NOTHING HERE HAS BEEN RUN
+
+Typechecks and builds, and that is all that is known. First test: does it appear
+at all, then `/sethud`, move something, save, reconnect, confirm it stuck.
+
+---
+
 ## PROMPT B: Task 11, the custom HUD, plus task 13
 
 Continue State of Mind RP. Read AUDIT.md 21.5 and the same plan. Standing rules
