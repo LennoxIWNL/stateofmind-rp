@@ -213,11 +213,6 @@ Config.Vehicles = {
 
         -- The originals, kept so an existing shift is not stranded if the pack
         -- is not streaming yet.
-        { model = 'polbuffalo4', label = 'Buffalo STX' },
-        { model = 'polcaracara', label = 'Caracara 4x4' },
-        { model = 'poldom',      label = 'Dominator' },
-        { model = 'polcomet',    label = 'Interceptor Comet',  cert = 'cert.interceptor' },
-        { model = 'polvstr',     label = 'Interceptor Vectre', cert = 'cert.interceptor' },
 
         -- Gated. Every one of these is re-checked server side on the spawn
         -- request as well as being filtered out of the list, so hiding a row is
@@ -356,13 +351,14 @@ Config.Keybinds = {
 -- ---------------------------------------------------------------------------
 
 Config.EmergencyModels = {
-    -- origen_police
-    polbuffalo4 = true, polcaracara = true, polcomet = true,
-    poldom = true, polvigero2 = true, polvstr = true,
-    -- TIG-PACK
-    scpolstang = true, scpolc7 = true, scpolvic = true,
-    scpolchal = true, scpolacr = true, scpolm4 = true,
-    -- Base game
+    -- Base game names ARE the fleet.
+    --
+    -- Zerofour04's Emergency Car Pack REPLACES vanilla police models rather
+    -- than adding spawn names, so police2 is a Buffalo cruiser and pranger is
+    -- the patrol SUV. Nothing extra needs listing.
+    --
+    -- The origen_police and TIG-PACK names that used to sit here are gone with
+    -- those packs. Neither is streamed and neither is coming back.
     police = true, police2 = true, police3 = true, police4 = true,
     policeb = true, policet = true, sheriff = true, sheriff2 = true,
     fbi = true, fbi2 = true, riata = true, polmav = true,

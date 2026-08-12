@@ -138,21 +138,28 @@ Config.Fleets = {
     lspd = {
         platePrefix = 'LSPD',
 
-        -- RESTORED. The pool was emptied pending a replacement pack, and the
-        -- replacement never became necessary: origen_police is ensured in
-        -- som.cfg and all five models resolve to it, verified model by model
-        -- during the vehicle audit. An empty list here is why the motor pool
-        -- rendered "Nothing here".
+        -- ON THE EMERGENCY CAR PACK, and NOT on origen_police.
         --
-        -- retireFleet() deletes rows for any model no longer listed, and
+        -- The origen models were pulled at the owner's request and are not
+        -- coming back. The pool runs on Zerofour04's Emergency Car Pack, which
+        -- is what lspd-Police-Cars, lspd-Police-Bike and lspd-Police-SWAT
+        -- stream and what som-police's fleet config already points at.
+        --
+        -- Those packs REPLACE vanilla police models rather than adding spawn
+        -- names, which is why these read as ordinary GTA names: police2 is a
+        -- Buffalo cruiser because the pack replaced it.
+        --
+        -- retireFleet() deletes rows for any model no longer listed and
         -- seedFleet() creates them on the next boot, so this list IS the pool.
-        -- Raising a count tops it up; removing a line removes the cars.
         vehicles = {
-            { model = 'polbuffalo4', label = 'Buffalo STX',        count = 3, price = 50000 },
-            { model = 'polcaracara', label = 'Caracara 4x4',       count = 2, price = 65000 },
-            { model = 'poldom',      label = 'Dominator',          count = 2, price = 55000 },
-            { model = 'polcomet',    label = 'Interceptor Comet',  count = 2, price = 95000, cert = 'cert.interceptor' },
-            { model = 'polvstr',     label = 'Interceptor Vectre', count = 2, price = 95000, cert = 'cert.interceptor' },
+            { model = 'police2',   label = 'Cruiser, Buffalo',      count = 3, price = 50000 },
+            { model = 'police3',   label = 'Cruiser, Interceptor',  count = 3, price = 55000 },
+            { model = 'pranger',   label = 'Patrol SUV',            count = 2, price = 65000 },
+            { model = 'police4',   label = 'Unmarked Cruiser',      count = 2, price = 70000, cert = 'cert.detective' },
+            { model = 'fbi',       label = 'Unmarked Sedan',        count = 1, price = 75000, cert = 'cert.detective' },
+            { model = 'fbi2',      label = 'Unmarked SUV',          count = 1, price = 80000, cert = 'cert.detective' },
+            { model = 'policeb',   label = 'Police Motorcycle',     count = 2, price = 45000, cert = 'cert.motorcycle' },
+            { model = 'pitbullbb', label = 'SWAT Armoured',         count = 1, price = 120000, cert = 'cert.swat' },
         },
     },
 }
