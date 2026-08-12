@@ -88,23 +88,21 @@ local function addBlip(call)
 
     local colour = def.colour or 1
 
+    -- THE PULSING RING IS THE WHOLE MARKER. There is deliberately no sprite
+    -- blip beside it any more.
+    --
+    -- Owner's call, and it is the right one for the same reason the radius
+    -- exists at all: a pinpoint icon on the exact coordinate tells officers
+    -- precisely where the shooter is standing, which is information the caller
+    -- never had. A ring says "somewhere around here", which is what a 911 call
+    -- actually contains. Two markers for one call also made the map noisy the
+    -- moment more than a couple were live.
     local area = AddBlipForRadius(call.coords.x, call.coords.y, call.coords.z, AREA_RADIUS)
     SetBlipHighDetail(area, true)
     SetBlipColour(area, colour)
     SetBlipAlpha(area, PULSE_MIN)
 
-    local mark = AddBlipForCoord(call.coords.x, call.coords.y, call.coords.z)
-    SetBlipSprite(mark, def.sprite or 110)
-    SetBlipColour(mark, colour)
-    SetBlipScale(mark, def.scale or 0.85)
-    SetBlipAsShortRange(mark, false)
-    SetBlipDisplay(mark, 4)
-
-    BeginTextCommandSetBlipName('STRING')
-    AddTextComponentSubstringPlayerName(call.dispatchMessage or 'Call')
-    EndTextCommandSetBlipName(mark)
-
-    blips[call.id] = { area = area, mark = mark }
+    blips[call.id] = { area = area }
 
     startPulse()
 

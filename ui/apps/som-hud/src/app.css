@@ -10,6 +10,23 @@
  * something merely true.
  */
 
+/* html AND body AND #root, not just body.
+ *
+ * CEF paints the ROOT element's background before the body's, so a full-screen
+ * page that clears only body still renders an opaque black rectangle over the
+ * whole game. som-dispatch learned this the same way. vite mounts into #root,
+ * a third element between the two, so that needs it as well.
+ *
+ * This HUD is full screen by definition, so getting it wrong blacks out
+ * everything rather than showing a stray box in one corner. */
+html,
+body,
+#root {
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
 .hud {
   position: fixed;
   inset: 0;

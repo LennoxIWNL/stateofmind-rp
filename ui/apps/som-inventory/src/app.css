@@ -477,33 +477,102 @@
 
 /* -------------------------------------------------------------- hotbar --- */
 
+/*
+ * The hotbar is a ROW OF THE SAME SLOT the grid uses, not a second design.
+ *
+ * It was drifting: different border, different background, different label
+ * treatment, so the five slots at the bottom of the screen read as belonging to
+ * another resource. Everything here now mirrors .som-slot exactly and only the
+ * size and the key badge differ.
+ */
+
 .som-hotbar {
   position: fixed;
   left: 50%;
   bottom: 3vh;
   transform: translateX(-50%);
   display: flex;
-  gap: 0.5vh;
+  gap: var(--inv-gap);
+  padding: var(--inv-gap);
+  border: 1px solid var(--som-border);
+  border-radius: var(--som-radius-lg);
+  background: var(--som-bg);
+  box-shadow: var(--som-shadow);
   z-index: 20;
+  animation: som-hotbar-in 200ms var(--som-transition, ease) both;
 }
 
+@keyframes som-hotbar-in {
+  from { opacity: 0; transform: translate(-50%, 1vh); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* Same cell as the grid, one step larger so it reads at a glance from the
+ * bottom of the screen. */
 .som-hotbar__slot {
   position: relative;
-  width: 6vh;
-  height: 6vh;
+  width: 6.2vh;
+  height: 6.2vh;
   border: 1px solid var(--som-border);
   border-radius: var(--som-radius);
-  background: color-mix(in srgb, var(--som-bg) 82%, transparent);
+  background: var(--som-card);
+  overflow: hidden;
 }
 
-.som-hotbar__slot.has-item { border-color: var(--som-pink-a45); }
-.som-hotbar__slot img { position: absolute; inset: 14% 14% 24% 14%; width: 72%; height: 62%; object-fit: contain; }
-.som-hotbar__key { position: absolute; top: 0.2vh; left: 0.4vh; font-size: 1vh; font-family: var(--som-font-mono); color: var(--som-text-mute); }
-.som-hotbar__count { position: absolute; top: 0.2vh; right: 0.4vh; font-size: 1vh; font-weight: 700; color: var(--som-pink-light); }
+.som-hotbar__slot.has-item { background: var(--som-surface); }
+
+.som-hotbar__slot img {
+  position: absolute;
+  inset: 12% 12% 26% 12%;
+  width: 76%;
+  height: 62%;
+  object-fit: contain;
+}
+
+/* The number is the KEY, so it takes the accent rather than sitting in the
+ * muted slot-index colour the grid uses: in the grid the number is an address,
+ * here it is an instruction. */
+.som-hotbar__key {
+  position: absolute;
+  top: 0.3vh;
+  left: 0.4vh;
+  font-size: 0.95vh;
+  font-family: var(--som-font-mono);
+  font-weight: 700;
+  color: var(--som-pink-light);
+  z-index: 1;
+}
+
+.som-hotbar__count {
+  position: absolute;
+  top: 0.25vh;
+  right: 0.3vh;
+  min-width: 1.4vh;
+  text-align: center;
+  font-size: 0.95vh;
+  font-weight: 700;
+  padding: 0.1vh 0.35vh;
+  border-radius: 3px;
+  background: var(--som-pink-a61);
+  color: var(--som-text);
+  z-index: 1;
+}
+
 .som-hotbar__label {
-  position: absolute; left: 0; right: 0; bottom: 0.2vh;
-  font-size: 0.8vh; text-align: center; text-transform: uppercase;
-  color: var(--som-text-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0.25vh 0.3vh;
+  font-size: 0.85vh;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--som-text-dim);
+  background: linear-gradient(transparent, var(--som-bg-deep) 55%);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ------------------------------------------------------------ clothing --- */

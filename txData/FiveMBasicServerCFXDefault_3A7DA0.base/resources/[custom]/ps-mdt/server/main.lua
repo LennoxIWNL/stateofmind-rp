@@ -813,23 +813,37 @@ RegisterNetEvent('mdt:server:incidentSearchPerson', function(query)
         if Player then
             local JobType = GetJobType(Player.PlayerData.job.name)
             if JobType == 'police' or JobType == 'doj' or JobType == 'ambulance' then
-                local firstname, lastname = query:match("^(%S+)%s*(%S*)$")
-                firstname = firstname or query
-                lastname = lastname or query
-
-                -- `jobtype` lives on mdt_data and records which department wrote
-                -- a person's MDT notes. It does not describe the person, and the
-                -- join is a LEFT JOIN, so for anyone without an mdt_data row it
-                -- is NULL and the comparison is never true. AND also binds
-                -- tighter than OR, so stock parsed as
-                -- `(first AND last) OR (citizenid AND jobtype)`: searching by
-                -- citizen ID returned only people who already had MDT notes,
-                -- which is nobody until an officer has written some. Filter
-                -- removed and the OR branch parenthesised.
-                local result = MySQL.query.await("SELECT p.citizenid, p.charinfo, p.metadata, md.pfp from players p LEFT JOIN mdt_data md on p.citizenid = md.cid WHERE (LOWER(JSON_UNQUOTE(JSON_EXTRACT(p.`charinfo`, '$.firstname'))) LIKE :firstname AND LOWER(JSON_UNQUOTE(JSON_EXTRACT(p.`charinfo`, '$.lastname'))) LIKE :lastname) OR LOWER(p.`citizenid`) LIKE :citizenid LIMIT 30", {
-                    firstname = string.lower('%' .. firstname .. '%'),
-                    lastname = string.lower('%' .. lastname .. '%'),
-                    citizenid = string.lower('%' .. query .. '%')
+                -- ONE term, matched against five things, rather than the stock
+                -- split into a first and last name.
+                --
+                -- The split was the bug. `("^(%S+)%s*(%S*)$")` on a single word
+                -- puts it in FIRSTNAME and leaves lastname empty, and the two
+                -- were ANDed, so searching "Test" required the FIRST name to
+                -- contain it. "Lennox Test" never matched his own surname.
+                --
+                -- Matching the term against first, last, "first last",
+                -- "last first" and the citizen id covers every way somebody
+                -- actually types a name, in either order, with no parsing to
+                -- get wrong.
+                --
+                -- `jobtype` was also removed here. It lives on mdt_data and
+                -- describes which department wrote a person's notes rather than
+                -- the person, and the LEFT JOIN makes it NULL for anyone
+                -- without notes, so it silently excluded most of the server.
+                local result = MySQL.query.await([[
+                    SELECT p.citizenid, p.charinfo, p.metadata, md.pfp
+                    FROM players p
+                    LEFT JOIN mdt_data md ON p.citizenid = md.cid
+                    WHERE LOWER(JSON_VALUE(p.charinfo, '$.firstname')) LIKE :query
+                       OR LOWER(JSON_VALUE(p.charinfo, '$.lastname')) LIKE :query
+                       OR LOWER(CONCAT(JSON_VALUE(p.charinfo, '$.firstname'), ' ',
+                                       JSON_VALUE(p.charinfo, '$.lastname'))) LIKE :query
+                       OR LOWER(CONCAT(JSON_VALUE(p.charinfo, '$.lastname'), ' ',
+                                       JSON_VALUE(p.charinfo, '$.firstname'))) LIKE :query
+                       OR LOWER(p.citizenid) LIKE :query
+                    LIMIT 30
+                ]], {
+                    query = string.lower('%' .. query .. '%'),
                 }) or {}
 
                 local data = {}
