@@ -12,7 +12,16 @@ Config = {}
 Config.Interval = {
     vehicle = 100,   -- the speedometer is the one thing that must not stutter
     status  = 500,
-    world   = 500,   -- heading and street, at a rate a human can read
+    world   = 500,   -- street and zone, at a rate a human can read
+    -- HEADING IS ITS OWN LOOP AND MUCH FASTER.
+    --
+    -- It used to ride along with the street name at 500ms, which is why the
+    -- compass moved in visible steps: a compass is watched WHILE TURNING, so
+    -- its update rate is a smoothness requirement rather than a reading rate.
+    -- Street and zone are the opposite and stay slow, because re-querying them
+    -- at this rate would be three expensive natives for a string that changes
+    -- once a block.
+    heading = 60,
     player  = 2000,  -- money, job, clock
 }
 

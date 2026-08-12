@@ -152,12 +152,26 @@ Config.Fleets = {
         -- retireFleet() deletes rows for any model no longer listed and
         -- seedFleet() creates them on the next boot, so this list IS the pool.
         vehicles = {
-            { model = 'police2',   label = 'Cruiser, Buffalo',      count = 3, price = 50000 },
-            { model = 'police3',   label = 'Cruiser, Interceptor',  count = 3, price = 55000 },
-            { model = 'pranger',   label = 'Patrol SUV',            count = 2, price = 65000 },
-            { model = 'police4',   label = 'Unmarked Cruiser',      count = 2, price = 70000, cert = 'cert.detective' },
-            { model = 'fbi',       label = 'Unmarked Sedan',        count = 1, price = 75000, cert = 'cert.detective' },
-            { model = 'fbi2',      label = 'Unmarked SUV',          count = 1, price = 80000, cert = 'cert.detective' },
+            -- LABELS DESCRIBE THE PACK'S CARS, NOT THE VANILLA ONES THEY REPLACE.
+            --
+            -- The previous labels were derived from what police2/police3/etc.
+            -- are in stock GTA, which is wrong the moment a pack replaces the
+            -- model. Reading lspd-Police-Cars' own vehicles.meta settles two of
+            -- them outright: police3's handlingId is `libertychar` and
+            -- police4's is `libertyvic`, so those are a Charger and a Crown
+            -- Victoria rather than an "Interceptor" and a generic unmarked.
+            -- pranger is a Taurus, reported from in game.
+            --
+            -- police2, fbi and fbi2 are NOT confirmed. Their handling ids map
+            -- to themselves, which tells us nothing about the body, so they
+            -- carry role-only names rather than a body style I would be
+            -- guessing at for the second time.
+            { model = 'police2',   label = 'Marked Cruiser',        count = 3, price = 50000 },
+            { model = 'police3',   label = 'Charger',               count = 3, price = 55000 },
+            { model = 'pranger',   label = 'Taurus',                count = 2, price = 65000 },
+            { model = 'police4',   label = 'Crown Victoria',        count = 2, price = 70000, cert = 'cert.detective' },
+            { model = 'fbi',       label = 'Unmarked, Detective',   count = 1, price = 75000, cert = 'cert.detective' },
+            { model = 'fbi2',      label = 'Unmarked, Command',     count = 1, price = 80000, cert = 'cert.detective' },
             { model = 'policeb',   label = 'Police Motorcycle',     count = 2, price = 45000, cert = 'cert.motorcycle' },
             { model = 'pitbullbb', label = 'SWAT Armoured',         count = 1, price = 120000, cert = 'cert.swat' },
         },

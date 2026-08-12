@@ -1220,3 +1220,52 @@
   from { opacity: 0; transform: translateY(1.4vh); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ---------------------------------------------------------------------------
+ * THE CLOTHING PANEL IS TRANSPARENT, and this is why the ped was invisible.
+ *
+ * Making .som-clothing__figure transparent did nothing, because .som-panel
+ * paints var(--som-bg) behind it. CSS cannot see through an opaque ANCESTOR:
+ * a transparent child of an opaque parent shows the parent, not the game.
+ *
+ * So the panel itself stops being a card and the pieces that need a surface
+ * carry their own. That is also closer to the reference, where the rails float
+ * either side of the character rather than sitting inside one slab.
+ * ------------------------------------------------------------------------ */
+
+.som-panel.som-clothing {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* The header and footer still need to be readable over the world. */
+.som-clothing > .som-panel__head,
+.som-clothing__footer,
+.som-clothing__note {
+  background: var(--som-bg);
+  border: 1px solid var(--som-border);
+  border-radius: var(--som-radius);
+  padding: 0.7vh 1vh;
+}
+
+.som-clothing__footer {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+/* Each rail becomes its own floating column. */
+.som-clothing__rail {
+  padding: 0.6vh;
+  background: var(--som-bg);
+  border: 1px solid var(--som-border);
+  border-radius: var(--som-radius-lg);
+  box-shadow: var(--som-shadow);
+}
+
+/* And the stage keeps NOTHING behind it. The ring vignette was still a paint
+ * over the ped, so it is gone: the rails frame the figure now. */
+.som-clothing__figure {
+  background: transparent;
+}

@@ -235,7 +235,6 @@ CreateThread(function()
             local street, crossing = GetStreetNameAtCoord(coords.x, coords.y, coords.z)
 
             local payload = {
-                heading = math.floor(GetEntityHeading(ped) + 0.5),
                 street = GetStreetNameFromHashKey(street),
                 crossing = crossing ~= 0 and GetStreetNameFromHashKey(crossing) or '',
                 zone = GetLabelText(GetNameOfZone(coords.x, coords.y, coords.z)),
@@ -352,4 +351,39 @@ AddEventHandler('som:client:onMoneyChanged', InvalidateHud)
 AddEventHandler('som:client:onJobChanged', InvalidateHud)
 AddEventHandler('onResourceStart', function(resource)
     if resource == GetCurrentResourceName() then InvalidateHud() end
+end)
+
+
+-- ---------------------------------------------------------------------------
+-- Heading
+--
+-- Separate from the world loop and roughly eight times faster. It used to be a
+-- field on that payload, so the compass only learned a new bearing twice a
+-- second and stepped between them.
+--
+-- Sent as a FLOAT rather than rounded. The page interpolates between samples,
+-- and rounding here would quantise the thing it interpolates, which puts the
+-- steps back at a finer grain rather than removing them.
+--
+-- Its own message so it does not drag street and zone along at this rate:
+-- those are three expensive natives for a string that changes once a block.
+-- ---------------------------------------------------------------------------
+
+CreateThread(function()
+    local last = -1
+
+    while true do
+        Wait(Config.Interval.heading)
+
+        if shown then
+            local heading = GetEntityHeading(PlayerPedId())
+
+            -- A tenth of a degree is below what a compass can show, so anything
+            -- smaller is a message nobody can see.
+            if math.abs(heading - last) > 0.1 then
+                last = heading
+                SendNUIMessage({ action = 'hud:heading', heading = heading })
+            end
+        end
+    end
 end)

@@ -359,8 +359,19 @@ Config.EmergencyModels = {
     --
     -- The origen_police and TIG-PACK names that used to sit here are gone with
     -- those packs. Neither is streamed and neither is coming back.
+    -- EVERY MODEL lspd-Police-Cars ACTUALLY STREAMS.
+    --
+    -- pranger, pitbullbb and policeold1 were missing, which is why Q and Left
+    -- Alt did nothing in the patrol SUV: emergencyVehicle() looked the model up
+    -- here, found nothing, and left both binds disabled. The car was fine and
+    -- the allow list was short.
+    --
+    -- Verified against the pack's stream folder rather than written from
+    -- memory: fbi, fbi2, police2, police3, police4, policeold1, pranger, plus
+    -- policeb from the bike pack and pitbullbb from the SWAT pack.
     police = true, police2 = true, police3 = true, police4 = true,
-    policeb = true, policet = true, sheriff = true, sheriff2 = true,
-    fbi = true, fbi2 = true, riata = true, polmav = true,
+    policeold1 = true, pranger = true, policeb = true, policet = true,
+    fbi = true, fbi2 = true, pitbullbb = true,
+    sheriff = true, sheriff2 = true, riata = true, polmav = true,
     ambulance = true, firetruk = true,
 }

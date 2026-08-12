@@ -11,6 +11,7 @@
  * players to stop reading the row it sits in.
  */
 
+import { useEffect, useRef, useState } from 'react'
 import type { Player, Status, Vehicle, World } from '../contract'
 
 // ---------------------------------------------------------------------------
@@ -271,10 +272,58 @@ const CARDINALS: Array<[number, string]> = [
   [180, 'S'], [225, 'SW'], [270, 'W'], [315, 'NW'],
 ]
 
-export function Compass({ world, minimal }: { world: World | null; minimal: boolean }) {
-  if (!world) return null
+/**
+ * Eases the compass toward the reported bearing instead of snapping to it.
+ *
+ * Messages arrive every 60ms; a monitor draws every 16ms. Rendering the raw
+ * value means three identical frames then a step, which is exactly the "numbers
+ * just jump" being reported. This runs on requestAnimationFrame so the tape
+ * moves on every frame the display actually has.
+ *
+ * THE WRAP IS THE WHOLE DIFFICULTY. Going from 350 to 10 degrees is a 20 degree
+ * turn to the right, not a 340 degree spin to the left. Interpolating the
+ * numbers directly makes the compass whirl backwards every time the player
+ * crosses north, so the delta is normalised into -180..180 first and the
+ * accumulator is allowed to run outside 0..360, then wrapped only for display.
+ */
+function useSmoothHeading(target: number) {
+  const [shown, setShown] = useState(target)
+  const current = useRef(target)
+  const goal = useRef(target)
 
-  const heading = world.heading
+  goal.current = target
+
+  useEffect(() => {
+    let frame = 0
+
+    const tick = () => {
+      let delta = goal.current - current.current
+      delta = ((((delta + 180) % 360) + 360) % 360) - 180
+
+      if (Math.abs(delta) < 0.05) {
+        current.current = goal.current
+      } else {
+        // Proportional, so a big turn starts fast and settles rather than
+        // arriving at a constant speed, which reads as mechanical.
+        current.current += delta * 0.18
+      }
+
+      setShown(((current.current % 360) + 360) % 360)
+      frame = requestAnimationFrame(tick)
+    }
+
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [])
+
+  return shown
+}
+
+export function Compass({ world, minimal }: { world: World | null; minimal: boolean }) {
+  // Called before the early return: a hook cannot sit behind a condition.
+  const heading = useSmoothHeading(world?.heading ?? 0)
+
+  if (!world) return null
   // A window either side of the current heading, wrapped, so the tape reads as
   // continuous rather than snapping at north.
   const span = minimal ? 60 : 90

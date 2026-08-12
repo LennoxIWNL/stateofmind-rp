@@ -27,18 +27,29 @@ local sirenState = setmetatable({}, { __mode = 'k' })
 ---Driver seat only. A passenger reaching over to work the siren is a different
 ---feature, and one that mostly produces accidents.
 ---@return number|nil vehicle
+--- Config.EmergencyModels keyed by model hash, built once at load.
+local EMERGENCY_HASHES = {}
+
+for name in pairs(Config.EmergencyModels) do
+    EMERGENCY_HASHES[joaat(name)] = true
+end
+
 local function emergencyVehicle()
     local vehicle = cache.vehicle
     if not vehicle or vehicle == 0 then return nil end
 
     if GetPedInVehicleSeat(vehicle, -1) ~= cache.ped then return nil end
 
-    local model = GetEntityModel(vehicle)
-    local name = GetDisplayNameFromVehicleModel(model)
-
-    if not name or name == '' then return nil end
-
-    return Config.EmergencyModels[name:lower()] and vehicle or nil
+    -- MATCHED BY HASH, not by display name.
+    --
+    -- GetDisplayNameFromVehicleModel returns the game LABEL, which a vehicle
+    -- pack is free to change when it replaces a model. Keying an allow list on
+    -- it means a pack update can silently switch the binds off, and the symptom
+    -- is a key that does nothing with no error anywhere.
+    --
+    -- The hash of the spawn name cannot drift, so the set is built once from
+    -- the config's own names.
+    return EMERGENCY_HASHES[GetEntityModel(vehicle)] and vehicle or nil
 end
 
 -- ---------------------------------------------------------------------------

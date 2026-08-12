@@ -76,6 +76,7 @@ export const INBOUND = {
   status: 'hud:status',
   vehicle: 'hud:vehicle',
   world: 'hud:world',
+  heading: 'hud:heading',
   player: 'hud:player',
   seatbelt: 'hud:seatbelt',
   layout: 'hud:layout',

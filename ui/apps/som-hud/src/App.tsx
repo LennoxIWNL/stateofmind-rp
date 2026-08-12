@@ -40,6 +40,16 @@ export function App() {
   useNuiEvent<Status>(INBOUND.status, setStatus)
   useNuiEvent<Vehicle>(INBOUND.vehicle, setVehicle)
   useNuiEvent<World>(INBOUND.world, setWorld)
+
+  /*
+   * Heading arrives on its own channel at 60ms while street and zone stay at
+   * 500ms. Merged into the same World object so nothing downstream has to know
+   * they came from two messages.
+   */
+  useNuiEvent<{ heading: number }>(INBOUND.heading, (d) => {
+    if (typeof d?.heading !== 'number') return
+    setWorld((w) => (w ? { ...w, heading: d.heading } : w))
+  })
   useNuiEvent<Player>(INBOUND.player, setPlayer)
   useNuiEvent<{ on: boolean }>(INBOUND.seatbelt, (d) =>
     setVehicle((v) => ({ ...v, seatbelt: d?.on === true })))
