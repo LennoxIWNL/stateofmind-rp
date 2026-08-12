@@ -730,3 +730,52 @@ onInventoryClosed[#onInventoryClosed + 1] = stopClothingPreview
 AddEventHandler('onResourceStop', function(resource)
     if resource == GetCurrentResourceName() then stopClothingPreview() end
 end)
+
+-- ---------------------------------------------------------------------------
+-- The inventory is CLOSED AND LOCKED while downed.
+--
+-- The real refusal is server side, in som-inventory/server/main.lua, using
+-- ox_inventory's registerHook. This half exists so an honest player does not
+-- see a working-looking inventory that silently refuses everything, which is a
+-- worse experience than not opening at all.
+--
+-- invBusy is ox_inventory's OWN mechanism for this: it is a statebag their
+-- client.lua watches (client.lua:1133) and canOpenInventory consults
+-- (client.lua:53). So this needs no edit to their files and no fighting.
+--
+-- WHY THEIR EXISTING GUARD DID NOT COVER IT: canOpenInventory refuses on
+-- `PlayerData.dead` or IsPedFatallyInjured. A SOM downed player is neither.
+-- som-medical keeps the ped alive on low health so it can be revived, so the
+-- inventory considered everything perfectly normal.
+-- ---------------------------------------------------------------------------
+
+CreateThread(function()
+    if GetResourceState('som-medical') ~= 'started' then return end
+
+    local locked = false
+
+    while true do
+        Wait(400)
+
+        local downed = exports['som-medical']:isDowned() == true
+
+        if downed ~= locked then
+            locked = downed
+            LocalPlayer.state:set('invBusy', downed, true)
+
+            -- Shut it if they were already looking at it when they went down.
+            if downed then exports.ox_inventory:closeInventory() end
+
+            -- KNOWN TRADE: invBusy has other owners. ox_inventory raises
+            -- it itself during progress bars and weapon timers, so
+            -- clearing it on revive could in principle clear somebody
+            -- else's hold.
+            --
+            -- Written only on TRANSITION rather than every tick, so that
+            -- is one write at the moment of revival rather than a loop
+            -- fighting them three times a second. Accepted because the
+            -- server hook is the actual boundary and this half only
+            -- decides what the UI shows.
+        end
+    end
+end)

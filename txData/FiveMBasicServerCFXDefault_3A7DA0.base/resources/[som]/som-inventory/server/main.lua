@@ -183,3 +183,60 @@ end)
 AddEventHandler('playerDropped', function()
     lastThrow[source] = nil
 end)
+
+-- ---------------------------------------------------------------------------
+-- DOWNED PLAYERS CANNOT TOUCH THEIR INVENTORY.
+--
+-- This is a SECURITY boundary, not a UX one, which is why it is here and not
+-- only in the client.
+--
+-- ox_inventory already refuses to open on `PlayerData.dead` or
+-- IsPedFatallyInjured. Neither is true for a SOM downed player: som-medical
+-- keeps the ped alive on low health so it can be revived, so as far as
+-- ox_inventory was concerned nothing was wrong and every action was allowed.
+--
+-- What that permitted: bleeding out while eating, healing yourself with a
+-- medkit you should have needed a medic for, and handing your entire inventory
+-- to a friend standing over you before police could search you. The last one is
+-- the real prize and it is why a client-side gate would not have been enough.
+--
+-- registerHook is ox_inventory's own supported extension point, so this adds no
+-- edits to their files. It IS on the AUDIT 16.2 re-apply list, because an
+-- ox_inventory upgrade drops the hook registration along with everything else.
+-- ---------------------------------------------------------------------------
+
+local function isDowned(source)
+    if GetResourceState('som-medical') ~= 'started' then return false end
+    return exports['som-medical']:isDowned(source) == true
+end
+
+CreateThread(function()
+    -- After ox_inventory exists. registerHook is one of its exports, so calling
+    -- it at load order is a race we would lose silently.
+    while GetResourceState('ox_inventory') ~= 'started' do Wait(250) end
+    Wait(500)
+
+    -- EVERY mutating surface, not just opening. Refusing `openInventory` alone
+    -- leaves the hotbar, which needs no open inventory to use an item, and
+    -- leaves a shop bought through a nearby target.
+    local guarded = { 'openInventory', 'swapItems', 'usingItem', 'buyItem', 'craftItem' }
+
+    for _, event in ipairs(guarded) do
+        exports.ox_inventory:registerHook(event, function(payload)
+            -- `source` VERIFIED, not assumed. All five of these payloads carry
+            -- it as a plain field: server.lua:244 and :469,
+            -- modules/inventory/server.lua:1581, modules/shops/server.lua:293
+            -- and modules/crafting/server.lua:193.
+            --
+            -- The first draft here read three possible field names as a hedge.
+            -- That hedge is worse than useless on a security check: if the
+            -- field were ever renamed, a fallback would quietly find some other
+            -- number, pass it to isDowned, get false, and allow everything. A
+            -- guard that fails open must fail LOUDLY instead.
+            local src = payload and payload.source
+            if not src then return true end
+
+            return not isDowned(src)
+        end)
+    end
+end)

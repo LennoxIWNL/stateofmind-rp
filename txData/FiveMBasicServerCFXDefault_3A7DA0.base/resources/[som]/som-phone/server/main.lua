@@ -58,9 +58,28 @@ end
 -- Callbacks
 -- ---------------------------------------------------------------------------
 
+--- Downed players cannot use anything.
+---
+--- SERVER SIDE, because that is the only side that counts. A client gate stops
+--- an honest player pressing a key; it does nothing about a crafted event, and
+--- "bleeding out" is exactly the state somebody has a reason to cheat their way
+--- out of.
+---
+--- Guarded on the resource being started so the phone still runs without
+--- som-medical, and defaults to NOT downed in that case rather than locking
+--- everyone out if medical is missing.
+local function isDowned(source)
+    if GetResourceState('som-medical') ~= 'started' then return false end
+    return exports['som-medical']:isDowned(source) == true
+end
+
 lib.callback.register('som-phone:server:open', function(source)
     local player = exports['som-core']:getPlayer(source)
     if not player then return { success = false, error = 'not loaded' } end
+
+    if isDowned(source) then
+        return { success = false, error = 'You are in no state to use a phone' }
+    end
 
     -- The phone is an item, so having one is checked here rather than assumed.
     if Config.RequireItem and GetResourceState('ox_inventory') == 'started' then

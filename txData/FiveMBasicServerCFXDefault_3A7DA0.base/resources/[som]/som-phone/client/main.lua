@@ -9,6 +9,13 @@ local isOpen = false
 local function open()
     if isOpen then return end
 
+    -- Courtesy check only. The SERVER refuses too, and that refusal is the one
+    -- that matters: this just avoids a round trip and a pointless error toast
+    -- for an honest player who pressed the key while bleeding out.
+    if GetResourceState('som-medical') == 'started' and exports['som-medical']:isDowned() then
+        return TriggerEvent('som:client:notify', 'You are in no state to use a phone', 'error')
+    end
+
     local result = lib.callback.await('som-phone:server:open', false)
     if not result or not result.success then
         TriggerEvent('som:client:notify', result and result.error or 'Cannot open phone', 'error')
