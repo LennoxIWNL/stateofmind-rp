@@ -68,6 +68,25 @@ export function Clothing({ weight }: { weight: number }) {
   const [slots, setSlots] = useState<WardrobeSlot[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  /*
+   * The camera lives exactly as long as this tab is mounted.
+   *
+   * Tying it to the component rather than to the inventory being open is what
+   * makes switching tabs put the camera away: the player looking at their
+   * pockets should be looking at the world, not at their own face.
+   *
+   * The Lua side ALSO drops the camera when the page reports itself closed,
+   * because a cleanup that only runs on unmount is one abrupt teardown away
+   * from stranding a scripted camera, and a stranded camera means the player
+   * cannot see.
+   */
+  useEffect(() => {
+    void fetchNui('somClothingPreview', { active: true })
+    return () => {
+      void fetchNui('somClothingPreview', { active: false })
+    }
+  }, [])
+
   const load = useCallback(async () => {
     const res = await fetchNui<WardrobeState>('somWardrobeState', {}, { success: false })
     if (res?.success && res.slots) {
@@ -141,41 +160,42 @@ export function Clothing({ weight }: { weight: number }) {
         <>
           <div className="som-clothing__body">
             {renderRail(left)}
-            <div className="som-clothing__figure">
             {/*
-              An actual body, drawn here rather than left as a gradient box.
-              The reference centres a figure between the two rails and without
-              one the tab reads as a panel that failed to load. Single path,
-              one stroke, so it inherits the accent and needs no asset.
+              A HOLE, not a picture.
+
+              The drawn silhouette that used to be here was replaced twice and
+              looked drawn both times. The inventories whose clothing screens
+              actually look right are not rendering an illustration at all:
+              they point a camera at the player's own ped and let the game draw
+              it behind a transparent gap in the page.
+
+              So this div is deliberately empty and deliberately transparent.
+              The character in it is the real one, wearing the real clothes,
+              which is also the only way this can ever show what a garment
+              actually looks like on the player.
             */}
-            <svg viewBox="0 0 120 260" role="img" aria-label="Character silhouette">
-              {/* Anatomical proportions rather than a stick figure: head one
-                  eighth of the height, shoulders three heads wide, waist at the
-                  midpoint. The old one was two boxes and a circle and looked
-                  it. Filled with a soft gradient so it reads as a body under
-                  the rails rather than as an outline drawing. */}
-              <defs>
-                <linearGradient id="somBody" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--som-surface)" stopOpacity="0.95" />
-                  <stop offset="100%" stopColor="var(--som-bg-deep)" stopOpacity="0.95" />
-                </linearGradient>
-              </defs>
-              <g fill="url(#somBody)" stroke="var(--som-pink-a45)" strokeWidth="1.2">
-                <ellipse cx="60" cy="26" rx="15" ry="18" />
-                <path d="M55 43h10v9l-5 3-5-3z" />
-                <path d="M60 52c-11 0-19 4-24 11l-7 34 10 4 8-24v37h26v-37l8 24 10-4-7-34c-5-7-13-11-24-11z" />
-                <path d="M29 63l-8 36 9 3 8-31z" />
-                <path d="M91 63l8 36-9 3-8-31z" />
-                <path d="M25 100c-3 8-4 16-3 22l9-1 4-19z" />
-                <path d="M95 100c3 8 4 16 3 22l-9-1-4-19z" />
-                <path d="M43 114h34l-3 56h-11l-4-38-4 38H46z" />
-                <path d="M43 170h13l3 62H45z" />
-                <path d="M64 170h13l-2 62H62z" />
-                <path d="M43 232h16v7H41z" />
-                <path d="M61 232h16v7H59z" />
-              </g>
-            </svg>
-          </div>
+            <div className="som-clothing__figure">
+              <div className="som-clothing__stage" aria-label="Character preview" role="img" />
+
+              <div className="som-clothing__turn">
+                <button
+                  type="button"
+                  className="som-clothing__turn-btn"
+                  onClick={() => void fetchNui('somClothingRotate', { by: -35 })}
+                  title="Turn left"
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  className="som-clothing__turn-btn"
+                  onClick={() => void fetchNui('somClothingRotate', { by: 35 })}
+                  title="Turn right"
+                >
+                  ›
+                </button>
+              </div>
+            </div>
             {renderRail(right)}
           </div>
 

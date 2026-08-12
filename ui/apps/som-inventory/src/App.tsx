@@ -321,10 +321,19 @@ export function App() {
           </button>
         </div>
 
+        {/*
+          Keyed on the tab so React REMOUNTS on a switch rather than reusing
+          the node. Without the key the entering panel is the same element with
+          new children, the animation never re-runs, and the two tabs swap with
+          a hard cut.
+
+          It also means the Clothing tab genuinely unmounts, which is what puts
+          the preview camera away.
+        */}
         {tab === 'inventory' ? (
-          <InventoryPanel side="primary" inventory={state.left} ctx={value} />
+          <InventoryPanel key="inventory" side="primary" inventory={state.left} ctx={value} />
         ) : (
-          <Clothing weight={leftWeightMax} />
+          <Clothing key="clothes" weight={leftWeightMax} />
         )}
 
         {/* Only while the inventory tab is showing and no container is open:

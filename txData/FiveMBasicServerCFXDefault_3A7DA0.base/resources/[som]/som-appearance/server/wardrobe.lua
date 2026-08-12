@@ -187,7 +187,16 @@ RegisterNetEvent('som-appearance:server:wardrobe', function(data)
     if not changed then return end
 
     persist(player, appearance)
-    TriggerClientEvent('som-appearance:client:refresh', src)
+
+    -- The kind and id ride along so the client can pick an animation that
+    -- matches the garment. COSMETIC ONLY: the client has already been told
+    -- what its appearance is by this point, and this changes nothing about
+    -- what was written. A client ignoring it just gets a generic motion.
+    TriggerClientEvent('som-appearance:client:refresh', src, {
+        action = action,
+        kind = data.kind == 'prop' and 'prop' or 'component',
+        id = tonumber(data.id),
+    })
 end)
 
 ---What is currently off, so the inventory rail can render each slot's state.

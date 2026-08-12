@@ -329,6 +329,11 @@ end)
 local somOpen = false
 local lastStatus = {}
 
+-- Run when the page reports itself closed. A list rather than a single handler
+-- because the close needs to reach code defined further down this file, and a
+-- local function cannot be referenced before it exists.
+local onInventoryClosed = {}
+
 local function healthPercent(ped)
     local max = GetEntityMaxHealth(ped)
     local floor = 100
@@ -364,7 +369,11 @@ end
 RegisterNUICallback('somInventoryOpen', function(data, cb)
     cb(1)
     somOpen = type(data) == 'table' and data.open == true
-    if not somOpen then lastStatus = {} end
+
+    if not somOpen then
+        lastStatus = {}
+        for _, hook in ipairs(onInventoryClosed) do pcall(hook) end
+    end
 end)
 
 -- ESC MUST CLOSE THE INVENTORY, NOT OPEN THE PAUSE MENU.
@@ -559,4 +568,113 @@ RegisterNUICallback('somOpenNearbyDrop', function(data, cb)
     if type(data) ~= 'table' or type(data.id) ~= 'string' then return end
 
     exports.ox_inventory:openInventory('drop', data.id)
+end)
+
+-- ---------------------------------------------------------------------------
+-- The clothing tab's character
+--
+-- A LIVE PED, not artwork. The drawn silhouette was replaced twice and looked
+-- drawn both times, and the survey behind that is the reason this exists: the
+-- inventories whose clothing screens actually look good are not displaying an
+-- illustration at all. They point a camera at the player's own ped and let the
+-- game render it behind a transparent hole in the page. The reference looks
+-- like a real character because it IS one, wearing the player's real clothes.
+--
+-- That is also why this cannot be solved on the web side. No SVG will ever
+-- show what the player is currently wearing.
+--
+-- The page is already transparent, so the only work here is framing. Nothing
+-- is spawned and nothing is cloned: it is the player's own ped, which means it
+-- is always correct by construction and there is no second entity to leak.
+--
+-- ROTATION TURNS THE PED, not the camera. Orbiting the camera would swing the
+-- background through frame and show the room spinning around a standing
+-- player; turning the ped keeps the backdrop still, which is what every
+-- clothing menu does. The heading is restored on close.
+-- ---------------------------------------------------------------------------
+
+local previewCam = nil
+local previewHeading = nil
+
+local function stopClothingPreview()
+    if not previewCam then return end
+
+    RenderScriptCams(false, true, 400, true, true)
+    DestroyCam(previewCam, true)
+    previewCam = nil
+
+    local ped = PlayerPedId()
+
+    if previewHeading then
+        SetEntityHeading(ped, previewHeading)
+        previewHeading = nil
+    end
+
+    FreezeEntityPosition(ped, false)
+end
+
+local function startClothingPreview()
+    if previewCam then return end
+
+    local ped = PlayerPedId()
+    local coords = GetEntityCoords(ped)
+
+    previewHeading = GetEntityHeading(ped)
+
+    -- Frozen so an idle sway or a nudge from the world does not walk the
+    -- subject out of a fixed frame while the player is picking clothes.
+    FreezeEntityPosition(ped, true)
+
+    previewCam = CreateCam('DEFAULT_SCRIPTED_CAMERA', true)
+
+    -- 2.4m out and slightly above the waist, which frames head to foot at this
+    -- field of view. Placed along the ped's own facing so the camera starts in
+    -- front of them whatever direction they happen to be standing.
+    local rad = math.rad(previewHeading)
+    SetCamCoord(previewCam,
+        coords.x - math.sin(rad) * 2.4,
+        coords.y + math.cos(rad) * 2.4,
+        coords.z + 0.05)
+
+    PointCamAtEntity(previewCam, ped, 0.0, 0.0, 0.05, true)
+    SetCamFov(previewCam, 45.0)
+    SetCamActive(previewCam, true)
+    RenderScriptCams(true, true, 400, true, true)
+end
+
+RegisterNUICallback('somClothingPreview', function(data, cb)
+    cb(1)
+    if type(data) ~= 'table' then return end
+
+    if data.active == true then
+        startClothingPreview()
+    else
+        stopClothingPreview()
+    end
+end)
+
+RegisterNUICallback('somClothingRotate', function(data, cb)
+    cb(1)
+    if not previewCam or type(data) ~= 'table' then return end
+
+    local by = num(data.by)
+    if not by then return end
+
+    local ped = PlayerPedId()
+    SetEntityHeading(ped, (GetEntityHeading(ped) + by) % 360.0)
+end)
+
+-- The inventory closing by ANY route has to put the camera back: Escape, the
+-- stock close, a script closing it, or the resource stopping mid-preview. A
+-- stranded scripted camera leaves the player unable to see, which is worse
+-- than any bug it was showing.
+--
+-- NOT ox_inventory:closedInventory. That is a SERVER event, raised in
+-- modules/inventory/server.lua, so a client handler for it would never fire
+-- even once. The page reporting itself closed is the signal that actually
+-- exists on this side.
+onInventoryClosed[#onInventoryClosed + 1] = stopClothingPreview
+
+AddEventHandler('onResourceStop', function(resource)
+    if resource == GetCurrentResourceName() then stopClothingPreview() end
 end)

@@ -673,15 +673,54 @@
   stroke-linejoin: round;
 }
 
+/* THE HOLE THE PED IS RENDERED IN.
+ *
+ * Transparent on purpose, and the one element on this page that must stay that
+ * way. The character is the game's own ped drawn behind the page, so any
+ * background here paints over it and the tab goes back to looking empty.
+ *
+ * The vignette is a ring rather than a fill for the same reason: it frames the
+ * subject without covering the middle where the subject is. */
 .som-clothing__figure {
+  position: relative;
   height: 38vh;
   border-radius: var(--som-radius);
-  background: radial-gradient(ellipse at 50% 42%, var(--som-pink-a16), transparent 68%);
+  background: radial-gradient(ellipse at 50% 45%, transparent 52%, var(--som-pink-a16) 100%);
   display: grid;
-  place-items: center;
+  place-items: end center;
+  padding-bottom: 0.8vh;
 }
 
-.som-clothing__figure svg { height: 100%; }
+.som-clothing__stage {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.som-clothing__turn {
+  position: relative;
+  display: flex;
+  gap: 0.6vh;
+}
+
+.som-clothing__turn-btn {
+  width: 3.2vh;
+  height: 3.2vh;
+  font-size: 1.8vh;
+  line-height: 1;
+  color: var(--som-text);
+  border: 1px solid var(--som-pink-a45);
+  border-radius: 50%;
+  background: rgba(20, 16, 24, 0.72);
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+
+.som-clothing__turn-btn:hover {
+  background: var(--som-pink-a30);
+  border-color: var(--som-pink);
+}
 
 .som-clothing__note {
   margin: 0;
@@ -1156,3 +1195,28 @@
 
 .som-shop__chip--cash { color: var(--som-success); }
 .som-shop__chip--bank { color: var(--som-pink-light); }
+
+/* The tab swap.
+ *
+ * The distinct `key` on each panel in App.tsx is what makes this fire at all.
+ * Without it the entering panel is the same DOM node with different children,
+ * so the animation never restarts and the tabs cut straight over.
+ *
+ * ANIMATED ON THE PANEL ITSELF, with no wrapper element. A wrapper was the
+ * obvious way to do this and it would have broken the inventory: `.som-inv`
+ * sets pointer-events: none and hands it back with `.som-inv > *`, which only
+ * matches DIRECT children. Wrapping the panels moves them out of that
+ * selector's reach, and `display: contents` on the wrapper does not save it
+ * because an element with no box cannot carry pointer-events either. The whole
+ * inventory would have rendered perfectly and ignored every click.
+ *
+ * Slides from BELOW rather than sideways: both tabs occupy the same column, so
+ * a horizontal slide reads as the panel being dragged off its own rail. */
+.som-panel--primary {
+  animation: som-tab-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes som-tab-in {
+  from { opacity: 0; transform: translateY(1.4vh); }
+  to   { opacity: 1; transform: translateY(0); }
+}
