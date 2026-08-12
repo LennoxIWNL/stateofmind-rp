@@ -50,10 +50,21 @@ local function setEditing(state)
     SendNUIMessage({ action = 'hud:edit', editing = editing })
 end
 
-RegisterCommand('sethud', function()
-    if not exports['som-core']:isPlayerLoaded() then return end
+local function openEditor()
+    -- Says why rather than returning silently. A command that does nothing and
+    -- explains nothing is indistinguishable from one that is not registered,
+    -- which is exactly how this was reported.
+    if not exports['som-core']:isPlayerLoaded() then
+        return TriggerEvent('som:client:notify', 'Load a character first', 'error')
+    end
+
     setEditing(true)
-end, false)
+end
+
+RegisterCommand('sethud', openEditor, false)
+
+-- Alias. /hud is what people actually type, and it cost one line to accept it.
+RegisterCommand('hud', openEditor, false)
 
 RegisterNUICallback('hudSaveLayout', function(data, cb)
     cb(1)

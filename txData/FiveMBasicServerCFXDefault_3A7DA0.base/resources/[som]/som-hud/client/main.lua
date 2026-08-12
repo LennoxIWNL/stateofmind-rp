@@ -290,6 +290,40 @@ CreateThread(function()
 end)
 
 -- ---------------------------------------------------------------------------
+-- The minimap
+--
+-- IN A VEHICLE ONLY. Owner's call, and it is the same reasoning the street name
+-- follows: on foot you can see where you are, and a radar permanently in the
+-- corner is GTA's habit rather than a roleplay server's. Driving is the one
+-- case where you genuinely cannot see far enough ahead.
+--
+-- DisplayRadar is the whole mechanism. Nothing else touches the radar, so there
+-- is no other owner of this state to fight with.
+-- ---------------------------------------------------------------------------
+
+CreateThread(function()
+    local shownRadar = nil
+
+    while true do
+        Wait(300)
+
+        local want = false
+
+        if core:isPlayerLoaded() and not IsPauseMenuActive() then
+            local vehicle = GetVehiclePedIsIn(PlayerPedId(), false)
+            want = vehicle ~= nil and vehicle ~= 0
+        end
+
+        -- Only when it CHANGES. DisplayRadar every tick is a native call three
+        -- times a second for nothing.
+        if want ~= shownRadar then
+            shownRadar = want
+            DisplayRadar(want)
+        end
+    end
+end)
+
+-- ---------------------------------------------------------------------------
 -- Invalidation
 --
 -- Forces the next tick of every loop to send whatever it finds.

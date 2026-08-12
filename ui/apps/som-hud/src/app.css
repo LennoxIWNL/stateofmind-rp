@@ -10,6 +10,16 @@
  * something merely true.
  */
 
+/* NO color-mix() ANYWHERE IN THIS FILE.
+ *
+ * It needs Chrome 111 and FiveM's CEF is older, so every color-mix background
+ * resolved to invalid and fell away to nothing. That is why the whole HUD read
+ * as "barely visible": the text was fine, it was sitting straight on the game
+ * with no backing behind it. Plain rgba() only, matching the token values by
+ * hand: --som-bg-deep is #08060a and --som-card is rgba(25, 25, 35, .95).
+ *
+ * The same rule applies to any CSS newer than roughly Chrome 103 here. */
+
 /* html AND body AND #root, not just body.
  *
  * CEF paints the ROOT element's background before the body's, so a full-screen
@@ -32,13 +42,16 @@ body,
   inset: 0;
   font-family: var(--som-font);
   color: var(--som-text);
+  /* Everything here is drawn over a live scene that can be any colour, so a
+   * shadow does the work a background cannot on the thin elements. */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
   pointer-events: none;
   user-select: none;
   transition: opacity 180ms ease;
 }
 
 .hud.is-hidden { opacity: 0; }
-.hud.is-editing { background: color-mix(in srgb, var(--som-bg-deep) 55%, transparent); pointer-events: auto; }
+.hud.is-editing { background: rgba(8, 6, 10, 0.55); pointer-events: auto; }
 
 .hud-panel { position: absolute; transform-origin: center; }
 
@@ -79,7 +92,7 @@ body,
   display: grid;
   place-items: center;
   clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
-  background: color-mix(in srgb, var(--som-bg-deep) 82%, transparent);
+  background: rgba(8, 6, 10, 0.86);
   overflow: hidden;
 }
 
@@ -235,7 +248,7 @@ body,
   gap: 0.5vh;
   padding: 0.5vh 1vh;
   border-radius: var(--som-radius);
-  background: color-mix(in srgb, var(--som-card) 88%, transparent);
+  background: rgba(20, 18, 28, 0.88);
 }
 
 .hud-aviation__value { font-size: 2vh; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -254,7 +267,17 @@ body,
 
 /* -------------------------------------------------------------- compass --- */
 
-.hud-compass { position: relative; width: 38vh; height: 4.4vh; }
+.hud-compass {
+  position: relative;
+  width: 38vh;
+  height: 4.4vh;
+  /* A backing, because a tape of thin ticks over a bright sky is unreadable.
+   * Faded at both ends so it still stops short of looking like a panel. */
+  background: linear-gradient(90deg,
+    transparent, rgba(8, 6, 10, 0.72) 16%, rgba(8, 6, 10, 0.72) 84%, transparent);
+  border-radius: var(--som-radius);
+}
+
 .hud-compass.is-minimal { width: 26vh; }
 
 .hud-compass__pointer {
@@ -274,6 +297,7 @@ body,
   overflow: hidden;
   /* Faded at both ends, so the tape reads as continuing past the panel rather
    * than stopping at a hard edge. */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
   mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
 }
 
@@ -313,7 +337,7 @@ body,
   gap: 0.8vh;
   padding: 0.8vh 1.2vh;
   border-radius: var(--som-radius);
-  background: color-mix(in srgb, var(--som-bg-deep) 72%, transparent);
+  background: rgba(8, 6, 10, 0.78);
   max-width: 30vh;
 }
 
@@ -352,7 +376,7 @@ body,
   gap: 0.4vh;
   padding: 0.4vh 0.9vh;
   border-radius: var(--som-radius);
-  background: color-mix(in srgb, var(--som-bg-deep) 72%, transparent);
+  background: rgba(8, 6, 10, 0.78);
   font-family: var(--som-font-mono);
   font-size: 1.15vh;
   font-weight: 700;

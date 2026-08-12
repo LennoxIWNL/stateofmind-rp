@@ -364,7 +364,7 @@
 .som-panel__drop.is-live {
   border-color: var(--som-danger);
   color: var(--som-danger);
-  background: color-mix(in srgb, var(--som-danger) 12%, transparent);
+  background: rgba(231, 76, 60, 0.12);
 }
 
 /* ---------------------------------------------------------------- ghost --- */

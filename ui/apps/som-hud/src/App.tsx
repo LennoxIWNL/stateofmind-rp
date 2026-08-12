@@ -55,6 +55,14 @@ export function App() {
 
   useNuiEvent<{ editing: boolean }>(INBOUND.edit, (d) => setEditing(d?.editing === true))
 
+  /**
+   * PERSIST. Called by the editor's Save button and by nothing else.
+   *
+   * Dragging a panel calls setLayout directly instead. It used to call this,
+   * which meant every pointermove posted hudSaveLayout, and the Lua closes the
+   * editor on save: the editor shut itself the instant you started dragging,
+   * and reopening resumed a drag that had never ended so it shut again.
+   */
   const save = useCallback((next: Layout) => {
     setLayout(next)
     void fetchNui(OUTBOUND.saveLayout, { layout: next })
@@ -66,7 +74,7 @@ export function App() {
 
   return (
     <div className={`hud ${editing ? 'is-editing' : ''} ${show ? '' : 'is-hidden'}`}>
-      <Panel id="status" layout={layout} editing={editing} onChange={save}>
+      <Panel id="status" layout={layout} editing={editing} onChange={setLayout}>
         <Condition status={editing ? PREVIEW_STATUS : status} hideAbove={HIDE_NEEDS_ABOVE} />
       </Panel>
 
@@ -74,7 +82,7 @@ export function App() {
           both at once: an aircraft has no gear to show and a car has no pitch.
           The Lua decides which by vehicle class, so the page does not guess. */}
       {(editing || (vehicle.inVehicle && !vehicle.air)) && (
-        <Panel id="speedo" layout={layout} editing={editing} onChange={save}>
+        <Panel id="speedo" layout={layout} editing={editing} onChange={setLayout}>
           {layout.speedoStyle === 'ring'
             ? <SpeedoRing vehicle={editing ? PREVIEW_VEHICLE : vehicle} />
             : <SpeedoDigital vehicle={editing ? PREVIEW_VEHICLE : vehicle} />}
@@ -82,32 +90,37 @@ export function App() {
       )}
 
       {(editing || (vehicle.inVehicle && vehicle.air)) && (
-        <Panel id="aviation" layout={layout} editing={editing} onChange={save}>
+        <Panel id="aviation" layout={layout} editing={editing} onChange={setLayout}>
           <Aviation vehicle={editing ? PREVIEW_AIR : vehicle} />
         </Panel>
       )}
 
-      <Panel id="compass" layout={layout} editing={editing} onChange={save}>
+      <Panel id="compass" layout={layout} editing={editing} onChange={setLayout}>
         <Compass world={editing ? PREVIEW_WORLD : world} minimal={layout.compassStyle === 'minimal'} />
       </Panel>
 
-      <Panel id="location" layout={layout} editing={editing} onChange={save}>
-        <Location world={editing ? PREVIEW_WORLD : world} />
-      </Panel>
+      {/* Street names ride with the minimap: in a vehicle only. On foot you can
+          see the street you are standing on, and the pair of them cluttered the
+          corner permanently for information nobody was reading. */}
+      {(editing || vehicle.inVehicle) && (
+        <Panel id="location" layout={layout} editing={editing} onChange={setLayout}>
+          <Location world={editing ? PREVIEW_WORLD : world} />
+        </Panel>
+      )}
 
-      <Panel id="money" layout={layout} editing={editing} onChange={save}>
+      <Panel id="money" layout={layout} editing={editing} onChange={setLayout}>
         <Money player={editing ? PREVIEW_PLAYER : player} />
       </Panel>
 
-      <Panel id="session" layout={layout} editing={editing} onChange={save}>
+      <Panel id="session" layout={layout} editing={editing} onChange={setLayout}>
         <Session player={editing ? PREVIEW_PLAYER : player} />
       </Panel>
 
-      <Panel id="voice" layout={layout} editing={editing} onChange={save}>
+      <Panel id="voice" layout={layout} editing={editing} onChange={setLayout}>
         <Voice player={editing ? PREVIEW_PLAYER : player} />
       </Panel>
 
-      <Panel id="identity" layout={layout} editing={editing} onChange={save}>
+      <Panel id="identity" layout={layout} editing={editing} onChange={setLayout}>
         <Identity player={editing ? PREVIEW_PLAYER : player} />
       </Panel>
 

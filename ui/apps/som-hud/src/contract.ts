@@ -137,10 +137,14 @@ export const DEFAULT_LAYOUT: Layout = {
   aviation:  { x: 12, y: 12, scale: 1, on: true },
   compass:   { x: 50, y: 3,  scale: 1, on: true },
   location:  { x: 3,  y: 82, scale: 1, on: true },
-  money:     { x: 95, y: 10, scale: 1, on: true },
+  /* OFF by default, owner's call. Cash and bank on screen at all times turns
+   * money into a scoreboard, the job and gang chips restate something the
+   * player already knows, and the voice chip read as a stray "Normal" with no
+   * context. All four are still in the editor for anyone who wants them. */
+  money:     { x: 95, y: 10, scale: 1, on: false },
   session:   { x: 95, y: 4,  scale: 1, on: true },
-  voice:     { x: 95, y: 20, scale: 1, on: true },
-  identity:  { x: 95, y: 26, scale: 1, on: true },
+  voice:     { x: 95, y: 20, scale: 1, on: false },
+  identity:  { x: 95, y: 26, scale: 1, on: false },
   speedoStyle: 'digital',
   compassStyle: 'primary',
 }
