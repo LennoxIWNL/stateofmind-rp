@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>som-loading</title>
+    <!--
+      NO LINK TO som-assets/tokens.css, unlike every other app here.
+
+      A loadscreen renders before the session starts, and cfx-nui-<resource>
+      only resolves for resources that are actually mounted at that moment.
+      Linking som-assets would work most of the time and render the whole
+      screen unstyled the one time it lost the race, which is the worst way
+      for a first impression to fail. The palette is copied into app.css and
+      the copy is marked so it can be reconciled deliberately.
+    -->
+    <script type="module" crossorigin src="./assets/index.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

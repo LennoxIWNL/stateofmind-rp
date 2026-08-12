@@ -1,0 +1,65 @@
+{
+  "_comment": [
+    "Read by the page over a relative fetch, with no Lua in the path, so this",
+    "can be edited and the resource restarted without touching any code.",
+    "",
+    "Every key here has a fallback in the page, so removing one renders that",
+    "section empty rather than breaking the screen.",
+    "",
+    "The keybinds below were read out of the resources rather than written from",
+    "memory. F2/K/TAB are ox_inventory's defaults from init.lua and are only",
+    "correct while server.cfg does not set inventory:keys. If that convar is",
+    "ever added, this list has to move with it."
+  ],
+
+  "server": {
+    "name": "State of Mind",
+    "tagline": "Los Santos, seriously"
+  },
+
+  "background": {
+    "type": "gradient",
+    "file": ""
+  },
+
+  "audio": {
+    "enabled": false,
+    "defaultVolume": 0.12,
+    "tracks": []
+  },
+
+  "links": [],
+
+  "tabs": {
+    "news": true,
+    "events": true,
+    "gallery": true,
+    "keybinds": true
+  },
+
+  "news": [
+    {
+      "title": "Welcome to State of Mind",
+      "description": "A serious roleplay server built from the ground up. Custom inventory, HUD, dispatch, policing, banking and garages, all written for this server rather than bolted together. Read the keybinds tab before you spawn in.",
+      "date": "2026-08-12"
+    }
+  ],
+
+  "events": [],
+
+  "gallery": [],
+
+  "keybinds": [
+    { "key": "F2", "action": "Open your inventory" },
+    { "key": "TAB", "action": "Toggle the hotbar" },
+    { "key": "K", "action": "Open a nearby or secondary inventory" },
+    { "key": "R", "action": "Reload your weapon" },
+    { "key": "F1", "action": "Open the radial menu" },
+    { "key": "M", "action": "Open your phone" },
+    { "key": "T", "action": "Open the command line" },
+    { "key": "B", "action": "Toggle your seatbelt" },
+    { "key": "X", "action": "Cancel what you are doing" },
+    { "key": "F11", "action": "Cycle your talking range" },
+    { "key": "LEFT ALT", "action": "Talk over the radio" }
+  ]
+}

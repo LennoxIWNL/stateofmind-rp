@@ -134,3 +134,12 @@ som-framework-rebuild-prompt.md
 # The session handoff. Working notes between sessions rather than part of the
 # server, and it churns every session, so it lives on disk and out of history.
 NEXT-SESSION.md
+
+# Paid escrowed scripts, kept in the tree as REFERENCE and never committed.
+# tuff-hud and tuff-loading are licensed to the owner, not to this repo, and
+# their .fxap Lua plus built dist are the product itself. Committing them
+# republishes someone's paid asset, so what we take from them is the feature
+# set and the approach, written fresh in som-* rather than copied.
+/[tuff-hud-2.0.0].pack/
+/[tuff-loading].pack/
+/*.pack/

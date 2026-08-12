@@ -1,0 +1,480 @@
+/*
+ * som-loading.
+ *
+ * CEF RULES, same as every other page here: nothing newer than roughly
+ * Chrome 103. No color-mix(), no unprefixed mask-image, no :has(). Those cost
+ * a full session to diagnose on the HUD because an unsupported background
+ * resolves to invalid and silently falls away rather than erroring.
+ *
+ * backdrop-filter IS allowed on this page and nowhere else, because a
+ * loadscreen paints its own opaque background. The rule it breaks only applies
+ * to pages you can see the game through, where there is nothing behind the
+ * element to filter and CEF composites the backdrop as opaque black.
+ *
+ * PALETTE IS COPIED, not linked. See index.html for why. Reconcile against
+ * som-assets/tokens.css deliberately if the brand moves.
+ */
+
+:root {
+  --som-pink: #ff1493;
+  --som-pink-light: #ff69b4;
+  --som-pink-dark: #c2185b;
+  --som-violet: #e566e8;
+  --som-bg: #0a0a12;
+  --som-bg-deep: #08060a;
+  --som-text: #e0e0e0;
+  --som-text-dim: #9a9aa5;
+  --som-text-mute: #85858f;
+  --som-radius: 8px;
+  --som-radius-lg: 12px;
+  --som-transition: 160ms ease;
+  --som-font: 'Oswald', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --som-font-mono: 'JetBrains Mono', 'Consolas', monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--som-font);
+  color: var(--som-text);
+  /* The gradient sits here rather than on the background element, so a video
+     or image that fails to load still leaves a designed screen behind it. */
+  background:
+    radial-gradient(120% 90% at 15% 10%, rgba(255, 20, 147, 0.20), transparent 60%),
+    radial-gradient(100% 80% at 85% 90%, rgba(229, 102, 232, 0.16), transparent 60%),
+    var(--som-bg-deep);
+}
+
+.load {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+.load__bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background-size: cover;
+  background-position: center;
+}
+
+/* Legibility over an arbitrary photo or video. Text on an unknown image is a
+   coin flip; this makes it a decision. */
+.load__scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to right, rgba(8, 6, 10, 0.94) 0%, rgba(8, 6, 10, 0.72) 45%, rgba(8, 6, 10, 0.45) 100%),
+    linear-gradient(to top, rgba(8, 6, 10, 0.92) 0%, transparent 45%);
+}
+
+.load__ui {
+  position: relative;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: 3vh 4vw;
+  gap: 2.4vh;
+  transition: opacity 260ms ease;
+}
+
+.load.is-hidden .load__ui { opacity: 0; pointer-events: none; }
+
+/* --------------------------------------------------------------------- */
+/* Header                                                                 */
+/* --------------------------------------------------------------------- */
+
+.load__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+.load__brand { display: flex; align-items: center; gap: 1rem; }
+
+.load__mark {
+  width: 3.2rem;
+  height: 3.2rem;
+  flex: none;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--som-pink), var(--som-violet));
+  box-shadow: 0 0 28px rgba(255, 20, 147, 0.55);
+}
+
+.load__name {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.load__tagline {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  color: var(--som-text-dim);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.load__links { display: flex; gap: 0.6rem; }
+
+.load__link {
+  font: inherit;
+  font-size: 0.82rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--som-text);
+  text-decoration: none;
+  padding: 0.55rem 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: var(--som-transition);
+}
+
+.load__link:hover {
+  border-color: rgba(255, 20, 147, 0.6);
+  background: rgba(255, 20, 147, 0.18);
+}
+
+/* --------------------------------------------------------------------- */
+/* Body                                                                   */
+/* --------------------------------------------------------------------- */
+
+.load__body {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 1.4vh;
+  min-height: 0;
+  max-width: 62vw;
+}
+
+.load__tabs { display: flex; gap: 0.4rem; }
+
+.load__tab {
+  font: inherit;
+  font-size: 0.82rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--som-text-mute);
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: var(--som-transition);
+}
+
+.load__tab:hover { color: var(--som-text); }
+
+.load__tab.is-active {
+  color: #fff;
+  border-bottom-color: var(--som-pink);
+}
+
+.load__panel {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.6rem;
+}
+
+.load__panel::-webkit-scrollbar { width: 6px; }
+.load__panel::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.04); }
+.load__panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 20, 147, 0.5);
+  border-radius: 3px;
+}
+
+.load__empty {
+  color: var(--som-text-mute);
+  font-size: 0.9rem;
+  padding: 2rem 0;
+}
+
+/* Entries -------------------------------------------------------------- */
+
+.load__entries { display: grid; gap: 1rem; }
+
+.load__entry {
+  display: grid;
+  grid-template-columns: 12rem 1fr;
+  gap: 1.1rem;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-left: 2px solid var(--som-pink);
+  border-radius: var(--som-radius);
+  background: rgba(20, 16, 24, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.load__entry:only-child { max-width: 46rem; }
+
+.load__entry-shot {
+  padding: 0;
+  border: 0;
+  border-radius: var(--som-radius);
+  overflow: hidden;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.4);
+  aspect-ratio: 16 / 10;
+}
+
+.load__entry-shot img,
+.load__shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 220ms ease;
+}
+
+.load__entry-shot:hover img,
+.load__shot:hover img { transform: scale(1.05); }
+
+.load__entry-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.4rem;
+}
+
+.load__entry-head h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.load__entry-head time {
+  font-family: var(--som-font-mono);
+  font-size: 0.72rem;
+  color: var(--som-text-mute);
+  flex: none;
+}
+
+.load__entry-text p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--som-text-dim);
+}
+
+/* Gallery -------------------------------------------------------------- */
+
+.load__gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.8rem;
+}
+
+.load__shot {
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--som-radius);
+  overflow: hidden;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.4);
+  aspect-ratio: 16 / 9;
+}
+
+.load__shot:hover { border-color: rgba(255, 20, 147, 0.6); }
+
+/* Keybinds ------------------------------------------------------------- */
+
+.load__keys {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: 0.5rem;
+}
+
+.load__key {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--som-radius);
+  background: rgba(20, 16, 24, 0.6);
+}
+
+.load__key kbd {
+  font-family: var(--som-font-mono);
+  font-size: 0.75rem;
+  min-width: 3.2rem;
+  text-align: center;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid rgba(255, 20, 147, 0.45);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: rgba(255, 20, 147, 0.14);
+  color: var(--som-pink-light);
+}
+
+.load__key span { font-size: 0.85rem; color: var(--som-text-dim); }
+
+/* --------------------------------------------------------------------- */
+/* Footer                                                                 */
+/* --------------------------------------------------------------------- */
+
+.load__foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 3rem;
+}
+
+.load__music {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 999px;
+  background: rgba(20, 16, 24, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.load__icon {
+  font: inherit;
+  font-size: 0.7rem;
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--som-text);
+  cursor: pointer;
+  transition: var(--som-transition);
+}
+
+.load__icon:hover {
+  background: rgba(255, 20, 147, 0.22);
+  border-color: rgba(255, 20, 147, 0.6);
+}
+
+.load__track { display: grid; min-width: 11rem; }
+
+.load__track-title {
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.load__track-artist {
+  font-size: 0.7rem;
+  color: var(--som-text-mute);
+}
+
+.load__volume {
+  width: 7rem;
+  height: 3px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.load__volume::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--som-pink);
+  box-shadow: 0 0 8px rgba(255, 20, 147, 0.8);
+}
+
+/* Progress ------------------------------------------------------------- */
+
+.load__progress { flex: 1; max-width: 34rem; }
+
+.load__progress-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--som-text-dim);
+  margin-bottom: 0.5rem;
+}
+
+.load__pct {
+  font-family: var(--som-font-mono);
+  color: var(--som-pink-light);
+}
+
+.load__bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.load__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--som-pink-dark), var(--som-pink), var(--som-violet));
+  box-shadow: 0 0 12px rgba(255, 20, 147, 0.7);
+  /* Eased, because loadFraction arrives in jumps and an unanimated bar reads
+     as stuck between them. */
+  transition: width 380ms ease-out;
+}
+
+/* --------------------------------------------------------------------- */
+/* Hide UI and lightbox                                                   */
+/* --------------------------------------------------------------------- */
+
+.load__show {
+  position: absolute;
+  right: 4vw;
+  bottom: 3vh;
+  font: inherit;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--som-text);
+  padding: 0.6rem 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(20, 16, 24, 0.8);
+  cursor: pointer;
+}
+
+.load__show:hover { border-color: var(--som-pink); }
+
+.load__lightbox {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 5vh 5vw;
+  background: rgba(4, 3, 6, 0.92);
+  cursor: zoom-out;
+}
+
+.load__lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--som-radius-lg);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.7);
+}

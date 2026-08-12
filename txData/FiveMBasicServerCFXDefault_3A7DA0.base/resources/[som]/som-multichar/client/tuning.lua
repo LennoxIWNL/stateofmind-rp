@@ -188,4 +188,8 @@ end)
 -- ---------------------------------------------------------------------------
 
 RegisterCommand('somhere', printCoords, false)
-RegisterKeyMapping('somhere', 'SOM: print my coordinates', 'keyboard', 'F11')
+-- F10, NOT F11. F11 is pma-voice's Cycle Proximity, which every player uses
+-- constantly, and server.cfg does not override voice_defaultCycle. Two
+-- mappings on one key means whoever registers second loses, so a dev tool for
+-- printing coordinates was quietly sitting on top of talking range.
+RegisterKeyMapping('somhere', 'SOM: print my coordinates', 'keyboard', 'F10')
