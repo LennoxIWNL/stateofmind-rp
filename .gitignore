@@ -130,3 +130,7 @@ som-framework-rebuild-prompt.md
 # already. *.rpf is covered above; this covers the 96MB of sign templates,
 # ELS configs and screenshots alongside them.
 /Vehicles/
+
+# The session handoff. Working notes between sessions rather than part of the
+# server, and it churns every session, so it lives on disk and out of history.
+NEXT-SESSION.md

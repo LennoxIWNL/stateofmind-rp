@@ -12,9 +12,14 @@
  */
 
 :root {
-  --inv-cell: 5.2vh;
-  --inv-gap: 0.5vh;
+  /* Sized off the reference shots: five columns filling a panel roughly a
+   * third of the screen height wide, so a tile reads at a glance rather than
+   * needing to be leaned into. The grid derives its cell from the panel width,
+   * so this is the one number to change. */
+  --inv-panel: 42vh;
+  --inv-gap: 0.55vh;
   --inv-cols: 5;
+  --inv-cell: calc((var(--inv-panel) - 2.4vh - (var(--inv-gap) * 4)) / 5);
 }
 
 .som-inv {
@@ -36,7 +41,7 @@
   top: 50%;
   right: 2vw;
   transform: translateY(-50%);
-  width: 34vh;
+  width: var(--inv-panel);
   display: flex;
   flex-direction: column;
   gap: var(--inv-gap);
@@ -93,12 +98,14 @@
   padding: 0.6vh 1.1vh;
   border-radius: var(--som-radius);
   border: 1px solid var(--som-danger);
-  background: transparent;
-  color: var(--som-danger);
+  /* FILLED, not an outline. As an outline it sat directly on whatever the game
+   * was drawing behind it and was barely legible. */
+  background: var(--som-danger);
+  color: #fff;
   cursor: pointer;
 }
 
-.som-inv__esc:hover { background: var(--som-danger); color: var(--som-bg-deep); }
+.som-inv__esc:hover { filter: brightness(1.15); }
 
 /* --------------------------------------------------------------- panel --- */
 
@@ -118,7 +125,7 @@
   top: 50%;
   left: 2vw;
   transform: translateY(-50%);
-  width: 34vh;
+  width: var(--inv-panel);
   animation: som-in-left 220ms var(--som-transition, ease) both;
 }
 
@@ -153,7 +160,14 @@
   font-weight: 700;
 }
 
-.som-panel__kg { color: var(--som-pink-light); font-family: var(--som-font-mono); }
+/* The display face, not the mono one. Mono made the weight read as a terminal
+ * readout rather than as part of the panel heading it sits in. Tabular figures
+ * keep it from shuffling as the number changes. */
+.som-panel__kg {
+  color: var(--som-pink-light);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
 
 /* Segmented rather than smooth: capacity reads as discrete, not as progress. */
 .som-panel__bar { display: flex; gap: 2px; }
@@ -205,7 +219,7 @@
   display: grid;
   grid-template-columns: repeat(var(--inv-cols), 1fr);
   gap: var(--inv-gap);
-  max-height: 46vh;
+  max-height: 52vh;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -278,14 +292,17 @@
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 0.25vh 0.3vh;
-  font-size: 0.9vh;
+  padding: 0.3vh 0.25vh;
+  font-size: 0.88vh;
   font-weight: 700;
+  line-height: 1.05;
   text-align: center;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  /* No letter-spacing here. It was what pushed a long single word like
+   * UNDERSHIRT past the tile edge, because spacing is added AFTER the ellipsis
+   * is measured. */
   color: var(--som-text-dim);
-  background: linear-gradient(transparent, var(--som-bg-deep) 55%);
+  background: linear-gradient(transparent, var(--som-bg-deep) 58%);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -606,10 +623,16 @@
 .som-clothing__figure {
   height: 32vh;
   border-radius: var(--som-radius);
-  background:
-    radial-gradient(ellipse at 50% 35%, var(--som-pink-a16), transparent 62%),
-    var(--som-card);
-  border: 1px solid var(--som-border);
+  background: radial-gradient(ellipse at 50% 38%, var(--som-pink-a16), transparent 64%);
+  display: grid;
+  place-items: center;
+}
+
+.som-clothing__figure svg {
+  height: 92%;
+  fill: var(--som-surface);
+  stroke: var(--som-pink-a45);
+  stroke-width: 1.5;
 }
 
 .som-clothing__note {

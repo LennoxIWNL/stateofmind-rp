@@ -25,7 +25,6 @@ import { SlotContextMenu, type MenuTarget } from './components/ContextMenu'
 import { Hotbar } from './components/Hotbar'
 import { Clothing } from './components/Clothing'
 import { ItemNotifications, type Notification } from './components/Notifications'
-import { ThrowCharge } from './components/Throw'
 import { Basket, type BasketLine } from './components/Shop'
 import { NearbyGive, type NearbyPlayer } from './components/Nearby'
 import { StatusStrip, type Status } from './components/StatusStrip'
@@ -42,7 +41,6 @@ export function App() {
   const [menu, setMenu] = useState<MenuTarget | null>(null)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [hotbar, setHotbar] = useState(false)
-  const [throwing, setThrowing] = useState<Slot | null>(null)
   const [basket, setBasket] = useState<BasketLine[]>([])
   const [nearby, setNearby] = useState<NearbyPlayer[]>([])
   const [status, setStatus] = useState<Status | null>(null)
@@ -83,7 +81,6 @@ export function App() {
     setVisible(false)
     setDrag(null)
     setMenu(null)
-    setThrowing(null)
     setHover(null)
     setTab('inventory')
     // The basket is staging, and the page is destroyed on close. Surviving a
@@ -355,12 +352,8 @@ export function App() {
           onUse={useSlot}
           onGive={giveSlot}
           onSwap={swap}
-          onThrow={setThrowing}
+          onThrow={(slot) => void fetchNui('somThrow', { slot: slot.slot })}
         />
-      )}
-
-      {throwing && (
-        <ThrowCharge slot={throwing} state={state} onDone={() => setThrowing(null)} />
       )}
 
       {drag && nearby.length > 0 && (

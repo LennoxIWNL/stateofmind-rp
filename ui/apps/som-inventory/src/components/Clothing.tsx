@@ -104,7 +104,20 @@ export function Clothing({ weight }: { weight: number }) {
         <>
           <div className="som-clothing__body">
             {renderRail(left)}
-            <div className="som-clothing__figure" role="img" aria-label="Character silhouette" />
+            <div className="som-clothing__figure">
+            {/*
+              An actual body, drawn here rather than left as a gradient box.
+              The reference centres a figure between the two rails and without
+              one the tab reads as a panel that failed to load. Single path,
+              one stroke, so it inherits the accent and needs no asset.
+            */}
+            <svg viewBox="0 0 100 220" role="img" aria-label="Character silhouette">
+              <circle cx="50" cy="24" r="16" />
+              <path d="M50 40c-13 0-24 8-27 20l-6 26 12 4 5-18v34h32V72l5 18 12-4-6-26c-3-12-14-20-27-20z" />
+              <path d="M34 106h32l-3 50h-9l-2-34-2 34h-9z" />
+              <path d="M34 156h11l2 52h-11zM55 156h11l-2 52H53z" />
+            </svg>
+          </div>
             {renderRail(right)}
           </div>
 

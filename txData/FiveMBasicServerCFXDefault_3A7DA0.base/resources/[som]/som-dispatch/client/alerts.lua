@@ -4,28 +4,29 @@
 -- client-side filtering of who may see what, because a filter a client applies
 -- is a filter a client can remove.
 
--- callId -> { area = radius blip, mark = sprite blip }
+-- callId -> { mark = blip handle }
 --
--- TWO blips per call, not one. The radius is the pulsing circle that says
--- roughly where; the small sprite in the middle is what makes it identifiable
--- on a crowded map and what the player actually clicks. A radius alone is a
--- coloured smear with no name attached.
+-- ONE blip per call. The pulse is the marker.
 local blips = {}
 
--- How wide the circle is drawn, in metres.
+-- THE MARKER IS FIVE-DISPATCH'S, EXACTLY.
 --
--- Deliberately not precise. A dispatch call is "somewhere around here", and a
--- pinpoint marker on the exact coordinate tells officers where the shooter is
--- standing, which is information the caller never had.
-local AREA_RADIUS = 80.0
+-- Corrected after checking the reference rather than assuming. An earlier
+-- version here used AddBlipForRadius with its alpha walked up and down on a
+-- timer, on the reasoning that GTA has no pulsing blip. That reasoning was
+-- wrong: `PulseBlip` is a real native, and it is what five-dispatch uses. The
+-- expanding ring on the minimap is the game drawing it, not us animating alpha.
+--
+-- Their values, kept as they are (client.lua:50-59): sprite 161, display 4,
+-- scale 1.0, short range, then PulseBlip. The only thing not taken from them is
+-- the colour, which stays per alert here because our alerts carry a priority
+-- and theirs do not.
+local BLIP_SPRITE = 161
+local BLIP_SCALE = 1.0
 
--- The pulse.
---
--- GTA has no pulsing blip, so it is animated: alpha walked up and down on an
--- interval. SetBlipFlashes exists and is not this, it hard-blinks the icon on
--- and off, which reads as an error state rather than as a live scene.
-local PULSE_MIN, PULSE_MAX, PULSE_STEP = 60, 180, 12
-local PULSE_INTERVAL = 60
+-- PulseBlip fires ONE ring. Re-firing it keeps the call visibly live rather
+-- than flashing once and then sitting there as an ordinary dot.
+local PULSE_INTERVAL = 3000
 
 local pulsing = false
 
@@ -34,28 +35,17 @@ local function startPulse()
     pulsing = true
 
     CreateThread(function()
-        local alpha, direction = PULSE_MIN, 1
-
         while true do
             local any = false
 
-            alpha = alpha + (PULSE_STEP * direction)
-
-            if alpha >= PULSE_MAX then
-                alpha, direction = PULSE_MAX, -1
-            elseif alpha <= PULSE_MIN then
-                alpha, direction = PULSE_MIN, 1
-            end
-
             for _, entry in pairs(blips) do
-                if entry.area and DoesBlipExist(entry.area) then
-                    SetBlipAlpha(entry.area, alpha)
+                if entry.mark and DoesBlipExist(entry.mark) then
+                    PulseBlip(entry.mark)
                     any = true
                 end
             end
 
-            -- The thread stops itself once the map is clear rather than
-            -- spinning forever at sixty wakeups a second for nothing.
+            -- Stops itself once the map is clear rather than waking forever.
             if not any then
                 pulsing = false
                 return
@@ -66,43 +56,36 @@ local function startPulse()
     end)
 end
 
----@param id number
 local function removeBlip(id)
     local entry = blips[id]
     if not entry then return end
 
-    if entry.area and DoesBlipExist(entry.area) then RemoveBlip(entry.area) end
     if entry.mark and DoesBlipExist(entry.mark) then RemoveBlip(entry.mark) end
-
     blips[id] = nil
 end
 
----@param call table
 local function addBlip(call)
     local def = call.blip
     if not def or not call.coords then return end
 
     -- One entry per call. A duplicate arriving (a reconnect, a resource
-    -- restart) must not leave the first one orphaned on the map forever.
+    -- restart) must not leave the first orphaned on the map forever.
     removeBlip(call.id)
 
-    local colour = def.colour or 1
+    local mark = AddBlipForCoord(call.coords.x, call.coords.y, call.coords.z)
+    SetBlipSprite(mark, def.sprite or BLIP_SPRITE)
+    SetBlipDisplay(mark, 4)
+    SetBlipScale(mark, def.scale or BLIP_SCALE)
+    SetBlipColour(mark, def.colour or 1)
+    SetBlipAsShortRange(mark, true)
 
-    -- THE PULSING RING IS THE WHOLE MARKER. There is deliberately no sprite
-    -- blip beside it any more.
-    --
-    -- Owner's call, and it is the right one for the same reason the radius
-    -- exists at all: a pinpoint icon on the exact coordinate tells officers
-    -- precisely where the shooter is standing, which is information the caller
-    -- never had. A ring says "somewhere around here", which is what a 911 call
-    -- actually contains. Two markers for one call also made the map noisy the
-    -- moment more than a couple were live.
-    local area = AddBlipForRadius(call.coords.x, call.coords.y, call.coords.z, AREA_RADIUS)
-    SetBlipHighDetail(area, true)
-    SetBlipColour(area, colour)
-    SetBlipAlpha(area, PULSE_MIN)
+    BeginTextCommandSetBlipName('STRING')
+    AddTextComponentSubstringPlayerName(call.dispatchMessage or 'Call')
+    EndTextCommandSetBlipName(mark)
 
-    blips[call.id] = { area = area }
+    PulseBlip(mark)
+
+    blips[call.id] = { mark = mark }
 
     startPulse()
 
@@ -141,9 +124,6 @@ end)
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
 
-    -- Each entry is a PAIR now, the radius and the sprite, so both handles have
-    -- to be released. Treating an entry as a bare handle here would leave every
-    -- circle painted on the map until the client reconnected.
     for id in pairs(blips) do removeBlip(id) end
 
     blips = {}

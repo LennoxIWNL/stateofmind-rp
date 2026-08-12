@@ -20,26 +20,169 @@
 -- whatever it does not like. A player editing this file, or calling these
 -- callbacks directly, gains no item they could not already have asked for.
 
+-- ---------------------------------------------------------------------------
+-- No screen blur.
+--
+-- ox_inventory calls TriggerScreenblurFadeIn when the inventory opens
+-- (modules/utils/client.lua:231). There is no convar for it, so the function
+-- is replaced rather than the native fought: blurring the world behind a panel
+-- that already has its own background just makes the game look out of focus.
+--
+-- Replacing the module member rather than editing their file keeps this on the
+-- re-apply list with everything else instead of buried in their source.
+-- ---------------------------------------------------------------------------
+
+CreateThread(function()
+    local ok, Utils = pcall(require, 'modules.utils.client')
+    if not ok or type(Utils) ~= 'table' then return end
+
+    Utils.blurIn = function() end
+    Utils.blurOut = function()
+        -- Still clears any fade left running by something else, so turning the
+        -- blur off here cannot strand one that another resource started.
+        if IsScreenblurFadeRunning() then DisableScreenblurFade() end
+    end
+end)
+
 local function num(value)
     value = tonumber(value)
     if not value or value ~= value then return nil end
     return value
 end
 
---- Throw the item in a slot. `power` is a 0..1 charge; the server clamps it and
---- decides the distance, so a forged 99 buys nothing.
+-- ---------------------------------------------------------------------------
+-- Throwing
+--
+-- Rewritten: the first version removed the item and made a drop appear a fixed
+-- distance in front of the player, which reads as the item vanishing.
+--
+-- How a throw actually works, which is what this now does:
+--   1. The page closes and the player AIMS. A ghost prop sits in their hand and
+--      an arc is drawn to where it will land, so the throw is a decision.
+--   2. Left click throws. The ped plays the underarm/overarm animation.
+--   3. The item lands as a REAL ox_inventory drop carrying THAT ITEM'S prop
+--      model, so a thrown bandage is a bandage lying on the floor.
+--
+-- The client picks the aim point and the server still decides everything that
+-- matters: it re-reads the slot, clamps the distance, and refuses a landing
+-- point further than the maximum from the player's own server-side position.
+-- ---------------------------------------------------------------------------
+
+local aiming = false
+
+---The prop a thrown item should become on the ground.
+---
+---Read CLIENT side because ox_inventory strips `client` from the server copy of
+---an item, so the server genuinely cannot see it. Cosmetic only: the server
+---uses it as a model and nothing else, so the worst a forged value achieves is
+---an oddly shaped bag.
+local function propFor(name)
+    local item = exports.ox_inventory:Items(name)
+    local prop = item and item.client and item.client.prop
+
+    if type(prop) == 'table' then
+        -- The binder shape is { model = hash, pos, rot }; a list is several
+        -- variants, in which case the first is representative.
+        return prop.model or prop[1] and prop[1].model
+    end
+
+    return nil
+end
+
 RegisterNUICallback('somThrow', function(data, cb)
     cb(1)
 
-    if type(data) ~= 'table' then return end
+    if type(data) ~= 'table' or aiming then return end
 
     local slot = num(data.slot)
     if not slot then return end
 
-    TriggerServerEvent('som-inventory:server:throw', {
-        slot = slot,
-        power = num(data.power) or 0,
-    })
+    local item = exports.ox_inventory:GetSlot(slot)
+    if not item or not item.name then return end
+
+    local model = propFor(item.name) or `prop_cs_bandage`
+
+    CreateThread(function()
+        aiming = true
+
+        -- Close the inventory first. Aiming with the grid still on screen is
+        -- the version that made the old one feel like the item vanished.
+        exports.ox_inventory:closeInventory()
+        Wait(150)
+
+        local ped = PlayerPedId()
+
+        lib.requestModel(model, 2000)
+        local ghost = CreateObject(model, GetEntityCoords(ped), false, false, false)
+        SetEntityCollision(ghost, false, false)
+        SetEntityAlpha(ghost, 153, false)
+        AttachEntityToEntity(ghost, ped, GetPedBoneIndex(ped, 28422),
+            0.1, 0.02, 0.02, -80.0, 0.0, 0.0, true, true, false, true, 1, true)
+
+        lib.requestAnimDict('anim@mp_snowball', 2000)
+        TaskPlayAnim(ped, 'anim@mp_snowball', 'pickup_snowball', 3.0, 3.0, -1, 50, 0, false, false, false)
+
+        local thrown, cancelled = false, false
+
+        while not thrown and not cancelled do
+            Wait(0)
+
+            -- The arc, drawn from the hand to where it lands. Sampled rather
+            -- than solved: twelve points of a simple ballistic curve is enough
+            -- to read as a trajectory and costs nothing.
+            local from = GetPedBoneCoords(ped, 28422, 0.0, 0.0, 0.0)
+            local forward = GetEntityForwardVector(ped)
+            local distance = 9.0
+
+            local prev = from
+            for i = 1, 12 do
+                local t = i / 12
+                local point = vector3(
+                    from.x + forward.x * distance * t,
+                    from.y + forward.y * distance * t,
+                    from.z + (2.2 * t) - (9.0 * t * t)
+                )
+                DrawLine(prev.x, prev.y, prev.z, point.x, point.y, point.z, 255, 20, 147, 180)
+                prev = point
+            end
+
+            DrawMarker(28, prev.x, prev.y, prev.z, 0, 0, 0, 0, 0, 0,
+                0.18, 0.18, 0.18, 255, 20, 147, 120, false, false, 2, nil, nil, false)
+
+            -- Attack throws, right click or Escape backs out. Disabled while
+            -- aiming so an unarmed swing does not go out with it.
+            DisableControlAction(0, 24, true)
+            DisableControlAction(0, 25, true)
+            DisableControlAction(0, 140, true)
+
+            if IsDisabledControlJustPressed(0, 24) then
+                thrown = true
+            elseif IsDisabledControlJustPressed(0, 25) or IsControlJustPressed(0, 202) then
+                cancelled = true
+            end
+        end
+
+        ClearPedTasks(ped)
+        if DoesEntityExist(ghost) then DeleteEntity(ghost) end
+        SetModelAsNoLongerNeeded(model)
+
+        if thrown then
+            lib.requestAnimDict('anim@arena@celeb@flat@paired@no_props@', 1000)
+            TaskPlayAnim(ped, 'anim@arena@celeb@flat@paired@no_props@',
+                'flip_a_player_a', 3.0, 3.0, 900, 48, 0, false, false, false)
+
+            TriggerServerEvent('som-inventory:server:throw', {
+                slot = slot,
+                -- The AIM POINT, not a charge. The server re-reads the player's
+                -- position and refuses anything beyond its own maximum, so this
+                -- is a request rather than a destination.
+                x = prev.x, y = prev.y, z = prev.z,
+                model = model,
+            })
+        end
+
+        aiming = false
+    end)
 end)
 
 --- Give to a SPECIFIC nearby player, which stock `giveItem` cannot express: it

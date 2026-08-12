@@ -8,7 +8,7 @@
  * not, and a drag that ends outside the panel is exactly the drop-to-world case.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import type { Inventory, InventoryType, Slot } from '../contract'
 import { formatWeight, itemImage, labelOf, weightOf, countOf, type State } from '../state'
 import type { MenuTarget } from './ContextMenu'
@@ -185,57 +185,32 @@ export function InventoryPanel({ side, inventory, ctx }: PanelProps) {
     [inventory.items, category, state.items],
   )
 
-  const finishDrag = useCallback(
-    (clientX: number, clientY: number) => {
-      const drag = dragRef.current
-      dragRef.current = null
-      setGhost(null)
-      ctx.setDrag(null)
-      if (!drag) return
-
-      const el = document.elementFromPoint(clientX, clientY) as HTMLElement | null
-
-      // The discard zone. Only lit while dragging, and only meaningful from a
-      // player inventory: ox_inventory refuses a newdrop in a vehicle or while
-      // falling anyway, but asking for one from a shop is nonsense.
-      const zone = el?.closest('.som-panel__drop') as HTMLElement | null
-      if (zone && drag.from.type === 'player') {
-        ctx.swap(drag.from, { type: 'newdrop', slot: 0 }, drag.count)
-        return
-      }
-
-      const cell = el?.closest('.som-slot') as HTMLElement | null
-      if (!cell) return
-
-      const toSlot = Number(cell.dataset.slot)
-      const toType = cell.dataset.invtype as InventoryType
-      if (!toSlot || !toType) return
-      if (toType === drag.from.type && toSlot === drag.from.slot) return
-
-      // Dragging OUT of a shop stages a basket line rather than buying on the
-      // spot. Checkout replays each line through ox_inventory's own buyItem, so
-      // the server still prices and validates every one of them; the basket is
-      // only a chance to change your mind before paying.
-      if (drag.from.type === 'shop' || drag.from.type === 'crafting') {
-        const price = (drag.item as { price?: number }).price
-        ctx.addToBasket({
-          slot: drag.from.slot,
-          name: drag.item.name || '',
-          count: drag.count,
-          price: typeof price === 'number' ? price : 0,
-        })
-        return
-      }
-
-      ctx.swap(drag.from, { type: toType, slot: toSlot }, drag.count)
-    },
-    [ctx],
-  )
+  /**
+   * DRAG.
+   *
+   * Rewritten because the first version did not work in game. Three things were
+   * wrong with it and all three are gone rather than patched:
+   *
+   *   * It called setPointerCapture on whatever child the press landed on. A
+   *     React re-render can replace that node, and losing the node silently
+   *     drops the capture and every event with it.
+   *   * The window listeners were registered from a useEffect keyed on the
+   *     panel context, which changes identity the instant a drag starts, so the
+   *     listeners were torn down and rebuilt in the middle of the gesture.
+   *   * Every pointermove set React state, re-rendering the whole grid at
+   *     pointer rate purely to move one 5vh square.
+   *
+   * Now: listeners are attached on pointerdown and removed on pointerup, the
+   * ghost is moved by writing to its style directly, and React is told about
+   * the drag exactly twice, at the start and the end.
+   */
+  const ghostRef = useRef<HTMLDivElement | null>(null)
 
   const onDragStart = useCallback(
     (e: React.PointerEvent, slot: Slot, invType: InventoryType) => {
-      // Shift splits the stack in half, which is the stock behaviour and the
-      // one shortcut players expect to already work.
+      e.preventDefault()
+
+      // Shift splits the stack in half, the stock shortcut players expect.
       const total = slot.count || 1
       const count = e.shiftKey && total > 1 ? Math.floor(total / 2) : total
 
@@ -251,27 +226,74 @@ export function InventoryPanel({ side, inventory, ctx }: PanelProps) {
       dragRef.current = drag
       setGhost(drag)
       ctx.setDrag(drag)
-      ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+
+      const move = (ev: PointerEvent) => {
+        const el = ghostRef.current
+        if (!el) return
+        // Written straight to the node. No React state, so moving the pointer
+        // costs one style write instead of a re-render of every slot.
+        el.style.left = `${ev.clientX}px`
+        el.style.top = `${ev.clientY}px`
+      }
+
+      const up = (ev: PointerEvent) => {
+        window.removeEventListener('pointermove', move)
+        window.removeEventListener('pointerup', up)
+        window.removeEventListener('pointercancel', up)
+        finishDrag(ev.clientX, ev.clientY)
+      }
+
+      window.addEventListener('pointermove', move)
+      window.addEventListener('pointerup', up)
+      window.addEventListener('pointercancel', up)
     },
+    // finishDrag is declared below and is stable for the life of the panel.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [ctx, state.imagepath, state.items],
   )
 
-  useEffect(() => {
-    const move = (e: PointerEvent) => {
-      if (!dragRef.current) return
-      const next = { ...dragRef.current, x: e.clientX, y: e.clientY }
-      dragRef.current = next
-      setGhost(next)
-    }
-    const up = (e: PointerEvent) => finishDrag(e.clientX, e.clientY)
+  function finishDrag(clientX: number, clientY: number) {
+    const drag = dragRef.current
+    dragRef.current = null
+    setGhost(null)
+    ctx.setDrag(null)
+    if (!drag) return
 
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-    return () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
+    // The ghost is gone from the DOM by the time this reads, but guard anyway:
+    // elementFromPoint must never return the thing following the cursor.
+    const el = document.elementFromPoint(clientX, clientY) as HTMLElement | null
+
+    // The discard zone. Only meaningful from a player inventory; ox_inventory
+    // refuses a newdrop in a vehicle or while falling regardless.
+    if (el?.closest('.som-panel__drop') && drag.from.type === 'player') {
+      ctx.swap(drag.from, { type: 'newdrop', slot: 0 }, drag.count)
+      return
     }
-  }, [finishDrag])
+
+    const cell = el?.closest('.som-slot') as HTMLElement | null
+    if (!cell) return
+
+    const toSlot = Number(cell.dataset.slot)
+    const toType = cell.dataset.invtype as InventoryType
+    if (!toSlot || !toType) return
+    if (toType === drag.from.type && toSlot === drag.from.slot) return
+
+    // Dragging OUT of a shop stages a basket line rather than buying on the
+    // spot. Checkout replays each line through ox_inventory's own buyItem, so
+    // the server still prices and validates every one.
+    if (drag.from.type === 'shop' || drag.from.type === 'crafting') {
+      const price = (drag.item as { price?: number }).price
+      ctx.addToBasket({
+        slot: drag.from.slot,
+        name: drag.item.name || '',
+        count: drag.count,
+        price: typeof price === 'number' ? price : 0,
+      })
+      return
+    }
+
+    ctx.swap(drag.from, { type: toType, slot: toSlot }, drag.count)
+  }
 
   const isPlayer = inventory.type === 'player'
   const title = inventory.label || (isPlayer ? 'Inventory' : inventory.type)
@@ -357,6 +379,7 @@ export function InventoryPanel({ side, inventory, ctx }: PanelProps) {
 
       {ghost && (
         <div
+          ref={ghostRef}
           className="som-ghost"
           style={{ left: ghost.x, top: ghost.y }}
         >

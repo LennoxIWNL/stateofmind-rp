@@ -84,26 +84,30 @@ RegisterNetEvent('som-inventory:server:throw', function(data)
     local item = slotOf(src, data.slot)
     if not item then return end
 
-    -- Power is a 0..1 charge from the page. Clamped rather than validated
-    -- away, because the only thing it can buy is distance and the range is
-    -- already bounded at both ends.
-    local power = tonumber(data.power) or 0
-    if power ~= power then power = 0 end
-    power = math.max(0, math.min(1, power))
-
     local ped = GetPlayerPed(src)
     if not ped or ped == 0 then return end
 
-    local coords = GetEntityCoords(ped)
-    local heading = GetEntityHeading(ped)
-    local rad = math.rad(heading)
-    local distance = Config.minDistance + (Config.maxDistance - Config.minDistance) * power
+    -- THE AIM POINT IS A REQUEST, NOT A DESTINATION.
+    --
+    -- The client picks where it is throwing, because only the client knows
+    -- where the player is looking. The server then re-reads its OWN view of the
+    -- ped and refuses anything further than the maximum, so the aim buys a
+    -- direction and never a delivery range.
+    local x, y, z = tonumber(data.x), tonumber(data.y), tonumber(data.z)
+    if not x or not y or not z or x ~= x or y ~= y or z ~= z then return end
 
-    local landing = vector3(
-        coords.x - math.sin(rad) * distance,
-        coords.y + math.cos(rad) * distance,
-        coords.z - 0.9
-    )
+    local origin = GetEntityCoords(ped)
+    local landing = vector3(x, y, z)
+
+    if #(origin - landing) > Config.maxDistance then
+        -- Clamped rather than refused: a laggy aim point a little too far is a
+        -- normal thing to happen, and dropping the throw silently would read as
+        -- the item vanishing, which is the bug this rewrite exists to fix.
+        local direction = landing - origin
+        local length = #direction
+        if length < 0.1 then return end
+        landing = origin + (direction / length) * Config.maxDistance
+    end
 
     -- Remove FIRST and only drop if the removal succeeded. The other order
     -- creates the drop and then discovers the item was already gone, which is
@@ -113,9 +117,15 @@ RegisterNetEvent('som-inventory:server:throw', function(data)
 
     lastThrow[src] = now
 
+    -- The MODEL is cosmetic and comes from the client, because ox_inventory
+    -- strips `client` from the server copy of an item so the prop genuinely is
+    -- not readable here. It is passed to CustomDrop as a model and used for
+    -- nothing else, so a forged value makes an oddly shaped bag and no more.
+    local model = tonumber(data.model)
+
     ox:CustomDrop('Thrown', {
         { name = item.name, count = 1, metadata = item.metadata },
-    }, landing)
+    }, landing, nil, nil, nil, model)
 end)
 
 -- ---------------------------------------------------------------------------
