@@ -38,7 +38,11 @@ local function emergencyVehicle()
     local vehicle = cache.vehicle
     if not vehicle or vehicle == 0 then return nil end
 
-    if GetPedInVehicleSeat(vehicle, -1) ~= cache.ped then return nil end
+    -- cache.seat, not GetPedInVehicleSeat. ox_lib caches the seat alongside the
+    -- vehicle and updates both together, whereas the native can still report
+    -- the seat as empty for a frame or two after cache.vehicle has changed.
+    -- That is a race this file used to lose.
+    if cache.seat ~= -1 then return nil end
 
     -- MATCHED BY HASH, not by display name.
     --
@@ -128,16 +132,22 @@ CreateThread(function()
         onPressed = toggleSiren,
     })
 
-    for _, bind in pairs(binds) do bind:disable(true) end
 end)
 
--- ox_lib's cache fires this whenever the player enters or leaves a vehicle,
--- which is exactly when these binds should come and go. Polling for it would be
--- a per-frame check for something the framework already reports.
-lib.onCache('vehicle', function()
-    local allowed = emergencyVehicle() ~= nil
-
-    for _, bind in pairs(binds) do
-        bind:disable(not allowed)
-    end
-end)
+-- THE BINDS ARE NEVER DISABLED, and that is the fix rather than an oversight.
+--
+-- They used to be enabled and disabled from lib.onCache('vehicle'), which is a
+-- cache-change hook. Two ways that left them dead:
+--
+--   * Entering a car fires the hook the instant cache.vehicle changes, and the
+--     driver seat can still read as empty for a frame after that. The hook then
+--     disabled the binds and, since no further cache change was coming, never
+--     re-enabled them.
+--   * Restarting the resource while already sitting in a car meant no cache
+--     change at all, so the initial disable(true) simply stood.
+--
+-- Both produced the same symptom: a key that does nothing, with no error.
+--
+-- toggleLights and toggleSiren ALREADY refuse unless the player is driving an
+-- emergency vehicle, so the enable/disable layer was an optimisation guarding a
+-- guard. Removing it costs one table lookup on a keypress and cannot get stuck.

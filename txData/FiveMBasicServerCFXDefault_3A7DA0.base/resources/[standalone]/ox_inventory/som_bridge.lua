@@ -646,49 +646,69 @@ end)
 -- ---------------------------------------------------------------------------
 
 local previewCam = nil
-local previewHeading = nil
+local previewPed = nil
+
+-- Somewhere nobody stands. Far under the map, so the double is never walked
+-- past, never collided with and never shows up in anyone else's frame.
+local STAGE = vector3(402.9, -996.8, -99.0)
 
 local function stopClothingPreview()
-    if not previewCam then return end
+    if previewPed and DoesEntityExist(previewPed) then
+        DeleteEntity(previewPed)
+    end
+    previewPed = nil
 
-    RenderScriptCams(false, true, 400, true, true)
-    DestroyCam(previewCam, true)
-    previewCam = nil
-
-    local ped = PlayerPedId()
-
-    if previewHeading then
-        SetEntityHeading(ped, previewHeading)
-        previewHeading = nil
+    if previewCam then
+        RenderScriptCams(false, true, 400, true, true)
+        DestroyCam(previewCam, true)
+        previewCam = nil
     end
 
-    FreezeEntityPosition(ped, false)
+    -- The real player was never touched, so there is nothing to restore.
+    SetEntityVisible(PlayerPedId(), true, false)
 end
 
 local function startClothingPreview()
     if previewCam then return end
 
     local ped = PlayerPedId()
-    local coords = GetEntityCoords(ped)
 
-    previewHeading = GetEntityHeading(ped)
+    -- A DOUBLE, not the player.
+    --
+    -- The first version turned the player's own body to rotate the view, which
+    -- meant anyone walking past saw somebody spinning on the spot in the middle
+    -- of the street. Cloning solves that completely: the real character stands
+    -- still and the thing being turned is a copy nobody else can see.
+    --
+    -- ClonePed carries the full appearance across, so the double is wearing
+    -- exactly what the player is wearing, which is the entire point of showing
+    -- it. isNetwork = false keeps it off the network so no other client is even
+    -- told it exists.
+    previewPed = ClonePed(ped, false, false, true)
 
-    -- Frozen so an idle sway or a nudge from the world does not walk the
-    -- subject out of a fixed frame while the player is picking clothes.
-    FreezeEntityPosition(ped, true)
+    if not previewPed or previewPed == 0 then
+        previewPed = nil
+        return
+    end
+
+    SetEntityCoordsNoOffset(previewPed, STAGE.x, STAGE.y, STAGE.z, false, false, false)
+    SetEntityHeading(previewPed, 0.0)
+    FreezeEntityPosition(previewPed, true)
+    SetEntityInvincible(previewPed, true)
+    SetBlockingOfNonTemporaryEvents(previewPed, true)
+    SetEntityCollision(previewPed, false, false)
+
+    -- Idle rather than a T-pose. Without a task a freshly cloned ped stands
+    -- with its arms out, which looks broken rather than neutral.
+    if DoesAnimDictExist('mp_character_creation@lineup@male_a') and
+       lib.requestAnimDict('mp_character_creation@lineup@male_a', 1000) then
+        TaskPlayAnim(previewPed, 'mp_character_creation@lineup@male_a',
+            'loop_a', 2.0, 2.0, -1, 1, 0, false, false, false)
+    end
 
     previewCam = CreateCam('DEFAULT_SCRIPTED_CAMERA', true)
-
-    -- 2.4m out and slightly above the waist, which frames head to foot at this
-    -- field of view. Placed along the ped's own facing so the camera starts in
-    -- front of them whatever direction they happen to be standing.
-    local rad = math.rad(previewHeading)
-    SetCamCoord(previewCam,
-        coords.x - math.sin(rad) * 2.4,
-        coords.y + math.cos(rad) * 2.4,
-        coords.z + 0.05)
-
-    PointCamAtEntity(previewCam, ped, 0.0, 0.0, 0.05, true)
+    SetCamCoord(previewCam, STAGE.x, STAGE.y + 2.4, STAGE.z + 0.05)
+    PointCamAtEntity(previewCam, previewPed, 0.0, 0.0, 0.05, true)
     SetCamFov(previewCam, 45.0)
     SetCamActive(previewCam, true)
     RenderScriptCams(true, true, 400, true, true)
@@ -707,13 +727,51 @@ end)
 
 RegisterNUICallback('somClothingRotate', function(data, cb)
     cb(1)
-    if not previewCam or type(data) ~= 'table' then return end
+    if not previewPed or not DoesEntityExist(previewPed) or type(data) ~= 'table' then return end
 
     local by = num(data.by)
     if not by then return end
 
-    local ped = PlayerPedId()
-    SetEntityHeading(ped, (GetEntityHeading(ped) + by) % 360.0)
+    -- Turns the DOUBLE. The player's own heading is never touched now.
+    SetEntityHeading(previewPed, (GetEntityHeading(previewPed) + by) % 360.0)
+end)
+
+--- Re-clones after a wardrobe change, so the double shows the new clothes.
+---
+--- som-appearance applies changes to the REAL ped, which the player cannot see
+--- while the camera is on the double. Without this the preview would keep
+--- showing whatever was worn when the tab opened.
+RegisterNetEvent('som-appearance:client:refresh', function()
+    if not previewCam then return end
+
+    -- After som-appearance has actually applied it. Its own handler animates
+    -- and then applies, so cloning immediately would copy the old outfit.
+    CreateThread(function()
+        Wait(1200)
+        if not previewCam then return end
+
+        local heading = previewPed and DoesEntityExist(previewPed)
+            and GetEntityHeading(previewPed) or 0.0
+
+        if previewPed and DoesEntityExist(previewPed) then DeleteEntity(previewPed) end
+
+        previewPed = ClonePed(PlayerPedId(), false, false, true)
+        if not previewPed or previewPed == 0 then return end
+
+        SetEntityCoordsNoOffset(previewPed, STAGE.x, STAGE.y, STAGE.z, false, false, false)
+        SetEntityHeading(previewPed, heading)
+        FreezeEntityPosition(previewPed, true)
+        SetEntityInvincible(previewPed, true)
+        SetBlockingOfNonTemporaryEvents(previewPed, true)
+        SetEntityCollision(previewPed, false, false)
+
+        if DoesAnimDictExist('mp_character_creation@lineup@male_a') then
+            TaskPlayAnim(previewPed, 'mp_character_creation@lineup@male_a',
+                'loop_a', 2.0, 2.0, -1, 1, 0, false, false, false)
+        end
+
+        PointCamAtEntity(previewCam, previewPed, 0.0, 0.0, 0.05, true)
+    end)
 end)
 
 -- The inventory closing by ANY route has to put the camera back: Escape, the

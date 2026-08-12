@@ -204,6 +204,21 @@ RegisterNUICallback('take', function(data, cb)
     if res.props then pcall(lib.setVehicleProperties, entity, res.props) end
     if res.fuel then SetVehicleFuelLevel(entity, res.fuel + 0.0) end
 
+    -- SETTLES IT ONTO THE FLOOR, and this is why the SWAT truck was in the
+    -- ceiling.
+    --
+    -- The server spawns every vehicle at one Z per garage, which is fine for a
+    -- sedan because the config was measured with one. A vehicle's coordinate is
+    -- its CENTRE, so a tall vehicle placed at a sedan's centre height has its
+    -- roof somewhere a sedan's roof never reaches, and in an underground car
+    -- park that is through the ceiling.
+    --
+    -- SetVehicleOnGroundProperly is client only, which is why it cannot live
+    -- with the spawn: it drops the vehicle onto whatever surface is beneath it
+    -- and works out the right height from the vehicle's own dimensions. So the
+    -- garage config no longer has to be correct for every body shape.
+    SetVehicleOnGroundProperly(entity)
+
     SetPedIntoVehicle(cache.ped, entity, -1)
 
     TriggerEvent('som:client:notify', ('%s is ready'):format(res.plate), 'success')
