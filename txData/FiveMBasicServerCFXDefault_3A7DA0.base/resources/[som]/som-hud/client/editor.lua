@@ -21,6 +21,18 @@
 local KVP = 'som_hud_layout'
 local editing = false
 
+-- BUMP THIS WHENEVER A DEFAULT POSITION CHANGES.
+--
+-- A saved layout completely replaces the defaults, so moving a panel in
+-- DEFAULT_LAYOUT does nothing for anyone who has ever opened the editor. That
+-- is why the condition panel was still bottom centre after being moved bottom
+-- left: the code was right and a stale KVP blob was winning.
+--
+-- A version mismatch discards the save and the new defaults apply. Losing a
+-- hand-tuned layout is the cost, and it is the right trade against a default
+-- that can never reach anyone who has used the editor once.
+local LAYOUT_VERSION = 2
+
 local function loadLayout()
     local raw = GetResourceKvpString(KVP)
     if not raw then return nil end
@@ -28,11 +40,17 @@ local function loadLayout()
     local ok, decoded = pcall(json.decode, raw)
     if not ok or type(decoded) ~= 'table' then return nil end
 
+    if decoded.version ~= LAYOUT_VERSION then
+        DeleteResourceKvp(KVP)
+        return nil
+    end
+
     return decoded
 end
 
 local function saveLayout(layout)
     if type(layout) ~= 'table' then return end
+    layout.version = LAYOUT_VERSION
     SetResourceKvp(KVP, json.encode(layout))
 end
 

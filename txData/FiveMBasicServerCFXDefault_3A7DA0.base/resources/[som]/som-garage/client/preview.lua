@@ -64,17 +64,43 @@ end
 ---Shows a model on the podium, replacing whatever was there.
 ---@param model string spawn name
 ---@param props table|nil ox_lib vehicle properties
+local generation = 0
+
 function Preview.Show(model, props)
     if not active or not anchor then return end
 
     destroyVehicle()
 
+    -- THE ANCHOR IS CAPTURED BEFORE THE YIELD, AND RE-CHECKED AFTER IT.
+    --
+    -- This was the garage crash. The guard above is correct at the moment it
+    -- runs, then lib.requestModel yields for up to EIGHT SECONDS, and closing
+    -- the garage during that wait sets anchor to nil. Execution resumes on a
+    -- line that had already been proven safe, and indexes nil.
+    --
+    -- Generation is the other half. Clicking through vehicles fires a Show per
+    -- click, each holding a model request open, which is what produced the
+    -- "too many loaded assets, waited 8011ms" spam: they were all still queued.
+    -- A newer Show now abandons every older one on resume.
+    generation = generation + 1
+    local mine = generation
+    local at = anchor
+
     local hash = joaat(model)
     if not lib.requestModel(hash, 8000) then return end
 
+    -- Everything below re-establishes what was true before the yield.
+    if not active or generation ~= mine or not anchor then
+        SetModelAsNoLongerNeeded(hash)
+        return
+    end
+
     -- isNetwork = false, netMissionEntity = false. Local only.
-    vehicle = CreateVehicle(hash, anchor.x, anchor.y, anchor.z, anchor.w, false, false)
-    if not vehicle or vehicle == 0 then return end
+    vehicle = CreateVehicle(hash, at.x, at.y, at.z, at.w, false, false)
+    if not vehicle or vehicle == 0 then
+        SetModelAsNoLongerNeeded(hash)
+        return
+    end
 
     if type(props) == 'table' then
         -- The real modifications. pcall because a saved props blob from an

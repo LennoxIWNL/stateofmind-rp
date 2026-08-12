@@ -17,20 +17,77 @@ import type { Player, Status, Vehicle, World } from '../contract'
 // Condition
 // ---------------------------------------------------------------------------
 
-const ICONS: Record<string, string> = {
-  health: 'M12 21s-7-4.4-7-9.5A4.5 4.5 0 0 1 12 8a4.5 4.5 0 0 1 7 3.5C19 16.6 12 21 12 21z',
-  armour: 'M12 2l7 3v6c0 4.5-3 8.3-7 11-4-2.7-7-6.5-7-11V5l7-3z',
-  hunger: 'M6 4h9a4 4 0 0 1 0 8H6zM6 12h12v6a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z',
-  thirst: 'M12 3s6 6.4 6 10.2A6 6 0 0 1 6 13.2C6 9.4 12 3 12 3z',
-  oxygen: 'M12 3a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V7a4 4 0 0 1 4-4zM8 17h8',
-  stress: 'M4 12h4l2-5 3 10 2-5h5',
-  voice: 'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM5 11a7 7 0 0 0 14 0M12 18v3',
+/*
+ * LUCIDE, not hand-drawn. The drawn ones looked drawn, and the owner said so.
+ *
+ * Worth recording what the survey actually found, because the obvious plan was
+ * wrong: there is no FiveM HUD with its own icon artwork to borrow. ps-hud,
+ * g4_hud and whoisLoku/fivem-hud ship ZERO svg files between them because they
+ * use Font Awesome. Code1616/fivem-gta-hud's files are literally named
+ * heart-svgrepo-com.svg and brain-svgrepo-com.svg, straight off SVGRepo.
+ * qb-hud has NO LICENCE AT ALL, so it is all rights reserved and not usable
+ * whatever it contains.
+ *
+ * So every one of those HUDs is already using a public icon set. Copying from
+ * them would be laundering the same icons through a GPL repo and taking the
+ * GPL with it. Going to the source is cleaner, better drawn and better
+ * licensed.
+ *
+ * Lucide is ISC: use, copy and modify freely, attribution only, no copyleft.
+ * Path data below is copied verbatim from lucide-icons/lucide so it is real
+ * rather than approximated, and every icon sits on the same 24x24 grid at the
+ * same 2px stroke, which is the thing hand-drawing could never hold.
+ *
+ * Multi-element icons are why this is an array of paths rather than one string.
+ */
+const ICONS: Record<string, string[]> = {
+  // heart
+  health: [
+    'M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5',
+  ],
+  // shield-half
+  armour: [
+    'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z',
+    'M12 22V2',
+  ],
+  // beef, which reads as food at 16px far better than a plate or cutlery does
+  hunger: [
+    'M16.4 13.7A6.5 6.5 0 1 0 6.28 6.6c-1.1 3.13-.78 3.9-3.18 6.08A3 3 0 0 0 5 18c4 0 8.4-1.8 11.4-4.3',
+    'm18.5 6 2.19 4.5a6.48 6.48 0 0 1-2.29 7.2C15.4 20.2 11 22 7 22a3 3 0 0 1-2.68-1.66L2.4 16.5',
+  ],
+  // droplet
+  thirst: [
+    'M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z',
+  ],
+  // wind
+  oxygen: [
+    'M12.8 19.6A2 2 0 1 0 14 16H2',
+    'M17.5 8a2.5 2.5 0 1 1 2 4H2',
+    'M9.8 4.4A2 2 0 1 1 11 8H2',
+  ],
+  // brain
+  stress: [
+    'M12 18V5',
+    'M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4',
+    'M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5',
+    'M17.997 5.125a4 4 0 0 1 2.526 5.77',
+    'M18 18a4 4 0 0 0 2-7.464',
+    'M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517',
+    'M6 18a4 4 0 0 1-2-7.464',
+    'M6.003 5.125a4 4 0 0 0-2.526 5.77',
+  ],
+  // mic
+  voice: ['M12 19v3', 'M19 10v2a7 7 0 0 1-14 0v-2'],
 }
 
+/** The rect in `mic` cannot be expressed as a path, so it is drawn separately. */
 function Glyph({ name }: { name: string }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d={ICONS[name]} />
+    <svg viewBox="0 0 24 24" aria-hidden="true" strokeLinecap="round" strokeLinejoin="round">
+      {(ICONS[name] ?? []).map((d) => (
+        <path key={d} d={d} />
+      ))}
+      {name === 'voice' && <rect x="9" y="2" width="6" height="13" rx="3" />}
     </svg>
   )
 }

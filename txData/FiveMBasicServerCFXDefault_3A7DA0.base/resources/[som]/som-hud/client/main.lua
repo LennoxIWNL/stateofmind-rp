@@ -314,12 +314,20 @@ CreateThread(function()
             want = vehicle ~= nil and vehicle ~= 0
         end
 
-        -- Only when it CHANGES. DisplayRadar every tick is a native call three
-        -- times a second for nothing.
-        if want ~= shownRadar then
-            shownRadar = want
-            DisplayRadar(want)
-        end
+        -- RE-ASSERTED EVERY TICK, deliberately, and the "only on change"
+        -- version is why the map stayed up on foot.
+        --
+        -- som-multichar calls DisplayRadar(true) when character selection ends.
+        -- This loop had already set its cached shownRadar to false, and `want`
+        -- was also false, so the two matched and it never called DisplayRadar
+        -- again. The cache described a radar state that another resource had
+        -- since overwritten, and nothing here could tell.
+        --
+        -- The optimisation was not worth it either: DisplayRadar three times a
+        -- second is nothing, and re-asserting makes this self-healing against
+        -- any resource that touches the radar, now or later.
+        shownRadar = want
+        DisplayRadar(want)
     end
 end)
 

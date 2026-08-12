@@ -388,7 +388,11 @@ local function endScene()
 
     destroyPreviewPed()
     destroyShell()
-    DisplayRadar(true)
+
+    -- The radar is NOT turned back on here. som-hud owns it and shows it in a
+    -- vehicle only; turning it on at spawn put it on screen on foot and left
+    -- som-hud's cached view of the state wrong. Character selection turning it
+    -- off is still this file's business, restoring it is not.
 
     -- Hand the clock and weather back to the server.
     if Config.Scene.freezeTimeAndWeather then

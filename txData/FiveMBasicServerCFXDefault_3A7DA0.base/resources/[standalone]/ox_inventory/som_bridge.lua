@@ -89,6 +89,63 @@ local function propFor(name)
     return nil
 end
 
+-- EVERY MODEL IS VALIDATED BEFORE IT IS REQUESTED, and that is the whole
+-- reason throwing never worked.
+--
+-- The fallback here used to be `prop_cs_bandage`, which is NOT A REAL GTA V
+-- MODEL. Its hash, 845288146, is exactly the one ox_lib was reporting as
+-- "attempted to load invalid model". lib.requestModel raises on an invalid
+-- model, that killed the whole thread, and because the raise happened inside
+-- CreateThread it never surfaced as a throw failing: it just did nothing.
+--
+-- So an item with no declared prop, which is most of them, could never be
+-- thrown. Fixing GetSlot earlier got the callback firing; this is what was
+-- waiting behind it.
+--
+-- IsModelValid alone is not enough. It answers whether the hash is
+-- well-formed, not whether the game actually ships that model, which is why
+-- IsModelInCdimage is checked too.
+local FALLBACK_PROPS = { `prop_paper_bag_01`, `prop_cs_bag_01`, `prop_ld_case_01` }
+
+---Plays an animation only if the dictionary actually exists.
+---
+---Same lesson as the model above, applied before it can cost another play-test:
+---lib.requestAnimDict on a dictionary the game does not ship raises, and inside
+---a CreateThread that reads as the feature silently doing nothing. A missing
+---animation should cost the animation, not the action.
+local function playAnim(ped, dict, name, duration, flag)
+    if not DoesAnimDictExist(dict) then return false end
+    if not lib.requestAnimDict(dict, 2000) then return false end
+
+    TaskPlayAnim(ped, dict, name, 3.0, 3.0, duration or -1, flag or 50, 0, false, false, false)
+    return true
+end
+
+local function validModel(model)
+    if not model then return nil end
+    if type(model) == 'string' then model = joaat(model) end
+    if type(model) ~= 'number' then return nil end
+    if not IsModelValid(model) or not IsModelInCdimage(model) then return nil end
+    return model
+end
+
+---The model a thrown item should use, or nil if nothing usable exists.
+---
+---nil is a legitimate answer and the caller handles it: the throw still
+---happens, just without a prop in hand. An item that cannot be represented is
+---not a reason to refuse to throw it.
+local function throwModel(name)
+    local model = validModel(propFor(name))
+    if model then return model end
+
+    for _, candidate in ipairs(FALLBACK_PROPS) do
+        model = validModel(candidate)
+        if model then return model end
+    end
+
+    return nil
+end
+
 RegisterNUICallback('somThrow', function(data, cb)
     cb(1)
 
@@ -110,7 +167,10 @@ RegisterNUICallback('somThrow', function(data, cb)
     local item = items and items[slot]
     if not item or not item.name then return end
 
-    local model = propFor(item.name) or `prop_cs_bandage`
+    -- May be nil, and that is fine. The throw proceeds without a prop in hand
+    -- rather than refusing, because an item we cannot draw is still an item
+    -- the player asked to throw.
+    local model = throwModel(item.name)
 
     CreateThread(function()
         aiming = true
@@ -121,16 +181,17 @@ RegisterNUICallback('somThrow', function(data, cb)
         Wait(150)
 
         local ped = PlayerPedId()
+        local ghost
 
-        lib.requestModel(model, 2000)
-        local ghost = CreateObject(model, GetEntityCoords(ped), false, false, false)
-        SetEntityCollision(ghost, false, false)
-        SetEntityAlpha(ghost, 153, false)
-        AttachEntityToEntity(ghost, ped, GetPedBoneIndex(ped, 28422),
-            0.1, 0.02, 0.02, -80.0, 0.0, 0.0, true, true, false, true, 1, true)
+        if model and lib.requestModel(model, 2000) then
+            ghost = CreateObject(model, GetEntityCoords(ped), false, false, false)
+            SetEntityCollision(ghost, false, false)
+            SetEntityAlpha(ghost, 153, false)
+            AttachEntityToEntity(ghost, ped, GetPedBoneIndex(ped, 28422),
+                0.1, 0.02, 0.02, -80.0, 0.0, 0.0, true, true, false, true, 1, true)
+        end
 
-        lib.requestAnimDict('anim@mp_snowball', 2000)
-        TaskPlayAnim(ped, 'anim@mp_snowball', 'pickup_snowball', 3.0, 3.0, -1, 50, 0, false, false, false)
+        playAnim(ped, 'anim@mp_snowball', 'pickup_snowball', -1, 50)
 
         local thrown, cancelled = false, false
 
@@ -173,13 +234,15 @@ RegisterNUICallback('somThrow', function(data, cb)
         end
 
         ClearPedTasks(ped)
-        if DoesEntityExist(ghost) then DeleteEntity(ghost) end
-        SetModelAsNoLongerNeeded(model)
+        if ghost and DoesEntityExist(ghost) then DeleteEntity(ghost) end
+        if model then SetModelAsNoLongerNeeded(model) end
 
         if thrown then
-            lib.requestAnimDict('anim@arena@celeb@flat@paired@no_props@', 1000)
-            TaskPlayAnim(ped, 'anim@arena@celeb@flat@paired@no_props@',
-                'flip_a_player_a', 3.0, 3.0, 900, 48, 0, false, false, false)
+            -- The snowball dict again rather than an arena celebration. It is
+            -- the throw motion the game actually ships, it is already loaded
+            -- from the aim above, and the celebration anim was picked for its
+            -- name rather than for having been checked.
+            playAnim(ped, 'anim@mp_snowball', 'pickup_throw', 900, 48)
 
             TriggerServerEvent('som-inventory:server:throw', {
                 slot = slot,

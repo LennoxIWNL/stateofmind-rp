@@ -23,7 +23,16 @@ local blips = {}
 -- The pulse is an alpha walk rather than PulseBlip. PulseBlip is what
 -- five-dispatch calls, and it animates a coord blip's ICON; there is no icon
 -- here to animate. Walking the radius alpha is what makes an area breathe.
-local AREA_RADIUS = 80.0
+-- 45m, down from 80m. An 80 metre radius draws a 160 metre circle, which on
+-- the minimap covers most of a district and tells an officer roughly nothing.
+-- 45m points at a block.
+local AREA_RADIUS = 45.0
+
+-- NINETY SECONDS, HARD CAP. Owner's call and it overrides config: the per-alert
+-- durations run 180 to 600 seconds, so a busy night left the map a wall of
+-- overlapping circles. A dispatch area is a "go now" marker, and one that
+-- outlives the response is just clutter.
+local MAX_AREA_SECONDS = 90
 
 local PULSE_MIN, PULSE_MAX, PULSE_STEP = 45, 165, 10
 local PULSE_INTERVAL = 55
@@ -90,7 +99,7 @@ local function addBlip(call)
 
     startPulse()
 
-    local seconds = def.duration or 300
+    local seconds = math.min(def.duration or 300, MAX_AREA_SECONDS)
 
     -- Areas expire on their own. Calls that never clear turn the map into a
     -- wall of circles within an hour.
