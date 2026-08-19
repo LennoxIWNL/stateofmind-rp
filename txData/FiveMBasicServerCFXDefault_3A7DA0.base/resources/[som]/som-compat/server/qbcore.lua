@@ -324,3 +324,32 @@ lib.callback.register('qb-garage:server:GetVehicleProperties', function(_, plate
     local props = MySQL.scalar.await('SELECT props FROM som_vehicles WHERE plate = ?', { plate })
     return props and json.decode(props) or nil
 end)
+
+--- ps-hud calls this to decide who may use its admin stress commands.
+---
+--- Mapped onto SOM's own ACEs rather than reimplemented. qb-core takes a group
+--- name or a list of them, so both shapes are accepted.
+---
+--- Refuses on anything it does not recognise. A permission shim that returns
+--- true for an unknown group is worse than one that is missing, because the
+--- caller stops checking.
+function QBCore.Functions.HasPermission(source, permission)
+    if not source or source == 0 then return false end
+
+    local groups = type(permission) == 'table' and permission or { permission }
+
+    for _, group in ipairs(groups) do
+        if type(group) == 'string' then
+            local ace = ({
+                god = 'som.god',
+                admin = 'som.admin',
+                mod = 'som.mod',
+                user = nil,
+            })[group:lower()]
+
+            if ace and IsPlayerAceAllowed(source, ace) then return true end
+        end
+    end
+
+    return false
+end

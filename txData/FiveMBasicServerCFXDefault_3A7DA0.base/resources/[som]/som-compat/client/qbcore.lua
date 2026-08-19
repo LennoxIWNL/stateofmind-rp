@@ -215,3 +215,75 @@ end)
 -- Vehicle keys are a Phase 5 concern, so for now it is a no-op that exists
 -- only so the call does not error.
 RegisterNetEvent('vehiclekeys:client:SetOwner', function() end)
+
+-- ---------------------------------------------------------------------------
+-- isLoggedIn
+--
+-- ps-hud gates its ENTIRE render loop on LocalPlayer.state.isLoggedIn, in seven
+-- places, and nothing in SOM has ever set it. Without this the HUD stays
+-- permanently hidden and its else-branch calls DisplayRadar(false) once a
+-- second forever, which would also fight som-hud's minimap rule.
+--
+-- It lives here rather than in som-core because it is purely a qb-core-shaped
+-- convention: som-core has its own loaded state and no reason to learn a second
+-- name for it. Anything else expecting the qb-core statebag gets it for free.
+-- ---------------------------------------------------------------------------
+
+local function setLoggedIn(value)
+    LocalPlayer.state:set('isLoggedIn', value, false)
+end
+
+-- onPlayerLoaded is the only one of these som-core actually emits. There is no
+-- unload event, so there is no handler for one: a listener for an event nobody
+-- raises reads like coverage and is not.
+AddEventHandler('som:client:onPlayerLoaded', function() setLoggedIn(true) end)
+
+CreateThread(function()
+    -- Covers a resource restart with a player already in the world, where no
+    -- load event is coming.
+    Wait(2000)
+    if exports['som-core']:isPlayerLoaded() then setLoggedIn(true) end
+end)
+
+-- ---------------------------------------------------------------------------
+-- Feeding ps-hud's needs and stress
+--
+-- ps-hud reads hunger, thirst and stress from EITHER an event
+-- (hud:client:UpdateNeeds, hud:client:UpdateStress) or a statebag on
+-- player:<serverId>. It never asks; it waits to be told, so on SOM it would sit
+-- at whatever it initialised to forever.
+--
+-- som-core keeps all three on metadata and raises onMetadataChanged, so this is
+-- a translation rather than a poll. The initial push matters as much as the
+-- updates: a player who does not eat for ten minutes would otherwise see a full
+-- bar for ten minutes.
+-- ---------------------------------------------------------------------------
+
+local function pushNeeds()
+    local core = exports['som-core']
+    if not core:isPlayerLoaded() then return end
+
+    local hunger = tonumber(core:getMetadata('hunger')) or 100
+    local thirst = tonumber(core:getMetadata('thirst')) or 100
+    local stress = tonumber(core:getMetadata('stress')) or 0
+
+    -- ps-hud expects whole numbers and clamps nothing itself.
+    TriggerEvent('hud:client:UpdateNeeds',
+        math.floor(math.max(0, math.min(100, hunger)) + 0.5),
+        math.floor(math.max(0, math.min(100, thirst)) + 0.5))
+
+    TriggerEvent('hud:client:UpdateStress',
+        math.floor(math.max(0, math.min(100, stress)) + 0.5))
+end
+
+AddEventHandler('som:client:onMetadataChanged', pushNeeds)
+
+AddEventHandler('som:client:onPlayerLoaded', function()
+    -- After ps-hud's own listeners exist. Pushing before it has registered them
+    -- is a message into nothing, and the next metadata change might be minutes
+    -- away.
+    CreateThread(function()
+        Wait(3000)
+        pushNeeds()
+    end)
+end)

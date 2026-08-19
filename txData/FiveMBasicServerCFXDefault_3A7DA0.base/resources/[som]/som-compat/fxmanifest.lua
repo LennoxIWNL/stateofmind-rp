@@ -13,6 +13,10 @@ provide 'qb-core'
 
 shared_scripts {
     '@ox_lib/init.lua',
+    -- NOT loaded into som-compat itself, only EXPOSED so ps-hud's manifest can
+    -- @-reference it. Listed in files{} below rather than here, because loading
+    -- it into every script that includes som-compat would define a global
+    -- Locale nothing here uses.
     'shared/lazy.lua',
     'shared/items.lua',
     'shared/vehicles.lua',
@@ -36,4 +40,9 @@ dependencies {
     'oxmysql',
     'som-core',
     'som-ui',
+}
+
+-- ps-hud @-references shared/locale.lua. See that file for why it exists.
+files {
+    'shared/locale.lua',
 }

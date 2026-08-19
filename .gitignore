@@ -143,3 +143,7 @@ NEXT-SESSION.md
 /[tuff-hud-2.0.0].pack/
 /[tuff-loading].pack/
 /*.pack/
+
+# ps-hud's minimap textures. Streamed binaries, hand-copied to the server like
+# every other .ytd in this repo.
+txData/FiveMBasicServerCFXDefault_3A7DA0.base/resources/[custom]/ps-hud/stream/
