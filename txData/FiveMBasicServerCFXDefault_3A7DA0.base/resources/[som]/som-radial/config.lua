@@ -116,6 +116,30 @@ Config.Items = {
         menu = 'seats',
         seatedOnly = true,
     },
+    -- STORING A CAR HAD NO WAY IN.
+    --
+    -- som-garage has had the whole path built for a while: a store() client
+    -- function that handles both sitting in the car and standing beside it, a
+    -- som-garage:server:store callback that re-checks ownership and distance,
+    -- and canStoreNear/storeNearest exports written specifically to be called
+    -- from here. Nothing ever called them, so the only route was the eye on the
+    -- garage zone, and ox_target does not work from a driver's seat.
+    --
+    -- So the feature existed end to end and read as missing, because you had to
+    -- get out of the car to put the car away and nothing said so.
+    --
+    -- NOT seatedOnly: standing beside it is a legitimate way to store, and
+    -- canStoreNear accepts the nearest vehicle within 8m as well as the one you
+    -- are sitting in.
+    {
+        id = 'vehicle.store',
+        section = 'vehicle',
+        label = 'Store vehicle',
+        icon = 'garage',
+        order = 50,
+        export = 'som-garage.storeNearest',
+        visible = 'som-garage.canStoreNear',
+    },
 }
 
 -- Submenus. `dynamic` is built at open time by the client, because seats and
