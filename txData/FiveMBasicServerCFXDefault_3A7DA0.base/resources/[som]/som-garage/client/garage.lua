@@ -56,11 +56,17 @@ local function open(garageId)
 
     Preview.Start(at)
 
-    -- The first vehicle is shown immediately, so the podium is never empty
-    -- while the player reads the list.
-    local first = res.vehicles[1]
-    if first then Preview.Show(first.model, first.props) end
-
+    -- THE PANEL OPENS FIRST AND THE CAR ARRIVES AFTER, which is the fix for the
+    -- garage taking seconds to appear the first time.
+    --
+    -- Preview.Show calls lib.requestModel with an EIGHT SECOND budget, and a
+    -- model nobody has streamed yet really can take most of it. This used to be
+    -- called before SendNUIMessage, so the whole panel waited on a texture: the
+    -- list, the prices and the buttons were all ready and held back by the
+    -- podium.
+    --
+    -- Nothing here depends on the model being loaded, so the wait moves off the
+    -- path entirely. The player reads the list while the car turns up behind it.
     SetNuiFocus(true, true)
     SendNUIMessage({
         action = 'open',
@@ -71,6 +77,17 @@ local function open(garageId)
             payment = res.payment,
         },
     })
+
+    local first = res.vehicles[1]
+
+    if first then
+        CreateThread(function()
+            -- Preview.Show re-checks `active` and its own generation counter
+            -- after the yield, so closing the garage during the load abandons
+            -- this rather than spawning a car into a closed preview.
+            Preview.Show(first.model, first.props)
+        end)
+    end
 end
 
 ---The garage the player is standing at, if any, and if they may use it.
@@ -150,7 +167,14 @@ RegisterNUICallback('select', function(data, cb)
     cb({})
     if not isOpen or type(data) ~= 'table' then return end
 
-    Preview.Show(data.model, data.props)
+    -- Own thread, because Preview.Show YIELDS on lib.requestModel and a NUI
+    -- callback handler is not a context to assume that is legal in. It is also
+    -- the same reason clicking quickly down the list used to queue eight second
+    -- model requests behind each other; the generation counter inside
+    -- Preview.Show is what abandons the older ones.
+    CreateThread(function()
+        Preview.Show(data.model, data.props)
+    end)
 end)
 
 RegisterNUICallback('rotate', function(data, cb)
