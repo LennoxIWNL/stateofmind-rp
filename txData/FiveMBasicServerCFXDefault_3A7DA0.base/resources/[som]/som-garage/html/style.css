@@ -54,27 +54,57 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 /* --- Panel --------------------------------------------------------------- */
 
+/* A FLOATING CARD, matching the inventory and shop panels.
+ *
+ * This used to be a full height slab welded to the left edge with a hard
+ * border and no radius, while every other panel on the server is an inset
+ * rounded card with a shadow. That single difference is most of why the garage
+ * did not look like it belonged to the same UI.
+ *
+ * Sized in vh like the inventory, so the two scale together on a resolution
+ * change rather than one growing while the other stays put. */
 .panel {
     position: absolute;
     z-index: 2;
-    top: 0;
-    left: 0;
-    height: 100vh;
-    width: 372px;
+    top: 4vh;
+    bottom: 4vh;
+    left: 2vw;
+    width: 34vh;
+    min-width: 300px;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(100deg, rgba(14, 11, 19, 0.97) 62%, rgba(14, 11, 19, 0.82) 100%);
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    gap: 1vh;
+    padding: 1.4vh;
+    background: var(--som-bg);
+    border: 1px solid var(--som-border);
+    border-radius: var(--som-radius-lg);
+    box-shadow: var(--som-shadow);
     animation: slide 320ms cubic-bezier(.16, 1, .3, 1) both;
 }
 
-.panel__head { padding: 22px 20px 12px; }
+.panel__head { padding: 0.4vh 0.2vh 0; }
+
+.panel__titlerow {
+    display: flex;
+    align-items: center;
+    gap: 0.8vh;
+    margin-bottom: 1.2vh;
+}
+
+/* The same accent square the inventory panels lead with. */
+.panel__icon {
+    width: 1.9vh;
+    height: 1.9vh;
+    border-radius: 3px;
+    background: var(--som-pink-a45);
+    flex: 0 0 auto;
+}
 
 .panel__title {
-    font-size: 1.15rem;
+    font-size: 1.9vh;
     font-weight: 650;
     letter-spacing: -0.01em;
-    margin-bottom: 12px;
+    margin: 0;
 }
 
 .tabs { display: flex; gap: 4px; }

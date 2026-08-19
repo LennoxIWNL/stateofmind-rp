@@ -20,7 +20,12 @@
              must never be covered: you are choosing what you can see. -->
         <aside class="panel">
             <header class="panel__head">
-                <h1 class="panel__title" id="title">Garage</h1>
+                <!-- The accent square the inventory and shop panels lead with.
+                     Same mark, so the two read as one system. -->
+                <div class="panel__titlerow">
+                    <span class="panel__icon" aria-hidden="true"></span>
+                    <h1 class="panel__title" id="title">Garage</h1>
+                </div>
                 <div class="tabs">
                     <button class="tab is-active" id="tab-owned" type="button">Vehicles</button>
                     <button class="tab hidden" id="tab-buy" type="button">Buy</button>
