@@ -1352,6 +1352,7 @@ upgrade of these resources drops them, so this table is the re-apply list.
 | `ox_inventory` | `ammo-taser` added, `WEAPON_STUNGUN` given `ammoname` | The stock stungun had no ammo type and fired forever |
 | `ox_doorlock` | `server/framework/som-compat.lua` added, listed first in `server/utils.lua` | Without it `GetPlayer` is nil and every door refuses silently |
 | `ox_doorlock` | `use_experimental_fxv2_oal` commented out | Suspected cause of the manifest and streaming faults; the texture dict still never loaded with it on |
+| `ox_doorlock` | `'@som-ui/client/skillcheck.lua'` listed first in `client_scripts` | The one live `lib.skillCheck` caller in the tree. jim-recycle goes through `exports.ox_lib:` and is untouched either way |
 | `ox_doorlock` | Texture dict awaited before the lock sprite draws | Stock requested it once and drew regardless, rendering a white square forever |
 | `ox_target` | Reach set through the `ox_target:maxDistance` convar, dots restyled to SOM pink | Stock hardcodes a much longer reach and gives the dot no hover state |
 | `ps-hud` | `fxmanifest.lua` shared_script repointed from `@qb-core/shared/locale.lua` to `@som-compat/shared/locale.lua` | There is no qb-core DIRECTORY here. A manifest @-reference is a file path and `provide 'qb-core'` does not satisfy one, so ps-hud failed to start before a line of its own code ran |

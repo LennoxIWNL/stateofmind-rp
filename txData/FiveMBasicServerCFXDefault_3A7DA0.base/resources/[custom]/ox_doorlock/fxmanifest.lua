@@ -32,6 +32,11 @@ shared_scripts {
 }
 
 client_scripts {
+    -- SOM: replaces lib.skillCheck with som-ui's, so the lockpick minigame is
+    -- SOM rather than stock ox_lib. FIRST, so the replacement is in place
+    -- before client/utils.lua ever calls it. Degrades to ox_lib's own if
+    -- som-ui is stopped. See som-ui/client/skillcheck.lua.
+    '@som-ui/client/skillcheck.lua',
     'client/main.lua',
     'client/utils.lua',
 }

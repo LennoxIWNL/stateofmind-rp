@@ -332,6 +332,15 @@ contextBack.addEventListener('click', () => postNui('contextBack'));
 contextBackdrop.addEventListener('click', () => postNui('contextClose'));
 
 document.addEventListener('keydown', (event) => {
+    // The skill check owns the keyboard while it is up, and it is never up at
+    // the same time as a menu: it takes focus without a cursor, a menu takes
+    // focus with one, and the Lua side refuses a second check.
+    if (!skill.hidden) {
+        if (event.repeat) return;
+        skillPress(String(event.key).toLowerCase());
+        return;
+    }
+
     if (context.hidden) return;
 
     if (event.key === 'Escape') {
@@ -345,6 +354,223 @@ document.addEventListener('keydown', (event) => {
         postNui('contextBack');
     }
 });
+
+
+// ---------------------------------------------------------------------------
+// Skill check
+//
+// Render and input only, like everything else on this page. The Lua side holds
+// the token and decides when a check is over; this reports a hit or a miss and
+// nothing else. It is a client side minigame either way, and no server action
+// rests on the answer.
+//
+// The needle sweeps clockwise from the top. A round is passed by pressing the
+// round's key while the needle is inside the arc, and failed by pressing the
+// wrong key, pressing outside the arc, or letting the needle run past the arc.
+// That is ox_lib's model, kept deliberately: the muscle memory is worth more
+// than an improvement here would be.
+// ---------------------------------------------------------------------------
+
+const skill = document.getElementById('skillcheck');
+const skillArea = document.getElementById('skill-area');
+const skillNeedle = document.getElementById('skill-needle');
+const skillKey = document.getElementById('skill-key');
+const skillRounds = document.getElementById('skill-rounds');
+
+// r=52 in the markup. Hard-coded rather than measured: getTotalLength on a
+// hidden SVG element returns 0 in this CEF build, which draws no arc at all.
+const SKILL_CIRCUMFERENCE = 2 * Math.PI * 52;
+
+// Degrees per second at speedMultiplier 1, so one revolution is 1.8s on easy.
+// The Lua side sizes its deadman timer off this same number.
+const SKILL_BASE_SPEED = 200;
+
+// How long the hit or miss colour stays before the next round or the exit.
+const SKILL_FLASH = 220;
+
+let skillToken = null;
+let skillState = null;
+let skillFrame = null;
+let skillFlashTimer = null;
+// True between reporting a result and the hit or miss colour finishing. The
+// Lua side sends skillcheck:hide as soon as it has the result, which arrives
+// well inside that window, so without this the flash is never seen.
+let skillFlashing = false;
+
+function skillStopLoop() {
+    if (skillFrame !== null) {
+        cancelAnimationFrame(skillFrame);
+        skillFrame = null;
+    }
+}
+
+function skillDraw() {
+    const s = skillState;
+    if (!s) return;
+
+    skillNeedle.setAttribute('transform', `rotate(${s.angle} 60 60)`);
+}
+
+function skillRender(round, index, total) {
+    const arc = (round.areaSize / 360) * SKILL_CIRCUMFERENCE;
+
+    skillArea.setAttribute('stroke-dasharray', `${arc} ${SKILL_CIRCUMFERENCE - arc}`);
+    // -90 puts zero at the top, where the needle starts.
+    skillArea.setAttribute('transform', `rotate(${round.areaStart - 90} 60 60)`);
+
+    skillKey.textContent = round.input.toUpperCase();
+    // A single round says nothing rather than "1/1", which is noise.
+    skillRounds.textContent = total > 1 ? `${index + 1} / ${total}` : '';
+
+    skillDraw();
+}
+
+function skillFinish(success) {
+    skillStopLoop();
+
+    const token = skillToken;
+    skillState = null;
+    skillToken = null;
+
+    skill.classList.remove('is-hit', 'is-miss');
+    skill.classList.add(success ? 'is-hit' : 'is-miss');
+
+    clearTimeout(skillFlashTimer);
+    skillFlashing = true;
+    skillFlashTimer = setTimeout(() => {
+        skillFlashing = false;
+        skill.hidden = true;
+        skill.classList.remove('is-open', 'is-hit', 'is-miss');
+    }, SKILL_FLASH);
+
+    postNui('skillCheckOver', { token, success });
+}
+
+function skillBeginRound(index) {
+    const s = skillState;
+    const source = s.rounds[index];
+
+    // The arc is placed away from the needle's start so every round has a
+    // run-up. Without it a hard round can be over before the dial is drawn.
+    const areaStart = 70 + Math.random() * 200;
+
+    s.index = index;
+    s.angle = 0;
+    s.round = {
+        areaSize: source.areaSize,
+        speedMultiplier: source.speedMultiplier,
+        areaStart,
+        areaEnd: areaStart + source.areaSize,
+        input: s.inputs[Math.floor(Math.random() * s.inputs.length)],
+    };
+
+    skillRender(s.round, index, s.rounds.length);
+}
+
+function skillStep(now) {
+    const s = skillState;
+    if (!s) return;
+
+    if (s.last === null) s.last = now;
+    const delta = (now - s.last) / 1000;
+    s.last = now;
+
+    s.angle += SKILL_BASE_SPEED * s.round.speedMultiplier * delta;
+
+    // Past the arc without a press is a miss. Checked before the wrap, or a
+    // fast needle laps the dial and starts a second free attempt.
+    if (s.angle > s.round.areaEnd) {
+        skillFinish(false);
+        return;
+    }
+
+    skillDraw();
+    skillFrame = requestAnimationFrame(skillStep);
+}
+
+function skillShow(token, data) {
+    const rounds = Array.isArray(data && data.rounds) ? data.rounds : [];
+    if (!rounds.length) return;
+
+    skillStopLoop();
+    clearTimeout(skillFlashTimer);
+    skillFlashing = false;
+
+    skillToken = token;
+    skillState = {
+        rounds,
+        inputs: Array.isArray(data.inputs) && data.inputs.length ? data.inputs : ['e'],
+        index: 0,
+        angle: 0,
+        last: null,
+        round: null,
+    };
+
+    skillBeginRound(0);
+
+    skill.hidden = false;
+    skill.classList.remove('is-open', 'is-hit', 'is-miss');
+    void skill.offsetWidth;
+    skill.classList.add('is-open');
+
+    skillFrame = requestAnimationFrame(skillStep);
+}
+
+function skillHide() {
+    skillStopLoop();
+
+    // A result already reported is mid-flash and hides itself when it ends.
+    // This path is the other two: a cancel, and the Lua deadman.
+    if (skillFlashing) {
+        skillState = null;
+        skillToken = null;
+        return;
+    }
+
+    clearTimeout(skillFlashTimer);
+
+    skillState = null;
+    skillToken = null;
+    skill.hidden = true;
+    skill.classList.remove('is-open', 'is-hit', 'is-miss');
+}
+
+function skillPress(key) {
+    const s = skillState;
+    if (!s || !s.round) return;
+
+    if (key !== s.round.input) {
+        skillFinish(false);
+        return;
+    }
+
+    if (s.angle < s.round.areaStart || s.angle > s.round.areaEnd) {
+        skillFinish(false);
+        return;
+    }
+
+    const next = s.index + 1;
+
+    if (next >= s.rounds.length) {
+        skillFinish(true);
+        return;
+    }
+
+    // A passed round flashes green without ending the check, so a three round
+    // lockpick reads as three separate wins rather than one long dial.
+    //
+    // Through skillFlashTimer rather than its own timer, so a fast round
+    // followed by the last one cannot have a stale timeout wipe the final
+    // colour off mid-flash.
+    skill.classList.add('is-hit');
+    clearTimeout(skillFlashTimer);
+    skillFlashTimer = setTimeout(() => skill.classList.remove('is-hit'), SKILL_FLASH);
+
+    skillStopLoop();
+    skillBeginRound(next);
+    s.last = null;
+    skillFrame = requestAnimationFrame(skillStep);
+}
 
 window.addEventListener('message', (event) => {
     const data = event.data;
@@ -375,5 +601,15 @@ window.addEventListener('message', (event) => {
 
     if (data.action === 'progress:stop') {
         progressStop(data.cancelled === true);
+        return;
+    }
+
+    if (data.action === 'skillcheck:show') {
+        skillShow(data.token, data.data);
+        return;
+    }
+
+    if (data.action === 'skillcheck:hide') {
+        skillHide();
     }
 });

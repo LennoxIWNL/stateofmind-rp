@@ -47,6 +47,26 @@
         </div>
     </div>
 
+    <!-- Skill checks, replacing ox_lib's. Takes keyboard focus and NO cursor:
+         the whole interaction is one key against a moving needle, and a cursor
+         parked in the middle of the dial would be in the way. -->
+    <div id="skillcheck" class="skill" hidden>
+        <div class="skill__dial">
+            <svg class="skill__ring" viewBox="0 0 120 120" aria-hidden="true">
+                <circle class="skill__track" cx="60" cy="60" r="52"></circle>
+                <circle class="skill__area" id="skill-area" cx="60" cy="60" r="52"></circle>
+                <g id="skill-needle">
+                    <line class="skill__needle" x1="60" y1="4" x2="60" y2="22"></line>
+                </g>
+            </svg>
+
+            <div class="skill__centre">
+                <span class="som-key skill__key" id="skill-key">E</span>
+                <span class="skill__rounds" id="skill-rounds"></span>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

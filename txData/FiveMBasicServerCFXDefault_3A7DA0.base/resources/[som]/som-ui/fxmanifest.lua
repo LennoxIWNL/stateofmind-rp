@@ -15,11 +15,12 @@ client_scripts {
     'client/notify.lua',
     'client/progress.lua',
     'client/contextui.lua',
+    'client/skillcheckui.lua',
     'client/feedback.lua',
 }
 
--- client/progressbar.lua and client/context.lua are deliberately NOT in
--- client_scripts. They are loaded by consumers with
+-- client/progressbar.lua, client/context.lua and client/skillcheck.lua are
+-- deliberately NOT in client_scripts. They are loaded by consumers with
 -- '@som-ui/client/<file>.lua' so that they run inside the calling resource,
 -- where their `lib` table is the caller's own and where the callbacks they hold
 -- actually live. See the header of each file.
@@ -38,6 +39,8 @@ files {
     'client/progressbar.lua',
     -- Fetched by consumers as '@som-ui/client/context.lua'.
     'client/context.lua',
+    -- Fetched by consumers as '@som-ui/client/skillcheck.lua'.
+    'client/skillcheck.lua',
 }
 
 dependencies {

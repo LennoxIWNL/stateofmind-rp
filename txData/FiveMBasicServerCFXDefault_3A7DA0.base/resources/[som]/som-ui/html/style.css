@@ -521,3 +521,104 @@ body {
     from { opacity: 0; transform: translateY(14px) scale(0.985); }
     to   { opacity: 1; transform: none; }
 }
+
+/* ---------------------------------------------------------------------------
+   Skill check
+
+   Centred, because it is the only thing on screen you are looking at while it
+   runs. No backdrop and no blur: the player is standing at a door mid-action
+   and needs to see the street. CEF here is around Chrome 103, so nothing in
+   this block uses color-mix, unprefixed mask-image or backdrop-filter.
+
+   The dial is drawn with the SVG transform ATTRIBUTE rather than a CSS
+   transform, because transform-origin on an SVG child needs transform-box to
+   be reliable and that is newer than this browser.
+   --------------------------------------------------------------------------- */
+
+.skill {
+    align-items: center;
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    position: fixed;
+    pointer-events: none;
+}
+
+.skill[hidden] { display: none; }
+
+.skill__dial {
+    height: 168px;
+    position: relative;
+    width: 168px;
+    opacity: 0;
+    transform: scale(0.9);
+    transition: opacity var(--som-transition), transform var(--som-transition);
+}
+
+.skill.is-open .skill__dial {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.skill__ring {
+    display: block;
+    height: 100%;
+    width: 100%;
+    filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.7));
+}
+
+.skill__track {
+    fill: rgba(10, 10, 18, 0.72);
+    stroke: var(--som-pink-a30);
+    stroke-width: 6;
+}
+
+.skill__area {
+    fill: none;
+    stroke: var(--som-pink);
+    stroke-linecap: butt;
+    stroke-width: 6;
+}
+
+.skill__needle {
+    stroke: var(--som-text);
+    stroke-linecap: round;
+    stroke-width: 3;
+}
+
+.skill__centre {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    inset: 0;
+    justify-content: center;
+    position: absolute;
+}
+
+.skill__key {
+    font-size: 20px;
+    line-height: 1;
+    padding: 6px 12px;
+}
+
+.skill__rounds {
+    color: var(--som-text-dim);
+    font-family: var(--som-font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+}
+
+/* A round landed. Brief and on the arc itself, so the eye is already there. */
+.skill.is-hit .skill__area { stroke: var(--som-success); }
+.skill.is-hit .skill__track { stroke: var(--som-success); }
+
+.skill.is-miss .skill__area { stroke: var(--som-danger); }
+.skill.is-miss .skill__track { stroke: var(--som-danger); }
+.skill.is-miss .skill__dial { animation: skill-shake 180ms ease; }
+
+@keyframes skill-shake {
+    0%, 100% { transform: scale(1) translateX(0); }
+    25%      { transform: scale(1) translateX(-5px); }
+    75%      { transform: scale(1) translateX(5px); }
+}
