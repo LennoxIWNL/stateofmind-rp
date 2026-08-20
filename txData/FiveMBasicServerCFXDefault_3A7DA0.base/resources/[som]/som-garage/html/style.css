@@ -382,3 +382,31 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     from { opacity: 0; transform: translateX(-24px); }
     to { opacity: 1; transform: none; }
 }
+
+/* Two actions on one shop row: a test drive and the sale. Side by side, so the
+ * row keeps the same height it has on the owned tab and the list does not jump
+ * as the selection moves down it. */
+.row__actions {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+}
+
+.row__actions .row__take { margin-top: 10px; }
+
+/* The secondary of the two. A test drive costs nothing and commits to nothing,
+ * so it should not look like the button that spends the money. */
+.row__take--ghost {
+    background: transparent;
+    border: 1px solid var(--som-pink-a45);
+    color: var(--som-text);
+}
+
+.row__take--ghost:hover {
+    background: var(--som-pink-a16);
+    filter: none;
+}
+
+/* A disabled BUY is a price you cannot meet, which is information rather than
+ * a pending action, so it does not get the wait cursor the others do. */
+.row__actions .row__take:disabled { cursor: not-allowed; }

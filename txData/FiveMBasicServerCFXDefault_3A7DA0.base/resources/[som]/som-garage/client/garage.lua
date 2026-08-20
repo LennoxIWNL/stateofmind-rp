@@ -10,6 +10,14 @@ local isOpen = false
 local currentGarage = nil
 local blips = {}
 
+-- The panel is shared with the dealership, which is the whole reason the
+-- dealership is in this resource: same page, same preview podium, same payment
+-- footer, a different catalogue. Only the resource that SERVED a frame answers
+-- its NUI callbacks, so a separate resource could not have driven this one.
+--
+-- `mode` is what the two NUI actions that differ, buy and take, route on.
+Panel = { mode = 'garage', shop = nil }
+
 local function handle(res, failure)
     if not res or not res.success then
         TriggerEvent('som:client:notify',
@@ -28,10 +36,49 @@ local function close()
 
     isOpen = false
     currentGarage = nil
+    Panel.mode = 'garage'
+    Panel.shop = nil
 
     SetNuiFocus(false, false)
     SendNUIMessage({ action = 'close' })
     Preview.Stop()
+end
+
+Panel.Close = close
+function Panel.IsOpen() return isOpen end
+
+---Puts a server payload on screen. Used by the dealership, which builds the
+---same shape from a different callback.
+---
+---The panel opens FIRST and the car arrives after, for the reason the garage
+---path records below: Preview.Show waits up to eight seconds on a model, and
+---nothing on screen depends on it having arrived.
+---@param res table the server payload
+---@param mode string 'garage' or 'shop'
+function Panel.Show(res, mode)
+    if isOpen then return end
+
+    isOpen = true
+    Panel.mode = mode or 'garage'
+    Panel.shop = res.shop
+
+    local at = res.previewAt
+        and vec4(res.previewAt.x, res.previewAt.y, res.previewAt.z, res.previewAt.w)
+
+    if at then Preview.Start(at) end
+
+    SetNuiFocus(true, true)
+    SendNUIMessage({ action = 'open', data = res })
+
+    -- A shop opens on its catalogue, so the podium shows the first car for sale
+    -- rather than standing empty.
+    local first = (res.vehicles or {})[1] or (res.catalogue or {})[1]
+
+    if first then
+        CreateThread(function()
+            Preview.Show(first.model, first.props)
+        end)
+    end
 end
 
 ---@param garageId string
@@ -43,6 +90,8 @@ local function open(garageId)
 
     isOpen = true
     currentGarage = garageId
+    Panel.mode = 'garage'
+    Panel.shop = nil
 
     local garage = Config.Garages[garageId]
 
@@ -197,6 +246,13 @@ RegisterNUICallback('take', function(data, cb)
         return cb({ success = false, error = 'invalid request' })
     end
 
+    -- A shop sends an empty vehicles list, so there is nothing here to take.
+    -- Refused rather than passed on, because the server's take callback would
+    -- answer with a garage error and read as a bug rather than as a shop.
+    if Panel.mode == 'shop' then
+        return cb({ success = false, error = 'nothing of yours is parked here' })
+    end
+
     local res = lib.callback.await('som-garage:server:take', false, {
         garage = currentGarage,
         id = data.id,
@@ -252,6 +308,10 @@ RegisterNUICallback('buy', function(data, cb)
     if not isOpen or type(data) ~= 'table' then
         return cb({ success = false, error = 'invalid request' })
     end
+
+    -- A dealership buys through its own callback: a different server check, a
+    -- different price source and, at a managed shop, a different path entirely.
+    if Panel.mode == 'shop' then return Dealership.Buy(data, cb) end
 
     local res = lib.callback.await('som-garage:server:buyFleetVehicle', false, {
         garage = currentGarage,

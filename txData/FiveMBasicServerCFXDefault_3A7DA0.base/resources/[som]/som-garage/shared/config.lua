@@ -221,3 +221,104 @@ Config.ModShop = {
     coords = vec3(452.05, -976.92, 25.70),
     rotation = 84.88,
 }
+
+-- ---------------------------------------------------------------------------
+-- Dealerships
+--
+-- Two shop TYPES, at the owner's decision of 2026-08-20:
+--
+--   free    self serve. Buy from a terminal, no staff, any hour. Limited to a
+--           cheap range, so a new player is never stuck waiting for somebody to
+--           log in, but a real car is still a transaction with a person.
+--   managed a player with the dealer job has to be present and hand the car
+--           over, and takes a commission for it. This is the roleplay version
+--           and it is where everything above the free range is sold.
+--
+-- WHY THIS LIVES IN som-garage AND NOT IN A som-dealership RESOURCE.
+-- DEALERSHIP-RESEARCH.md called for a separate resource, and it was written
+-- before this resource had a panel. It now has one, with a live 3D preview
+-- podium, a search, a Buy tab and a cash-or-card footer, and the police fleet
+-- already BUYS through it. A dealership is that panel with a different
+-- catalogue. A second resource could not reuse the page either: a NUI callback
+-- only answers for the resource that SERVED the frame, which is the trap AUDIT
+-- records against som-inventory. Duplicating a 384 line stylesheet and a 313
+-- line renderer to sell civilian cars instead of police ones is the exact
+-- duplication section 7.4 exists to stop.
+--
+-- COORDINATES. `pdm` is the stock Premium Deluxe showroom and is NOT verified
+-- in game. `beachlot` is derived from the `beach` garage coordinate above,
+-- which is, so it is the safer of the two. Correct either here.
+--
+-- THERE IS NO SPAWN POINT, deliberately. A bought car is delivered to a real
+-- garage rather than materialised on the forecourt, which means a shop needs no
+-- verified bay, cannot drop a car into a wall, and leaves the player with a
+-- vehicle where they already know to look for it. `preview` is a local,
+-- non-networked ghost and doubles as where a test drive starts.
+-- ---------------------------------------------------------------------------
+
+Config.Shops = {
+    pdm = {
+        label = 'Premium Deluxe Motorsport',
+        type = 'managed',
+        job = 'cardealer',
+        business = 'pdm',
+
+        -- UNVERIFIED. The showroom floor.
+        coords = vec3(-56.7, -1098.5, 26.4),
+        preview = vec4(-47.5, -1095.5, 26.4, 30.0),
+
+        -- Everything. The free lot's range is a subset of this one.
+        deliverTo = 'legion',
+        blip = { sprite = 326, colour = 3, scale = 0.75 },
+    },
+
+    beachlot = {
+        label = 'Beachfront Used Cars',
+        type = 'free',
+        business = 'pdm',
+
+        -- Derived from the verified `beach` garage a few metres away, so a car
+        -- bought here is collected from the garage you are standing next to.
+        coords = vec3(-1176.5, -1499.8, 4.4),
+        preview = vec4(-1180.0, -1505.0, 4.4, 125.0),
+
+        deliverTo = 'beach',
+        blip = { sprite = 326, colour = 46, scale = 0.6 },
+
+        -- The cheap range, and the whole reason this shop exists. A price cap
+        -- rather than a model list: adding a car to the catalogue under the cap
+        -- puts it here automatically, and raising its price takes it away
+        -- again, so the two shops can never disagree about what they sell.
+        maxPrice = 26000,
+    },
+}
+
+Config.Dealership = {
+    -- How close the server insists you are to the shop counter. Looser than the
+    -- interaction, because client coordinates lag the server's.
+    distance = 20.0,
+
+    -- A managed sale is agreed between two people standing together. Checked
+    -- server side against BOTH of them, so neither half can be spoofed.
+    saleDistance = 8.0,
+
+    -- The dealer's cut of a managed sale, paid by the business out of the sale
+    -- rather than minted. Zero would make the job pointless; too high and a
+    -- dealer earns more than the business does.
+    commission = 0.08,
+
+    -- Test drives.
+    testDrive = {
+        -- Seconds. The despawn is enforced SERVER side: the reference scripts
+        -- lean on the client for it, and a test drive a player can keep is a
+        -- free car.
+        seconds = 120,
+
+        -- Cars a test drive may not be taken in. Anything over this is looked
+        -- at rather than driven, which is also how it works in a real showroom.
+        maxPrice = 250000,
+
+        -- One at a time per player, and refused while one is already out.
+        cooldownSeconds = 30,
+    },
+}

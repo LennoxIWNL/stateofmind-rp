@@ -106,6 +106,31 @@ Jobs = {
     -- Template civilian jobs. Copy either one to add a new civilian job: no
     -- new resource is needed, only a new entry here plus locations in som-jobs
     -- once Phase 5 lands.
+    -- The dealership. Whitelisted, because a managed sale moves real money out
+    -- of a business account as commission, and an open job would be a faucet
+    -- anybody could turn on.
+    --
+    -- defaultDuty is FALSE here, unlike the mechanic. A dealer on duty is what
+    -- makes the showroom sell at all, so going on shift has to be a deliberate
+    -- act rather than a side effect of logging in: an AFK dealer standing in
+    -- the showroom would otherwise be the only one who can serve anybody.
+    cardealer = {
+        label = 'Premium Deluxe Motorsport',
+        business = 'pdm',
+        whitelisted = true,
+        defaultDuty = false,
+        offDutyPay = false,
+        -- Commission is the pay. The wage is a retainer, not a living, or a
+        -- dealer earns the same standing still as selling.
+        commission = 0.08,
+        grades = {
+            [0] = { name = 'Salesperson', payment = 200 },
+            [1] = { name = 'Senior Salesperson', payment = 250 },
+            [2] = { name = 'Sales Manager', payment = 300 },
+            [3] = { name = 'Owner', payment = 350, isboss = true },
+        },
+    },
+
     taxi = {
         label = 'Downtown Cab Co.',
         business = 'downtowncab',

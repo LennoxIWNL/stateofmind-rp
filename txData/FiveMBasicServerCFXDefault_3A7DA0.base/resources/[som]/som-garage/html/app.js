@@ -4,7 +4,14 @@ const root = document.getElementById('root');
 const listEl = document.getElementById('list');
 const searchEl = document.getElementById('search');
 
-let state = { vehicles: [], catalogue: [], payment: [], account: null, tab: 'owned' };
+let state = {
+    vehicles: [], catalogue: [], payment: [], account: null, tab: 'owned',
+    // 'garage' or 'shop'. A shop has no owned vehicles and a much longer
+    // catalogue, and at a managed one the buy button asks a person rather than
+    // a terminal.
+    mode: 'garage', shopType: null, dealer: false,
+    deliverLabel: null, testDrive: null,
+};
 
 function post(endpoint, body) {
     return fetch(`https://${RESOURCE}/${endpoint}`, {
@@ -156,13 +163,18 @@ function renderOwned(filter) {
     listEl.replaceChildren(frag);
 }
 
+/* Which catalogue row is selected. Same idea as selectedId on the owned tab:
+ * clicking PREVIEWS and the action is a separate, deliberate button. */
+let selectedModel = null;
+
 function renderBuy(filter) {
     const frag = document.createDocumentFragment();
 
     const rows = state.catalogue.filter((v) =>
         !filter
         || v.model.toLowerCase().includes(filter)
-        || (v.label || '').toLowerCase().includes(filter));
+        || (v.label || '').toLowerCase().includes(filter)
+        || (v.categoryLabel || '').toLowerCase().includes(filter));
 
     if (!rows.length) {
         frag.appendChild(el('p', 'empty', 'Nothing for sale here.'));
@@ -170,9 +182,18 @@ function renderBuy(filter) {
         return;
     }
 
+    const shop = state.mode === 'shop';
+    const managed = shop && state.shopType === 'managed';
+    const account = state.payment.find((p) => p.account === state.account);
+
     rows.forEach((v) => {
-        const row = el('button', 'row');
-        row.type = 'button';
+        // A DIV rather than a button, because a row now carries buttons of its
+        // own and a button inside a button is not valid markup. It is also what
+        // fixes browsing: a disabled button fires no mouse events in this
+        // engine, so an unaffordable car could not even be previewed, which on
+        // a shop floor is the one thing you most want to do.
+        const row = el('div', 'row');
+        if (v.model === selectedModel) row.classList.add('is-selected');
 
         row.appendChild(thumb(v.model));
 
@@ -181,25 +202,71 @@ function renderBuy(filter) {
             el('span', 'row__price', money(v.price)));
         row.appendChild(head);
 
-        row.appendChild(el('div', 'row__note',
-            'Yours to keep and modify. Stays at this department.'));
+        row.appendChild(el('div', 'row__note', shop
+            ? 'Delivered to ' + (state.deliverLabel || 'your garage')
+            : 'Yours to keep and modify. Stays at this department.'));
 
-        // Unaffordable ON THE SELECTED ACCOUNT rather than hidden, so switching
-        // to the other one answers "can I pay for this with what I picked".
-        const selected = state.payment.find((p) => p.account === state.account);
-        if (!selected || selected.balance < v.price) row.disabled = true;
+        if (shop && v.categoryLabel) row.appendChild(el('span', 'tag', v.categoryLabel));
 
-        row.addEventListener('mouseenter', () => post('select', { model: v.model }));
-
-        row.addEventListener('click', async () => {
-            row.disabled = true;
-            const res = await post('buy', { model: v.model, account: state.account });
-
-            if (!res.success) {
-                row.disabled = false;
-                toast(res.error || 'Could not buy that');
-            }
+        row.addEventListener('click', () => {
+            selectedModel = v.model;
+            post('select', { model: v.model });
+            render();
         });
+
+        if (v.model === selectedModel) {
+            const actions = el('div', 'row__actions');
+
+            // Test drives are the shop's, not the department's, and only for
+            // cars under the cap. Above it the car is looked at, which is also
+            // how it works in a real showroom.
+            const drivable = shop && state.testDrive && state.testDrive.allowed
+                && (!state.testDrive.maxPrice || v.price <= state.testDrive.maxPrice);
+
+            if (drivable) {
+                const drive = el('button', 'row__take row__take--ghost', 'Test drive');
+                drive.type = 'button';
+
+                drive.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    drive.disabled = true;
+
+                    const res = await post('testDrive', { model: v.model });
+                    if (!res.success) {
+                        drive.disabled = false;
+                        toast(res.error || 'Could not bring it round');
+                    }
+                });
+
+                actions.appendChild(drive);
+            }
+
+            // At a managed shop a dealer SELLS and everybody else is told who
+            // to ask. The button says which of the two is about to happen.
+            const affordable = !managed && account && account.balance >= v.price;
+            const label = managed
+                ? (state.dealer ? 'Sell to nearby' : 'Ask a member of staff')
+                : (affordable ? 'Buy' : 'Cannot afford');
+
+            const buy = el('button', 'row__take', label);
+            buy.type = 'button';
+            buy.disabled = managed ? !state.dealer : !affordable;
+
+            buy.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                buy.disabled = true;
+
+                const res = await post('buy', { model: v.model, account: state.account });
+
+                if (!res.success) {
+                    buy.disabled = false;
+                    toast(res.error || 'Could not buy that');
+                }
+            });
+
+            actions.appendChild(buy);
+            row.appendChild(actions);
+        }
 
         frag.appendChild(row);
     });
@@ -289,22 +356,34 @@ window.addEventListener('message', (event) => {
         const d = msg.data || {};
         const payment = d.payment || [];
 
+        const shop = d.mode === 'shop';
+
         state = {
             vehicles: d.vehicles || [],
             catalogue: d.catalogue || [],
             payment: payment,
             account: (payment.find((p) => p.balance > 0) || payment[0] || {}).account,
-            tab: 'owned',
+            tab: shop ? 'buy' : 'owned',
+            mode: shop ? 'shop' : 'garage',
+            shopType: d.shopType || null,
+            dealer: d.dealer === true,
+            deliverLabel: d.deliverLabel || null,
+            testDrive: d.testDrive || null,
         };
 
         selectedId = (state.vehicles[0] || {}).id ?? null;
+        selectedModel = (state.catalogue[0] || {}).model ?? null;
 
         document.getElementById('title').textContent = d.label || 'Garage';
+        // A shop has nothing of yours parked in it, so the tab that would list
+        // it goes rather than sitting there empty.
+        document.getElementById('tab-owned').classList.toggle('hidden', shop);
         document.getElementById('tab-buy').classList.toggle('hidden', !state.catalogue.length);
+        searchEl.placeholder = shop ? 'Search the stock' : 'Search';
         searchEl.value = '';
 
         renderPayment();
-        setTab('owned');
+        setTab(state.tab);
         root.classList.remove('hidden');
         return;
     }

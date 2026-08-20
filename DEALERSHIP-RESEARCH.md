@@ -109,8 +109,75 @@ A dealership is that flow with a catalogue, a showroom and a sales floor on top.
 
 Recorded in `AUDIT.md` 18.4, with the housing half in 18.7.
 
-**Open question, still unanswered:** whether the first dealership is free-use
-(buy from a terminal, works on an empty server) or managed (needs a player on
-duty, better roleplay). My recommendation is both, with free-use on a limited
-cheap range so a new player is never stuck, and managed for everything else.
-That is a design call, not a technical one, and it does not block starting.
+## Built, 2026-08-20
+
+**Owner's decision: both**, free-use on a cheap range and managed above it.
+That was the one open question and it is now closed.
+
+### It is NOT a separate resource, and that is a change from the plan above
+
+This document called for `som-dealership`. It was written before `som-garage`
+had a panel. It now has one, with a live 3D preview podium, a search, a Buy tab
+and a cash-or-card footer, and **the police fleet already buys through it**. A
+dealership is that panel with a different catalogue.
+
+A second resource could not have reused the page either. A `RegisterNUICallback`
+only answers for the resource that SERVED the frame, which is the trap AUDIT
+records against `som-inventory`. So the choice was between duplicating a 384
+line stylesheet and a 313 line renderer to sell civilian cars instead of police
+ones, or putting the dealership where the panel already is. It is in
+`som-garage`, and everything about it is named `dealership` or `shop` so it is
+still findable:
+
+| File | What it is |
+|---|---|
+| `shared/catalogue.lua` | 74 cars, priced and categorised. `Catalogue.IsStreamed` |
+| `shared/config.lua` | `Config.Shops`, `Config.Dealership` |
+| `server/dealership.lua` | Catalogue, both sale paths, test drives |
+| `client/dealership.lua` | Zones, blips, offers, the test drive clock |
+| `client/garage.lua` | `Panel`, shared by both. `buy` routes on `Panel.mode` |
+
+### The two shops
+
+- **Beachfront Used Cars**, free-use, capped at $26,000. A price CAP rather than
+  a model list, so the two shops can never disagree about what they sell:
+  raising a car's price takes it off the cheap lot on its own.
+- **Premium Deluxe Motorsport**, managed, the whole catalogue. Browsable by
+  anyone at any hour and buyable only through a dealer on duty, because a
+  showroom that shows nothing when the staff are off shift is one nobody ever
+  walks into.
+
+### What was taken from the research and what was refused
+
+- The catalogue lists **only models that stream**. `Catalogue.IsStreamed` gates
+  the 25 `som-lorefriendly` names on that resource being started, which is a
+  real check rather than a promise: som-lorefriendly is gitignored and
+  hand-copied, so a fresh server without the copy would otherwise sell 25 cars
+  no client can load.
+- **The showroom swap hole is not reproduced.** `qbx_vehicleshop` rebroadcasts
+  client data to every client unvalidated. There are no pedestal vehicles here
+  at all yet; the panel's preview podium is the showroom.
+- **Test drive despawn is server side.** The car is also deliberately given no
+  `som_vehicles` row and no `vehicleid` statebag, so it has no glovebox, cannot
+  be stored, insured, sold or retrieved, and the worst case if deletion ever
+  failed is a car in the street until the next restart.
+- **A managed offer is re-checked on acceptance, not on creation.** The dealer's
+  job, duty, distance and continued existence are all read again at the moment
+  the buyer says yes.
+- **Commission comes OUT of the business**, which was just credited the full
+  sale price, rather than being minted beside it.
+- **No hand-typed polygon vertices.** Two sphere zones through `som-interact`.
+- **No spawn point.** A bought car is delivered to a real garage rather than
+  materialised on the forecourt, so a shop needs no verified bay and cannot drop
+  a car into a wall.
+
+### Still to build
+
+- **Financing.** The whole of it. That is the `Properties` phone app and it is
+  the next item; nothing here writes a balance anywhere.
+- **Showroom pedestal vehicles.** Cosmetic, and the part most sensitive to
+  coordinates nobody has verified.
+- **Player to player sale**, and blocking the sale of a financed car.
+- **`pdm`'s coordinates are NOT verified in game.** `beachlot`'s are derived
+  from the `beach` garage, which is.
+- `ex-cars` is still unensured. The catalogue does not reference it.

@@ -944,7 +944,12 @@ INSERT IGNORE INTO `som_bank_accounts` (`account_no`, `label`, `type`, `balance`
   ('GOV-EMS',   'San Andreas Medical Services',   'business', 500000),
   ('BUS-LSC',   'Los Santos Customs',             'business', 150000),
   ('BUS-CAB',   'Downtown Cab Co.',               'business', 100000),
-  ('BUS-POSTOP','Post OP',                        'business', 100000);
+  ('BUS-POSTOP','Post OP',                        'business', 100000),
+  -- The dealership. Opening float is deliberately large: a managed sale pays
+  -- the seller's commission OUT of this account, and a business that cannot
+  -- cover the first commission would refuse it and leave the dealer unpaid on
+  -- a sale that already went through.
+  ('BUS-PDM',   'Premium Deluxe Motorsport',      'business', 250000);
 
 INSERT IGNORE INTO `som_businesses`
   (`name`, `label`, `job`, `account_id`, `tax_rate`, `funding`, `category`, `active`, `treasury_cut`)
@@ -957,7 +962,8 @@ VALUES
   ('ems',         'San Andreas Medical Services', 'ambulance', (SELECT id FROM som_bank_accounts WHERE account_no='GOV-EMS'),    0.0000, 'treasury', 'emergency',  1, 0.0000),
   ('lscustoms',   'Los Santos Customs',           'mechanic',  (SELECT id FROM som_bank_accounts WHERE account_no='BUS-LSC'),    0.0000, 'sales',    'private',    1, 0.0800),
   ('downtowncab', 'Downtown Cab Co.',             'taxi',      (SELECT id FROM som_bank_accounts WHERE account_no='BUS-CAB'),    0.0000, 'sales',    'private',    1, 0.0800),
-  ('postop',      'Post OP',                      'delivery',  (SELECT id FROM som_bank_accounts WHERE account_no='BUS-POSTOP'), 0.0000, 'sales',    'private',    1, 0.0800);
+  ('postop',      'Post OP',                      'delivery',  (SELECT id FROM som_bank_accounts WHERE account_no='BUS-POSTOP'), 0.0000, 'sales',    'private',    1, 0.0800),
+  ('pdm',         'Premium Deluxe Motorsport',    'cardealer', (SELECT id FROM som_bank_accounts WHERE account_no='BUS-PDM'),    0.0000, 'sales',    'private',    1, 0.0800);
 
 -- Corrections for databases seeded before the funding model existed, where
 -- INSERT IGNORE above skipped the rows and left them on column defaults.
@@ -969,7 +975,7 @@ UPDATE `som_businesses`
 UPDATE `som_businesses` SET `funding` = 'treasury', `category` = 'emergency' WHERE `name` = 'ems';
 
 UPDATE `som_businesses` SET `funding` = 'sales', `category` = 'private', `treasury_cut` = 0.0800
- WHERE `name` IN ('lscustoms', 'downtowncab', 'postop');
+ WHERE `name` IN ('lscustoms', 'downtowncab', 'postop', 'pdm');
 
 -- Superseded by the ems department above.
 DELETE FROM `som_businesses` WHERE `name` = 'pillbox';

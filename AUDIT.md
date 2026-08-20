@@ -2144,8 +2144,18 @@ empty by construction.
 
 - **Vehicle keys, lockpicking and hotwiring.** Turns theft from taking a car
   into a crime.
-- **A dealership.** `som-dealership`, researched in `DEALERSHIP-RESEARCH.md`.
-  Built on `som-garage/server/fleet.lua`'s existing purchase flow, which is
+- **A dealership. BUILT 2026-08-20, minus financing.** It is NOT a separate
+  `som-dealership` resource: it is in `som-garage`, because that is where the
+  panel it needs already lives and a NUI callback only answers for the resource
+  that served the frame. `DEALERSHIP-RESEARCH.md` records what was built, what
+  was refused and what is left. Owner's decision on the open question: BOTH,
+  free-use capped at $26,000 and managed above it.
+
+  The design it was built to, kept below as the record of WHY, with the parts
+  that are done marked:
+
+  Researched in `DEALERSHIP-RESEARCH.md`, and
+  built on `som-garage/server/fleet.lua`'s existing purchase flow, which is
   already correct: the client sends a model name and never a price, the server
   re-resolves the entry, distance is checked server side, a failed row write
   refunds in full, and the selling business is credited so a sale moves money
