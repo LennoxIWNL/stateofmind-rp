@@ -47,6 +47,26 @@
         </div>
     </div>
 
+    <!-- Input and alert dialogs, replacing ox_lib's. One panel and one focus
+         for both, because they can never be up at the same time. Takes a
+         cursor as well as focus: a form is something you click into. -->
+    <div id="dialog" class="dlg" hidden>
+        <div class="dlg__backdrop" id="dialog-backdrop"></div>
+
+        <form class="dlg__panel" id="dialog-form" role="dialog" aria-modal="true">
+            <h1 class="dlg__title" id="dialog-title"></h1>
+
+            <p class="dlg__content" id="dialog-content" hidden></p>
+
+            <div class="dlg__rows" id="dialog-rows"></div>
+
+            <footer class="dlg__foot">
+                <button class="dlg__button" id="dialog-cancel" type="button"></button>
+                <button class="dlg__button dlg__button--go" id="dialog-confirm" type="submit"></button>
+            </footer>
+        </form>
+    </div>
+
     <!-- Skill checks, replacing ox_lib's. Takes keyboard focus and NO cursor:
          the whole interaction is one key against a moving needle, and a cursor
          parked in the middle of the dial would be in the way. -->

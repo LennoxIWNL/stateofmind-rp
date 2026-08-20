@@ -28,6 +28,13 @@ server_scripts {
     'init.lua'
 }
 
+-- SOM PATCH. Replaces lib.inputDialog with som-ui's, so the police evidence
+-- locker prompt is SOM rather than stock ox_lib. BEFORE init.lua, because
+-- modules/interface/client.lua re-exports the function by VALUE as `Keyboard`
+-- and captures whatever lib.inputDialog is at that moment. Loaded after it, the
+-- export would still hold ox_lib's.
+client_script '@som-ui/client/dialog.lua'
+
 client_script 'init.lua'
 
 -- SOM PATCH. som_bridge.lua is a NEW file, not an edit to any of theirs. It

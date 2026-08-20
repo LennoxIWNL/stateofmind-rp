@@ -46,6 +46,7 @@ client_scripts {
     '@som-ui/client/progressbar.lua',   -- lib.progressBar, lib.progressCircle
     '@som-ui/client/context.lua',       -- lib.registerContext, showContext
     '@som-ui/client/skillcheck.lua',    -- lib.skillCheck, cancelSkillCheck
+    '@som-ui/client/dialog.lua',        -- lib.inputDialog, lib.alertDialog
     'client/whatever.lua',
 }
 ```
@@ -59,6 +60,17 @@ live token acts on it. Every shim path must also appear in this resource's
 All three fall back to `ox_lib`'s own if `som-ui` is stopped, so a restart
 degrades the look rather than breaking the action.
 
+`lib.inputDialog` implements six of `ox_lib`'s eleven row types: `input`,
+`number`, `textarea`, `checkbox`, `select` and `slider`. That is every type
+anything in this tree asks for. **A dialog containing any other type is handed
+to `ox_lib` whole**, rather than drawn with the unknown row missing, because a
+form that silently drops a field returns a value the caller believes is real.
+
+Values are coerced and clamped in the shim against the rows the CALLER passed,
+not the ones the page rendered, and a `select` value is re-resolved against the
+options actually offered. The page decides layout; it decides nothing about what
+comes back.
+
 **A skill check is a client side minigame and its result is a client claim**, in
 `ox_lib` and here alike. It decides presentation. Nothing a server does may rest
 on the player having passed one; the server re-checks the act itself.
@@ -66,6 +78,8 @@ on the player having passed one; the server re-checks the act itself.
 ## Known gaps
 
 - No queueing: past 5 simultaneous notifications the oldest is dropped rather than deferred.
-- `lib.inputDialog` and `lib.alertDialog` are still `ox_lib`'s. They are the same job again and each is smaller than the context menu was.
+- `lib.alertDialog` is implemented and has **no caller anywhere in the tree**. It was built because the shim set is one surface, not three, but nothing has exercised it.
+- `lib.inputDialog` does not implement `date`, `date-range`, `time`, `color` or `multi-select`. Those calls fall through to `ox_lib` intact.
+- `lib.registerMenu` (the keyboard-driven list menu) is still `ox_lib`'s. Its only caller in the tree is `popcornrp-customs`, which is not ensured. If that resource is ever started it will look like ox_lib.
 - No progress or persistent notification type yet. Phase 7 adds those alongside the HUD.
 - Not verified against a live server.

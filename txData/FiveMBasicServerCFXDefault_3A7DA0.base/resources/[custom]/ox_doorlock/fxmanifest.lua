@@ -37,6 +37,8 @@ client_scripts {
     -- before client/utils.lua ever calls it. Degrades to ox_lib's own if
     -- som-ui is stopped. See som-ui/client/skillcheck.lua.
     '@som-ui/client/skillcheck.lua',
+    -- And lib.inputDialog, which is the door passcode prompt in client/main.lua.
+    '@som-ui/client/dialog.lua',
     'client/main.lua',
     'client/utils.lua',
 }

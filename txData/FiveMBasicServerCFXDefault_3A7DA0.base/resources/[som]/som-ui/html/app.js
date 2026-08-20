@@ -332,6 +332,14 @@ contextBack.addEventListener('click', () => postNui('contextBack'));
 contextBackdrop.addEventListener('click', () => postNui('contextClose'));
 
 document.addEventListener('keydown', (event) => {
+    // A dialog is checked before the menu because a menu selection is the usual
+    // way one opens, and Escape while both are somehow up should answer the
+    // thing on top. Enter is left to the form's own submit handler.
+    if (!dialog.hidden) {
+        if (event.key === 'Escape' && !dialogCancel.hidden) dialogSubmit(true);
+        return;
+    }
+
     // The skill check owns the keyboard while it is up, and it is never up at
     // the same time as a menu: it takes focus without a cursor, a menu takes
     // focus with one, and the Lua side refuses a second check.
@@ -355,6 +363,249 @@ document.addEventListener('keydown', (event) => {
     }
 });
 
+
+// ---------------------------------------------------------------------------
+// Input and alert dialogs
+//
+// Render and input only, like everything else on this page. The row list this
+// draws from is a description; the resource that opened the dialog holds the
+// real rows and coerces and clamps every value on the way back, so an edited
+// copy of this file buys a player fields the caller will not accept.
+//
+// One panel serves both surfaces because they can never both be up: an alert
+// has content and no rows, an input has rows and no content.
+// ---------------------------------------------------------------------------
+
+const dialog = document.getElementById('dialog');
+const dialogForm = document.getElementById('dialog-form');
+const dialogTitle = document.getElementById('dialog-title');
+const dialogContent = document.getElementById('dialog-content');
+const dialogRows = document.getElementById('dialog-rows');
+const dialogCancel = document.getElementById('dialog-cancel');
+const dialogConfirm = document.getElementById('dialog-confirm');
+const dialogBackdrop = document.getElementById('dialog-backdrop');
+
+let dialogToken = null;
+let dialogKind = null;
+let dialogFields = [];
+
+function dlgEl(tag, cls, text) {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text !== undefined) node.textContent = text;
+    return node;
+}
+
+// Every value read back through the control's own property, so a number field
+// is read as a number here and re-checked as one in Lua.
+function dialogValue(field) {
+    if (field.type === 'checkbox') return field.el.checked;
+    if (field.type === 'number' || field.type === 'slider') {
+        // Empty comes back as an empty STRING rather than null. A null inside a
+        // JSON array decodes to a nil in the Lua table, which is a hole in the
+        // middle of a positional list, and positional is exactly how callers
+        // read it. tonumber('') is nil on the other side either way.
+        return field.el.value === '' ? '' : Number(field.el.value);
+    }
+    return field.el.value;
+}
+
+function dialogFilled(field) {
+    if (!field.required) return true;
+    if (field.type === 'checkbox') return true;
+
+    const value = dialogValue(field);
+    return value !== null && value !== '' && !Number.isNaN(value);
+}
+
+// Confirm is disabled rather than hidden while something required is empty, so
+// the form reads as unfinished rather than as having no way out.
+function dialogValidate() {
+    dialogConfirm.disabled = !dialogFields.every(dialogFilled);
+}
+
+function dialogRow(row) {
+    const wrap = dlgEl('div', 'dlg__row');
+    const label = dlgEl('label', 'dlg__label', row.label || '');
+
+    if (row.required) {
+        const mark = dlgEl('span', null, ' *');
+        label.append(mark);
+    }
+
+    // Held on a data attribute and never resolved to a glyph, the same decision
+    // the context menu records. One CSS rule the day a licensed set lands.
+    if (row.icon) wrap.setAttribute('data-icon', row.icon);
+
+    let el;
+
+    if (row.type === 'textarea') {
+        el = document.createElement('textarea');
+        el.className = 'dlg__field';
+        if (row.default) el.value = row.default;
+    } else if (row.type === 'checkbox') {
+        el = document.createElement('input');
+        el.type = 'checkbox';
+        el.className = 'dlg__check';
+        el.checked = row.checked === true;
+        wrap.className = 'dlg__row dlg__row--checkbox';
+    } else if (row.type === 'select') {
+        el = document.createElement('select');
+        el.className = 'dlg__field';
+
+        // A blank first entry for an optional select, so "none" is reachable.
+        // A required one opens on its first real option instead.
+        if (!row.required) el.append(new Option('', ''));
+
+        (row.options || []).forEach((option) => {
+            el.append(new Option(option.label, option.value));
+        });
+
+        if (row.default) el.value = row.default;
+    } else if (row.type === 'slider') {
+        el = document.createElement('input');
+        el.type = 'range';
+        el.className = 'dlg__range';
+        el.min = row.min !== undefined && row.min !== null ? row.min : 0;
+        el.max = row.max !== undefined && row.max !== null ? row.max : 100;
+        if (row.step) el.step = row.step;
+        el.value = row.default !== undefined && row.default !== null ? row.default : el.min;
+    } else {
+        el = document.createElement('input');
+        el.className = 'dlg__field';
+        el.type = row.type === 'number' ? 'number' : (row.password ? 'password' : 'text');
+        if (row.type === 'number') {
+            if (row.min !== undefined && row.min !== null) el.min = row.min;
+            if (row.max !== undefined && row.max !== null) el.max = row.max;
+            if (row.step) el.step = row.step;
+        } else if (row.max !== undefined && row.max !== null) {
+            el.maxLength = row.max;
+        }
+        if (row.placeholder) el.placeholder = row.placeholder;
+        if (row.default !== undefined && row.default !== null) el.value = row.default;
+    }
+
+    if (row.disabled) el.disabled = true;
+    el.addEventListener('input', dialogValidate);
+
+    // A checkbox puts its label beside the control rather than above it, so the
+    // label and any description go into their own column and the row stays two
+    // elements wide however much text it carries.
+    if (row.type === 'checkbox') {
+        const text = dlgEl('div', 'dlg__checktext');
+        text.append(label);
+        if (row.description) text.append(dlgEl('div', 'dlg__desc', row.description));
+
+        wrap.append(el, text);
+        dialogFields.push({ el, type: 'checkbox', required: row.required === true });
+        return wrap;
+    }
+
+    wrap.append(label);
+
+    if (row.description) wrap.append(dlgEl('div', 'dlg__desc', row.description));
+
+    if (row.type === 'slider') {
+        const slider = dlgEl('div', 'dlg__slider');
+        const readout = dlgEl('span', 'dlg__value', String(el.value));
+        el.addEventListener('input', () => { readout.textContent = el.value; });
+        slider.append(el, readout);
+        wrap.append(slider);
+    } else {
+        wrap.append(el);
+    }
+
+    dialogFields.push({ el, type: row.type || 'input', required: row.required === true });
+    return wrap;
+}
+
+function dialogShow(token, data) {
+    if (!data) return;
+
+    dialogToken = token;
+    dialogKind = data.kind;
+    dialogFields = [];
+
+    dialogTitle.textContent = data.heading || '';
+
+    const isAlert = data.kind === 'alert';
+
+    dialogContent.textContent = isAlert ? (data.content || '') : '';
+    dialogContent.hidden = !isAlert || !data.content;
+
+    const rows = Array.isArray(data.rows) ? data.rows : [];
+    const frag = document.createDocumentFragment();
+    rows.forEach((row) => frag.append(dialogRow(row)));
+    dialogRows.replaceChildren(frag);
+
+    const labels = data.labels || {};
+    dialogCancel.textContent = labels.cancel || 'Cancel';
+    dialogConfirm.textContent = labels.confirm || (isAlert ? 'Confirm' : 'Submit');
+
+    // ox_lib's alert shows a cancel button only when the caller asked for one.
+    // An input dialog always has one: a form with no way out is a stuck cursor.
+    dialogCancel.hidden = isAlert && data.cancel !== true;
+
+    dialogConfirm.disabled = false;
+    dialogValidate();
+
+    dialog.hidden = false;
+    dialog.classList.remove('is-open');
+    void dialog.offsetWidth;
+    dialog.classList.add('is-open');
+
+    // Focus the first field so a fine can be typed without reaching for the
+    // mouse. Deferred, or the element is not laid out yet and focus is lost.
+    setTimeout(() => {
+        const first = dialogFields.find((field) => !field.el.disabled);
+        if (first) first.el.focus();
+        else dialogConfirm.focus();
+    }, 20);
+}
+
+function dialogHide() {
+    dialog.hidden = true;
+    dialog.classList.remove('is-open');
+    dialogRows.replaceChildren();
+    dialogFields = [];
+    dialogToken = null;
+    dialogKind = null;
+}
+
+function dialogSubmit(cancelled) {
+    if (dialogToken === null) return;
+
+    const token = dialogToken;
+    const body = { token, cancelled };
+
+    if (!cancelled) {
+        if (dialogKind === 'alert') {
+            body.choice = 'confirm';
+        } else {
+            body.values = dialogFields.map(dialogValue);
+        }
+    }
+
+    // Hidden here as well as by Lua, so the panel goes the moment it is
+    // answered rather than after a round trip.
+    dialogHide();
+    postNui('dialogSubmit', body);
+}
+
+dialogForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (dialogConfirm.disabled) return;
+    dialogSubmit(false);
+});
+
+dialogCancel.addEventListener('click', () => dialogSubmit(true));
+
+// Clicking off an input dialog cancels it, matching the context menu. An alert
+// that offers no cancel button does not get one from the backdrop either.
+dialogBackdrop.addEventListener('click', () => {
+    if (dialogCancel.hidden) return;
+    dialogSubmit(true);
+});
 
 // ---------------------------------------------------------------------------
 // Skill check
@@ -611,5 +862,15 @@ window.addEventListener('message', (event) => {
 
     if (data.action === 'skillcheck:hide') {
         skillHide();
+        return;
+    }
+
+    if (data.action === 'dialog:show') {
+        dialogShow(data.token, data.data);
+        return;
+    }
+
+    if (data.action === 'dialog:hide') {
+        dialogHide();
     }
 });
