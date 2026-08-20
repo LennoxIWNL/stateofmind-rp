@@ -147,3 +147,10 @@ NEXT-SESSION.md
 # ps-hud's minimap textures. Streamed binaries, hand-copied to the server like
 # every other .ytd in this repo.
 txData/FiveMBasicServerCFXDefault_3A7DA0.base/resources/[custom]/ps-hud/stream/
+
+# Session handoff notes, same reasoning as NEXT-SESSION.md above: working notes
+# between sessions rather than part of the server, and they churn every session.
+# Both spellings, because git ignore patterns are case sensitive on the Linux
+# VPS even though they would not be on this Windows box.
+handoff.md
+HANDOFF.md
