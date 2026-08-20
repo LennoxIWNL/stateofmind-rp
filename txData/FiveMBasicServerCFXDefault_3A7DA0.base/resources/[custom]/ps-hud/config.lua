@@ -7,7 +7,11 @@ Config.MinimumStress = 50 -- Minimum Stress Level For Screen Shaking
 Config.MinimumSpeedUnbuckled = 50 -- Going Over This Speed Will Cause Stress
 Config.MinimumSpeed = 100 -- Going Over This Speed Will Cause Stress
 Config.DisablePoliceStress = false -- Default: false, If true will disable stress for people with the police job
-Config.FuelScript = 'LegacyFuel' -- change to lj-fuel if you use lj-fuel or something else if you use any other LegcyFuel compatible script
+-- SOM: repointed from 'LegacyFuel'. There is no fuel resource on this server,
+-- and this export is called from inside the main render loop, so a missing
+-- resource here took the whole HUD down the moment you got into a car.
+-- som-compat answers GetFuel. See its client/qbcore.lua for what that is worth.
+Config.FuelScript = 'som-compat'
 
 -- Admin only to change hud icons/shapes
 Config.AdminOnly = false

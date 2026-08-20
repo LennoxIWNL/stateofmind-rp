@@ -39,9 +39,22 @@ function Locale:new(opts)
     return self
 end
 
-function Locale:extend(phrases)
+-- Phrase tables are NESTED and keys are looked up DOTTED. ps-hud writes
+-- `Translations.notify.hud_start` and reads `Lang:t('notify.hud_start')`, so
+-- the tree has to be flattened into dotted keys on the way in. A shallow copy
+-- stores one entry per top level group, every real lookup misses, and every
+-- string on screen reads back as its own key.
+---@param phrases table
+---@param prefix string|nil
+function Locale:extend(phrases, prefix)
     for key, phrase in pairs(phrases) do
-        self.phrases[key] = phrase
+        local path = prefix and (prefix .. '.' .. key) or key
+
+        if type(phrase) == 'table' then
+            self:extend(phrase, path)
+        else
+            self.phrases[path] = phrase
+        end
     end
 end
 

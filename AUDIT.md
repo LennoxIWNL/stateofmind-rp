@@ -1354,6 +1354,9 @@ upgrade of these resources drops them, so this table is the re-apply list.
 | `ox_doorlock` | `use_experimental_fxv2_oal` commented out | Suspected cause of the manifest and streaming faults; the texture dict still never loaded with it on |
 | `ox_doorlock` | Texture dict awaited before the lock sprite draws | Stock requested it once and drew regardless, rendering a white square forever |
 | `ox_target` | Reach set through the `ox_target:maxDistance` convar, dots restyled to SOM pink | Stock hardcodes a much longer reach and gives the dot no hover state |
+| `ps-hud` | `fxmanifest.lua` shared_script repointed from `@qb-core/shared/locale.lua` to `@som-compat/shared/locale.lua` | There is no qb-core DIRECTORY here. A manifest @-reference is a file path and `provide 'qb-core'` does not satisfy one, so ps-hud failed to start before a line of its own code ran |
+| `ps-hud` | `config.lua`: `Config.FuelScript` repointed from `LegacyFuel` to `som-compat` | No fuel resource is installed. The call sits inside the MAIN render loop, so getting into a car raised on a missing resource and killed the condition rings, the speedometer and the whole vehicle panel with it |
+| `ps-hud` | `client.lua`: `hasHarness()` guarded on `GetResourceState('qb-smallresources')` | qb-smallresources is on disk and not ensured. Same class of fault on a 1500ms in-vehicle loop, costing the seatbelt alarm |
 | `ox_target` | `somProgressActive()` added at `client/main.lua:35` and checked alongside `lib.progressActive()` at `:203` | som-ui replaced ox_lib's progress bar, and `lib.progressActive` is not in ox_lib's `imports/`, so ox_target's call resolves to `exports.ox_lib:progressActive()` and reads ox_lib's own state, which is now permanently false. Without this the eye stays openable throughout a search or a cuffing. Guarded on som-ui being started, so ox_target still runs standalone |
 
 ### 16.3 Bugs found and their real causes

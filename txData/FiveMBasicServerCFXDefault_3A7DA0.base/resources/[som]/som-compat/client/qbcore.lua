@@ -217,17 +217,33 @@ end)
 RegisterNetEvent('vehiclekeys:client:SetOwner', function() end)
 
 -- ---------------------------------------------------------------------------
--- isLoggedIn
+-- The qb-core player lifecycle, as ps-hud expects to be told about it
 --
--- ps-hud gates its ENTIRE render loop on LocalPlayer.state.isLoggedIn, in seven
--- places, and nothing in SOM has ever set it. Without this the HUD stays
--- permanently hidden and its else-branch calls DisplayRadar(false) once a
--- second forever, which would also fight som-hud's minimap rule.
+-- Three separate things, and they have to happen in this order.
 --
--- It lives here rather than in som-core because it is purely a qb-core-shaped
--- convention: som-core has its own loaded state and no reason to learn a second
--- name for it. Anything else expecting the qb-core statebag gets it for free.
+-- 1. QBCore:Player:SetPlayerData. ps-hud takes a COPY of GetPlayerData() at
+--    script load and refreshes it only from this event. som-core replaces its
+--    PlayerData table wholesale on load rather than mutating it, so the copy
+--    ps-hud took is the empty one it was handed before anybody was logged in,
+--    and it stays empty forever. Its render loop then reads
+--    PlayerData.metadata["inlaststand"] every tick, which is an index of nil,
+--    which kills the whole thread on its FIRST pass. That is a dead HUD, not a
+--    hidden one, and nothing about it looks like a missing statebag.
+--
+-- 2. isLoggedIn, which gates that render loop. Set AFTER the data, or the loop
+--    wakes into the same nil.
+--
+-- 3. QBCore:Client:OnPlayerLoaded, which is what makes ps-hud build its NUI and
+--    load the minimap. Its own handler waits two seconds before reading player
+--    data, so it cannot be the thing that supplies it.
+--
+-- Nothing in SOM emits any of the three; this is the only emitter in the tree.
 -- ---------------------------------------------------------------------------
+
+local function pushPlayerData()
+    if not core:isPlayerLoaded() then return end
+    TriggerEvent('QBCore:Player:SetPlayerData', QBCore.Functions.GetPlayerData())
+end
 
 local function setLoggedIn(value)
     LocalPlayer.state:set('isLoggedIn', value, false)
@@ -236,13 +252,76 @@ end
 -- onPlayerLoaded is the only one of these som-core actually emits. There is no
 -- unload event, so there is no handler for one: a listener for an event nobody
 -- raises reads like coverage and is not.
-AddEventHandler('som:client:onPlayerLoaded', function() setLoggedIn(true) end)
+AddEventHandler('som:client:onPlayerLoaded', function()
+    pushPlayerData()
+    setLoggedIn(true)
+    TriggerEvent('QBCore:Client:OnPlayerLoaded')
+end)
 
 CreateThread(function()
     -- Covers a resource restart with a player already in the world, where no
     -- load event is coming.
     Wait(2000)
-    if exports['som-core']:isPlayerLoaded() then setLoggedIn(true) end
+    if not core:isPlayerLoaded() then return end
+
+    pushPlayerData()
+    setLoggedIn(true)
+    TriggerEvent('QBCore:Client:OnPlayerLoaded')
+end)
+
+AddEventHandler('som:client:onJobChanged', pushPlayerData)
+AddEventHandler('som:client:onGangChanged', pushPlayerData)
+
+-- ---------------------------------------------------------------------------
+-- Money
+--
+-- ps-hud's money panel reads its OWN PlayerData for the new balances and takes
+-- only the delta from the event, so the refresh has to land before the event
+-- or the panel animates a change from the new number to the same new number.
+--
+-- som-core reports the whole account table rather than a delta, so the delta is
+-- worked out here. The first report after a load establishes the baseline and
+-- announces nothing: a login is not an income.
+-- ---------------------------------------------------------------------------
+
+local lastMoney
+
+AddEventHandler('som:client:onMoneyChanged', function(money)
+    if type(money) ~= 'table' then return end
+
+    pushPlayerData()
+
+    local previous = lastMoney
+    lastMoney = { cash = money.cash or 0, bank = money.bank or 0 }
+    if not previous then return end
+
+    for _, account in ipairs({ 'cash', 'bank' }) do
+        local delta = lastMoney[account] - previous[account]
+        if delta ~= 0 then
+            TriggerEvent('hud:client:OnMoneyChange', account, math.abs(delta), delta < 0)
+        end
+    end
+end)
+
+-- ---------------------------------------------------------------------------
+-- Fuel
+--
+-- ps-hud calls exports[Config.FuelScript]:GetFuel(vehicle) from inside its main
+-- render loop, and its stock Config.FuelScript is 'LegacyFuel', which is not on
+-- this server. Calling an export on a resource that does not exist RAISES, and
+-- that call sits in the same thread as the condition rings, so getting into any
+-- car would take the entire HUD down with it.
+--
+-- ps-hud's config is repointed here so there is an export to answer it. This is
+-- not a fuel system and does not pretend to be one: GetVehicleFuelLevel on a
+-- vanilla vehicle barely moves, so the gauge reads roughly full and sits there.
+-- A real one is the ox_fuel decision in AUDIT 17.3, still open. Until then a
+-- static gauge is the cost, rather than the HUD.
+-- ---------------------------------------------------------------------------
+
+exports('GetFuel', function(vehicle)
+    if not vehicle or vehicle == 0 or not DoesEntityExist(vehicle) then return 0 end
+    return GetVehicleFuelLevel(vehicle) + 0.0
 end)
 
 -- ---------------------------------------------------------------------------
@@ -253,6 +332,11 @@ end)
 -- player:<serverId>. It never asks; it waits to be told, so on SOM it would sit
 -- at whatever it initialised to forever.
 --
+-- The event is the half worth bridging. ps-hud builds its statebag filter from
+-- GetPlayerServerId at script load, which is not reliable that early, so those
+-- three handlers may well never match anything. som-core makes the same point
+-- about its own bags in client/main.lua and resolves the name per call instead.
+--
 -- som-core keeps all three on metadata and raises onMetadataChanged, so this is
 -- a translation rather than a poll. The initial push matters as much as the
 -- updates: a player who does not eat for ten minutes would otherwise see a full
@@ -260,7 +344,6 @@ end)
 -- ---------------------------------------------------------------------------
 
 local function pushNeeds()
-    local core = exports['som-core']
     if not core:isPlayerLoaded() then return end
 
     local hunger = tonumber(core:getMetadata('hunger')) or 100
@@ -276,7 +359,12 @@ local function pushNeeds()
         math.floor(math.max(0, math.min(100, stress)) + 0.5))
 end
 
-AddEventHandler('som:client:onMetadataChanged', pushNeeds)
+AddEventHandler('som:client:onMetadataChanged', function()
+    -- The render loop reads inlaststand and isdead straight off its own copy,
+    -- so metadata has to refresh the copy as well as the bars.
+    pushPlayerData()
+    pushNeeds()
+end)
 
 AddEventHandler('som:client:onPlayerLoaded', function()
     -- After ps-hud's own listeners exist. Pushing before it has registered them

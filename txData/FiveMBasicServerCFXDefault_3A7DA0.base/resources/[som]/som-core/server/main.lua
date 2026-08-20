@@ -45,6 +45,36 @@ CreateThread(function()
 end)
 
 -- ---------------------------------------------------------------------------
+-- Hunger and thirst decay
+--
+-- setMetadata clamps to Config.MetadataBounds, so the floor is handled there
+-- and this only has to subtract. Skipped entirely if either rate is zero, so
+-- turning decay off is a config edit rather than a code one.
+-- ---------------------------------------------------------------------------
+
+CreateThread(function()
+    local needs = Config.Needs
+    if not needs then return end
+
+    local interval = (needs.intervalMinutes or 0) * 60000
+    if interval <= 0 then return end
+
+    while true do
+        Wait(interval)
+
+        for _, player in ipairs(Players.GetAll()) do
+            if needs.hungerPerInterval and needs.hungerPerInterval > 0 then
+                player:setMetadata('hunger', (player.metadata.hunger or 100) - needs.hungerPerInterval)
+            end
+
+            if needs.thirstPerInterval and needs.thirstPerInterval > 0 then
+                player:setMetadata('thirst', (player.metadata.thirst or 100) - needs.thirstPerInterval)
+            end
+        end
+    end
+end)
+
+-- ---------------------------------------------------------------------------
 -- Payroll
 --
 -- Pay is drawn from the job's business account, never minted. If the business

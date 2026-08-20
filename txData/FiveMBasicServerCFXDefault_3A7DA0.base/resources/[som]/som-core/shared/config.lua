@@ -75,6 +75,22 @@ Config.Save = {
     intervalMinutes = 5,
 }
 
+-- Hunger and thirst decay.
+--
+-- These existed as metadata and as bounds from the first commit, and food and
+-- drink moved them, but nothing ever moved them DOWNWARD, so in practice a
+-- character sat at 100 and 100 for their whole life and the bars were
+-- decoration. Server side, because every other write to these keys is.
+--
+-- At these rates a full character empties in a little over two hours of
+-- connected play. Nothing happens at zero yet: the consequence is a Phase 2
+-- decision and belongs with som-medical, not here.
+Config.Needs = {
+    intervalMinutes = 5,
+    hungerPerInterval = 4,
+    thirstPerInterval = 5,
+}
+
 -- Metadata keys created on every new character. Anything not listed here is
 -- rejected by SetMetadata, so a compromised client cannot invent state.
 Config.DefaultMetadata = {

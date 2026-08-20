@@ -77,6 +77,15 @@ local function hasHarness()
     local ped = PlayerPedId()
     if not IsPedInAnyVehicle(ped, false) then return end
 
+    -- SOM: qb-smallresources is on disk but is not ensured, and an export call
+    -- on a resource that is not started raises. This runs on a 1500ms loop
+    -- whenever you are in a vehicle, so unguarded it killed that thread and
+    -- took the seatbelt alarm with it.
+    if GetResourceState('qb-smallresources') ~= 'started' then
+        harness = false
+        return
+    end
+
     local _harness = false
     local hasHarness = exports['qb-smallresources']:HasHarness()
     if hasHarness then
