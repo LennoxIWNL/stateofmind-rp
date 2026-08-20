@@ -18,6 +18,9 @@ client_scripts {
     -- After main, because it calls Appearance.Apply which appearance.lua
     -- defines and main.lua is the one that already proves is reachable.
     'client/wardrobe.lua',
+    -- The barber and clothing store zones. Last, because they only call the
+    -- openEditor export, which main.lua registers.
+    'client/zones.lua',
 }
 
 server_scripts {
@@ -41,4 +44,5 @@ dependencies {
     'oxmysql',
     'som-core',
     'som-assets',
+    'som-interact',
 }

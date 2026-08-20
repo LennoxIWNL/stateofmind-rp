@@ -212,3 +212,70 @@ Config.Pricing = {
 -- Nothing reads it yet; som-police and the MDT will. A face that can change
 -- silently is a face that cannot be investigated.
 Config.LogFaceChanges = true
+
+-- ---------------------------------------------------------------------------
+-- World locations
+--
+-- The editor was reachable from character creation and from NOWHERE ELSE, so a
+-- player built a face once and could never change it or their clothes again.
+-- This is the missing half: a zone at every vanilla barber and clothing store
+-- that calls openEditor with the matching scope.
+--
+-- SHARED rather than client, because the server distance-checks against the
+-- same list before it charges anybody. A zone the client draws is not a
+-- permission to edit; see server/main.lua.
+--
+-- These are the stock GTA V shop entrances. Any of them sitting under a custom
+-- MLO wants its coordinate corrected here rather than the zone removed, and
+-- `radius` is where the circle appears while the option's own distance is how
+-- close you must be to use it.
+-- ---------------------------------------------------------------------------
+
+Config.Locations = {
+    barber = {
+        radius = 1.5,
+        distance = 2.0,
+        label = 'Barber',
+        prompt = 'Take a seat',
+        icon = 'fa-solid fa-scissors',
+        blip = { sprite = 71, colour = 0, scale = 0.6 },
+        coords = {
+            vec3(-814.31, -183.84, 37.57),   -- Bob Mulet, Rockford Hills
+            vec3(136.83, -1708.4, 29.3),     -- Herr Kutz, Davis
+            vec3(-1282.6, -1116.8, 6.99),    -- Beach Combover, Vespucci
+            vec3(1931.51, 3729.67, 32.85),   -- Sandy Shores
+            vec3(-278.09, 6228.46, 31.71),   -- Paleto Bay
+            vec3(1212.83, -472.92, 66.21),   -- Hair on Hawick, Vinewood
+        },
+    },
+
+    clothing = {
+        radius = 1.5,
+        distance = 2.0,
+        label = 'Clothing Store',
+        prompt = 'Browse the racks',
+        icon = 'fa-solid fa-shirt',
+        blip = { sprite = 73, colour = 0, scale = 0.6 },
+        coords = {
+            vec3(72.3, -1399.1, 29.38),      -- Binco, Strawberry
+            vec3(-703.78, -152.32, 37.41),   -- Ponsonbys, Morningwood
+            vec3(-167.86, -298.95, 39.73),   -- Suburban, Hawick
+            vec3(428.69, -800.1, 29.49),     -- Suburban, Burton
+            vec3(-829.4, -1073.7, 11.32),    -- Suburban, Del Perro
+            vec3(-1193.43, -768.54, 17.32),  -- Binco, Del Perro
+            vec3(-1447.8, -242.5, 49.82),    -- Ponsonbys, Del Perro Plaza
+            vec3(11.63, 6514.22, 31.88),     -- Binco, Paleto Bay
+            vec3(123.64, -219.44, 54.56),    -- Discount Store, Pillbox Hill
+            vec3(1696.36, 4829.34, 42.06),   -- Binco, Grapeseed
+            vec3(618.09, 2759.63, 42.09),    -- Binco, Harmony
+            vec3(1190.31, 2713.44, 38.22),   -- Binco, Route 68
+            vec3(-3172.5, 1048.1, 20.86),    -- Binco, Chumash
+            vec3(-1108.4, 2708.92, 19.11),   -- Binco, Great Chaparral
+        },
+    },
+}
+
+-- How far the SERVER will accept a save from, per scope. Deliberately looser
+-- than the interaction distance: the client's coordinates lag the server's, and
+-- refusing a real haircut is worse than the metre it gives away.
+Config.SaveDistance = 20.0

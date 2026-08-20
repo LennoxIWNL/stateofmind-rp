@@ -76,13 +76,33 @@ hardcoded, because the counts vary by model and by what is streamed. A menu that
 offers a drawable the ped does not have renders an invisible torso, which is the
 classic broken clothing menu.
 
+## Getting in from the world
+
+`client/zones.lua` puts a sphere on every vanilla barber and clothing store in
+`Config.Locations` and calls `openEditor` with the matching scope. Before it
+existed the editor had exactly one caller, `som-multichar` at character
+creation, so a player built a face once and then lived with it and with the
+clothes they were created in for the life of the character.
+
+Spheres rather than entity targets, because `ox_target` draws its indicator
+circle for zones only. The shops are static, so a sphere behaves identically and
+earns the marker. The option hides itself in a vehicle and while downed.
+
+**The zone is not the permission.** `som-appearance:server:save` re-checks the
+scope against the same shared `Config.Locations` with the server's own view of
+where the ped is, at `Config.SaveDistance`, which is deliberately looser than
+the interaction distance because the client's coordinates lag the server's.
+
+`creator` is the one scope with no location, and it is accepted only while
+nothing is stored for the character, the same condition `needsCreation` reports
+to `som-multichar`. Without that check a client could send `creator` from
+anywhere and get every section, the ped model and the gender, for free, which is
+a new person rather than a haircut.
+
 ## Known gaps
 
 - **No tattoos.** The field is in the shape and reserved; the overlay collection
   work is not done.
-- **No shops.** The barber and clothing scopes exist and are enforced, but
-  nothing places a barber chair or a shop counter yet. `openEditor` is exported
-  ready for `som-interact` to call.
 - **No outfits or wardrobe.**
 - Hair swatch colours are approximations. The game's palette is not exposed to
   NUI, so the swatch is a guess while the value sent is the real palette index.

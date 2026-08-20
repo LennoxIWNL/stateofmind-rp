@@ -105,6 +105,43 @@ local function priceFor(changed)
     return total
 end
 
+-- ---------------------------------------------------------------------------
+-- Where a save is allowed to come from
+--
+-- The zones in client/zones.lua decide what a player can SEE. They decide
+-- nothing about what the server will accept, and until they existed nothing had
+-- to: there was no world entry point, so the only caller was character
+-- creation. There was also nothing stopping a client sending scope 'creator'
+-- from anywhere at any time, which is every section unlocked, the model and the
+-- gender included, for free. That is not a haircut, it is a new person, and it
+-- undoes the reason Config.Pricing prices face work an order of magnitude above
+-- a trim.
+--
+-- creator is now allowed exactly once, while nothing is stored, which is the
+-- same condition needsCreation reports to som-multichar. Every other scope has
+-- to be standing at one of its own locations.
+-- ---------------------------------------------------------------------------
+
+---@param source number
+---@param scope string
+---@return boolean
+local function atLocation(source, scope)
+    local def = Config.Locations and Config.Locations[scope]
+    if not def or type(def.coords) ~= 'table' then return false end
+
+    local ped = GetPlayerPed(source)
+    if not ped or ped == 0 then return false end
+
+    local coords = GetEntityCoords(ped)
+    local limit = Config.SaveDistance or 20.0
+
+    for _, position in ipairs(def.coords) do
+        if #(coords - position) <= limit then return true end
+    end
+
+    return false
+end
+
 lib.callback.register('som-appearance:server:save', function(source, data)
     if type(data) ~= 'table' or type(data.appearance) ~= 'table' then
         return { success = false, error = 'invalid request' }
@@ -115,6 +152,16 @@ lib.callback.register('som-appearance:server:save', function(source, data)
 
     local player, stored = load(source)
     if not player then return { success = false, error = 'not loaded' } end
+
+    if scope == 'creator' then
+        if stored ~= nil then
+            return { success = false, error = 'this character has already been created' }
+        end
+    elseif not atLocation(source, scope) then
+        local def = Config.Locations and Config.Locations[scope]
+        local label = (def and def.label) or scope
+        return { success = false, error = ('you are not at a %s'):format(label:lower()) }
+    end
 
     local merged, changed = merge(stored, data.appearance, scope)
 
