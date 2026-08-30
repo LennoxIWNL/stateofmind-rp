@@ -78,13 +78,38 @@ Citizen.CreateThread(function()
     end
 end)
 
+-- ox_inventory's GetPlayerItems hands back its own PlayerData.inventory, which
+-- is nil until it has finished setting the player up. som-compat fires
+-- QBCore:Player:SetPlayerData the moment a character loads, and that is what
+-- reaches DoRadioCheck, so on a fresh load the export answered nil and the
+-- pairs() over it raised "table expected, got nil" every single time.
+--
+-- Waits rather than defaulting to an empty table: {} answers "no radio" for
+-- somebody who is holding one, which is worse than a short wait. Capped,
+-- because a spin with no end is its own bug, and on Wait(100) rather than
+-- Wait(0) so this is not a per-frame loop.
+function GetOxItems()
+    local items = exports.ox_inventory:GetPlayerItems()
+    local waited = 0
+
+    while not items and waited < 10000 do
+        Citizen.Wait(100)
+        waited = waited + 100
+        items = exports.ox_inventory:GetPlayerItems()
+    end
+
+    return items
+end
+
 function DoRadioCheck()
     if CoreName == "qb-core" or CoreName == "qbx_core" then
         local PlayerData = Core.Functions.GetPlayerData()
         while not next(PlayerData) do Citizen.Wait(0) end
         local hasOX = GetResourceState('ox_inventory') == 'started'
         if hasOX then
-            local oxItems = exports.ox_inventory:GetPlayerItems()
+            local oxItems = GetOxItems()
+            if not oxItems then return false end
+
             for k, v in pairs(oxItems) do
                 if v.name == Config.RadioItem then
                     return true
@@ -102,7 +127,9 @@ function DoRadioCheck()
         while not Core.IsPlayerLoaded() do Citizen.Wait(0) end
         local hasOX = GetResourceState('ox_inventory') == 'started'
         if hasOX then
-            local oxItems = exports.ox_inventory:GetPlayerItems()
+            local oxItems = GetOxItems()
+            if not oxItems then return false end
+
             for k, v in pairs(oxItems) do
                 if v.name == Config.RadioItem then
                     return true
