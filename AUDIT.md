@@ -2856,3 +2856,89 @@ here and give them the review before trusting them.
   `som-ui/shared/config.lua` is believed correct and none has been heard on
   this server. A silent one is a wrong string, not broken code, and it is a one
   line fix there.
+
+---
+
+## 22. Session handoff, fourth pass
+
+### 22.1 What was built
+
+| Thing | Where | State |
+|---|---|---|
+| Minimap zoom, single owner | `karma-minimap` + `som-compat/MINIMAP.md` | ps-hud owns `SetRadarZoom` |
+| txAdmin heal clears downed | `som-medical/server/main.lua` | `txAdmin:events:playerHealed` |
+| pa-radio nil guard | `[voice]/pa-radio/client/core.lua` | Both call sites, one helper |
+| NUI apps buildable again | every `ui/apps/*/package.json` | `--configLoader runner` |
+| Inventory browser mock | `ui/apps/som-inventory/src/dev.ts` | `npm run dev`, real icons and tokens |
+| Shorthand-token sweep | `som-assets/tokens.css` + 31 call sites | `--som-border-color`, `--som-card-lift` |
+
+### 22.2 A CSS token that is a shorthand cannot go in a colour slot
+
+The most expensive thing found this session, and it had been shipping.
+
+`--som-border` is `1px solid var(--som-pink-a30)`, a full border shorthand.
+Thirty-one places wrote `border: 1px solid var(--som-border)`, which expands to
+`border: 1px solid 1px solid rgba(...)`. **An invalid shorthand does not fall
+back to a sane value, it drops the whole declaration.** `.som-slot` computed to
+`0px none`: every inventory slot has had no border at all.
+
+The part worth carrying: **that silently killed the entire rarity system.**
+`border-color` cannot show on a border of width zero, so all five
+`.som-slot.rarity-*` rules had never rendered anything, and the failure looks
+exactly like "rarity was never implemented" rather than like a broken token. The
+same token used as a `background` computed to `rgba(0,0,0,0)`, which is why the
+weight meter only ever drew its filled segments. `--som-glow` is a shorthand
+too, so `box-shadow: 0 0 0.8vh var(--som-glow)` was dead the same way.
+
+`--som-border-color` now sits beside `--som-border`, both carrying a comment
+saying where they may go. The shorthand stays because six places in the tree do
+use it correctly, and flipping the token to a colour would have broken those
+instead. **When a token is misused in 31 of 37 places, check which reading the
+minority holds before you redefine it.**
+
+This is the same shape as the four export-side mistakes in the previous
+handoffs: the thing exists, and it is wrong in the position you put it in.
+
+### 22.3 Two "missing features" that were a thin mock
+
+Both category chips and the status footer looked absent in the browser render
+and were fully implemented. The chips derive from each item's `category` rather
+than a fixed ALL/WEAPONS/FOOD/HEALING list, deliberately, and the footer is fed
+by `som_bridge`. Neither can appear unless the payload carries them.
+
+**A gap in a fixture reads exactly like a gap in the product.** Check the
+component before changing it; twice this session that check saved a wrong fix.
+
+### 22.4 Diagnostics that no longer need the owner in the loop
+
+Two loops now exist, and both found real bugs this session.
+
+- **Deploy check.** `curl http://<vps>:30120/info.json` lists every running
+  resource. Diffed against `som.cfg` it proved the VPS was eleven commits
+  behind, which is why ps-hud "was not working": it was never deployed.
+- **Live NUI inspection.** The client's CEF debugger is on `127.0.0.1:13172`
+  with `+set moo 31337` on the shortcut. Every resource page is an iframe inside
+  `nui://game/ui/root.html`, so one CDP target reaches all of them: DOM,
+  computed styles, the NUI message bus and clipped screenshots. **ps-hud was
+  confirmed working end to end this way, including that hunger 96 and thirst 95
+  were reaching the arc geometry**, without the owner describing anything.
+
+The same CDP approach drives a headless Chrome against reference sites. Pull
+bytes with `Network.getResponseBody` rather than navigating to an asset URL:
+imgur redirects a document navigation to an HTML page, so a naive fetch returns
+`<!doct` and every decode fails.
+
+### 22.5 Still open
+
+1. **`minimap.gfx` is streamed by both** karma-minimap and ps-hud. The owner has
+   now hand-copied `ps-hud/stream/`, so this is live and resolves by load order.
+   Deleting one is a binary-asset edit and therefore the owner's.
+2. **A PDM map.** Every standard one is paid, and an MLO is binary assets, so it
+   cannot be pulled in from here. Gabz PDM is the recommendation: four Gabz maps
+   already run and `cfx-gabz-mapdata` is already ensured.
+3. **Inventory proportions.** The panel is `--inv-panel: 45vh` and reads
+   narrower than the reference, which is wider relative to its height.
+4. **Four literal colours remain in `som-inventory/app.css`** (lines 130, 401,
+   418, 728), against that file's own header rule.
+5. **Nothing in this session has been run in game.** All of it is deployed only
+   as far as GitHub.
