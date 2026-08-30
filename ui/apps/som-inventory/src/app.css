@@ -99,7 +99,7 @@
   font-size: 1.35vh;
   font-weight: 700;
   padding: 0.7vh 1.4vh;
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   border-radius: var(--som-radius);
   background: var(--som-card);
   color: var(--som-text-dim);
@@ -137,7 +137,7 @@
 
 .som-panel {
   background: var(--som-bg);
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   border-radius: var(--som-radius-lg);
   box-shadow: var(--som-shadow);
   padding: 1.2vh;
@@ -202,7 +202,7 @@
   width: 0.5vh;
   height: 1.1vh;
   border-radius: 1px;
-  background: var(--som-border);
+  background: var(--som-border-color);
 }
 
 .som-panel__bar i.is-on { background: var(--som-pink); }
@@ -225,7 +225,7 @@
   letter-spacing: 0.05em;
   padding: 0.45vh 1vh;
   border-radius: 999px;
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   background: transparent;
   color: var(--som-text-mute);
   cursor: pointer;
@@ -254,7 +254,7 @@
 .som-slot {
   position: relative;
   aspect-ratio: 1;
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   border-radius: var(--som-radius);
   background: var(--som-card);
   overflow: hidden;
@@ -270,12 +270,12 @@
  * cheap, and it spends the accent on "this slot is not empty", which the icon
  * already says. Colour is worth more on rarity and on the active category.
  *
- * Literal rgba on the hover rather than color-mix: CEF is Chrome 103 and
- * color-mix needs 111, where it resolves to invalid and silently takes the
- * whole declaration with it.
+ * The hover lift is --som-card-lift, a token rather than a literal: this file
+ * takes all its colour from som-assets, and color-mix is not an option either
+ * way, since CEF is Chrome 103 and color-mix needs 111.
  */
 .som-slot.has-item { background: var(--som-card-hover); cursor: grab; }
-.som-slot.has-item:hover { border-color: var(--som-pink); background: rgba(46, 46, 64, 0.95); }
+.som-slot.has-item:hover { border-color: var(--som-pink); background: var(--som-card-lift); }
 .som-slot.has-item:active { cursor: grabbing; }
 
 .som-slot__art {
@@ -355,7 +355,7 @@
   bottom: 2.1vh;
   height: 0.35vh;
   border-radius: 2px;
-  background: var(--som-border);
+  background: var(--som-border-color);
   overflow: hidden;
 }
 
@@ -372,16 +372,16 @@
  * is a ranking, so it reads as one ramp getting hotter rather than as four
  * unrelated colours competing with each other and with the accent.
  */
-.som-slot.rarity-common    { border-color: var(--som-border); }
+.som-slot.rarity-common    { border-color: var(--som-border-color); }
 .som-slot.rarity-uncommon  { border-color: var(--som-text-mute); }
 .som-slot.rarity-rare      { border-color: var(--som-pink-a45); }
 .som-slot.rarity-epic      { border-color: var(--som-pink); }
-.som-slot.rarity-legendary { border-color: var(--som-pink-light); box-shadow: 0 0 0.8vh var(--som-glow); }
+.som-slot.rarity-legendary { border-color: var(--som-pink-light); box-shadow: 0 0 0.8vh var(--som-pink-a45); }
 
 /* ------------------------------------------------------------ drop zone --- */
 
 .som-panel__drop {
-  border: 1px dashed var(--som-border);
+  border: 1px dashed var(--som-border-color);
   border-radius: var(--som-radius);
   padding: 1.1vh;
   text-align: center;
@@ -491,7 +491,7 @@
   font-size: 1.4vh;
   line-height: 1;
   padding: 0.4vh 0;
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   border-radius: var(--som-radius);
   background: var(--som-card);
   color: var(--som-text);
@@ -506,7 +506,7 @@
   font-size: 1.2vh;
   text-align: center;
   padding: 0.4vh 0;
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   border-radius: var(--som-radius);
   background: var(--som-card);
   color: var(--som-text);
@@ -526,7 +526,7 @@
   letter-spacing: 0.04em;
   padding: 0.6vh 0.4vh;
   border-radius: var(--som-radius);
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   background: var(--som-card);
   color: var(--som-text-dim);
   cursor: pointer;
@@ -562,7 +562,7 @@
   display: flex;
   gap: var(--inv-gap);
   padding: var(--inv-gap);
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   border-radius: var(--som-radius-lg);
   background: var(--som-bg);
   box-shadow: var(--som-shadow);
@@ -586,7 +586,7 @@
   position: relative;
   width: var(--inv-cell);
   height: var(--inv-cell);
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   border-radius: var(--som-radius);
   background: var(--som-card);
   overflow: hidden;
@@ -663,7 +663,7 @@
 .som-clothing__slot {
   width: 5.2vh;
   height: 5.2vh;
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   border-radius: var(--som-radius);
   background: var(--som-card);
   color: var(--som-text-mute);
@@ -762,7 +762,7 @@
   align-items: center;
   gap: 0.7vh;
   padding: 0.7vh 1vh;
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   border-left: 2px solid var(--som-pink);
   border-radius: var(--som-radius);
   background: var(--som-bg-deep);
@@ -812,7 +812,7 @@
   height: 0.9vh;
   border-radius: 999px;
   background: var(--som-card);
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   overflow: hidden;
 }
 
@@ -860,7 +860,7 @@
   align-items: center;
   gap: 0.5vh;
   padding: 0.5vh;
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   border-radius: var(--som-radius);
   background: var(--som-card);
 }
@@ -883,7 +883,7 @@
   width: 1.7vh;
   height: 1.7vh;
   line-height: 1;
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   border-radius: 3px;
   background: var(--som-surface);
   color: var(--som-text);
@@ -901,7 +901,7 @@
   line-height: 1;
   width: 1.7vh;
   height: 1.7vh;
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   border-radius: 3px;
   background: transparent;
   color: var(--som-text-mute);
@@ -915,7 +915,7 @@
   justify-content: space-between;
   align-items: baseline;
   padding-top: 0.6vh;
-  border-top: 1px solid var(--som-border);
+  border-top: 1px solid var(--som-border-color);
   font-size: 1.2vh;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -963,7 +963,7 @@
   min-width: 16vh;
   font: inherit;
   padding: 0.6vh 1vh;
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   border-radius: var(--som-radius);
   background: var(--som-card);
   color: var(--som-text);
@@ -986,7 +986,7 @@
   align-items: center;
   gap: 0.8vh;
   padding: 0.8vh 1.2vh;
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   border-radius: var(--som-radius-lg);
   background: var(--som-bg);
   box-shadow: var(--som-shadow);
@@ -1056,7 +1056,7 @@
   font-size: 1vh;
   color: var(--som-text-mute);
   padding-top: 0.35vh;
-  border-top: 1px solid var(--som-border);
+  border-top: 1px solid var(--som-border-color);
 }
 
 /* --------------------------------------------------------- take all row --- */
@@ -1149,7 +1149,7 @@
  * your jacket off. */
 .som-clothing__slot.is-off {
   border-style: dashed;
-  border-color: var(--som-border);
+  border-color: var(--som-border-color);
   color: var(--som-text-mute);
   background: transparent;
 }
@@ -1200,7 +1200,7 @@
   padding: 0.45vh 1vh;
   border-radius: var(--som-radius);
   background: var(--som-bg-deep);
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   font-size: 1.15vh;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -1267,7 +1267,7 @@
 .som-clothing__footer,
 .som-clothing__note {
   background: var(--som-bg);
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   border-radius: var(--som-radius);
   padding: 0.7vh 1vh;
 }
@@ -1282,7 +1282,7 @@
 .som-clothing__rail {
   padding: 0.6vh;
   background: var(--som-bg);
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   border-radius: var(--som-radius-lg);
   box-shadow: var(--som-shadow);
 }

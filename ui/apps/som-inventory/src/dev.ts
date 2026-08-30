@@ -56,17 +56,17 @@ function item(
 
 const ITEMS: Record<string, ItemData> = Object.fromEntries([
   item('money', 'Cash'),
-  item('phone', 'Phone', { usable: true }),
-  item('lockpick', 'Lockpick', { usable: true, description: 'Bent by hand. Will not survive many doors.' }),
-  item('joint', 'Joint', { usable: true }),
-  item('water', 'Water', { usable: true }),
-  item('burger', 'Burger', { usable: true }),
-  item('sandwich', 'Sandwich', { usable: true }),
-  item('cola', 'Cola', { usable: true }),
-  item('bandage', 'Bandage', { usable: true }),
-  item('radio', 'Radio', { usable: true }),
-  item('armour', 'Body Armour', { usable: true }),
-  item('WEAPON_PISTOL', 'Pistol', { stack: false, usable: true }),
+  item('phone', 'Phone', { usable: true, category: 'tools' }),
+  item('lockpick', 'Lockpick', { usable: true, category: 'tools', rarity: 'rare', description: 'Bent by hand. Will not survive many doors.' }),
+  item('joint', 'Joint', { usable: true, category: 'drugs' }),
+  item('water', 'Water', { usable: true, category: 'food' }),
+  item('burger', 'Burger', { usable: true, category: 'food' }),
+  item('sandwich', 'Sandwich', { usable: true, category: 'food' }),
+  item('cola', 'Cola', { usable: true, category: 'food' }),
+  item('bandage', 'Bandage', { usable: true, category: 'healing' }),
+  item('radio', 'Radio', { usable: true, category: 'tools' }),
+  item('armour', 'Body Armour', { usable: true, category: 'healing', rarity: 'epic' }),
+  item('WEAPON_PISTOL', 'Pistol', { stack: false, usable: true, rarity: 'legendary' }),
 ])
 
 /** Mirrors a real character carrying a bit of everything. */
@@ -107,3 +107,9 @@ debugData([
 // the UI. Sending them together would race the catalogue that the slots are
 // rendered against.
 debugData([{ action: INBOUND.setupInventory, data: { leftInventory: LEFT } }], 80)
+
+// `somStatus` is ours, not ox_inventory's: it comes from som_bridge.lua, which
+// is the only half that can read the ped. Not in INBOUND for that reason, and
+// sent here so the footer renders rather than sitting empty and reading as a
+// missing feature.
+debugData([{ action: 'somStatus', data: { health: 88, armour: 42, hunger: 61, thirst: 47 } }], 140)

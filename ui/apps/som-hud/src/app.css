@@ -457,7 +457,7 @@ body,
 /* THE one accent on this HUD. Transmitting is the only thing here describing
  * something happening now rather than something merely true. */
 .hud-chip--voice.is-live { color: var(--som-pink-light); }
-.hud-chip--voice.is-live .hud-mic { background: var(--som-pink); box-shadow: 0 0 0.6vh var(--som-glow); }
+.hud-chip--voice.is-live .hud-mic { background: var(--som-pink); box-shadow: 0 0 0.6vh var(--som-pink-a45); }
 
 /* --------------------------------------------------------------- editor --- */
 
@@ -526,7 +526,7 @@ body,
   font: inherit;
   font-size: 1.1vh;
   padding: 0.5vh;
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   border-radius: var(--som-radius);
   background: var(--som-card);
   color: var(--som-text);
@@ -557,7 +557,7 @@ body,
   height: 1.2vh;
   border-radius: 999px;
   background: var(--som-card);
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   position: relative;
   transition: all 140ms;
 }
@@ -588,7 +588,7 @@ body,
   letter-spacing: 0.05em;
   padding: 0.7vh;
   border-radius: var(--som-radius);
-  border: 1px solid var(--som-border);
+  border: 1px solid var(--som-border-color);
   background: var(--som-card);
   color: var(--som-text-dim);
   cursor: pointer;

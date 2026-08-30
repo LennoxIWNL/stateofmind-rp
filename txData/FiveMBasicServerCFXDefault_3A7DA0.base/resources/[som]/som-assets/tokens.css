@@ -78,6 +78,9 @@
     --som-surface: #3d1735;
     --som-card: rgba(25, 25, 35, 0.95);
     --som-card-hover: rgba(35, 35, 50, 0.95);
+    /* One step above --som-card-hover, for a surface that is already lifted and
+     * needs a hover of its own, such as a filled inventory slot. */
+    --som-card-lift: rgba(46, 46, 64, 0.95);
 
     /* Text
      *
@@ -109,7 +112,19 @@
     /* Shape and motion */
     --som-radius: 8px;
     --som-radius-lg: 12px;
+    /* A full border SHORTHAND, so it belongs in `border:` and nowhere else.
+     * `border: 1px solid var(--som-border)` expands to
+     * `border: 1px solid 1px solid rgba(...)`, which is invalid, and the whole
+     * declaration is dropped: no border at all, silently. Use the colour token
+     * below in any colour position. */
     --som-border: 1px solid var(--som-pink-a30);
+
+    /* The colour inside --som-border, for `border-color:`, `background:` and
+     * anywhere else a shorthand cannot go. Added because every consumer in the
+     * tree was reaching for --som-border in a colour position and getting
+     * nothing; six places used the shorthand correctly, so the shorthand
+     * stays. */
+    --som-border-color: var(--som-pink-a30);
     --som-glow: 0 0 12px var(--som-pink-a45);
     --som-glow-strong: 0 0 20px var(--som-pink-a61);
     --som-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
