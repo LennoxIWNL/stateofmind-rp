@@ -45,15 +45,25 @@ level now, edit ps-hud's "Minimap update" thread. One number, one place.
 
 Re-do it after any fresh install of karma-minimap.
 
-## Still open: a second collision
+## The second collision, and how it is held
 
 Both resources stream a file named `minimap.gfx`:
 
 - `karma-minimap/stream/gfx/minimap.gfx`
 - `ps-hud/stream/minimap.gfx`
 
-Two resources streaming the same asset name resolve by load order, which is not
-something to rely on. This has not caused a visible problem yet, most likely
-because `ps-hud/stream/` is itself gitignored and may not be on the VPS at all.
-It becomes a real question the moment that folder is hand-copied across: decide
-then which minimap artwork should win, and stop the other from streaming it.
+Two resources streaming one asset name resolves by load order. som.cfg ensures
+karma-minimap up in the map block and ps-hud further down, so ps-hud wins, which
+is the one wanted: it draws the HUD the frame has to match. That ordering is now
+commented in som.cfg as load-bearing, so nobody tidies the ensures into
+alphabetical order and then wonders why the minimap frame changed.
+
+karma-minimap keeps what it is actually for either way. Its coloured map tiles
+and `minimap_main_map.gfx` do not collide by name and are unaffected.
+
+**Ordering makes the outcome consistent, not correct by construction.** The only
+way to remove the ambiguity is to delete one of the two files. That is a binary
+asset, which the workspace rules put outside what is edited from here, so it
+stays the owner's call:
+
+    rm "[assets-streams]/[graphics]/karma-minimap/stream/gfx/minimap.gfx"
