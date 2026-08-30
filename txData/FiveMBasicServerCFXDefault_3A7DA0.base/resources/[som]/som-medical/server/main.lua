@@ -288,3 +288,44 @@ AddEventHandler('som:server:playerUnloaded', function(source, citizenid)
 
     entry.source = nil
 end)
+
+-- ---------------------------------------------------------------------------
+-- txAdmin's heal
+--
+-- txAdmin restores health and knows nothing about a downed state, so healing
+-- from the admin menu used to leave the character lying in the street at full
+-- health with the countdown still running. txAdmin publishes this event for
+-- exactly that case: its own docs name "resources that keep a player
+-- unconscious even after the health being restored to 100%".
+--
+-- AddEventHandler, NOT RegisterNetEvent. txAdmin raises this on the server, and
+-- a net event here would hand every client a free self-revive by name.
+--
+-- `target` is a server id, or -1 for the whole server. `author` is the admin's
+-- name, a string, so it is not passed to Revive: `by` is typed as a source id
+-- and the log is better with nothing than with the wrong shape.
+--
+-- Sources are collected before reviving because Revive clears entries from
+-- `downed`, and emptying a table underneath the loop that is walking it is the
+-- kind of thing that works until it does not.
+-- ---------------------------------------------------------------------------
+AddEventHandler('txAdmin:events:playerHealed', function(data)
+    if type(data) ~= 'table' then return end
+
+    local target = tonumber(data.target)
+    if not target then return end
+
+    if target ~= -1 then
+        Medical.Revive(target, nil)
+        return
+    end
+
+    local sources = {}
+    for _, entry in pairs(downed) do
+        if entry.source then sources[#sources + 1] = entry.source end
+    end
+
+    for i = 1, #sources do
+        Medical.Revive(sources[i], nil)
+    end
+end)
