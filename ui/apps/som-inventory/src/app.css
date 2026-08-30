@@ -261,8 +261,21 @@
   transition: border-color 120ms, background 120ms;
 }
 
-.som-slot.has-item { background: var(--som-surface); cursor: grab; }
-.som-slot.has-item:hover { border-color: var(--som-pink); background: var(--som-card-hover); }
+/**
+ * A filled slot is a LIFT, not a hue.
+ *
+ * This used to be var(--som-surface), which is #3d1735, so every slot holding
+ * an item turned plum while the empty ones stayed neutral. Fifty slots of
+ * magenta is the "pink everywhere" AUDIT 20.4 calls the fastest way to look
+ * cheap, and it spends the accent on "this slot is not empty", which the icon
+ * already says. Colour is worth more on rarity and on the active category.
+ *
+ * Literal rgba on the hover rather than color-mix: CEF is Chrome 103 and
+ * color-mix needs 111, where it resolves to invalid and silently takes the
+ * whole declaration with it.
+ */
+.som-slot.has-item { background: var(--som-card-hover); cursor: grab; }
+.som-slot.has-item:hover { border-color: var(--som-pink); background: rgba(46, 46, 64, 0.95); }
 .som-slot.has-item:active { cursor: grabbing; }
 
 .som-slot__art {
