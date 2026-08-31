@@ -791,6 +791,177 @@ CREATE TABLE IF NOT EXISTS `ox_doorlock` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ===========================================================================
+--  7d. HOUSING (som-housing)
+--
+--  A property is a DOOR IN THE WORLD plus a SHELL MODEL, never a mapped
+--  interior. One shell serves every property that uses it, because each
+--  occupied property gets its own routing bucket, so `shell` here is a model
+--  name and not a location.
+--
+--  NOTE ON NAMES. `player_houses`, `houselocations` and `apartments` already
+--  exist further down as empty compatibility VIEWS for ps-mdt. They are views,
+--  not tables, and a real table cannot take those names. Everything here is
+--  som_ prefixed for that reason as much as for consistency.
+-- ===========================================================================
+
+-- The property itself. Rows are SEEDED FROM CONFIG at boot and reconciled the
+-- way som-garage reconciles its fleet: config decides what exists, the row
+-- carries what has happened to it since.
+--
+-- `realtor_only` is the expensive tier. It cannot be bought outright at all,
+-- which is what makes a real estate agent a job rather than a convenience.
+CREATE TABLE IF NOT EXISTS `som_properties` (
+  `id`            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  -- The config key, not a display name. Stable across restarts, which is what
+  -- makes reconciliation possible at all.
+  `slug`          VARCHAR(64)  NOT NULL,
+  `label`         VARCHAR(96)  NOT NULL,
+  `type`          ENUM('house','apartment','warehouse') NOT NULL DEFAULT 'house',
+  `tier`          VARCHAR(24)  NOT NULL DEFAULT 'standard',
+  -- A model name from qb-interior or jordqn_free_shells. The exit offset that
+  -- goes with it lives in som-housing/shared/shells.lua, not here: an offset is
+  -- a property of the MODEL, so storing it per row would be the same number
+  -- copied a hundred times and wrong the moment a shell is swapped.
+  `shell`         VARCHAR(64)  NOT NULL,
+  `door_x`        DOUBLE       NOT NULL,
+  `door_y`        DOUBLE       NOT NULL,
+  `door_z`        DOUBLE       NOT NULL,
+  `door_heading`  FLOAT        NOT NULL DEFAULT 0.0,
+  `price`         BIGINT       NOT NULL DEFAULT 0,
+  `stash_slots`   INT          NOT NULL DEFAULT 50,
+  `stash_weight`  INT          NOT NULL DEFAULT 100000,
+  `for_sale`      TINYINT(1)   NOT NULL DEFAULT 1,
+  `realtor_only`  TINYINT(1)   NOT NULL DEFAULT 0,
+  `created_at`    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_slug` (`slug`),
+  KEY `idx_sale` (`for_sale`, `type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Who may open a property, and in what capacity.
+--
+-- A ROW RATHER THAN A METADATA BLOB, deliberately. som-core's setMetadata
+-- whitelists keys against Config.DefaultMetadata and silently returns false for
+-- anything else, so a keyring stored there would fail without erroring. A row
+-- is also what lets a key be revoked by whoever granted it.
+CREATE TABLE IF NOT EXISTS `som_property_owners` (
+  `property_id` INT UNSIGNED NOT NULL,
+  `citizenid`   VARCHAR(16)  NOT NULL,
+  -- owner    bought it, and the only role finance is ever written against
+  -- co_owner holds a key, cannot sell
+  -- tenant   holds a key while rent is paid
+  `role`        ENUM('owner','co_owner','tenant') NOT NULL DEFAULT 'owner',
+  `granted_by`  VARCHAR(16)  DEFAULT NULL,
+  `granted_at`  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`property_id`, `citizenid`),
+  KEY `idx_citizen` (`citizenid`),
+  CONSTRAINT `fk_owner_property` FOREIGN KEY (`property_id`)
+    REFERENCES `som_properties` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Placed furniture.
+--
+-- OFFSETS ARE RELATIVE TO THE SHELL ORIGIN, never world coordinates. The shell
+-- is spawned somewhere different for every bucket, so a world coordinate would
+-- be correct exactly once. Relative offsets make one row set work in every
+-- instance of that property.
+CREATE TABLE IF NOT EXISTS `som_property_furniture` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `property_id` INT UNSIGNED NOT NULL,
+  `model`       VARCHAR(64)  NOT NULL,
+  `off_x`       FLOAT NOT NULL,
+  `off_y`       FLOAT NOT NULL,
+  `off_z`       FLOAT NOT NULL,
+  `rot_x`       FLOAT NOT NULL DEFAULT 0.0,
+  `rot_y`       FLOAT NOT NULL DEFAULT 0.0,
+  `rot_z`       FLOAT NOT NULL DEFAULT 0.0,
+  `placed_by`   VARCHAR(16)  DEFAULT NULL,
+  `placed_at`   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_property` (`property_id`),
+  CONSTRAINT `fk_furniture_property` FOREIGN KEY (`property_id`)
+    REFERENCES `som_properties` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- A mortgage.
+--
+-- THE DEBT LIVES HERE AND NOWHERE ELSE. It is deliberately not a balance column
+-- on som_properties: AUDIT 8.5 records storing a balance on the asset row as the
+-- mistake made against som-banking, because two places then disagree about what
+-- is owed and neither is obviously wrong.
+--
+-- Each instalment becomes a real som_phone_bills row with auto_collect set, so
+-- the phone's existing sweep does the collecting and this table only tracks the
+-- contract. `missed_cycles` is what that sweep increments when the debtor is
+-- offline, because som-phone's collector resolves debtors from memory and would
+-- otherwise skip them silently and forever.
+CREATE TABLE IF NOT EXISTS `som_property_finance` (
+  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `property_id`   INT UNSIGNED NOT NULL,
+  `citizenid`     VARCHAR(16)  NOT NULL,
+  `principal`     BIGINT       NOT NULL,
+  `remaining`     BIGINT       NOT NULL,
+  `instalment`    BIGINT       NOT NULL,
+  `interval_days` INT          NOT NULL DEFAULT 7,
+  `next_due`      DATETIME     NOT NULL,
+  `missed_cycles` INT          NOT NULL DEFAULT 0,
+  -- The realtor who wrote the contract. A mortgage requires one to be online,
+  -- and this is who the commission is owed to.
+  `realtor_citizenid` VARCHAR(16) DEFAULT NULL,
+  `status`        ENUM('active','settled','repossessed') NOT NULL DEFAULT 'active',
+  `created_at`    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_citizen_status` (`citizenid`, `status`),
+  KEY `idx_due` (`status`, `next_due`),
+  CONSTRAINT `fk_finance_property` FOREIGN KEY (`property_id`)
+    REFERENCES `som_properties` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- A search warrant against a PROPERTY.
+--
+-- ps-mdt's own warrants are person-based, a flag on mdt_convictions keyed by
+-- cid, so there is nothing there to extend and this is separate on purpose.
+--
+-- A WARRANT IS AUTHORITY, NOT A KEY. Nothing in this table unlocks a door. It
+-- records that a raid was lawful, which is what makes an unwarranted breach a
+-- decision with a consequence rather than something the game simply refuses.
+CREATE TABLE IF NOT EXISTS `som_property_warrants` (
+  `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `property_id`  INT UNSIGNED NOT NULL,
+  `requested_by` VARCHAR(16)  NOT NULL,
+  `approved_by`  VARCHAR(16)  DEFAULT NULL,
+  `reason`       VARCHAR(255) NOT NULL,
+  `granted_at`   TIMESTAMP    NULL DEFAULT NULL,
+  `expires_at`   DATETIME     NULL DEFAULT NULL,
+  `served_at`    TIMESTAMP    NULL DEFAULT NULL,
+  `status`       ENUM('requested','granted','refused','served','expired')
+                 NOT NULL DEFAULT 'requested',
+  `created_at`   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_property_status` (`property_id`, `status`),
+  KEY `idx_expiry` (`status`, `expires_at`),
+  CONSTRAINT `fk_warrant_property` FOREIGN KEY (`property_id`)
+    REFERENCES `som_properties` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Raids, warranted or not. Written whether or not a warrant existed, because
+-- the record of an unlawful entry is the entire point of recording them.
+CREATE TABLE IF NOT EXISTS `som_property_raids` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `property_id` INT UNSIGNED NOT NULL,
+  `officer`     VARCHAR(16)  NOT NULL,
+  `warrant_id`  BIGINT UNSIGNED DEFAULT NULL,
+  `method`      ENUM('ram','lockpick','key') NOT NULL,
+  `lawful`      TINYINT(1)   NOT NULL DEFAULT 0,
+  `raided_at`   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_property` (`property_id`),
+  KEY `idx_officer` (`officer`),
+  CONSTRAINT `fk_raid_property` FOREIGN KEY (`property_id`)
+    REFERENCES `som_properties` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
 --  8b. UPGRADES
 --
 --  Columns added after the tables above first shipped. Fresh installs already

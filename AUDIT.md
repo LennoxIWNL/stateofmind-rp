@@ -583,7 +583,14 @@ Plus the paid-but-unmarked families the rebuild spec names as third-party: `elix
 
 Everything not in A through D. Principally:
 - **The framework itself:** `[qb]/qbx_core`, `[qb]/qbx_vehicles`, `[qb]/qb-core` (disabled), `[qb]/qb-inventory` (disabled), `[qb]/qb-multicharacter`, `[qb]/qb-management`, `[qb]/qb-menu`, `[qb]/qb-input`, `[qb]/qb-skillbar`
-- **All `qb-*` gameplay:** `qb-policejob`, `qb-ambulancejob`, `qb-garages`, `qb-houses`, `qb-apartments`, `qb-drugs`, `qb-weed`, `qb-crypto`, `qb-cityhall`, `qb-vehiclekeys`, `qb-smallresources`, `qb-weathersync`, `qb-clothing`, `qb-weapons`, `qb-traphouse`, `qb-prison`, `qb-pawnshop`, `qb-jewelery`, `qb-scrapyard`, `qb-diving`, `qb-fitbit`, `qb-lift`, `qb-lockpick`, `qb-keyminigame`, `qb-lapraces`, `qb-streetraces`, `qb-interior`, `qb-npwd`, `qb-phone-compat`, `qb-phone.disabled`, and the `qb-*job` set
+- **All `qb-*` gameplay:** `qb-policejob`, `qb-ambulancejob`, `qb-garages`, `qb-houses`, `qb-apartments`, `qb-drugs`, `qb-weed`, `qb-crypto`, `qb-cityhall`, `qb-vehiclekeys`, `qb-smallresources`, `qb-weathersync`, `qb-clothing`, `qb-weapons`, `qb-traphouse`, `qb-prison`, `qb-pawnshop`, `qb-jewelery`, `qb-scrapyard`, `qb-diving`, `qb-fitbit`, `qb-lift`, `qb-lockpick`, `qb-keyminigame`, `qb-lapraces`, `qb-streetraces`, `qb-npwd`, `qb-phone-compat`, `qb-phone.disabled`, and the `qb-*job` set
+
+**`qb-interior` came off that list.** som-housing is built on its 16 streamed
+shell models and the exit offsets in its client files, which are the only such
+reference on disk. Its Lua is framework-free despite the folder it sits in, so it
+starts cleanly and is ensured by name; the offsets are copied into
+`som-housing/shared/shells.lua` rather than called through its exports.
+
 - **All `[jobs]`** (35), **all `[robberies]`** (7), **all `[new]`** (15)
 - **Rebranded third-party in `[custom]`** that Phase 2 through 7 replaces: `som-banking` (and `2na_core` with it), `som-carcontrol`, `som-deathscreen`, `som-lockpick`, `som-playerlist`, `som-rentacar`, `som-text`, `som-spray`, `som-lib`, `loadingscreen` (after branding extraction), `elixir-base`, `elixir-drugs`, `np-taskbar`, `jim-notepad`, `jim-jobgarage`, `ps-playergroups`, `ps-zones`, `r14-evidence`, `alpr`, `messy-bodycam`, `bbv-cctv`, `npwpdcar`, `qb-k9`, `qb-parkingmeter`, `qb-radargun`, `qb-vehicle-tracker`, `Renewed-Sirensync`, `s4-realisticdisease`, `fl-activeofficers`, `randol_grandma`, `randol_service`, `XNL-FiveM-Trains-U3`, `jim-skateboard`
 - **Superseded by SOM:** `som-textui` and `som-zones` fold into `som-interact` (port the code first), `som-notify` folds into `som-core`, `som-jobsetup` and `som-gangboss-app` are rewritten against `som-core` (port the UI and logic first)
