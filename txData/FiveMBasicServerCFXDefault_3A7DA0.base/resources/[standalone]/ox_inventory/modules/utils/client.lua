@@ -37,7 +37,19 @@ function Utils.Raycast(flag, destination, size)
             -- DrawLine(playerCoords.x, playerCoords.y, playerCoords.z + 0.5, destination.x, destination.y, destination.z, 0, 0, 255, 255)
             -- DrawLine(playerCoords.x, playerCoords.y, playerCoords.z + 0.5, coords.x, coords.y, coords.z, 255, 0, 0, 255)
             local entityType
-            if entityHit then entityType = GetEntityType(entityHit) end
+            -- SOM PATCH. `if entityHit then` does not guard this, twice over.
+            --
+            -- Lua treats 0 as truthy, so a shape test that hit nothing still
+            -- reached GetEntityType, and this loop Wait(0)s between starting the
+            -- test and reading it, so the entity it hit can be deleted in
+            -- between and leave a freed handle behind. Either one raises "Error
+            -- executing native 0x8ACD366038D14505", which is GET_ENTITY_TYPE,
+            -- every time the inventory key is pressed near one.
+            --
+            -- DoesEntityExist covers both without having to know which it was.
+            if entityHit and entityHit ~= 0 and DoesEntityExist(entityHit) then
+                entityType = GetEntityType(entityHit)
+            end
             if entityHit and entityType ~= 0 then
                 return entityHit, entityType
             end
