@@ -9,6 +9,15 @@ This folder contains two self-contained Node.js processes managed by PM2:
 
 ---
 
+## Bump reminders
+
+The bot uses Disboard's 120-minute cooldown. It sends one reminder with a direct
+mention when the cooldown expires, then stays silent until Disboard confirms a
+successful `/bump`. The reminder state is saved locally so a PM2 restart cannot
+make it spam repeatedly.
+
+---
+
 ## One-time setup on your VPS
 
 ### 1. Install Node.js 22+

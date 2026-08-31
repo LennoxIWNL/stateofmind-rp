@@ -1,0 +1,147 @@
+STATE OF MIND DISCORD BOT — COMMAND REFERENCE
+==============================================
+
+GENERAL
+-------
+/help
+  Opens an interactive help menu grouped by feature.
+
+/faq show [category]
+  Shows the FAQ library publicly. A category can optionally filter the list.
+
+/report
+  Opens a private form for sending a report to the staff team. Reports are
+  posted in the report logging channel and are not exposed to the reporter's
+  channel.
+
+SERVER SETUP AND ADMINISTRATION
+-------------------------------
+/setup
+  Destructively deletes the server's channels and roles, then rebuilds the
+  standard FiveM community layout. Use only for a full reset.
+
+/upgrade
+  Safely adds missing bot feature channels and self-service roles. It never
+  deletes existing channels, roles, messages, or settings.
+
+/discordlogs
+  Creates dedicated Discord event log channels. It does not set permissions;
+  configure those manually after creation.
+
+/onboarding setup
+  Configures native Discord onboarding with the server's rules and verify
+  channels. Discord server eligibility and bot permissions still apply.
+
+/logs
+  Rebuilds the FiveM/Lennox and qb-log webhook channel groups.
+
+/postrules
+  Posts the standard rules embeds in the current channel.
+
+/embed edit <target>
+  Opens a form to edit one standard embed: FiveM rules, Discord rules, verify,
+  or ticket panel.
+
+/embed channel <target> <channel>
+  Saves the destination channel for one standard embed.
+
+/embeds
+  Reposts all standard embeds using their saved destinations.
+
+/botnick <name>
+  Changes the bot's nickname in this server.
+
+/purge
+  Deletes all messages in the current channel, including messages older than
+  Discord's bulk-delete limit one at a time.
+
+MODERATION
+----------
+/warn <user> <reason>
+  Adds a warning and may auto-kick at three or auto-ban at five warnings.
+
+/warnings <user>
+  Shows a member's warning history.
+
+/clearwarnings <user>
+  Clears all warnings for a member.
+
+/kick <user> <reason>
+  Kicks a member and logs the action.
+
+/ban <user> <reason>
+  Bans a member and logs the action.
+
+/unban <user_id>
+  Unbans a member by Discord ID.
+
+EVENTS AND MAINTENANCE
+----------------------
+/event create <title> <when> [description] [channel]
+  Schedules a community event announcement. Use a future date/time such as
+  "2026-09-15 19:00 UTC".
+
+/event list
+  Lists scheduled events for this server.
+
+/event cancel <id>
+  Cancels a scheduled event.
+
+/maintenance create <title> <when> [description] [channel]
+  Schedules a maintenance announcement.
+
+/maintenance list
+  Lists scheduled maintenance notices.
+
+/maintenance cancel <id>
+  Cancels a scheduled maintenance notice.
+
+SUGGESTIONS
+-----------
+/suggestion approve <message_id> [reason]
+  Marks a suggestion approved and posts a staff decision reply.
+
+/suggestion reject <message_id> [reason]
+  Marks a suggestion rejected and posts a staff decision reply.
+
+/suggestion lock <message_id>
+  Locks a suggestion by removing its voting reactions.
+
+/suggestion list
+  Lists suggestions with a recorded staff status.
+
+GIVEAWAYS
+---------
+/giveaway start <prize> <duration_minutes> <winners> [channel]
+  Starts a button-entry giveaway with persistent state.
+
+/giveaway list
+  Lists active giveaways.
+
+/giveaway end <id>
+  Ends a giveaway immediately and selects winners.
+
+MEMBER SELF-SERVICE
+-------------------
+/memberpanel toggle <enabled>
+  Turns the optional member self-service panel on or off.
+
+/memberpanel post [channel]
+  Posts buttons for Community Updates, Events, and Giveaways roles when the
+  panel is enabled. Members can click a button again to remove a role.
+
+AUTOMATIC SYSTEMS
+-----------------
+Disboard bump reminders
+  Uses the 120-minute cooldown and sends one direct mention after the
+  cooldown. It stays silent until the next successful bump.
+
+FiveM server status
+  Polls the CFX server and edits one status message in place.
+
+Suggestion voting
+  Automatically adds 👍 and 👎 reactions to messages in #suggestions.
+
+Discord event logging
+  Logs message, member, nickname, role, ban, and unban activity to the
+  discordlogs-* channels when available, otherwise falling back to #mod-log.
