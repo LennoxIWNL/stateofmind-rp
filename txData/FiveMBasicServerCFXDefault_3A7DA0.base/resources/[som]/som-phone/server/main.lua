@@ -489,5 +489,18 @@ lib.callback.register('som-phone:server:properties', function(source)
     local owned = exports['som-housing']:listFor(player.citizenid) or {}
     local finance = exports['som-housing']:financeListFor(player.citizenid) or {}
 
-    return { success = true, properties = owned, finance = finance }
+    -- What is for sale within reach, resolved by som-housing from the ped the
+    -- SERVER can see. This is why the app can sell anything at all: it only
+    -- ever offers the door you are standing at.
+    local near = lib.callback.await('som-housing:server:nearby', source) or {}
+
+    return {
+        success = true,
+        properties = owned,
+        finance = finance,
+        nearby = near.nearby or {},
+        accounts = near.accounts or {},
+        owned = near.owned or 0,
+        maxOwned = near.maxOwned or 0,
+    }
 end)

@@ -46,6 +46,12 @@ RegisterNUICallback('close', function(_, cb)
     close()
 end)
 
+RegisterNUICallback('buyProperty', function(data, cb)
+    -- Straight through. The phone decides nothing: som-housing re-reads the
+    -- price, the sale status and the distance from the door.
+    cb(lib.callback.await('som-housing:server:buy', false, data) or { success = false })
+end)
+
 RegisterNUICallback('properties', function(_, cb)
     cb(lib.callback.await('som-phone:server:properties', false) or { success = false })
 end)

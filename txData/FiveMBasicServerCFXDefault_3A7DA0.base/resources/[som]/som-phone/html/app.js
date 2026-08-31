@@ -630,70 +630,132 @@ window.addEventListener('message', async (event) => {
 /**
  * Properties.
  *
- * READ ONLY, deliberately. Buying, keys and mortgages all happen at the door,
- * in person, so there is nothing here to press. This is the statement, not the
- * shop: what you own, and what is still owed on it.
+ * Two halves. FOR SALE HERE is the shop, and it is only ever populated when
+ * you are stood at a door, because som-housing scopes it by the ped the SERVER
+ * can see. YOURS is a statement: outstanding balance, missed payments, nothing
+ * to press.
  *
- * Built with el() and textContent rather than innerHTML, for the reason stated
- * beside that helper. A property label comes from config today, but a co-owner
- * name will not, and the pattern is the protection.
+ * The app is trusted with none of it. Buying re-reads the price, the sale
+ * status and the distance from the door server side, so a forged listing buys
+ * nothing. Same relationship the garage panel has with its own purchase.
  *
- * money() is the one at the top of this file. It already prefixes the dollar,
- * and redeclaring it here as a function would be a SyntaxError against the
- * const, which takes the whole phone down rather than just this app.
+ * Classes are this file's existing vocabulary, list/row/row__main/section/
+ * empty, rather than new ones. A renderer that invents card and muted looks
+ * unstyled, because style.css has never heard of them.
  */
 async function loadProperties() {
     const res = await post('properties');
-    const list = document.getElementById('properties-list');
-    list.textContent = '';
+    const body = document.getElementById('properties-list');
+    body.textContent = '';
 
     if (!res || !res.success) {
-        list.appendChild(el('p', 'muted', (res && res.error) || 'Unavailable'));
+        body.appendChild(el('div', 'empty', (res && res.error) || 'Unavailable'));
         return;
     }
 
+    renderForSale(body, res);
+    renderOwned(body, res);
+}
+
+/** The shop half. Empty unless you are stood at a door. */
+function renderForSale(body, res) {
+    if (!res.nearby || res.nearby.length === 0) return;
+
+    body.appendChild(el('div', 'section', 'For sale here'));
+    const list = el('div', 'list');
+
+    const full = (res.owned || 0) >= (res.maxOwned || 0);
+
+    for (const p of res.nearby) {
+        const row = el('div', 'row');
+        const main = el('div', 'row__main');
+
+        main.appendChild(el('div', 'row__title', p.label));
+        main.appendChild(el('div', 'row__sub', money(p.price) + ' · ' + p.tier));
+        row.appendChild(main);
+
+        const actions = el('div', 'row__actions');
+
+        if (p.realtorOnly) {
+            // Shown and refused rather than hidden, so somebody outside a
+            // luxury house learns why instead of hunting for the button.
+            actions.appendChild(el('span', 'pill', 'Agent only'));
+        } else if (full) {
+            actions.appendChild(el('span', 'pill', 'At your limit'));
+        } else if (!(res.accounts || []).length) {
+            actions.appendChild(el('span', 'pill', 'No funds'));
+        } else {
+            // ONE BUTTON PER ACCOUNT rather than a picker. The phone has no
+            // modal of its own, and "Card" is a shorter road to the same
+            // decision than building one.
+            for (const account of res.accounts) {
+                const buy = el('button', 'btn btn--primary btn--sm', account.label);
+                buy.type = 'button';
+                buy.addEventListener('click', () => buyProperty(p, account.account));
+                actions.appendChild(buy);
+            }
+        }
+
+        row.appendChild(actions);
+        list.appendChild(row);
+    }
+
+    body.appendChild(list);
+}
+
+/** The statement half. */
+function renderOwned(body, res) {
+    body.appendChild(el('div', 'section', 'Yours'));
+
     if (!res.properties || res.properties.length === 0) {
-        list.appendChild(el('p', 'muted', 'You do not hold any property.'));
+        body.appendChild(el('div', 'empty', 'You do not hold any property.'));
         return;
     }
 
     const owed = {};
     for (const f of res.finance || []) owed[f.property_id] = f;
 
-    const ROLES = {
-        owner: 'Owner',
-        co_owner: 'Co-owner',
-        tenant: 'Tenant',
-    };
+    const ROLES = { owner: 'Owner', co_owner: 'Co-owner', tenant: 'Tenant' };
+    const list = el('div', 'list');
 
     for (const p of res.properties) {
-        const card = el('article', 'card');
-        const head = el('header');
+        const row = el('div', 'row');
+        const main = el('div', 'row__main');
 
-        head.appendChild(el('h3', null, p.label));
-        head.appendChild(el('span', 'pill', ROLES[p.role] || p.role));
-        card.appendChild(head);
+        main.appendChild(el('div', 'row__title', p.label));
 
         const debt = owed[p.id];
+        let sub;
 
-        if (debt) {
-            card.appendChild(row('Outstanding', money(debt.remaining)));
-            card.appendChild(row('Each payment', money(debt.instalment)));
-            if (debt.missed_cycles > 0) {
-                card.appendChild(row('Missed payments', String(debt.missed_cycles), 'warn'));
-            }
+        if (!debt) {
+            sub = 'Owned outright';
+        } else if (debt.missed_cycles > 0) {
+            sub = money(debt.remaining) + ' outstanding · ' + debt.missed_cycles + ' missed';
         } else {
-            card.appendChild(row('Owned outright', 'Yes'));
+            sub = money(debt.remaining) + ' outstanding · ' + money(debt.instalment) + ' each';
         }
 
-        list.appendChild(card);
+        main.appendChild(el('div', 'row__sub', sub));
+        row.appendChild(main);
+
+        const actions = el('div', 'row__actions');
+        actions.appendChild(el('span', 'pill', ROLES[p.role] || p.role));
+        row.appendChild(actions);
+
+        list.appendChild(row);
     }
+
+    body.appendChild(list);
 }
 
-/** One label-and-value line inside a property card. */
-function row(label, value, cls) {
-    const node = el('div', cls ? 'row ' + cls : 'row');
-    node.appendChild(el('span', null, label));
-    node.appendChild(el('b', null, value));
-    return node;
+/** Buys with the account whose button was pressed. */
+async function buyProperty(property, account) {
+    const res = await post('buyProperty', { slug: property.slug, account: account });
+
+    if (!res || !res.success) {
+        return toast((res && res.error) || 'Could not buy that', true);
+    }
+
+    toast(property.label + ' is yours');
+    await loadProperties();
 }

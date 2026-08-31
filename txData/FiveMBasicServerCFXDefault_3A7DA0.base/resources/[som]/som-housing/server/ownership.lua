@@ -393,3 +393,58 @@ lib.callback.register('som-housing:server:keys', function(source, slug)
 
     return { success = true, keys = rows, label = property.label }
 end)
+
+--- What is for sale within reach, for the Properties app to offer.
+---
+--- SCOPED BY THE SERVER'S OWN VIEW of where the player is standing. The phone
+--- shows a shop only when there is a door in front of you, which is what keeps
+--- buying a property a thing you do at the property.
+---
+--- No security rests on this. It decides what the phone DISPLAYS; the buy call
+--- re-measures the same distance and re-reads the same price, so a client that
+--- forged this list would still be refused there. Same relationship the garage
+--- panel has with its own purchase.
+lib.callback.register('som-housing:server:nearby', function(source)
+    local player = core:getPlayer(source)
+    if not player then return { success = false, error = 'not loaded' } end
+
+    local ped = GetPlayerPed(source)
+    if not ped or ped == 0 then return { success = false, error = 'no ped' } end
+
+    local here = GetEntityCoords(ped)
+
+    local rows = MySQL.query.await([[
+        SELECT id, slug, label, type, tier, price, realtor_only,
+               door_x, door_y, door_z
+        FROM som_properties
+        WHERE for_sale = 1
+    ]]) or {}
+
+    local out = {}
+
+    for _, row in ipairs(rows) do
+        local door = vec3(row.door_x, row.door_y, row.door_z)
+
+        if #(here - door) <= Config.Purchase.distance then
+            out[#out + 1] = {
+                slug = row.slug,
+                label = row.label,
+                type = row.type,
+                tier = row.tier,
+                price = row.price,
+                -- The phone shows this one as unbuyable rather than hiding it,
+                -- so somebody standing outside a luxury house learns why they
+                -- cannot have it instead of wondering where the button went.
+                realtorOnly = row.realtor_only == 1,
+            }
+        end
+    end
+
+    return {
+        success = true,
+        nearby = out,
+        accounts = core:paymentOptions(source),
+        owned = Ownership.OwnedCount(player.citizenid),
+        maxOwned = Config.Purchase.maxOwned,
+    }
+end)

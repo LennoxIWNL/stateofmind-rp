@@ -76,6 +76,11 @@ end
 --- would not be in scope when the closure is built, so the closure would
 --- capture a global that never gets assigned and calling it would be a nil
 --- call at the door rather than an error at load.
+---
+--- INFORMATION ONLY. Buying moved into the Properties app on the phone, which
+--- lists what is for sale within reach of wherever you are standing. The door
+--- still tells you what the place is, because reading a For Sale sign should
+--- not require taking your phone out.
 ---@param slug string
 local function inspect(slug)
     local res = lib.callback.await('som-housing:server:inspect', false, slug)
@@ -84,38 +89,12 @@ local function inspect(slug)
         return TriggerEvent('som:client:notify', res and res.error or 'Nothing to see', 'error')
     end
 
-    -- Owned, sold, or agent-only. All three are just something to read.
-    if not res.forSale then
-        return TriggerEvent('som:client:notify', res.text, res.owned and 'inform' or 'error')
+    if res.forSale then
+        return TriggerEvent('som:client:notify',
+            ('%s Open Properties on your phone to buy it.'):format(res.text), 'inform')
     end
 
-    if not res.accounts or #res.accounts == 0 then
-        return TriggerEvent('som:client:notify', 'You have no account to pay from', 'error')
-    end
-
-    local options = {}
-    for i = 1, #res.accounts do
-        local account = res.accounts[i]
-        options[i] = { value = account.account, label = ('%s'):format(account.label) }
-    end
-
-    local answer = lib.inputDialog(res.label, {
-        { type = 'select', label = 'Pay with', options = options, required = true },
-    })
-
-    if not answer or not answer[1] then return end
-
-    local bought = lib.callback.await('som-housing:server:buy', false, {
-        slug = slug,
-        -- A NAME, not a balance and not a price. The server re-reads both.
-        account = answer[1],
-    })
-
-    if not bought or not bought.success then
-        return TriggerEvent('som:client:notify', bought and bought.error or 'Sale failed', 'error')
-    end
-
-    TriggerEvent('som:client:notify', ('%s is yours'):format(bought.label), 'success')
+    TriggerEvent('som:client:notify', res.text, res.owned and 'inform' or 'error')
 end
 
 --- Forcing a door.
