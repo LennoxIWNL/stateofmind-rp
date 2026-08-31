@@ -131,6 +131,31 @@ Jobs = {
         },
     },
 
+    -- Dynasty 8. The same shape as the dealership and for the same reasons.
+    --
+    -- defaultDuty is FALSE: an estate agent on duty is what makes the luxury
+    -- tier sellable at all, and a mortgage cannot be written without one, so
+    -- going on shift has to be a deliberate act rather than a side effect of
+    -- logging in.
+    --
+    -- Commission is higher than the car dealer's because a property sells far
+    -- less often. A dealer moves several cars a shift; an agent may write one
+    -- contract a week.
+    realtor = {
+        label = 'Dynasty 8 Real Estate',
+        business = 'dynasty8',
+        whitelisted = true,
+        defaultDuty = false,
+        offDutyPay = false,
+        commission = 0.12,
+        grades = {
+            [0] = { name = 'Agent', payment = 200 },
+            [1] = { name = 'Senior Agent', payment = 250 },
+            [2] = { name = 'Branch Manager', payment = 320 },
+            [3] = { name = 'Broker', payment = 400, isboss = true },
+        },
+    },
+
     taxi = {
         label = 'Downtown Cab Co.',
         business = 'downtowncab',

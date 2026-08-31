@@ -1120,7 +1120,10 @@ INSERT IGNORE INTO `som_bank_accounts` (`account_no`, `label`, `type`, `balance`
   -- the seller's commission OUT of this account, and a business that cannot
   -- cover the first commission would refuse it and leave the dealer unpaid on
   -- a sale that already went through.
-  ('BUS-PDM',   'Premium Deluxe Motorsport',      'business', 250000);
+  ('BUS-PDM',   'Premium Deluxe Motorsport',      'business', 250000),
+  -- Dynasty 8. Mortgage instalments are collected into this account, so it is
+  -- where property debt actually lands rather than vanishing into the economy.
+  ('BUS-DYN8',  'Dynasty 8 Real Estate',          'business', 200000);
 
 INSERT IGNORE INTO `som_businesses`
   (`name`, `label`, `job`, `account_id`, `tax_rate`, `funding`, `category`, `active`, `treasury_cut`)
@@ -1134,7 +1137,8 @@ VALUES
   ('lscustoms',   'Los Santos Customs',           'mechanic',  (SELECT id FROM som_bank_accounts WHERE account_no='BUS-LSC'),    0.0000, 'sales',    'private',    1, 0.0800),
   ('downtowncab', 'Downtown Cab Co.',             'taxi',      (SELECT id FROM som_bank_accounts WHERE account_no='BUS-CAB'),    0.0000, 'sales',    'private',    1, 0.0800),
   ('postop',      'Post OP',                      'delivery',  (SELECT id FROM som_bank_accounts WHERE account_no='BUS-POSTOP'), 0.0000, 'sales',    'private',    1, 0.0800),
-  ('pdm',         'Premium Deluxe Motorsport',    'cardealer', (SELECT id FROM som_bank_accounts WHERE account_no='BUS-PDM'),    0.0000, 'sales',    'private',    1, 0.0800);
+  ('pdm',         'Premium Deluxe Motorsport',    'cardealer', (SELECT id FROM som_bank_accounts WHERE account_no='BUS-PDM'),    0.0000, 'sales',    'private',    1, 0.0800),
+  ('dynasty8',    'Dynasty 8 Real Estate',        'realtor',   (SELECT id FROM som_bank_accounts WHERE account_no='BUS-DYN8'),   0.0000, 'sales',    'private',    1, 0.0800);
 
 -- Corrections for databases seeded before the funding model existed, where
 -- INSERT IGNORE above skipped the rows and left them on column defaults.

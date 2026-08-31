@@ -179,7 +179,11 @@ function Finance.RaiseNext(propertyId)
 
     local id = phone:billCitizen(
         contract.citizenid,
-        'property-finance',
+        -- The estate agency's business account, seeded in setup.sql. It has to
+        -- be a REAL row in som_businesses: som-phone's collector books the
+        -- payment against it through recordBusinessRevenue, and a name with no
+        -- business behind it would take the money and have nowhere to put it.
+        Config.Finance.business,
         amount,
         ('Mortgage: %s'):format(property.label),
         { dueDays = contract.interval_days }

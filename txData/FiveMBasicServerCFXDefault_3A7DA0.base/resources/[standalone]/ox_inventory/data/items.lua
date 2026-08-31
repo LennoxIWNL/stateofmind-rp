@@ -135,6 +135,26 @@ return {
 		}
 	},
 
+	-- SOM PATCH. On the AUDIT 16.2 re-apply list with the other items.
+	--
+	-- Police entry tool for som-housing raids. Heavy and unstackable on purpose:
+	-- carrying one is a decision, and an officer should not have four.
+	--
+	-- The image is WEAPON_HAMMER.png, which ox_inventory already ships. Pointing
+	-- client.image at an existing file rather than adding a new PNG keeps this
+	-- to a code change: a binary asset is outside what gets edited here, and
+	-- there are already 61 blank icons in this inventory without adding a 62nd.
+	['breach_ram'] = {
+		label = 'Battering Ram',
+		weight = 8000,
+		stack = false,
+		close = true,
+		description = 'Police entry tool. Loud.',
+		client = {
+			image = 'WEAPON_HAMMER.png',
+		},
+	},
+
 	['lockpick'] = {
 		label = 'Lockpick',
 		weight = 300,

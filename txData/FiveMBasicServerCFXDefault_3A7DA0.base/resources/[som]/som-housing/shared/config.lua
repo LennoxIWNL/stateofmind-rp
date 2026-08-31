@@ -87,6 +87,9 @@ Config.Warehouses = {
 --- phone's existing sweep collects them and som-housing only owns the contract.
 Config.Finance = {
     job = 'realtor',
+    -- Must match a row in som_businesses. Instalments are collected into this
+    -- account, so property debt lands somewhere real rather than evaporating.
+    business = 'dynasty8',
 
     -- Of the price, paid up front before any contract is written.
     depositRate = 0.15,
