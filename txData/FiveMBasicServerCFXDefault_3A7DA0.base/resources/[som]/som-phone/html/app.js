@@ -195,6 +195,11 @@ async function openApp(id) {
         showView('bank');
         return;
     }
+    if (id === 'properties') {
+        await loadProperties();
+        showView('properties');
+        return;
+    }
     if (id === 'settings') {
         renderThemes();
         showView('settings');
@@ -621,3 +626,74 @@ window.addEventListener('message', async (event) => {
 
     if (msg.action === 'close') stow();
 });
+
+/**
+ * Properties.
+ *
+ * READ ONLY, deliberately. Buying, keys and mortgages all happen at the door,
+ * in person, so there is nothing here to press. This is the statement, not the
+ * shop: what you own, and what is still owed on it.
+ *
+ * Built with el() and textContent rather than innerHTML, for the reason stated
+ * beside that helper. A property label comes from config today, but a co-owner
+ * name will not, and the pattern is the protection.
+ *
+ * money() is the one at the top of this file. It already prefixes the dollar,
+ * and redeclaring it here as a function would be a SyntaxError against the
+ * const, which takes the whole phone down rather than just this app.
+ */
+async function loadProperties() {
+    const res = await post('properties');
+    const list = document.getElementById('properties-list');
+    list.textContent = '';
+
+    if (!res || !res.success) {
+        list.appendChild(el('p', 'muted', (res && res.error) || 'Unavailable'));
+        return;
+    }
+
+    if (!res.properties || res.properties.length === 0) {
+        list.appendChild(el('p', 'muted', 'You do not hold any property.'));
+        return;
+    }
+
+    const owed = {};
+    for (const f of res.finance || []) owed[f.property_id] = f;
+
+    const ROLES = {
+        owner: 'Owner',
+        co_owner: 'Co-owner',
+        tenant: 'Tenant',
+    };
+
+    for (const p of res.properties) {
+        const card = el('article', 'card');
+        const head = el('header');
+
+        head.appendChild(el('h3', null, p.label));
+        head.appendChild(el('span', 'pill', ROLES[p.role] || p.role));
+        card.appendChild(head);
+
+        const debt = owed[p.id];
+
+        if (debt) {
+            card.appendChild(row('Outstanding', money(debt.remaining)));
+            card.appendChild(row('Each payment', money(debt.instalment)));
+            if (debt.missed_cycles > 0) {
+                card.appendChild(row('Missed payments', String(debt.missed_cycles), 'warn'));
+            }
+        } else {
+            card.appendChild(row('Owned outright', 'Yes'));
+        }
+
+        list.appendChild(card);
+    }
+}
+
+/** One label-and-value line inside a property card. */
+function row(label, value, cls) {
+    const node = el('div', cls ? 'row ' + cls : 'row');
+    node.appendChild(el('span', null, label));
+    node.appendChild(el('b', null, value));
+    return node;
+}

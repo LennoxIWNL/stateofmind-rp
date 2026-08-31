@@ -118,6 +118,100 @@ local function inspect(slug)
     TriggerEvent('som:client:notify', ('%s is yours'):format(bought.label), 'success')
 end
 
+--- Forcing a door.
+---
+--- Loud, slow and always possible. The warrant is not checked here and does not
+--- gate anything: the server records whether one existed, which is the
+--- consequence. Deciding to go in without one is the interesting choice and
+--- taking it away would be the wrong kind of safe.
+---@param slug string
+local function breach(slug)
+    local options = {
+        { value = 'ram', label = 'Battering ram (fast, loud)' },
+        { value = 'lockpick', label = 'Lockpick (slow, quiet, can fail)' },
+    }
+
+    local answer = lib.inputDialog('Force entry', {
+        { type = 'select', label = 'How', options = options, required = true },
+    })
+
+    if not answer or not answer[1] then return end
+
+    local method = answer[1]
+    local tool = Config.Raid[method]
+
+    if not lib.progressBar({
+        duration = tool.duration,
+        label = method == 'ram' and 'Forcing the door' or 'Working the lock',
+        useWhileDead = false,
+        canCancel = true,
+        disable = { move = true, combat = true },
+    }) then
+        return
+    end
+
+    -- The lockpick can fail. Rolled on the client because it costs nothing and
+    -- decides nothing: a client that skipped the roll would still have to get
+    -- past every check the server makes next.
+    if method == 'lockpick' and math.random() < tool.failChance then
+        return TriggerEvent('som:client:notify', 'The lock held', 'error')
+    end
+
+    local res = lib.callback.await('som-housing:server:breach', false, { slug = slug, method = method })
+
+    if not res or not res.success then
+        return TriggerEvent('som:client:notify', res and res.error or 'It did not give', 'error')
+    end
+
+    TriggerEvent('som:client:notify',
+        res.lawful and ('Door forced. Warrant on file, %d minutes.'):format(res.minutes)
+                    or ('Door forced. NO WARRANT ON FILE. %d minutes.'):format(res.minutes),
+        res.lawful and 'success' or 'warning')
+end
+
+--- Writing a mortgage, from the estate agent's side.
+---
+--- The realtor calls this, not the buyer, which is why the buyer is an argument
+--- and the caller is the one validated. A buyer cannot write themselves one.
+---@param slug string
+local function mortgage(slug)
+    local nearby = lib.callback.await('som-housing:server:nearbyBuyers', false)
+
+    if not nearby or not nearby.success or #nearby.players == 0 then
+        return TriggerEvent('som:client:notify', 'Nobody is standing with you', 'error')
+    end
+
+    local people = {}
+    for i, person in ipairs(nearby.players) do
+        people[i] = { value = person.source, label = person.name }
+    end
+
+    local answer = lib.inputDialog('Sell on finance', {
+        { type = 'select', label = 'Buyer', options = people, required = true },
+        { type = 'number', label = 'Payments', min = Config.Finance.minCycles,
+          max = Config.Finance.maxCycles, default = 8, required = true },
+    })
+
+    if not answer or not answer[1] then return end
+
+    local res = lib.callback.await('som-housing:server:mortgage', false, {
+        slug = slug,
+        buyer = answer[1],
+        cycles = answer[2],
+        -- The BUYER's deposit comes off their bank. They agreed to the deal by
+        -- standing here; picking the account is not a decision worth a second
+        -- dialog on somebody else's screen.
+        account = 'bank',
+    })
+
+    if not res or not res.success then
+        return TriggerEvent('som:client:notify', res and res.error or 'Could not write it', 'error')
+    end
+
+    TriggerEvent('som:client:notify',
+        ('%s sold. %d payments, your cut $%d.'):format(res.label, res.cycles, res.commission), 'success')
+end
+
 -- ---------------------------------------------------------------------------
 -- Door zones
 -- ---------------------------------------------------------------------------
@@ -143,6 +237,28 @@ CreateThread(function()
                     label = ('Enter %s'):format(property.label),
                     distance = 2.0,
                     onSelect = function() enter(property.slug) end,
+                },
+                {
+                    name = ('property:%s:breach'):format(property.slug),
+                    icon = 'fa-solid fa-hammer',
+                    label = ('Force the door'),
+                    distance = 2.0,
+                    -- A UI filter. The server re-checks the job, the duty, the
+                    -- tool and the distance, and records the raid either way.
+                    canInteract = function()
+                        return core:hasJob(Config.Raid.job, nil, true)
+                    end,
+                    onSelect = function() breach(property.slug) end,
+                },
+                {
+                    name = ('property:%s:mortgage'):format(property.slug),
+                    icon = 'fa-solid fa-file-signature',
+                    label = ('Sell on finance'),
+                    distance = 2.0,
+                    canInteract = function()
+                        return core:hasJob(Config.Finance.job, nil, true)
+                    end,
+                    onSelect = function() mortgage(property.slug) end,
                 },
                 {
                     name = ('property:%s:view'):format(property.slug),
@@ -183,6 +299,16 @@ CreateThread(function()
                 if not inside or not inside.stash then return end
                 exports.ox_inventory:openInventory('stash', inside.stash)
             end,
+        },
+        {
+            name = 'property:furnish',
+            icon = 'fa-solid fa-couch',
+            label = 'Furnish',
+            distance = 1.8,
+            canInteract = function()
+                return Interior.Current() ~= nil
+            end,
+            onSelect = function() Furniture.Menu() end,
         },
     })
 end)

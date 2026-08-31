@@ -71,6 +71,15 @@ function Interior.Build(data)
         waited = waited + 50
     end
 
+    -- Fetched rather than sent with the enter payload, so server/interior.lua
+    -- does not have to load after server/furniture.lua to know about it. Load
+    -- order between two server files is a worse thing to depend on than one
+    -- extra round trip nobody is waiting on.
+    local res = lib.callback.await('som-housing:server:furniture', false)
+    if res and res.success then
+        Furniture.Draw(void, res.furniture or {})
+    end
+
     DoScreenFadeIn(600)
     SetModelAsNoLongerNeeded(joaat(data.property.shell))
 
@@ -80,6 +89,9 @@ end
 ---Removes the interior. Safe to call when there is not one.
 function Interior.Tear()
     if not current then return end
+
+    -- Before the shell, so nothing is left floating where the room used to be.
+    Furniture.Clear()
 
     if DoesEntityExist(current.shell) then
         DeleteEntity(current.shell)

@@ -212,6 +212,14 @@ local function appIdentity(appId)
         if app.id == appId then return app.label, app.icon end
     end
 
+    -- REGISTERED APPS TOO. This used to scan Config.Apps only, so every app
+    -- added through the registerApp export bannered as "System" with the
+    -- settings gear no matter what it declared, directly contradicting the
+    -- comment beside registerApp that says an app declares its icon once.
+    for _, app in pairs(registered or {}) do
+        if app.id == appId then return app.label, app.icon end
+    end
+
     -- An unknown app still notifies rather than failing silently. `system` is
     -- the catch-all for anything without an app of its own yet.
     return 'System', 'settings'
@@ -462,4 +470,24 @@ lib.addCommand('testnotify', {
 
     TriggerClientEvent('som:client:notify', source,
         args.text or 'This is a world notification, not a phone one.', 'inform', 6000)
+end)
+
+--- The Properties app.
+---
+--- A READ-ONLY VIEW over som-housing. Every number here is resolved by that
+--- resource from its own tables; the phone renders and decides nothing, which
+--- is why there is no property id in the request and no way to act on one.
+--- Buying, keys and mortgages all happen at the door, in person.
+lib.callback.register('som-phone:server:properties', function(source)
+    local player = exports['som-core']:getPlayer(source)
+    if not player then return { success = false } end
+
+    if GetResourceState('som-housing') ~= 'started' then
+        return { success = false, error = 'Properties is unavailable' }
+    end
+
+    local owned = exports['som-housing']:listFor(player.citizenid) or {}
+    local finance = exports['som-housing']:financeListFor(player.citizenid) or {}
+
+    return { success = true, properties = owned, finance = finance }
 end)

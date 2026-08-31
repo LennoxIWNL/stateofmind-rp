@@ -127,6 +127,17 @@ Config.Apps = {
         order = 10,
     },
     {
+        id = 'properties',
+        label = 'Properties',
+        -- briefcase is already in the ICONS table in html/app.js. An icon name
+        -- that is not there renders as the raw string, so this is checked
+        -- rather than chosen.
+        icon = 'briefcase',
+        colour = '#e0a13b',
+        -- Between bank at 10 and settings at 90, so money things sit together.
+        order = 20,
+    },
+    {
         id = 'settings',
         label = 'Settings',
         icon = 'settings',

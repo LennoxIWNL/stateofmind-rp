@@ -105,6 +105,11 @@ Config.Finance = {
     -- from memory and silently skips anyone offline, so the sweep records a
     -- missed cycle instead and housing settles the arrears on next login,
     -- oldest first. Logging out is not a way to keep a house for free.
+    -- How often the arrears sweep runs. Longer than som-phone's own 15 minute
+    -- collector because this only moves clocks and counts misses; the money is
+    -- moved by that collector, not by this one.
+    sweepMinutes = 20,
+
     repossessAfterMissed = 4,
     -- Of what has been paid so far, returned on repossession. Not zero: losing
     -- the house is the punishment, and taking the money as well is what makes
@@ -148,6 +153,12 @@ Config.Interior = {
     enterDistance = 6.0,
 }
 
+Config.Keys = {
+    -- Both people present. A key handed over from across the map is a key
+    -- handed to an id somebody typed, and typing an id is not knowing a person.
+    distance = 3.0,
+}
+
 Config.Purchase = {
     -- Same reasoning, applied to money rather than to doors.
     distance = 8.0,
@@ -155,6 +166,47 @@ Config.Purchase = {
     -- given a spare key to six houses must not stop somebody buying their first.
     maxOwned = 3,
 }
+
+-- ---------------------------------------------------------------------------
+-- Furniture
+-- ---------------------------------------------------------------------------
+
+--- What can be placed, and nothing else.
+---
+--- A WHITELIST, not a suggestion. The client sends a model NAME and the server
+--- refuses anything not in this table, because a client that could name its own
+--- model could place a locked door, a wall, or an ATM inside a room only it can
+--- reach. som-props takes the same position for the same reason.
+---
+--- Vanilla models only for now. ex-maps carries a Gabz furniture set but costs
+--- 868MB as one resource, which is a decision worth making on its own rather
+--- than as a side effect of this.
+Config.Furniture = {
+    -- How far from the shell origin anything may sit. Generous enough for the
+    -- largest shell and small enough that nothing can be pushed out of the room
+    -- and into somebody else's bucket.
+    maxOffset = 30.0,
+    maxPerProperty = 60,
+
+    catalogue = {
+        { model = 'v_res_tre_sofa',        label = 'Sofa',          category = 'seating' },
+        { model = 'v_res_tt_bed',          label = 'Bed',           category = 'bedroom' },
+        { model = 'v_res_mbcabinet',       label = 'Cabinet',       category = 'storage' },
+        { model = 'prop_table_04',         label = 'Dining Table',  category = 'tables' },
+        { model = 'prop_table_04_chr',     label = 'Dining Chair',  category = 'seating' },
+        { model = 'v_res_tre_tvstand',     label = 'TV Stand',      category = 'living' },
+        { model = 'prop_tv_flat_01',       label = 'Television',    category = 'living' },
+        { model = 'v_res_fridge_2',        label = 'Fridge',        category = 'kitchen' },
+        { model = 'prop_micro_01',         label = 'Microwave',     category = 'kitchen' },
+        { model = 'v_res_d_rug',           label = 'Rug',           category = 'decor' },
+        { model = 'prop_plant_01a',        label = 'Plant',         category = 'decor' },
+        { model = 'prop_shelves_02',       label = 'Shelving',      category = 'storage' },
+        { model = 'v_res_lastbin',         label = 'Bin',           category = 'decor' },
+        { model = 'prop_off_chair_01',     label = 'Office Chair',  category = 'seating' },
+        { model = 'prop_desk_01',          label = 'Desk',          category = 'tables' },
+    },
+}
+
 -- ---------------------------------------------------------------------------
 -- Properties
 -- ---------------------------------------------------------------------------

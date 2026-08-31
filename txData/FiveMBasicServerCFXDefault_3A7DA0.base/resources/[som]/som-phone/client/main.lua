@@ -46,6 +46,10 @@ RegisterNUICallback('close', function(_, cb)
     close()
 end)
 
+RegisterNUICallback('properties', function(_, cb)
+    cb(lib.callback.await('som-phone:server:properties', false) or { success = false })
+end)
+
 RegisterNUICallback('bank', function(_, cb)
     cb(lib.callback.await('som-phone:server:bank', false) or {})
 end)

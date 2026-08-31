@@ -65,7 +65,11 @@ lib.callback.register('som-housing:server:enter', function(source, slug)
     local property = Properties.BySlug(slug)
     if not property then return { success = false, error = 'no such property' } end
 
-    if not Ownership.HasAccess(player.citizenid, property.id) then
+    -- A key, OR a door that police have already forced. Raid.CanEnter is false
+    -- for everyone else including the owner's friends, so a breach opens the
+    -- property to the raid rather than to the public.
+    if not Ownership.HasAccess(player.citizenid, property.id)
+        and not Raid.CanEnter(source, property.id) then
         return { success = false, error = 'you do not have a key' }
     end
 

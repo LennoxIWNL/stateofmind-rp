@@ -21,8 +21,13 @@ client_scripts {
     -- at a door stops being stock ox_lib. Client only, so it cannot go in
     -- shared_scripts, and first, so every file below sees the replacement.
     '@som-ui/client/dialog.lua',
+    -- And lib.progressBar, which is the bar that runs while a door is being
+    -- forced. Same reason: som-ui's, not ox_lib's stock one.
+    '@som-ui/client/progressbar.lua',
     -- interior.lua first: property.lua calls Interior.Build into it.
     'client/interior.lua',
+    -- furniture before property: property's inside menu calls Furniture.Menu.
+    'client/furniture.lua',
     'client/property.lua',
 }
 
@@ -32,8 +37,12 @@ server_scripts {
     -- through, the same split som-garage uses with vehicles.lua.
     'server/properties.lua',
     'server/ownership.lua',
-    -- Last: entering needs both a property and a key, so it uses the other two.
+    'server/finance.lua',
+    -- raid before interior: entering consults Raid.CanEnter for a forced door.
+    'server/raid.lua',
     'server/interior.lua',
+    -- Last: furniture is scoped by where interior.lua says the player is.
+    'server/furniture.lua',
 }
 
 dependencies {
@@ -48,6 +57,11 @@ dependencies {
     -- The input dialog shim is loaded from it at start time, so its absence
     -- must be a loud failure rather than a nil call at a door.
     'som-ui',
+    -- Mortgage instalments are raised as real som_phone_bills rows through its
+    -- billCitizen export, so the phone's own sweep collects them. One way only:
+    -- som-phone reaches back through GetResourceState rather than a dependency,
+    -- which is what keeps this from being a cycle.
+    'som-phone',
     -- The shells themselves. Without it every property points at a model that
     -- does not exist, which fails as an invisible interior rather than as an
     -- error, so its absence must be loud.

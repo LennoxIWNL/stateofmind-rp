@@ -280,3 +280,116 @@ lib.callback.register('som-housing:server:inspect', function(source, slug)
         text = ('%s. For sale at $%s.'):format(property.label, comma(property.price)),
     }
 end)
+
+-- ---------------------------------------------------------------------------
+-- Keys
+-- ---------------------------------------------------------------------------
+
+--- Handing somebody a key.
+---
+--- ONLY THE OWNER, and only to somebody standing next to them. Both halves
+--- matter: a key granted from across the map is a key granted to a citizenid
+--- somebody typed, and being able to type an id is not the same as knowing the
+--- person.
+lib.callback.register('som-housing:server:grantKey', function(source, data)
+    if type(data) ~= 'table' then return { success = false, error = 'bad request' } end
+
+    local owner = core:getPlayer(source)
+    if not owner then return { success = false, error = 'not loaded' } end
+
+    local property = Properties.BySlug(data.slug)
+    if not property then return { success = false, error = 'no such property' } end
+
+    if Ownership.RoleOf(owner.citizenid, property.id) ~= 'owner' then
+        return { success = false, error = 'only the owner can hand out keys' }
+    end
+
+    local targetSource = tonumber(data.target)
+    if not targetSource then return { success = false, error = 'no one selected' } end
+
+    local target = core:getPlayer(targetSource)
+    if not target then return { success = false, error = 'they are not here' } end
+
+    if target.citizenid == owner.citizenid then
+        return { success = false, error = 'you already have a key' }
+    end
+
+    local ownerPed, targetPed = GetPlayerPed(source), GetPlayerPed(targetSource)
+    if not ownerPed or ownerPed == 0 or not targetPed or targetPed == 0 then
+        return { success = false, error = 'no ped' }
+    end
+
+    if #(GetEntityCoords(ownerPed) - GetEntityCoords(targetPed)) > Config.Keys.distance then
+        return { success = false, error = 'they need to be next to you' }
+    end
+
+    local role = data.role == 'tenant' and 'tenant' or 'co_owner'
+
+    if not Ownership.Grant(property.id, target.citizenid, role, owner.citizenid) then
+        return { success = false, error = 'could not hand over the key' }
+    end
+
+    TriggerClientEvent('som:client:notify', targetSource,
+        ('You have been given a key to %s'):format(property.label), 'success')
+
+    return { success = true, label = property.label, name = target.charinfo and
+        ('%s %s'):format(target.charinfo.firstname, target.charinfo.lastname) or 'them' }
+end)
+
+--- Taking one back.
+---
+--- No distance check, deliberately. Revoking a key is something you should be
+--- able to do the moment you decide to, and requiring the other person to stand
+--- next to you while you do it is exactly backwards.
+lib.callback.register('som-housing:server:revokeKey', function(source, data)
+    if type(data) ~= 'table' then return { success = false, error = 'bad request' } end
+
+    local owner = core:getPlayer(source)
+    if not owner then return { success = false, error = 'not loaded' } end
+
+    local property = Properties.BySlug(data.slug)
+    if not property then return { success = false, error = 'no such property' } end
+
+    if Ownership.RoleOf(owner.citizenid, property.id) ~= 'owner' then
+        return { success = false, error = 'only the owner can take keys back' }
+    end
+
+    if type(data.citizenid) ~= 'string' then return { success = false, error = 'no key selected' } end
+
+    if data.citizenid == owner.citizenid then
+        return { success = false, error = 'you cannot revoke your own ownership' }
+    end
+
+    if not Ownership.Revoke(property.id, data.citizenid) then
+        return { success = false, error = 'they do not hold a key' }
+    end
+
+    return { success = true }
+end)
+
+---Who holds a key, for the owner to look at.
+lib.callback.register('som-housing:server:keys', function(source, slug)
+    local owner = core:getPlayer(source)
+    if not owner then return { success = false, error = 'not loaded' } end
+
+    local property = Properties.BySlug(slug)
+    if not property then return { success = false, error = 'no such property' } end
+
+    if Ownership.RoleOf(owner.citizenid, property.id) ~= 'owner' then
+        return { success = false, error = 'not yours' }
+    end
+
+    -- Joined to som_characters so the list shows names rather than ids. An
+    -- owner looking at their own keyring is the one place a name is the right
+    -- thing to show, which is why inspect does not.
+    local rows = MySQL.query.await([[
+        SELECT o.citizenid, o.role, o.granted_at,
+               c.firstname, c.lastname
+        FROM som_property_owners o
+        LEFT JOIN som_characters c ON c.citizenid = o.citizenid
+        WHERE o.property_id = ? AND o.role <> 'owner'
+        ORDER BY o.granted_at ASC
+    ]], { property.id }) or {}
+
+    return { success = true, keys = rows, label = property.label }
+end)
