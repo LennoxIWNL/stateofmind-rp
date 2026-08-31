@@ -137,6 +137,24 @@ Config.Raid = {
     breachOpenMinutes = 15,
 }
 
+
+-- ---------------------------------------------------------------------------
+-- Entering and buying
+-- ---------------------------------------------------------------------------
+
+Config.Interior = {
+    -- How close the SERVER insists you are to a door before it will let you in.
+    -- Looser than the target range because client coordinates lag the server.
+    enterDistance = 6.0,
+}
+
+Config.Purchase = {
+    -- Same reasoning, applied to money rather than to doors.
+    distance = 8.0,
+    -- Keys held on other people's properties do not count towards this. Being
+    -- given a spare key to six houses must not stop somebody buying their first.
+    maxOwned = 3,
+}
 -- ---------------------------------------------------------------------------
 -- Properties
 -- ---------------------------------------------------------------------------
