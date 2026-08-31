@@ -57,11 +57,19 @@ end
 -- distance in front of the player, which reads as the item vanishing.
 --
 -- How a throw actually works, which is what this now does:
---   1. The page closes and the player AIMS. A ghost prop sits in their hand and
---      an arc is drawn to where it will land, so the throw is a decision.
---   2. Left click throws. The ped plays the underarm/overarm animation.
---   3. The item lands as a REAL ox_inventory drop carrying THAT ITEM'S prop
---      model, so a thrown bandage is a bandage lying on the floor.
+--   1. The page closes and a ghost prop goes into the player's hand.
+--   2. HOLD RIGHT CLICK TO AIM. An arc is drawn to where it will land while the
+--      button is down, so the throw is a decision. Let go and the arm drops.
+--   3. LEFT CLICK, while aiming, throws. The ped plays the throw animation.
+--   4. The item lands as a REAL ox_inventory drop carrying THAT ITEM'S prop
+--      model, so a thrown bandage is a bandage lying on the floor, picked back
+--      up with the target eye.
+--
+-- Right click aims and left click throws because that is how the base game
+-- throws a snowball. The first version had no aim state at all: holding LEFT
+-- click charged a power value, releasing it threw, and right click CANCELLED,
+-- so aiming with it threw the item away instead. That charge is gone and the
+-- speed is fixed.
 --
 -- The client picks the aim point and the server still decides everything that
 -- matters: it re-reads the slot, clamps the distance, and refuses a landing
@@ -194,7 +202,19 @@ RegisterNUICallback('somThrow', function(data, cb)
         playAnim(ped, 'anim@mp_snowball', 'pickup_snowball', -1, 50)
 
         local thrown, cancelled = false, false
-        local power = 0.0
+
+        -- Right click holds the aim, left click releases the throw, which is how
+        -- the base game throws a snowball. There is no charge: distance is not a
+        -- decision any more, so one speed that carries a sensible distance.
+        local holdingAim = false
+        local THROW_SPEED = 18.0
+
+        -- A loop that disables the mouse needs a way out that is not the mouse.
+        -- ESC cancels, and this expires on its own if the player walks off and
+        -- never aims at all, because a throw nobody finishes must not leave the
+        -- controls held down forever.
+        local started = GetGameTimer()
+        local TIMEOUT = 15000
 
         -- HOISTED OUT OF THE LOOP. This was the crash: `landing` used to be
         -- declared inside the while body as `prev`, so the throw below read it
@@ -215,22 +235,33 @@ RegisterNUICallback('somThrow', function(data, cb)
 
             aimDir = vector3(-math.sin(yaw) * cosPitch, math.cos(yaw) * cosPitch, math.sin(pitch))
 
-            -- CHARGED BY HOLDING, which is the baseball part. Held attack ramps
-            -- power over about a second; a tap is a gentle underarm toss and a
-            -- full hold is a proper throw. Distance being a decision is what
-            -- makes this feel like throwing rather than like placing.
-            if IsDisabledControlPressed(0, 24) then
-                power = math.min(1.0, power + 0.022)
-            elseif power > 0.0 then
-                thrown = true
+            -- The controls are taken every frame, before anything reads them,
+            -- so the game does not also shoot, punch or zoom while aiming.
+            DisableControlAction(0, 24, true)
+            DisableControlAction(0, 25, true)
+            DisableControlAction(0, 140, true)
+
+            -- ESC is the only cancel. Right click cannot also be one now that it
+            -- is the aim, which is what it used to be and why aiming was
+            -- impossible: pressing it threw the item away instead.
+            if IsControlJustPressed(0, 202) or GetGameTimer() - started > TIMEOUT then
+                cancelled = true
+                goto continue
             end
 
-            local speed = 7.0 + (power * 15.0)
+            holdingAim = IsDisabledControlPressed(0, 25)
+
+            -- Arm down, no arc, nothing to throw until they actually aim.
+            if not holdingAim then goto continue end
+
+            if IsDisabledControlJustPressed(0, 24) then thrown = true end
+
+            local speed = THROW_SPEED
             local from = GetPedBoneCoords(ped, 28422, 0.0, 0.0, 0.0)
 
             -- The arc is SIMULATED with the same gravity the throw uses, so the
             -- preview is a prediction rather than a decorative curve. Stepping
-            -- the velocity is what makes it bend correctly at every power.
+            -- the velocity is what makes it bend correctly at any distance.
             local px, py, pz = from.x, from.y, from.z
             local vx, vy, vz = aimDir.x * speed, aimDir.y * speed, aimDir.z * speed
             local dt = 0.06
@@ -255,19 +286,16 @@ RegisterNUICallback('somThrow', function(data, cb)
             DrawMarker(28, landing.x, landing.y, landing.z, 0, 0, 0, 0, 0, 0,
                 0.18, 0.18, 0.18, 255, 20, 147, 120, false, false, 2, nil, nil, false)
 
-            DisableControlAction(0, 24, true)
-            DisableControlAction(0, 25, true)
-            DisableControlAction(0, 140, true)
-
-            if IsDisabledControlJustPressed(0, 25) or IsControlJustPressed(0, 202) then
-                cancelled = true
-            end
+            -- Label last in the block on purpose: Lua only allows a goto to a
+            -- label it can reach without entering a local's scope, and a label
+            -- at the end of a block is past every local declared inside it.
+            ::continue::
         end
 
         if thrown then
             playAnim(ped, 'anim@mp_snowball', 'pickup_throw', 900, 48)
 
-            local speed = 7.0 + (power * 15.0)
+            local speed = THROW_SPEED
 
             -- THE PROP IS ACTUALLY THROWN rather than deleted and re-created at
             -- a computed point. It detaches, gets its collision and opacity
