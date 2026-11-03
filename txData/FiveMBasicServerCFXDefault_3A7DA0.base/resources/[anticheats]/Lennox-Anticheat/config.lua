@@ -3,12 +3,14 @@ LACConfig = {}
 -- =========================================================================
 --  Discord Webhooks
 -- =========================================================================
+-- Read from convars, not committed here. Set the real (regenerated) values
+-- in server.cfg, which is gitignored; see server.cfg.example.
 LACConfig.Webhooks = {
-    bans        = 'https://discord.com/api/webhooks/1519638861846941810/Z3AytSBerim1tirZEoplZBWzYMQh3TWH74rEU75MeSloEVwYt2XmacL9Eqk0NcmuRKZl',
-    kicks       = 'https://discord.com/api/webhooks/1519638866091577465/rw2fTXVUetUcOpE4Gx17Uj8OxtqnjJT2kAO4m7XQF72oDoScAjiUBdI141eQkt00J-ax',
-    flags       = 'https://discord.com/api/webhooks/1519638868092256356/qBX5jtABSKqF3BRAiK4twJ9t3dFNXGqOPI3n3JBUQGsAnksn03UJQ8HTB4df0M0RcTDM',
-    events      = 'https://discord.com/api/webhooks/1519638871019884674/JMGHSltfS1DMOuHUNXjTCINq-24-1zXLT1Ja4-6cC-ncQNwK5OIyXqhoFreh8GvJyDDm',
-    connections = 'https://discord.com/api/webhooks/1519638873490194482/Y2u7GmM9qU6AIrxImvKjVVjrylLKR4FjIivlgz5e5TsklAEqivrc_9k6aPQmW67lPDgo',
+    bans        = GetConvar('lac_webhook_bans', ''),
+    kicks       = GetConvar('lac_webhook_kicks', ''),
+    flags       = GetConvar('lac_webhook_flags', ''),
+    events      = GetConvar('lac_webhook_events', ''),
+    connections = GetConvar('lac_webhook_connections', ''),
 }
 
 -- =========================================================================

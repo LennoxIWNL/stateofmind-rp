@@ -93,9 +93,10 @@ Config.ImpoundLocations = {
     [2] = vector4(-436.14, 5982.63, 31.34, 136.0),
 }
 
--- Support for Wraith ARS 2X. 
+-- Support for Wraith ARS 2X. wk_wars2x is now vendored under [custom] and
+-- ensured in som.cfg, so this can be on.
 
-Config.UseWolfknightRadar = false
+Config.UseWolfknightRadar = true
 Config.WolfknightNotifyTime = 5000 -- How long the notification displays for in milliseconds (30000 = 30 seconds)
 Config.PlateScanForDriversLicense = false -- If true, plate scanner will check if the owner of the scanned vehicle has a drivers license
 

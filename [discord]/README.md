@@ -113,3 +113,12 @@ pm2 restart all                   # restart everything
 
 The GitHub auto-pull process handles server resource updates automatically — you only
 need to manually copy files when the bot itself changes.
+
+**`index.mjs` is a built bundle, not source.** The real source lives in the
+Replit project this README's own "Updating the bot later" section points
+at, not in this git repo — only the `pm2-package-build.mjs` output ever gets
+committed here. That's a known, accepted limitation (editing the bundle
+directly isn't practical, and it isn't broken, just unmaintainable from this
+repo alone): if this repo ever needs to be the source of truth for the bot,
+the Replit project's real source should be committed here too, built as a
+gitignored step rather than checked in pre-built.

@@ -27,6 +27,28 @@ load_server_icon server-icon.png
 set sv_enforceGameBuild 2944
 set mysql_connection_string "mysql://root:YOUR_DB_PASSWORD@localhost/stateofmindrp?charset=utf8mb4"
 
+# Lennox-Anticheat's webhooks (Lennox-NUIBlocker reuses lac_webhook_events).
+# Create NEW webhooks in Discord's channel settings for these - the values
+# that used to be hardcoded in those resources' config.lua are burned and
+# must never be reused, even here.
+set lac_webhook_bans "YOUR_DISCORD_WEBHOOK_URL"
+set lac_webhook_kicks "YOUR_DISCORD_WEBHOOK_URL"
+set lac_webhook_flags "YOUR_DISCORD_WEBHOOK_URL"
+set lac_webhook_events "YOUR_DISCORD_WEBHOOK_URL"
+set lac_webhook_connections "YOUR_DISCORD_WEBHOOK_URL"
+
+# ps-mdt's webhooks (mug shots, clock-in notifications).
+set psmdt_webhook_mugshot "YOUR_DISCORD_WEBHOOK_URL"
+set psmdt_webhook_clockin "YOUR_DISCORD_WEBHOOK_URL"
+
+# qb-smallresources' webhooks. Also burned, also need new ones in Discord.
+set qbsmall_webhook_economy "YOUR_DISCORD_WEBHOOK_URL"
+set qbsmall_webhook_inventory "YOUR_DISCORD_WEBHOOK_URL"
+set qbsmall_webhook_crime "YOUR_DISCORD_WEBHOOK_URL"
+set qbsmall_webhook_player_staff "YOUR_DISCORD_WEBHOOK_URL"
+set qbsmall_webhook_comms "YOUR_DISCORD_WEBHOOK_URL"
+set qbsmall_webhook_system "YOUR_DISCORD_WEBHOOK_URL"
+
 # ---------------------------------------------------------------------------
 # Everything else lives in som.cfg, which IS tracked in git.
 #

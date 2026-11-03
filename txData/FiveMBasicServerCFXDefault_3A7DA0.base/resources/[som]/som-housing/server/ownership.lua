@@ -191,23 +191,32 @@ lib.callback.register('som-housing:server:buy', function(source, data)
         return { success = false, error = ('you already own %d properties'):format(Config.Purchase.maxOwned) }
     end
 
+    -- CLAIMED BEFORE ANY MONEY MOVES. The UPDATE only succeeds while for_sale
+    -- is still 1, so two buyers racing this callback can never both win: the
+    -- second one's claim affects zero rows and is refused here, before it
+    -- has paid a cent.
+    if not Properties.Claim(property.id) then
+        return { success = false, error = 'somebody already bought it' }
+    end
+
     -- payWith validates the account against som-core's payable list, so a
     -- client asking to pay from 'dirty' is refused there rather than here.
     local paid, payErr = core:payWith(source, data.account, property.price,
         ('property:%s'):format(property.slug))
 
     if not paid then
+        Properties.Release(property.id)
         return { success = false, error = payErr or 'could not pay' }
     end
 
     if not Ownership.Grant(property.id, player.citizenid, 'owner', nil) then
-        -- Refunded in full. The alternative is taking the money and handing
-        -- back nothing, which is the failure som-garage refunds against too.
+        -- Refunded in full and put back on the market. The alternative is
+        -- taking the money and handing back nothing, which is the failure
+        -- som-garage refunds against too.
         core:addMoney(source, data.account, property.price, 'property-refund')
+        Properties.Release(property.id)
         return { success = false, error = 'could not register the sale' }
     end
-
-    MySQL.update.await('UPDATE som_properties SET for_sale = 0 WHERE id = ?', { property.id })
 
     return { success = true, label = property.label, price = property.price }
 end)

@@ -107,6 +107,14 @@ lib.callback.register('som-housing:server:mortgage', function(source, data)
         end
     end
 
+    -- CLAIMED BEFORE ANY MONEY MOVES, for the same reason
+    -- som-housing:server:buy claims first: the UPDATE only succeeds while
+    -- for_sale is still 1, so a straight buy and a mortgage racing the same
+    -- property can never both win.
+    if not Properties.Claim(property.id) then
+        return { success = false, error = 'somebody already bought it' }
+    end
+
     local deposit = math.floor(property.price * Config.Finance.depositRate)
     local financed = property.price - deposit
     local total = math.floor(financed * (1.0 + Config.Finance.interestRate))
@@ -117,15 +125,17 @@ lib.callback.register('som-housing:server:mortgage', function(source, data)
         ('property-deposit:%s'):format(property.slug))
 
     if not paid then
+        Properties.Release(property.id)
         return { success = false, error = payErr or 'the buyer could not pay the deposit' }
     end
 
     if not Ownership.Grant(property.id, buyer.citizenid, 'owner', realtor.citizenid) then
         core:addMoney(buyerSource, data.account, deposit, 'property-deposit-refund')
+        Properties.Release(property.id)
         return { success = false, error = 'could not register the sale' }
     end
 
-    MySQL.update.await('UPDATE som_properties SET for_sale = 0 WHERE id = ?', { property.id })
+    -- for_sale was already cleared by Properties.Claim above.
 
     MySQL.insert.await([[
         INSERT INTO som_property_finance
@@ -137,11 +147,19 @@ lib.callback.register('som-housing:server:mortgage', function(source, data)
         Config.Finance.intervalDays, Config.Finance.intervalDays, realtor.citizenid,
     })
 
-    -- Commission comes out of the deposit rather than out of the bank, so the
-    -- money in play is money a player actually handed over.
+    -- Commission comes out of Dynasty 8's own account, debited first, the
+    -- same order the dealership's commission uses. A raw addMoney with
+    -- nothing debited mints the commission out of nothing; this moves it.
     local commission = math.floor(deposit * Config.Finance.commission)
     if commission > 0 then
-        core:addMoney(source, 'bank', commission, ('property-commission:%s'):format(property.slug))
+        local spent = exports['som-economy']:businessSpend(Config.Finance.business, commission,
+            ('commission:%s'):format(realtor.citizenid))
+
+        if spent then
+            core:addMoney(source, 'bank', commission, ('property-commission:%s'):format(property.slug))
+        else
+            commission = 0
+        end
     end
 
     Finance.RaiseNext(property.id)

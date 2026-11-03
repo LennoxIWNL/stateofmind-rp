@@ -172,6 +172,31 @@ end
 exports('getProperty', Properties.ById)
 exports('getPropertyBySlug', Properties.BySlug)
 
+---Atomically takes a property off the market. Returns true only to the
+---caller that actually wins the race: a second claim on the same property
+---affects zero rows and comes back false before any money has moved.
+---@param propertyId number
+---@return boolean
+function Properties.Claim(propertyId)
+    propertyId = tonumber(propertyId)
+    if not propertyId then return false end
+
+    local affected = MySQL.update.await(
+        'UPDATE som_properties SET for_sale = 0 WHERE id = ? AND for_sale = 1',
+        { propertyId })
+
+    return (affected or 0) > 0
+end
+
+---Puts a property back on the market after a claimed sale fails partway.
+---@param propertyId number
+function Properties.Release(propertyId)
+    propertyId = tonumber(propertyId)
+    if not propertyId then return end
+
+    MySQL.update.await('UPDATE som_properties SET for_sale = 1 WHERE id = ?', { propertyId })
+end
+
 CreateThread(function()
     -- After som-core has confirmed the schema is present, same as som-garage.
     Wait(3000)

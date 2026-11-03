@@ -7,7 +7,9 @@ NUIBlocker.Config = {
     LogSource = 'Lennox-NUIBlocker',
 
     UseDiscordLogs = true,
-    DiscordWebhook = 'https://discord.com/api/webhooks/1519638871019884674/JMGHSltfS1DMOuHUNXjTCINq-24-1zXLT1Ja4-6cC-ncQNwK5OIyXqhoFreh8GvJyDDm',
+    -- Same webhook Lennox-Anticheat uses for its "events" channel. Read from
+    -- a convar, not committed; set the real value in server.cfg.
+    DiscordWebhook = GetConvar('lac_webhook_events', ''),
 
     BanOnThreshold     = false,
     BanThreshold       = 10,

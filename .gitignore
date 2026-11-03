@@ -100,6 +100,12 @@ txData/default/config.json
 skills/
 
 # -------------------------------------------------------------
+#  Test harness output (tests/ itself IS tracked; only generated
+#  screenshots from the NUI harness are a build artifact)
+# -------------------------------------------------------------
+tests/nui/screenshots/
+
+# -------------------------------------------------------------
 #  AI development session reports (audits, fix logs, rundowns) —
 #  useful in the moment, not meant to be permanent repo docs
 # -------------------------------------------------------------

@@ -1781,697 +1781,418 @@ The binary streams around them stay ignored, which is the point: never
 
 ## 17. Feature gap register
 
-Cross-referenced against **140 distinct sources**: 22 public roleplay servers,
-16 server templates, 20 frameworks and 82 free resource bundles. Five feature
-domains were surveyed and **104 gaps** recorded. **76 are missing outright and
-28 are partial.** By how common they are across the surveyed servers: 51 are
-near universal, 45 are common, 8 are differentiators.
+**Replaces this section's and Section 18's own earlier versions entirely.**
+Those were written before som-housing, the dealership, the inventory
+reskin, som-hud, and several other resources existed, and before this
+session's research, and were confirmed stale by the project owner rather
+than trusted as-is. Rewritten from a fresh read of the actual current code
+(not from the old register's own claims) plus three deep-research passes
+into NoPixel, ProdigyRP and EchoRP specifically, since "NoPixel and Prodigy
+tier" (14.1) is the standard this section measures against. Section 16's
+session-handoff history is untouched and still accurate about what it
+covers.
 
-**The honest read.** SOM is further along than a typical build at this stage in
-exactly one half of the problem and barely started in the other. The framework
-layer is genuinely strong: server-authoritative money with a full ledger, a
-single mint path for vehicles, a compat layer that lets preserved third-party
-resources run untouched, a radial that cannot be told to fire an arbitrary
-event, and a dispatch that refuses client-authored calls. Several surveyed
-servers, including well known ones, do worse on every one of those.
+### 17.1 — Named, sourced features of the three servers we're benchmarked against
 
-The content layer is where the work is. There is no death or downed state, so a
-shooting has no consequence. There is no route for a civilian to own a vehicle,
-so personal garages are empty by construction. There is no housing, no drugs, no
-robberies, no freelance job loop, and no way to get a job without a staff member
-typing `/setjob`. **32 player-facing capabilities exist today**, and most of them
-are police or framework.
+All three run proprietary, unreleased scripts — there is no official spec
+to cite. Every claim below is sourced from that server's own public rule
+pages, documentation, wikis or repeated first-party marketing copy, with a
+confidence tag, not from guessing what a "good" version would look like.
 
-So "very little done" is wrong, but "very little a player can DO" is right. That
-is a normal consequence of having built the authority layer first, which was the
-correct order, and it does mean the visible surface lags a long way behind the
-foundation.
+**NoPixel** (confirmed cross-source unless noted):
+- Heists are **nested-difficulty vaults, not single-stage robberies**.
+  Fleeca Bank → Paleto Bank → the City Vault (Pacific Standard), and inside
+  the Casino heist itself an outer layer → a much harder "Lower Vault,"
+  each tier gated behind progressively rarer tools (a laptop, then a
+  dongle, then a key card, depending on the era) and a hacking minigame.
+  The VAR 8-digit hack is NoPixel's own signature "hardest" minigame —
+  even a NoPixel developer has publicly said he completes it only about
+  half the time. Crews chain tiers into one operation ("Rainbow Road" hit
+  Fleeca, Paleto and the City Vault in a single continuous job, with
+  hostages held at multiple sites at once).
+- Bail is a real mechanic with teeth, not a toggle: felony-only, requires
+  documentation (an arrest report number, criminal history), forfeits in
+  full on a violation, and missing a 72-hour appeal window auto-issues a
+  new warrant. Warrants expire after 3 days. Confirmed from the server's
+  own in-character legislation text.
+- Court/DOJ is a functioning role, not lore — judges, prosecutors and
+  defense roleplayers who study real case law (confirmed by the existence
+  of player-made study guides for it).
+- **Correction worth recording plainly: bodycam is not an in-game mechanic
+  on NoPixel.** It's OOC slang players use for their own stream footage
+  ("I have a bodycam" = "I'm streaming this"). A sibling heavy-RP community
+  defines the term the same way. Building a literal bodycam-recording
+  resource would be chasing a feature the benchmark server doesn't actually
+  have.
+- Gang turf is a spray-radius-claim system, and it is the same system as
+  the drug economy, not two: a gang's sprayed radius is what lets locals in
+  that area passively sell drugs. Wars range from low-intensity (contesting
+  rival sprays, no combat) to full combat engagements — two distinct
+  intensity tiers, not one.
+- A "Chopping" VIN-scrub minigame exists for stolen vehicles (confirmed to
+  exist and be named this in NoPixel 4.0; its exact play pattern is
+  disputed between two independent fan sources, so treat the mechanic's
+  *existence* as confirmed and its exact steps as unconfirmed).
+- The single rule NoPixel enforces hardest isn't a mechanic at all —
+  metagaming (acting on stream/Discord information your character
+  wouldn't have) is named the server's own rulebook as its most serious
+  violation, ahead of any gameplay system.
+- Not found despite searching (treat as a gap in *research*, not
+  necessarily a gap in NoPixel's actual design): confirmed wanted/heat
+  system specifics, and a confirmed MDT feature list (every MDT writeup
+  found was a third-party recreation, not NoPixel's own).
 
-**One domain was not surveyed.** Social and world systems (phone apps, clothing,
-gyms, casinos, activities, HUD, admin tooling) hit the session limit and never
-ran, as did the automated synthesis. This register was assembled by hand from
-the five domains that completed. Treat social and world as unknown rather than
-empty.
+**ProdigyRP** (confirmed via the server's own rules page, docs site and
+wiki unless noted):
+- A graduated New Life Rule tied to *cause of death*, not a binary
+  down-state: full memory retained on a melee knockout, "fuzzy" memory on a
+  critical gunshot, only "hazy" details after bleeding out, no memory after
+  a full respawn.
+- A real academy/FTO pipeline across multiple named departments including a
+  SWAT division (Cadet → Probationary Officer → ... → Lieutenant →
+  Commissioner, per the server's own LSPD rank table).
+- A large first-party custom script catalogue (`prp-*`): a configurable
+  tiered warehouse robbery, a multi-stage "Aerial Run" smuggling heist, a
+  boosting resource with a player-run contract marketplace, a bespoke
+  property/auction system, a custom vehicle-tuning shop replacement.
+- Explicitly written anti-metagaming/anti-powergaming/anti-griefing rule
+  definitions (e.g. powergaming is defined specifically as removing another
+  player's ability to respond to a scene, with a player's own IC choices
+  explicitly carved out as not powergaming).
 
-### 17.1 How to read this
+**EchoRP** (confirmed via the server's own wiki and repeated recruitment
+posts unless noted):
+- A three-branch DOJ (Public Defender's Office / State Attorney's Office /
+  Judiciary) tied to a named Department of Corrections.
+- A roster of roughly 20 named gangs.
+- Its most-repeated marketing claim — a "balanced economy" — has **no
+  documented mechanism anywhere** found in this research. Worth recording
+  plainly rather than treating it as a system to copy: it's the server's
+  own branding, not a specification.
+- Its own players' feedback board has called its gang system
+  underdeveloped ("every gang does boosting, meth, and jobs because that's
+  all they can do," gang applications "broken for most gangs"). Useful as a
+  calibration point: gang depth is something EchoRP itself hasn't solved
+  either, so matching our current tag-plus-pay gang system to *their*
+  level is not a meaningful bar to clear.
 
-- **How common**: near universal means nearly every surveyed server has it;
-  common means most do; differentiator means few do and it would stand out.
-- **SOM status**: strict. A resource existing but the capability not being
-  reachable by a player counts as missing or partial, not present.
-- **Effort**: small is under a day, medium one to three days, large about a
-  week, epic multiple weeks.
-- **Free option** names a genuinely free or open source resource. Paid and
-  escrowed scripts were excluded from sourcing entirely.
+### 17.2 — Cross-reference against this repo's actual current code
 
-Only gaps are listed. Anything SOM fully has is absent from these tables, which
-is why the police section looks thin relative to how much police work exists.
+Verified by direct code reads this session, not by trusting this document's
+own prior claims.
 
-### 17.2 The critical path
+**Mature already** (context, not a gap): a server-authoritative economy
+with real ledgers (`som-economy`), vehicles and a dealership (`som-garage`),
+housing (`som-housing`, race-fixed this session), and — this directly
+overturns this document's own earlier claim that the server "still has
+stock UI everywhere" — a genuinely custom UI suite now exists
+(`som-ui`/`som-hud`/`som-pause`/`som-radial`/`som-interact`/`som-chat`/
+`som-loading`), plus a police records/MDT system (`ps-mdt`) with a real
+181-entry charge catalogue, incident roles, BOLOs and warrants.
 
-Not everything, just the ordered sequence that unblocks the most.
+**Crime and justice — the single biggest gap cluster, by far.** Charges,
+BOLOs, warrants, cuffing, escort, fines and impound all exist and are
+solid, but there is **no enforcement**: no jail cell, no bail (zero hits
+anywhere in the codebase), no court/DOJ (`cityhallv1` is a disabled empty
+shell). The one jail hook that exists (`ps-mdt` calling
+`qb-communityservice` on sentencing) points at a resource that is not
+present anywhere in this repo or, confirmed by this session's research,
+anywhere open-source under that name — recording a sentence today changes
+nothing in-game. Heists and robberies of any kind (store, bank, drugs) **do
+not exist at all**, not even partially — the only hits anywhere are flavor
+text in charge names and an unrelated map-prop loader. Gangs are a tag plus
+passive pay with no turf or territory, which the gang config's own comments
+already flag as future work. The native GTA wanted-star system is
+explicitly disabled (`SetMaxWantedLevel(0)`) and nothing replaces it —
+crime visibility to police is entirely dispatch-call-driven today. Bodycam
+is a flavor inventory item with no function. ANPR and evidence/forensics
+(`r14-evidence`) exist in code but are switched off (`som.cfg`:
+`UseWolfknightRadar = false`, no camera resource installed; `r14-evidence`
+still calls removed QBCore members and isn't bridged through
+`som-compat`).
 
-1. **Death and downed state.** Epic, and it is the single next thing to build.
-   Nothing on this server currently has stakes: you cannot be killed, revived or
-   hospitalised. It blocks EMS, revive, injuries, the morgue, jail intake, five
-   dispatch call types including officer down, r14-evidence's value, and the
-   entire consequence side of every crime feature below it. Every other item
-   competes for second place; this one has no substitute.
-2. **Vehicle keys and hotwiring.** Medium. Turns vehicle theft from taking a car
-   into a crime, and is the precondition for boosting and for a chop shop
-   meaning anything.
-3. **A dealership.** Large. Until a civilian can own a car, personal garages,
-   insurance, player-to-player sale and the whole vehicle economy are empty.
-4. **Getting a job without staff.** Medium. Everything in the economy domain is
-   gated behind a human typing `/setjob` today.
-5. **One freelance earning loop.** Medium for the first one. A new player
-   currently has no way to earn anything at all.
+**Identity and immersion**: no whitelist/application pipeline, no
+backstory/character-depth requirement enforced anywhere, no injury-realism
+rules beyond medical's intentionally minimal down state.
 
-### 17.3 Cheap wins, disproportionate value
+**Launch/ops readiness**: no tests or luacheck config existed anywhere in
+the repo before this session (see Part 1.6 of this session's own work,
+folded into 17.5); the Discord bot ships as a committed build with no
+source in this repo (the real source lives in a Replit project this repo
+only ever receives a built bundle from); no staff tooling beyond `ps-mdt`'s
+own police-side tools. `som.cfg` itself already carries owner-authored
+phase tags ("NO CONSUMER YET... phase N") for several of the resources
+named above — a genuinely more current cross-check than this document's own
+prior roadmap was, since it's live boot config rather than a point-in-time
+writeup.
 
-Twenty-seven gaps are small. These are the ones where the ratio is best, several
-because the work is already done and only needs wiring:
+### 17.3 — Recommendation: which of 17.1's features to actually add
 
-| Gap | Why it is cheap |
-|---|---|
-| ~~Fuel stations~~ | **Corrected: not cheap.** See below |
-| Lockpick and hack minigame | `ox_lib` skillcheck is already installed |
-| Clothing shops and barbers as places | som-appearance is built; it needs som-interact zones |
-| Custom loading screen | The `loadingscreen` resource already exists |
-| Spawn point selection on login | Small, and it is the first thing a player ever sees |
-| Cash withdrawal from the bank | Bank money cannot currently become cash |
-| Suppressing vanilla NPC police | Small, and vanilla wanted stars undermine every police feature |
-| Police patrol vehicles | The fleet system works; `Config.Fleets.lspd` is deliberately empty pending a pack |
-| Photo on ID cards | `screenshot-basic` is already started |
-| Money visible without opening the phone | Needs a HUD, which does not exist yet |
+Not the full list — picks, with reasons:
 
-**Correction, made while starting on this list.** Fuel was recorded as small
-because `cdn-fuel` is on disk. It is not small. Its manifest hard-depends on
-`qb-target`, `qb-input` and `qb-menu`, none of which are installed, and it
-shared-scripts `@qbx_core/shared/locale.lua`, and **qbx_core is removed from
-this server**, so it fails at load rather than degrading. Its ox_lib and
-ox_target branches exist but are commented out. Making it work means switching
-those branches, dropping the qbx_core include and rewiring its targets to
-som-interact: a medium, not a small. `ox_fuel` would be the genuinely cheap
-route and is **not** installed. Treat the row above as medium until one of those
-two is resolved.
+1. **The bail/warrant/court loop**, built to NoPixel's actual documented
+   mechanical pattern (documentation-gated bail, real forfeiture, an
+   auto-reissued warrant on a missed appeal deadline) rather than a vague
+   "jail exists." This is the single most-named blocker across every prior
+   pass at this roadmap, and still is — nothing else in the crime loop
+   matters while an arrest has no consequence.
+2. **A tiered heist ladder**, built on the nested-vault pattern (store →
+   small bank → major heist), since this repo has zero heist content today
+   and this is the single most consistently-named signature across all
+   three benchmarked servers.
+3. **Gang turf wired directly into the drug economy, as one system**, not
+   a separate turf-build followed by a separate drug-build — this is
+   literally how NoPixel's own turf system works (turf *is* what gates
+   passive drug income), and building it as one system here halves two
+   roadmap items into one.
+4. **ProdigyRP's cause-of-death-graduated New Life Rule**, as a cheap,
+   high-value upgrade to the existing minimal down-state — it's a rules/
+   design change more than a code-heavy one.
 
-**Done from this list:** vanilla NPC police and the wanted star system are now
-suppressed in `som-core/client/main.lua`, configured by `Config.World`. Left on,
-GTA answers every shooting with its own infinite police who shoot back and
-arrest nobody, which makes the entire player police force decoration.
+Explicitly **not** recommended, with reasons:
 
-### 17.4 Emergency services (30 gaps)
+- **A literal bodycam-recording resource.** Downgraded from "should build"
+  to "skip unless specifically wanted" — the server we're benchmarked
+  against doesn't treat this as a game mechanic at all, so building one
+  isn't closing a real gap.
+- **A persistent wanted/heat/reputation score.** Considered and explicitly
+  rejected, on direction from the project owner during this session's
+  planning: no reference server was confirmed to run one, and that's not
+  an oversight on their part — a scored system invites exactly the kind of
+  powergaming this server's own rules are meant to prevent (reacting to a
+  number instead of to what's actually happening in a scene; treating
+  crime as "free" once a cap is hit; treating an escaped suspect as owing
+  a debt no officer actually witnessed). The native wanted stars stay off
+  and **nothing mechanically replaces them.** Crime visibility to police
+  stays entirely interaction-driven through the existing `som-dispatch`
+  calls/BOLOs: if nobody responds or catches someone in time, that's the
+  end of the consequence, the same as it would be in character. This is a
+  closed question for this roadmap, not an open gap — recording the
+  reasoning here so a future pass doesn't quietly re-propose it.
 
-| Feature | How common | SOM | Effort | Free option |
-|---|---|---|---|---|
-| Death and downed state | near universal | missing | epic | qbx_medical (GPL) |
-| Revive and medical treatment | near universal | missing | large | build on the above |
-| Ambulance job and hospital | near universal | missing | large | qb-ambulancejob |
-| Jail and serving a sentence | near universal | missing | large | qb-prison |
-| Police patrol vehicles | near universal | missing | small | build, fleet exists |
-| Evidence and forensics | near universal | missing | medium | r14-evidence, already on disk |
-| Officer blips, callsigns, panic | near universal | missing | medium | build |
-| Working service radio | near universal | partial | medium | pma-voice channels exist |
-| Dispatch as a real system | near universal | partial | medium | in progress |
-| Calling 911 from the phone | near universal | partial | medium | build in som-phone |
-| Warrants and wanted status | near universal | partial | medium | ps-mdt ships warrants |
-| Citations from the MDT charge list | common | partial | small | build |
-| Booking a prisoner (mugshot) | common | missing | medium | MugShotBase64 |
-| ANPR and speed radar | common | missing | medium | wk_wars2x (MIT) |
-| Police deployables | common | missing | medium | free spike strips |
-| Limb injuries and wound effects | common | missing | medium | qb-ambulancejob |
-| Air support | common | partial | medium | free helicam |
-| K9 unit | common | missing | medium | v-k9 |
-| Fire and rescue | common | missing | large | qb-firefighterjob |
-| Holding cells, bail, transport | common | missing | medium | qb-prison |
-| More than one agency and station | common | missing | medium | build, som-police is configurable |
-| CCTV | common | missing | medium | qb-policejob camera code |
-| SWAT and tactical kit | common | missing | medium | qb-policejob stormram |
-| AI medic fallback | common | missing | small | build |
-| Courts and DOJ | differentiator | missing | large | qb-doj |
-| Morgue, coroner, permadeath | differentiator | missing | medium | build |
-| Bodycam and dashcam | differentiator | missing | medium | ps-mdt v3 |
-| Ankle monitor and parole | differentiator | missing | small | qb-policejob |
-| Weapon serial registry, ballistics | differentiator | missing | medium | ps-mdt firearm registry |
+### 17.4 — What "fully-fledged and playable" actually requires
 
-### 17.5 Vehicles and property (22 gaps)
+A distinct question from "does it match the benchmark servers
+feature-for-feature," and worth answering separately. The smallest set of
+systems that make this a complete, launchable RP server:
 
-| Feature | How common | SOM | Effort | Free option |
-|---|---|---|---|---|
-| Dealership, any route to owning a car | near universal | missing | large | qb-vehicleshop |
-| Vehicle keys, lockpicking, hotwiring | near universal | missing | medium | qbx_vehiclekeys |
-| Fuel and refuelling | near universal | missing | small | cdn-fuel, on disk |
-| Housing and apartments | near universal | missing | epic | ps-housing |
-| Mechanic shop and repair | near universal | missing | large | jim-mechanic |
-| Vehicle HUD, speedo, fuel gauge | near universal | missing | medium | build som-hud |
-| Job and emergency fleets with real cars | near universal | partial | small | build |
-| Paid customisation shop | near universal | partial | medium | jim-mechanic catalogue |
-| Player to player vehicle sale | common | missing | medium | qb-vehiclesales |
-| Impound release fee for civilians | common | partial | small | build |
-| Furniture and decoration | common | missing | large | ps-housing |
-| Property storage and house garage | common | missing | medium | ps-housing or ox_property |
-| Property rental and landlords | common | missing | medium | qbx_properties |
-| Racing | common | missing | medium | qb-streetraces |
-| DMV and driving test | common | missing | medium | qb-cityhall |
-| Vehicle registration and plate ownership | common | partial | small | build on som-police plate flags |
-| Vehicle insurance | common | missing | medium | free QBCore insurance |
-| Businesses as property, boss menu | common | missing | large | qb-management |
-| Garage coverage and types | common | partial | medium | qbx_garages |
-| Chop shop | common | missing | medium | elixir-ui chopshop, on disk |
-| Tow truck job | common | missing | medium | qb-towjob |
-| Rentals surviving a restart | common | partial | small | build, persist to a table |
+- A working arrest-to-consequence loop (jail/bail at minimum, court can
+  follow).
+- At least one real heist.
+- A legal job a player can do without staff present.
+- A whitelist/onboarding path.
+- Baseline staff and anti-cheat tooling.
 
-### 17.6 Crime and illegal (23 gaps)
+Everything else — turf wars beyond the basic drug tie-in, undercover play,
+a second police agency, casino minigames, a second heist tier — is real
+depth worth having, but is "more depth later," not a blocker to being
+playable at all.
 
-| Feature | How common | SOM | Effort | Free option |
-|---|---|---|---|---|
-| An in-world way to sell illegal goods | near universal | partial | small | build on som-economy |
-| Drug production chain | near universal | missing | large | md-drugs |
-| Store robberies | near universal | missing | medium | qbx_storerobbery |
-| Vehicle keys, hotwiring, real theft | near universal | missing | large | qbx_vehiclekeys |
-| Jail and prison sentence | near universal | missing | large | qb-prison |
-| Suppressing vanilla NPC police | near universal | missing | small | qbx_smallresources |
-| Gang org: boss menu, ranks, stash | near universal | partial | medium | qb-management |
-| ATM robberies | near universal | missing | small | free ATM robbery scripts |
-| Bank and jewellery heists with prep | near universal | missing | epic | qb-bankrobbery, qb-jewelery |
-| Chop shop | near universal | missing | medium | free chop shop |
-| Money laundering | near universal | missing | medium | ren-laundering |
-| Lockpick and hacking minigames | near universal | partial | small | ox_lib skillcheck, installed |
-| Black market and weapon dealing | near universal | partial | medium | glow_blackmarket |
-| Police alerts for the full crime set | near universal | partial | small | build, som-dispatch exists |
-| Robbing another player | near universal | partial | medium | build, som-theft exists |
-| Boosting contracts | common | missing | large | qb-car-boost |
-| House robbery | common | missing | medium | qb-houserobbery |
-| Evidence and forensics | common | missing | medium | r14-evidence, on disk |
-| Turf and territory | common | missing | large | qb-gangs |
-| Counterfeiting | common | missing | medium | free printer scripts |
-| Bounty board | common | missing | medium | free bounty hunting |
-| Drug effects on the user | common | missing | small | md-drugs |
-| Train robbery | differentiator | missing | large | free train heist |
+### 17.5 — Asset/resource sourcing strategy
 
-### 17.7 Core identity and progression (11 gaps)
+This repo already has a track record of adopting vetted open resources
+instead of building everything from scratch (`ps-mdt`, `r14-evidence`,
+`qb-interior`, `ox_doorlock`, via the `som-compat` QBCore-impersonation
+bridge). A dedicated research pass this session found real candidates, and
+just as usefully, found where no free candidate exists at all.
 
-| Feature | How common | SOM | Effort | Free option |
-|---|---|---|---|---|
-| Licence issuance and DMV testing | near universal | missing | medium | qb-cityhall |
-| Barber, clothing and tattoo shops | near universal | partial | small | build, som-appearance is done |
-| Spawn point selection on login | near universal | missing | small | qb-spawn |
-| Custom loading screen | near universal | missing | small | resource already present |
-| Character select fit for players | near universal | partial | small | build |
-| Status metadata that actually drains | near universal | partial | small | build the drain and the effects |
-| Weapon licence gating and revocation | near universal | partial | small | qb-cityhall plus existing police verbs |
-| Photo on ID cards and licences | common | missing | small | MugShotBase64 |
-| New player onboarding | common | missing | medium | free spawn tutorial |
-| Job uniforms and clothing rooms | common | missing | medium | build on som-appearance |
-| Skills, XP and reputation | common | missing | large | xperience, pn-skills |
+**Adopt, with a real open-source license:**
+- **ANPR — re-enable, don't replace.** `ps-mdt`'s own Wolfknight-radar hook
+  is already built and currently disabled only because the camera resource
+  it targets isn't installed. `wk_wars2x` (MIT license, the single most
+  actively-maintained repo found in this entire research pass — 122 stars,
+  442 commits) is that exact resource. This is the lowest-effort,
+  highest-confidence item in the whole gap list: install it, flip the
+  config flag, verify the plate-scan event still fires into `ps-mdt`.
+- **Jail enforcement base**: `qb-prison` (GPL-3.0, QBCore-native, so it
+  should need less adaptation through the existing `som-compat` shim than
+  a standalone alternative would). The dead `qb-communityservice` hook
+  `ps-mdt` currently calls is a confirmed dead end — it doesn't exist
+  anywhere as an open resource under that name — so community service
+  specifically stays a small custom addition; only the holding-cell/
+  sentence-timer half is adopted.
+- **Store-robbery base**: `lation_247robbery` (GPL-3.0, 132 stars, the
+  most active free robbery script found, already dual QBCore/ESX support
+  with `ox_target` compatibility) as the bottom tier of the heist ladder.
+  No free tiered bank/casino heist framework exists anywhere — the bank
+  and major-heist tiers are custom builds on top of this base, not another
+  adoption.
+- **Gang turf skeleton**: `qb-territories` (BSD-3-Clause, zone definition
+  and hostile-zone detection) as the base, with the drug-price/passive-
+  income tie-in built as custom glue code into `som-economy` — matching
+  how NoPixel's own turf-drug link actually works per 17.1.
 
-### 17.8 Economy and legal jobs (18 gaps)
+GPL-3.0 note: `qb-prison`, `lation_247robbery`, and the ANPR fallback
+candidate `CameraTech` are all GPL-3.0. Fine to run and modify privately;
+a public redistribution of a modified fork would itself have to stay
+GPL-3.0.
 
-| Feature | How common | SOM | Effort | Free option |
-|---|---|---|---|---|
-| Bank money into cash (ATM or teller) | near universal | missing | small | build |
-| Getting a job without a staff member | near universal | missing | medium | qb-cityhall |
-| Freelance earning loops | near universal | missing | epic | qb-truckerjob, qb-garbagejob and others |
-| Buying a personal vehicle | near universal | missing | medium | qb-vehicleshop |
-| Fuel stations | near universal | missing | small | ox_fuel or cdn-fuel |
-| Boss menu for a job or business | near universal | missing | medium | qb-management |
-| Somewhere to sell what you gathered | near universal | missing | medium | qb-pawnshop as a pattern |
-| Mechanic job | near universal | missing | medium | qb-mechanicjob |
-| Clothing shops and barbers as places | near universal | partial | small | build, only wiring left |
-| Money visible without the phone | near universal | missing | small | build a HUD |
-| Player-owned businesses | common | missing | large | flex-ownedshops |
-| Player to player commerce | common | missing | large | zz-marketplace |
-| Crafting | common | partial | medium | ox_inventory crafting is present |
-| Taxes | common | partial | medium | build, som-economy has the config |
-| Tow job | common | partial | medium | qb-towjob |
-| Professional whitelisted roles | common | missing | large | qb-newsjob and others |
-| Loans and credit | differentiator | missing | medium | free loans script |
-| Crypto trading | differentiator | partial | medium | qb-crypto |
+**Build custom — confirmed no viable free candidate exists:**
+- **Bail.** No standalone or framework-agnostic open script found
+  anywhere; it only ever shows up as a line item inside paid all-in-one
+  jail packages. Build it directly against the bail mechanics NoPixel
+  actually documents (17.1) rather than inventing the rules from scratch.
+- **Court/DOJ tooling.** Every real option found (BK DOJ, Fantasy Scripts
+  DOJ, RK MDT DOJ) is a paid Tebex product. Extend `ps-mdt` — already
+  adopted and vetted — with a lightweight case-status/hearing module,
+  modeled on EchoRP's three-branch structure scaled down to this server's
+  size, rather than buying or copying a paid suite.
+- **Bodycam, if ever wanted despite 17.3's recommendation to skip it.**
+  The closest free, permissively-licensed starting point is Axon Body 3
+  (MIT) for the cosmetic/wearable half; no free resource does the actual
+  recording-and-review pipeline, so that half would be a custom build
+  regardless.
 
-### 17.9 What SOM already does better than the surveyed servers
+**Caution surfaced by the research itself, worth repeating here**: several
+results used "open source" as pure marketing language on what are actually
+paid or closed-license Tebex products. A storefront listing that says
+"open source" is not the same as a real license grant — anything found
+only via a Tebex/storefront URL in this research is paid, not adoptable.
 
-Truthful, specific, and worth protecting when adding anything above.
+### 17.6 — Design constraint on all of the above: no stock-script UI
 
-- **Money has no client-reachable event at all.** Every movement goes through
-  som-core and writes a ledger row tagged with the calling resource. Several
-  surveyed servers ship money events a client can trigger.
-- **Dispatch refuses client-authored calls.** ps-dispatch, which a large part of
-  the ecosystem runs, accepts the entire call payload from the client including
-  priority and coordinates, and its attach flow takes the unit's identity from
-  the client too. som-dispatch derives all of it server side.
-- **One mint path for vehicles.** `Vehicles.Create` is the only code that
-  creates a `som_vehicles` row, so plate uniqueness and ownership shape are
-  decided once rather than in every caller.
-- **The radial cannot fire an arbitrary event.** Entries name a validated
-  export, and job and gang filtering happens server side rather than in CSS.
-- **The progress bar is stricter than ox_lib's callers expect.** It interrupts
-  on ragdoll, cuffs, falling, swimming and death, and sets `invBusy` so a player
-  cannot eat or draw a weapon mid-action.
-- **A compat layer instead of forked third-party code.** ps-mdt, ox_doorlock and
-  ox_inventory run against som-core through som-compat and a SQL view layer, so
-  they stay upgradeable instead of becoming forks.
-- **Every diagnostic is in game.** `/mdtsearch` is the reason the MDT search bug
-  was found in one step rather than a debugging pass down the wrong path.
+Flagged directly by the project owner during this session's planning: a lot
+of FiveM scripts, adopted or custom, "use weird cheap UIs and like circles
+on the ground that kill immersion and make the server feel cheap." This
+document already commits the server to a diegetic-UI house style (14.3: a
+physical anchor gets a physical-feeling screen) and names "zero visible
+stock chrome" as part of the "wow factor" (20.4). That rule extends to
+every system 17.3 and 17.5 add, not just the ones built from scratch:
 
-### 17.10 Not surveyed
+- **Adopted third-party resources keep their logic, not their UI.** When
+  `qb-prison`, `lation_247robbery`, `qb-territories` and `wk_wars2x` get
+  adopted, their default NUI and world markers get stripped and rebuilt
+  through `som-interact` (world-anchored prompts — a cell door, a vault
+  panel, a camera) and `som-ui` (screen-space UI), the same way `som-ui`
+  already shims `ox_lib`'s `progressBar` and context menu instead of using
+  them stock. This is real extra work beyond "install the script," not a
+  footnote.
+- **Heist and hacking minigames get a bespoke look.** A generic
+  colored-grid popup dropped in unmodified is exactly the "cheap script"
+  feel being avoided.
+- **No floating circle-on-the-ground interaction prompts anywhere.**
+  Anything a player interacts with in the world goes through
+  `som-interact`'s existing prompt system, matching how the rest of the
+  server already presents world interactions.
 
-- Social and world systems: phone apps beyond banking, social media, clothing
-  stores, gyms, casinos, activities and minigames, weather and time sync, world
-  events, HUD, scoreboard, admin tooling, anticheat tuning and logging. The
-  agent covering this hit the session limit. Assume gaps here too.
-- Everything in this register is desk research against public sources plus a
-  read of this repo. None of it has been validated by playing the surveyed
-  servers.
+### 17.7 — A Lua test harness now exists
+
+There was no test infrastructure anywhere in this repo and no way to boot a
+live FXServer from a dev session. This session built one (`tests/`,
+`lua5.4 tests/run.lua`): mocked FiveM natives, an in-memory fake MySQL
+matched against the exact queries real resource files issue, and a
+cross-resource export registry, all loading the *real* `.lua` files rather
+than reimplementing them. It was used to catch and verify the housing
+buy/mortgage race fix below — run it before trusting a change to money or
+ownership code again, rather than reasoning about it by eye. A companion
+Playwright-based harness (`tests/nui/`) does the same for NUI HTML/JS: a
+real headless browser, the real page, with the two directions of the NUI
+postMessage/fetch bridge mocked, functional and screenshot assertions
+both. Neither substitutes for the one manual in-game pass CLAUDE.md's own
+"Done criteria" already calls for — they're the best available check
+without a live server, not a replacement for one.
 
 ---
 
 ## 18. Roadmap: current stage to launch
 
-Section 16.6 is the near-term queue and stays as it is. This section is the
-whole road, so that any queue item can be placed against it and so the size of
-what is left is visible rather than felt.
-
-Ordering principle throughout: **build the thing that unblocks the most next,
-not the thing that demos best.** A feature with no consequence layer under it
-produces a screenshot, not a server.
-
-Effort per phase is engineering time with one person working, and assumes the
-free resources named in section 17 are adopted rather than written from scratch
-wherever they fit.
-
-### 18.0 Where we are
-
-Framework layer largely done: authority, persistence, money and ledger,
-permissions, compat, inventory, phone, radial, eye, notifications, progress,
-character creation and selection, police, garages, dispatch skeleton, MDT.
-
-Content layer barely started: 32 player-facing capabilities, most of them police
-or framework, and nothing on the server currently has a consequence.
-
-### 18.1 Phase 1: World feel and cheap wins
-
-**Goal.** The server stops feeling like a fresh FiveM install within one working
-session. Nothing here is architectural; it is all wiring and settings.
-
-- Suppress vanilla NPC police and the wanted system. **DONE.**
-- Spawn point selection on login.
-- Custom loading screen (the resource is already on disk).
-- Clothing shops, barbers and tattoo as real places, wiring som-interact zones
-  to the existing som-appearance.
-- Lockpick and hacking minigames on `ox_lib` skillcheck, already installed.
-- Photos on ID cards and licences via MugShotBase64 and screenshot-basic, both
-  already on disk.
-- Cash withdrawal and deposit, so bank money can become cash.
-- Character status metadata that actually drains and has effects.
-- A HUD, so money, hunger, thirst, armour and vehicle state are visible without
-  opening the phone. This is the one item here that is a new build.
-
-**Exit criteria.** A new player can join, choose where to spawn, look how they
-want, see their own status, and no vanilla police ever appear.
-
-**Effort.** Roughly a week.
-
-### 18.2 Phase 2: Consequence
-
-**Goal.** Things that happen to a player matter. This is the phase the whole
-server is currently missing, and every crime and police feature is worth more
-after it than before it.
-
-- **Death and downed state.** Bleeding out, last stand, respawn rules, death
-  timer. The single highest-value item on this roadmap.
-- Revive and medical treatment, and the item and skill gating around it.
-- Ambulance job and a hospital, including AI medic fallback so the loop closes
-  when no medic is online.
-- Limb injuries and wound effects that persist until treated.
-- **Jail and serving a sentence.** Today an arrest ends with nowhere to put
-  anybody. Holding cells, bail, prisoner transport.
-- Morgue and coroner, and a decision on permadeath.
-- Wire som-dispatch's EMS half, which is already pre-wired for it.
-
-**Exit criteria.** A shooting produces a casualty, a medic, a hospital record
-and, if police attend, an arrest that ends in a cell.
-
-**Effort.** Three to four weeks. This is the biggest single phase.
-
-### 18.3 Phase 3: Police to a competitive standard
-
-**Goal.** som-police stands next to a serious server's police department. See
-18.9 for the specific comparison this phase is written against.
-
-- **Dispatch NUI.** The current notification is a generic toast and reads as
-  one. Own call stack, priority tiers, code chips, evidence rows, per-tier
-  tones, point and radius blips.
-- Full call taxonomy with a real code table, and a server-side caller for each
-  from the resource that owns the mechanic.
-- Officer map blips, callsigns and an F1 panic button with sound.
-- Evidence and forensics: adopt r14-evidence, which is already on disk and
-  currently fires at a dead event with its alerts disabled.
-- Booking: mugshot, prints, property, charges from the MDT's 181-charge list.
-- Deployables: spike strips, cones, barriers, road flares.
-- ANPR and speed radar via wk_wars2x, which is MIT.
-- Warrants that actually drive behaviour rather than only being records.
-- Weapon serial registry tied to evidence and ballistics.
-- More than one agency and more than one station.
-- K9, SWAT kit, air support with a helicam.
-- Bodycam, dashcam and CCTV.
-- Courts and DOJ, so charges have a destination.
-
-**Exit criteria.** An officer can run a full shift, from patrol and a traffic
-stop through pursuit, arrest, booking, evidence and charges, without leaving the
-game to do any of it.
-
-**Effort.** Three to four weeks, and it depends on phase 2 for the arrest to
-mean anything.
-
-### 18.4 Phase 4: The vehicle economy
-
-**Goal.** Cars can be owned, stolen, kept and lost. Personal garages stop being
-empty by construction.
-
-- **Vehicle keys, lockpicking and hotwiring.** Turns theft from taking a car
-  into a crime.
-- **A dealership. BUILT 2026-08-20, minus financing.** It is NOT a separate
-  `som-dealership` resource: it is in `som-garage`, because that is where the
-  panel it needs already lives and a NUI callback only answers for the resource
-  that served the frame. `DEALERSHIP-RESEARCH.md` records what was built, what
-  was refused and what is left. Owner's decision on the open question: BOTH,
-  free-use capped at $26,000 and managed above it.
-
-  The design it was built to, kept below as the record of WHY, with the parts
-  that are done marked:
-
-  Researched in `DEALERSHIP-RESEARCH.md`, and
-  built on `som-garage/server/fleet.lua`'s existing purchase flow, which is
-  already correct: the client sends a model name and never a price, the server
-  re-resolves the entry, distance is checked server side, a failed row write
-  refunds in full, and the selling business is credited so a sale moves money
-  rather than minting it. Owner's direction:
-  - **A browsable catalogue.** Cars are looked at before they are bought, with
-    the shop NUI from the task 3 grid. Listed stock is limited to models that
-    actually stream, or the shop sells cars that will not load.
-  - **Test drives.** Time limited, with the despawn enforced SERVER side. The
-    reference scripts lean on the client for it, and a test drive a player can
-    keep is a free car.
-  - **Financing**, with a down payment and a term. The finance clock runs on
-    PLAYTIME rather than wall clock, copied from qbx_vehicleshop and the one
-    genuinely good idea in it: a player who does not log in for a week should
-    not return to a repossession.
-  - **Free-use and managed shops.** Managed, where a real player hands the car
-    over, is the roleplay version and matches 10.1's direction of turning
-    commands into physical acts.
-- **`som-phone`: the Properties app.** Owner's direction, and the reason
-  financing is NOT a set of columns on the vehicle row the way both reference
-  scripts do it. **Vehicle finance payments are bills, and bills are paid in the
-  phone.** The app is introduced here for cars and **extended in Phase 7 to
-  cover housing**, which is why it is called Properties rather than Finance:
-  one place a player goes to see everything they are paying off and everything
-  they own.
-  - The machinery already exists and does not need inventing:
-    `som_phone_bills` carries `auto_collect` and `due_at`, and
-    `som_transactions` is a real queryable ledger. Storing a balance in a
-    column on the vehicle is the mistake 8.5 records against `som-banking`.
-  - Missed payments drive repossession, so the app is also where a player sees
-    it coming rather than logging in to an empty garage.
-- Fuel, resolving the cdn-fuel or ox_fuel decision recorded in 17.3.
-- Mechanic shop, repair and a paid customisation catalogue.
-- Vehicle HUD: speedometer, fuel and indicators.
-- Player-to-player sale, registration and plate ownership.
-- Insurance, and impound release fees for civilians.
-- Tow job.
-- Racing.
-
-**Exit criteria.** A player can earn money, buy a car, insure it, modify it,
-have it stolen, and get it back from an impound lot.
-
-**Effort.** Three weeks.
-
-### 18.5 Phase 5: Earning a living
-
-**Goal.** A new player has something to do that pays, without a staff member
-typing a command.
-
-- Getting a job without staff: a city hall or job centre.
-- Licence issuance and a DMV driving test.
-- Freelance loops: trucker, garbage, bus, taxi, delivery, mining, fishing,
-  hunting. The first is medium, each after it is small.
-- Somewhere to sell what was gathered.
-- Boss menus, hiring and firing, society accounts.
-- Player-owned businesses.
-- Crafting, using the ox_inventory crafting that is already present.
-- Taxes, which som-economy already has config for.
-- Professional whitelisted roles: lawyer, judge, news, real estate.
-
-**Exit criteria.** A player who joins with nothing can reach a first car
-entirely through legal work.
-
-**Effort.** Three to four weeks.
-
-### 18.6 Phase 6: Crime with a supply chain
-
-**Goal.** Illegal money has a source, a process and a risk, rather than being a
-single button.
-
-- Store robberies, ATM robberies, house robbery.
-- Drug production chains and drug effects.
-- Chop shop and boosting contracts.
-- Money laundering and counterfeiting.
-- Black market and illegal weapon dealing.
-- Bank and jewellery heists with prep chains.
-- Gang organisation, stashes, and turf.
-- Bounty board.
-- An in-world route to sell illegal goods, which som-economy is half way to.
-
-**Exit criteria.** Every illegal income stream has a preparation step, a police
-alert, and a way to lose the proceeds.
-
-**Effort.** Four weeks.
-
-### 18.7 Phase 7: Property
-
-**Goal.** Somewhere to live and somewhere to keep things.
-
-- Housing and apartments, purchase and rental.
-- **The Properties phone app, extended.** It is built in Phase 4 for vehicle
-  finance (18.4) and named Properties rather than Finance precisely so this
-  phase extends it rather than adding a second app beside it. Rent, mortgage
-  payments and the list of what a player owns all land here, next to the car
-  payments already there. Same `som_phone_bills` machinery, same ledger.
-- Property storage, wardrobes and house garages.
-- Furniture and decoration.
-- Landlord relations.
-- Businesses as property.
-
-**Exit criteria.** A player has an address, storage and a reason to defend both,
-and one app that tells them everything they own and everything they owe.
-
-**Effort.** Three weeks. Epic if written rather than adopted.
-
-### 18.7b Phase 7b: Identity and continuity
-
-**Goal.** The server stops looking stale and starts looking like itself. Full
-detail in 18.12, including the inventory reskin, which is the largest unstyled
-surface on the server.
-
-Run **twice**: a first pass now at the end of phase 1 while the surface is small
-enough to fix cheaply, and a second before launch when everything exists.
-Leaving it all until the end means reconciling forty screens instead of ten.
-
-**Exit criteria.** Five screens side by side read as one product to somebody
-who has not seen the server before.
-
-**Effort.** One week for the first pass, two for the second.
-
-### 18.8 Phase 8: Depth, then launch readiness
-
-**Goal.** The things that keep players past week two, then the things that keep
-the server up.
-
-Depth: skills, XP and reputation; activities and minigames; casinos; gyms;
-social media and the rest of the phone; world events; racing leagues.
-
-Launch readiness, none of which is optional:
-
-- Performance pass under load, with the ~5GB asset group live.
-- Anticheat tuning against real player behaviour rather than defaults.
-- Logging and staff tooling: an admin menu, reports, and a paper trail on every
-  economy and item movement.
-- New player onboarding.
-- A backup and restore procedure that has actually been tested by restoring.
-- A staging server, so changes stop being tested in production.
-- Rules, a Discord, and an application or whitelist flow if the server is
-  whitelisted.
-- Load testing with more players than are expected on opening night.
-
-**Effort.** Four weeks, and the launch readiness half is the part most likely to
-be skipped and most likely to hurt.
-
-### 18.9 What a competitive PD needs, measured against ours
-
-Written against the standard the owner named. Ordered by how badly the absence
-is felt, not by effort.
-
-| Need | SOM today | Why it matters |
-|---|---|---|
-| Somewhere to put an arrested person | **Missing** | An arrest currently ends with the officer holding a cuffed player and no next step. This is the single largest hole in the department |
-| A casualty state | **Missing** | No officer down, no shooting with a victim, no reason for EMS or for the whole custody chain to exist |
-| Dispatch that reads as dispatch | **Partial** | The owner's own assessment is that it looks like a standard notification. Correct, and it is the most visible part of police work |
-| Evidence that ties a scene to a suspect | **Missing** | r14-evidence is on disk, better than anything worth writing, wired to a dead event and disabled |
-| Knowing where other units are | **Missing** | No officer blips, no callsigns, no panic button. Officers currently coordinate entirely by voice |
-| Stopping a vehicle | **Missing** | No spike strips, no ANPR, no radar. Traffic policing is most of a real shift and almost none of it is supported |
-| Booking | **Missing** | No mugshot, no prints, no property. ps-mdt supports images and MugShotBase64 is already on disk |
-| Charges reaching a destination | **Partial** | 181 charges exist and are reachable now that the MDT search is fixed, but nothing consumes a sentence because there is no jail and no court |
-| More than one agency | **Missing** | One department and one station. State police, sheriff and their own stations are standard |
-| Cameras | **Missing** | Bodycam, dashcam and CCTV are all differentiators rather than requirements, but the named servers all have them |
-
-**The honest summary.** som-police has a genuinely good foundation: duty,
-armoury, custody, fines, impounds, certifications, plate flags and an MDT that
-now works. What it does not have is a **beginning and an end**. There is no
-casualty to respond to and no cell to finish in, so the middle, which is the
-part that is built, has nothing to connect. Jail and the downed state are worth
-more to the police experience than every remaining item on the list combined.
-
-### 18.10 Honest total
-
-Roughly **five to six months** of single-person full-time work from here to a
-launchable server, assuming free resources are adopted where they fit rather
-than written from scratch, and assuming the launch readiness phase is not
-skipped.
-
-That is not a discouraging number for a build with this much framework already
-correct. The expensive half, the part that is hard to retrofit, is largely done:
-server authority, a ledger on every money movement, a single mint path for
-vehicles, and a compat layer that keeps third-party resources upgradeable. Most
-of what remains is content on top of a foundation that will hold it.
-
-### 18.11 Feedback: the cross-cutting gap
-
-Raised by the owner against the armoury, and correctly diagnosed as general
-rather than local: **nothing on this server acknowledges an action.** A purchase,
-a vehicle coming out of a garage, a door unlocking, a fine being paid. All of
-them changed numbers silently and left the player to infer the outcome from a
-list redrawing. That is the difference between a shop and a debug menu, and it
-is not a per-screen problem, so it is not being solved per screen.
-
-**The split.** Sound is central, visuals are local.
-
-- `som-ui/client/feedback.lua` exports `playSound(kind)` against a vocabulary in
-  `som-ui/shared/config.lua`: `purchase`, `success`, `error`, `select`, `nav`,
-  `back`. Every resource asks for a meaning, never an audio string, which is
-  what stops the armoury and a future dealership drifting into two different
-  purchase sounds. There is also a `som-ui:client:sound` net event for feedback
-  the client cannot know it earned, such as a fine landing.
-- The VISUAL half belongs to whichever UI is on screen, because only it knows
-  what moved.
-
-Sounds are the game's own frontend sets, following the precedent som-phone
-already set: guaranteed present on every client, no streaming, no licence
-question, and already meaningful to players. **None has been heard on this
-server yet.** If one is silent it is a wrong string rather than broken code, and
-it is a one line fix in config. That is why they are config.
-
-**The armoury is the first consumer**, and it is worth reading as the template
-for every shop that follows:
-
-- A free issue item and a $95,000 rifle no longer sound the same. Drawing from
-  department issue plays `success`; spending money plays `purchase`.
-- The balance is back on the payment switcher. An earlier pass removed it on the
-  grounds that the player already knows what they have, which was right in
-  isolation and wrong in context: with it gone, nothing on screen moved when you
-  bought something, so a success and a refusal looked identical. **The number
-  changing is the feedback.**
-- The amount floats up out of the account that paid it, because two balances a
-  second apart do not tell you what something cost.
-- The row you drew from flashes, so the click is acknowledged by the thing you
-  clicked.
-- The footer becomes a receipt: what you drew and what it cost. Deliberately the
-  footer rather than a toast, because a toast is for things that went wrong and
-  vanishes before it is read, while what you just bought is worth leaving on
-  screen as you keep shopping.
-- `takeItem` now echoes the item, label, count and price back. The client uses
-  it for the confirmation line and to choose the sound, never to decide whether
-  the purchase was allowed.
-
-**Still to wire**, in rough order of how badly each is missed: garage take and
-store, the mod bay, rentals, fines and bills arriving, door lock and unlock,
-custody actions, and every shop added from here. None is more than a few lines
-now that the layer exists.
-
-### 18.12 Identity and continuity: the missing phase
-
-The roadmap as first written had no phase for how the server LOOKS, and that is
-a real omission rather than a detail. The owner's assessment is that the server
-currently looks stale and has no distinction of its own, and that the leading
-servers have a wow factor this does not. Both are correct.
-
-This is not a polish pass to be tacked onto the end. Continuity is a phase with
-its own exit criteria, and it fails if it is left until last, because by then
-there are forty screens to reconcile instead of ten.
-
-**Run it twice.** Once now, at the end of phase 1, while the surface is small
-enough to fix cheaply. Once again before launch, when everything exists.
-
-#### What continuity actually means here
-
-- **One visual language, enforced.** `som-assets/tokens.css` exists and is the
-  single source of truth. Every som-* NUI already imports it. The failure mode
-  is not missing tokens, it is screens that import them and then hardcode
-  values anyway, which is how `.panel` and `.card` ended up at 18px/65% against
-  16px/68% and looked like a mistake. An audit pass over every NUI for local
-  values that should be tokens.
-- **One motion language.** Durations, easings and entrance directions currently
-  differ per screen because each was written on its own day. Pick one set, put
-  it in tokens, apply everywhere.
-- **One sound language.** Now started, see 18.11. Every screen and every action
-  either has a feedback sound or has a reason not to.
-- **One empty state, one error state, one loading state.** A blank panel that
-  looks like a failed load is a bug that appears once per screen.
-- **A brand that is not just a colour.** Pink is a palette, not an identity. A
-  logo treatment, a typographic voice, a consistent card silhouette, a login and
-  loading sequence that says which server this is.
-
-#### Named work
-
-| Item | What it is | Effort |
-|---|---|---|
-| **Full inventory reskin** | ox_inventory's stock UI is the single largest unstyled surface on the server and the one players look at most. It must be brought into the SOM language: card shape, tokens, motion, sounds. This is the highest-value visual item on the roadmap | large |
-| **Inventory icon set** | Currently a mix of realistic and cartoon, with some items missing icons entirely. See the constraint below | medium |
-| Phone visual pass | Slide-up animation, banner design, app chrome. Currently functional and plain | medium |
-| Loading screen and login sequence | First thing anyone sees, and currently the stock one | small |
-| HUD | Does not exist. Whatever is built sets the tone for everything around it | medium |
-| Motion and token audit | Every NUI, checked against tokens | medium |
-| Map, blips and waypoint styling | Coloured minimap is in; blip sprites and colours are still per-resource choices | small |
-| Character selector presentation | Works, looks plain, and is the second thing anyone sees | medium |
-| Death, arrest and jail screens | Do not exist yet. They arrive with phase 2 and must arrive already in-language | medium |
-
-#### Constraint on the icon set
-
-**Icons are binary assets and cannot be added by Claude**, exactly as vehicle
-packs cannot. The most any session can do is recommend a set and wire the config
-once the files are on disk.
-
-What is needed is a **single complete set covering every item in
-`ox_inventory/data/items.lua` plus every som-* item**, in one consistent style.
-Mixing two sets is what produces the current half-realistic half-cartoon result,
-and adding a few missing icons from a third source makes it worse rather than
-better.
-
-Sourcing rules apply as everywhere else: a freely redistributable set, or one
-whose licence permits use on a game server. Icon packs are commonly redistributed
-without a clear licence, and "found in another inventory script" is not a
-licence. This needs checking before adoption, not after.
-
-Once the files are on disk the wiring is small: ox_inventory resolves an item's
-image from its name, so a complete set in one folder needs no per-item config.
-The audit work is finding the items that have NO icon, which is a script that
-lists every item name against the icon folder and prints the misses.
-
-#### Exit criteria
-
-A screenshot of any five screens, shown side by side, reads as one product by
-somebody who has not seen the server before. No screen uses a colour, radius,
-duration or font that is not in tokens. Every action has feedback. Nothing is
-stock.
+Supersedes the version below. Phased from the actually-current state (not
+from the old draft's), each phase named with its blocking gaps from
+Section 17.
+
+1. **Close what's open.** This session's fixes: the housing buy/mortgage
+   race (two players could both "buy" the same house — fixed via an atomic
+   claim in `som-housing/server/properties.lua`), a mortgage-commission
+   bug that minted money instead of moving it, five live Discord webhook
+   URLs that were committed in plaintext (now read from convars — the
+   owner still needs to regenerate all of them in Discord, moving them to
+   a convar doesn't revoke the exposed ones). Also: the last 4 literal
+   (non-token) CSS colors in `som-inventory`, the minimap-resource pick
+   and PDM MLO sourcing already flagged as the owner's own call, and the
+   single lowest-effort win from 17.5 — re-enable ANPR via `wk_wars2x`,
+   including reskinning its scan result straight into `ps-mdt`'s own panel
+   rather than any stock popup.
+2. **Crime has consequences.** Jail built on `qb-prison`'s logic with its
+   UI fully replaced (cell doors and booking presented through
+   `som-interact`/`som-ui`, not its default menus), plus a custom
+   sentence-timer/community-service layer — the old `qb-communityservice`
+   hook is a confirmed dead end. Bail built to NoPixel's actual documented
+   rules (felony-only, forfeiture, 72-hour appeal-or-rewarrant). A minimal
+   DOJ/court flow extending `ps-mdt` rather than buying a paid suite. This
+   was the single most-named blocker in every prior pass at this roadmap
+   and still is — nothing else in the crime loop matters while an arrest
+   is free.
+3. **Police to a competitive standard.** Enable `r14-evidence` (needs a
+   `som-compat` bridge for its remaining QBCore calls, and its own
+   collection-prompt UI reskinned the same way as everything else),
+   a dispatcher/escalation role, multi-agency response. Bodycam dropped
+   from this phase per 17.3's research-backed correction — not a credible
+   gap against the named benchmark.
+4. **Heists and robberies.** Net-new scope: nested-difficulty tiers (store
+   robbery on `lation_247robbery`'s logic, reskinned, → a Fleeca-style
+   small bank → a City-Vault-style major heist), each gated behind a
+   progressively rarer tool and a bespoke hacking minigame, with crews
+   able to chain tiers the way NoPixel's "Rainbow Road" heist did — not
+   four disconnected one-off jobs.
+5. **Gang territory and the drug economy, as one system.**
+   `qb-territories` for the zone skeleton (its own UI replaced with
+   world-anchored turf markers through `som-interact`, no floating zone
+   circles), turf ownership gating drug-sale income directly, rival-gang
+   conflict with a spray-only/low-intensity mode alongside full combat
+   wars, and activating the chop-shop resource that's on disk but
+   unbridged alongside a bespoke VIN-scrub minigame.
+6. **Identity and launch ops**, in full depth below.
+
+**Decided against, not deferred: a wanted/heat/reputation score.** See
+17.3. The native stars stay off and nothing mechanically replaces them;
+crime visibility to police stays entirely interaction-driven through the
+existing `som-dispatch` calls/BOLOs. Recorded here explicitly so a future
+pass doesn't quietly re-propose it as a gap to fill.
+
+### Phase 6, in full depth — Identity and launch ops
+
+The phase that turns "feature-complete" into "actually launchable." This
+document's own session handoffs have repeatedly noted that recent work has
+been deployed only as far as GitHub, never run in-game — that makes this
+phase a real risk, not a formality.
+
+- **Whitelist/application pipeline.** A Discord-bot-driven application form
+  (the existing `[discord]` bot is the natural home for this) requiring a
+  written backstory, gated by staff review before a character can log in —
+  modeled on ProdigyRP's queue-based Discord-integrated flow, sized to this
+  server's scale rather than copying its paid-priority-queue mechanic.
+- **Character depth at creation.** A backstory requirement enforced at
+  character creation (`som-multichar`/`som-appearance`), not just
+  collected once at application and forgotten.
+- **Rules, written with the same precision the research found.**
+  ProdigyRP's and NoPixel's rule pages define metagaming, powergaming and
+  griefing in specific, enforceable terms, not "don't metagame" — write
+  this server's rules to that standard, since NoPixel's own confirmed "top
+  violation" is exactly this kind of enforcement, not a game mechanic.
+- **Staff tooling.** A ticket/report system, teleport/spectate/noclip for
+  on-duty staff, and an audit log of staff actions — none of this exists
+  today beyond `ps-mdt`'s own police-side tools.
+- **Anti-cheat coverage review.** `Lennox-Anticheat` already exists; this
+  phase includes actually checking its rule coverage against common FiveM
+  exploit classes (speed, noclip, godmode, weapon-spawn, money-injection)
+  rather than assuming it's complete because it's installed.
+- **Test coverage**, building on 17.7's new harness: the same style of
+  assert-based check already used to verify this session's housing fix,
+  applied to the other money/ownership paths (vehicle purchase, inventory
+  give/take, bank transfers) that currently have none.
+- **Backups.** Automated DB dumps and a `server.cfg`/`som.cfg` backup
+  routine — not currently documented anywhere.
+- **A staging step before production.** Given recent work has only ever
+  been deployed to GitHub, launch readiness has to include actually
+  booting the server and testing the money/ownership/crime flows live
+  before calling anything in this roadmap "done."
+- **Load test.** Simulate concurrent players against the exact race-prone
+  paths this session just fixed (property buy/mortgage, vehicle purchase)
+  to confirm the fix holds under real concurrency, not just the test
+  harness's single-process checks.
+- **Launch checklist.** Discord server structure (channels/roles tied to
+  the whitelist pipeline), rules published, backups verified restorable,
+  staff trained on the tools above, before the whitelist opens.
 
 ---
 

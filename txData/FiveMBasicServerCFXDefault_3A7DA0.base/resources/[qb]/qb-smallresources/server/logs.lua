@@ -1,10 +1,11 @@
 local QBCore = exports['qb-core']:GetCoreObject()
-local WH_ECONOMY      = 'https://discord.com/api/webhooks/1519638879974457365/EI4ETuWu0U1PgfGEYX4xQfy9F7OvM94H6B7mybl3qtMm9gkXAiDb1HJNzEjfGF2MNFC0'
-local WH_INVENTORY    = 'https://discord.com/api/webhooks/1519638881731870842/CqHmm9zbY4mIB0k1CdBDSmHfXL6kfRBy4-PXkno6VVRwfosfrj01557s-VAN2qTKYU_y'
-local WH_CRIME        = 'https://discord.com/api/webhooks/1519638884504436817/V8ETrLrN-v62Ne3b2HrUGh8NGEiN1fI9GBHfTjkLQpprHC2xtqzRMhOqnD2tJxDebWaa'
-local WH_PLAYER_STAFF = 'https://discord.com/api/webhooks/1519638887016824954/UD2T2CIGhOyEuCQFg7VZzHKUpxFvB8hB8sTKIOv7ABdapH-qjKintWPYEkfJgKXeWaFo'
-local WH_COMMS        = 'https://discord.com/api/webhooks/1519638891093557288/UD_EvY9-7bK320TZIGzTVLcO-OcPSdukNInO5QuXbeHBTpu65JkqQ1gFcZsK2MwQS9pd'
-local WH_SYSTEM       = 'https://discord.com/api/webhooks/1519638893073399929/soUYhzuPsR1WyQDkmjCcyO7UrYcD2R-HnXe1R9ydtEAcELeAOMIzJIsY_HLiDoyVxZXP'
+-- Read from server.cfg, not committed here; see server.cfg.example.
+local WH_ECONOMY      = GetConvar('qbsmall_webhook_economy', '')
+local WH_INVENTORY    = GetConvar('qbsmall_webhook_inventory', '')
+local WH_CRIME        = GetConvar('qbsmall_webhook_crime', '')
+local WH_PLAYER_STAFF = GetConvar('qbsmall_webhook_player_staff', '')
+local WH_COMMS        = GetConvar('qbsmall_webhook_comms', '')
+local WH_SYSTEM       = GetConvar('qbsmall_webhook_system', '')
 
 local Webhooks = {
     -- System

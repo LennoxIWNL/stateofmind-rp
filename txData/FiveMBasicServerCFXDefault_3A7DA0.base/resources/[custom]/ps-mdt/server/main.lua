@@ -11,13 +11,13 @@ local antiSpam = false
 
 
 --------------------------------
--- SET YOUR WEHBOOKS IN HERE
--- Images for mug shots will be uploaded here. Add a Discord webhook. 
-local MugShotWebhook = 'https://discord.com/api/webhooks/1519638887016824954/UD2T2CIGhOyEuCQFg7VZzHKUpxFvB8hB8sTKIOv7ABdapH-qjKintWPYEkfJgKXeWaFo'
+-- SET YOUR WEHBOOKS IN server.cfg, not here (see server.cfg.example).
+-- Images for mug shots will be uploaded here. Add a Discord webhook.
+local MugShotWebhook = GetConvar('psmdt_webhook_mugshot', '')
 
 -- Clock-in notifications for duty. Add a Discord webhook.
 -- Command /mdtleaderboard, will display top players per clock-in hours.
-local ClockinWebhook = 'https://discord.com/api/webhooks/1519638887016824954/UD2T2CIGhOyEuCQFg7VZzHKUpxFvB8hB8sTKIOv7ABdapH-qjKintWPYEkfJgKXeWaFo'
+local ClockinWebhook = GetConvar('psmdt_webhook_clockin', '')
 --------------------------------
 
 QBCore.Functions.CreateCallback('ps-mdt:server:MugShotWebhook', function(source, cb)
