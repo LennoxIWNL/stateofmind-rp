@@ -52,7 +52,11 @@ Source: `github.com/germanfndez/fiveai-skills`
 Also load `ponytail` for any coding task: the smallest change that fully
 solves it, no unrequested abstraction, and a short note on what was skipped
 or any risk. Never skip validation, error handling, security, or
-accessibility. Source: `github.com/DietrichGebert/ponytail`.
+accessibility. Companion skills, invoked on request rather than always-on:
+`ponytail-review` (review a diff), `ponytail-audit` (review the whole repo),
+`ponytail-debt` (list deferred `shortcut:` comments), `ponytail-gain`
+(benchmark scoreboard), `ponytail-help` (reference card). All read-only
+except `ponytail` itself. Source: `github.com/DietrichGebert/ponytail`.
 
 ## Hard security rules (non-negotiable)
 1. Server is the authority - money, bank, inventory, items, jobs, gangs, permissions are validated and mutated **server-side only**; never trust the client.
