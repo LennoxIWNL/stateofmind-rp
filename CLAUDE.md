@@ -49,6 +49,11 @@ Load the matching FiveAI skill from `.claude/skills/` **before** writing any Fiv
 
 Source: `github.com/germanfndez/fiveai-skills`
 
+Also load `ponytail` for any coding task: the smallest change that fully
+solves it, no unrequested abstraction, and a short note on what was skipped
+or any risk. Never skip validation, error handling, security, or
+accessibility. Source: `github.com/DietrichGebert/ponytail`.
+
 ## Hard security rules (non-negotiable)
 1. Server is the authority - money, bank, inventory, items, jobs, gangs, permissions are validated and mutated **server-side only**; never trust the client.
 2. Every `RegisterNetEvent` handler validates `source` and all arguments (type, range, existence).
