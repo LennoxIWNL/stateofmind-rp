@@ -45,6 +45,7 @@ local function resetDb()
     mysql.db.phoneAudit = {}
     mysql.db.notes = {}
     mysql.db.heist = { dongles = {}, runs = {} }
+    mysql.db.turf = { zones = {}, events = {}, market = {} }
     mysql.db.vehicles = {}
     mysql.db.social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} }
     mysql.db.bills = {}
@@ -2976,6 +2977,124 @@ do
     check(said:find('Issued dongle'), 'heist: an admin can issue a ledger backed dongle')
     _G.TriggerClientEvent = realT
     restore()
+end
+
+-- ---------------------------------------------------------------------------
+-- Turf and the street drug market
+-- ---------------------------------------------------------------------------
+
+local function turfScene(open)
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-turf', { 'shared/config.lua', 'server/main.lua' })
+    Mocks.players = {
+        [1] = { citizenid = 'T1', gang = { name = 'ballas', grade = 2 } },
+        [2] = { citizenid = 'T2', gang = { name = 'vagos', grade = 2 } },
+        [3] = { citizenid = 'T3', gang = { name = 'none', grade = 0 } },
+        [4] = { citizenid = 'T4', gang = { name = 'ballas', grade = 0 } },
+        [5] = { citizenid = 'T5', gang = { name = 'families', grade = 2 } },
+    }
+    Mocks.inv = { [1] = {}, [2] = {} }
+    Mocks.minted = {}
+    Mocks.exported.mintBills = function(_, worths, tag) Mocks.minted[#Mocks.minted + 1] = { worths = worths, tag = tag }; return { 'x' } end
+    Mocks.calls.dispatchAlert = 0
+    Mocks.clock = 1000000
+    mysql.fakeNow = 5000000
+    if open ~= false then
+        local z = env.Config.zones[1]
+        z.enabled, z.center, z.radius, z.tag = true, vec3(0, 0, 0), 50.0, vec3(10, 0, 0)
+    end
+    mysql.db.turf.zones.grove = { owner = nil }
+    for _, id in ipairs({ 1, 2, 3, 4, 5 }) do FakePeds[id] = vec3(10, 0, 0) end
+    return env
+end
+
+local function tagFor(source, name)
+    local began = RegisteredCallbacks['som-turf:server:tagBegin'](source, name)
+    if not began.success then return began end
+    Mocks.clock = Mocks.clock + 20000
+    return RegisteredCallbacks['som-turf:server:tagFinish'](source, name)
+end
+
+local function sell(source, name, item) return RegisteredCallbacks['som-turf:server:sell'](source, name, item) end
+
+do
+    local env = turfScene(false)
+    check(RegisteredCallbacks['som-turf:server:tagBegin'](1, 'grove').error == 'there is nothing to claim here', 'turf: every zone ships disabled')
+    check(#RegisteredCallbacks['som-turf:server:zones'](1).zones == 0, 'turf: disabled zones are not sent to clients')
+end
+
+do
+    local env = turfScene()
+    check(tagFor(3, 'grove').error == 'you are not in a gang', 'turf: a civilian cannot tag')
+    check(tagFor(4, 'grove').error == 'your rank is too low to claim turf', 'turf: a recruit cannot claim turf')
+    FakePeds[1] = vec3(500, 0, 0)
+    check(tagFor(1, 'grove').error == 'you are too far away', 'turf: tagging needs you at the wall')
+    FakePeds[1] = vec3(10, 0, 0)
+    check(RegisteredCallbacks['som-turf:server:tagBegin'](1, 'nope').error == 'there is nothing to claim here', 'turf: an unknown zone is refused')
+
+    check(RegisteredCallbacks['som-turf:server:tagFinish'](1, 'grove').error == 'you have not started tagging', 'turf: finishing without starting is refused')
+    RegisteredCallbacks['som-turf:server:tagBegin'](1, 'grove')
+    Mocks.clock = Mocks.clock + 2000
+    check(RegisteredCallbacks['som-turf:server:tagFinish'](1, 'grove').error == 'you were too quick', 'turf: a skipped progress bar does not claim')
+
+    check(tagFor(1, 'grove').success == true and mysql.db.turf.zones.grove.owner == 'ballas', 'turf: an unowned zone is claimed by the tagger\'s gang')
+    check(mysql.db.turf.events[1].action == 'claim', 'turf: the claim is logged')
+    check(tagFor(1, 'grove').error == 'this is already yours and nobody is contesting it', 'turf: tagging your own quiet turf does nothing')
+
+    check(tagFor(2, 'grove').success == true and mysql.db.turf.zones.grove.contested_by == 'vagos' and mysql.db.turf.zones.grove.owner == 'ballas', 'turf: a rival tag only contests')
+    check(tagFor(2, 'grove').error == 'it is not time yet', 'turf: the rival must wait out the hold window')
+    check(tagFor(5, 'grove').error == 'another gang is already contesting this', 'turf: a third gang cannot jump the queue')
+
+    mysql.fakeNow = mysql.fakeNow + env.Config.holdMinutes * 60 + 1
+    check(tagFor(2, 'grove').success == true and mysql.db.turf.zones.grove.owner == 'vagos' and mysql.db.turf.zones.grove.contested_by == nil, 'turf: after the window a second tag takes the zone')
+
+    tagFor(1, 'grove')
+    check(mysql.db.turf.zones.grove.contested_by == 'ballas', 'turf: the old owner can contest back')
+    check(tagFor(2, 'grove').success == true and mysql.db.turf.zones.grove.contested_by == nil and mysql.db.turf.zones.grove.owner == 'vagos', 'turf: the owner defending clears a contest')
+end
+
+do
+    local env = turfScene()
+    mysql.db.turf.zones.grove.owner = 'ballas'
+    Mocks.inv[1][1] = { name = 'weed_ogkush', count = 1, slot = 1 }
+    check(sell(3, 'grove', 'weed_ogkush').error == 'you are not in a gang', 'turf: a civilian cannot sell on a gang corner')
+    check(sell(1, 'grove', 'iron_ore').error == 'nobody wants that', 'turf: only listed drugs sell')
+    check(sell(2, 'grove', 'weed_ogkush').error == 'this is not your turf', 'turf: a rival gang cannot sell here')
+    FakePeds[1] = vec3(500, 0, 0)
+    check(sell(1, 'grove', 'weed_ogkush').error == 'you are too far away', 'turf: selling needs you inside the zone')
+    FakePeds[1] = vec3(10, 0, 0)
+    Mocks.inv[1] = {}
+    check(sell(1, 'grove', 'weed_ogkush').error == 'you have nothing to sell', 'turf: you cannot sell what you do not carry')
+
+    Mocks.clock = Mocks.clock + 60000
+    Mocks.inv[1][1] = { name = 'weed_ogkush', count = 1, slot = 1 }
+    local r = sell(1, 'grove', 'weed_ogkush')
+    check(r.success == true and Mocks.minted[1].worths[1] == 110 and Mocks.minted[1].tag == 'turf:grove', 'turf: a sale pays base plus the owner bonus in marked bills')
+    check(Mocks.inv[1][1] == nil and mysql.db.turf.market.weed_ogkush.units == 1, 'turf: the item is taken and the market records the unit')
+    check(Mocks.calls.addMoney == 0 and Mocks.calls.dispatchAlert == 1, 'turf: no clean cash is created and dispatch is told')
+
+    Mocks.inv[1][2] = { name = 'weed_ogkush', count = 1, slot = 2 }
+    Mocks.clock = Mocks.clock + 1000
+    check(sell(1, 'grove', 'weed_ogkush').error == 'wait a moment', 'turf: sales have a cooldown')
+
+    Mocks.clock = Mocks.clock + 60000
+    mysql.db.turf.market.weed_ogkush.units = 20
+    sell(1, 'grove', 'weed_ogkush')
+    check(Mocks.minted[2].worths[1] == 66, 'turf: a flooded market pays less, down to the floor')
+
+    mysql.db.turf.market.weed_ogkush = { units = 20, ts = mysql.fakeNow - 7200 }
+    Mocks.inv[1][3] = { name = 'weed_ogkush', count = 1, slot = 3 }
+    Mocks.clock = Mocks.clock + 60000
+    sell(1, 'grove', 'weed_ogkush')
+    check(Mocks.minted[3].worths[1] == 110, 'turf: the price recovers with time')
+
+    Mocks.inv[1][4] = { name = 'weed_ogkush', count = 1, slot = 4 }
+    Mocks.clock = Mocks.clock + 60000
+    Mocks.exported.mintBills = function() return nil, 'could not carry the bills' end
+    local failed = sell(1, 'grove', 'weed_ogkush')
+    local back = false
+    for _, it in pairs(Mocks.inv[1]) do if it.name == 'weed_ogkush' and it.slot ~= 4 then back = true end end
+    check(failed.success == false and (Mocks.inv[1][4] ~= nil or back), 'turf: the drug is returned when the bills cannot be issued')
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))

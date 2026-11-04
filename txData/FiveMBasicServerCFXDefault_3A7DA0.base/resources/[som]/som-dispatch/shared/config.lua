@@ -132,6 +132,18 @@ Config.Alerts = {
         blip = { sprite = 280, colour = 5, scale = 1.0, duration = 600 },
     },
 
+    -- Raised by som-turf on a street sale, at the seller's position, so most
+    -- sales go unseen. NOT `reportable`.
+    drugDeal = {
+        label = 'Suspicious Exchange',
+        code = '10-66',
+        priority = 3,
+        chance = 0.25,
+        cooldown = 120,
+        jobs = { 'police' },
+        blip = { sprite = 51, colour = 1, scale = 0.9, duration = 240 },
+    },
+
     -- Raised by som-heists when a terminal is touched. NOT `reportable`: the
     -- server raises it with the site's own coordinates.
     heistInProgress = {

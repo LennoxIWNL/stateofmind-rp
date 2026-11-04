@@ -1563,3 +1563,18 @@ CREATE TABLE IF NOT EXISTS `som_heist_runs` (
   KEY `idx_site` (`site`, `created_at`),
   KEY `idx_tier` (`tier`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
+--  7k. TURF AND THE DRUG MARKET (som-turf)
+--
+--  som_turf and som_turf_events are in section 4 and are seeded by som-turf at
+--  boot. This table holds how many units of each drug were sold recently; the
+--  price recovers by timestamp, so a restart changes nothing.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_drug_market` (
+  `item`       VARCHAR(48) NOT NULL,
+  `units`      INT UNSIGNED NOT NULL DEFAULT 0,
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`item`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

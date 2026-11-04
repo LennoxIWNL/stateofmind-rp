@@ -30,6 +30,7 @@ M.db = {
     phoneAudit = {},
     notes = {},
     heist = { dongles = {}, runs = {} },
+    turf = { zones = {}, events = {}, market = {} },
     vehicles = {},
     social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} },
     nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
@@ -399,6 +400,57 @@ local function heist(kind, query, params)
     return false
 end
 
+local function turf(kind, query, params)
+    local T = M.db.turf
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    if kind == 'single' and has('FROM som_turf WHERE name = ?') then
+        local z = T.zones[params[1]]
+        if not z then return true, nil end
+        return true, { name = params[1], owner_gang = z.owner, contested_by = z.contested_by,
+                       contest_age = z.contest_started and (now() - z.contest_started) or nil }
+    elseif kind == 'insert' and has('INSERT INTO som_turf_events') then
+        T.events[#T.events + 1] = { gang = params[1], citizenid = params[2], points = params[3], action = params[4], zone = params[5] }
+        return true, #T.events
+    elseif kind == 'scalar' and has('FROM som_drug_market WHERE item = ?') then
+        local m = T.market[params[2]]
+        if not m then return true, nil end
+        return true, math.max(0, m.units - math.floor((now() - m.ts) / 3600 * params[1]))
+    elseif kind == 'update' then
+        if has('INSERT INTO som_drug_market') then
+            local m = T.market[params[1]] or { units = 0, ts = now() }
+            m.units = math.max(0, m.units - math.floor((now() - m.ts) / 3600 * params[2])) + 1
+            m.ts = now()
+            T.market[params[1]] = m
+            return true, 1
+        end
+        local z
+        if has('SET owner_gang = ?, claimed_at = NOW(), contested_by = NULL, contest_started = NULL WHERE name = ? AND owner_gang IS NULL') then
+            z = T.zones[params[2]]
+            if z and z.owner == nil then z.owner = params[1]; z.contested_by, z.contest_started = nil, nil; return true, 1 end
+            return true, 0
+        end
+        if has('SET contested_by = ?, contest_started = NOW() WHERE name = ? AND owner_gang = ? AND contested_by IS NULL') then
+            z = T.zones[params[2]]
+            if z and z.owner == params[3] and z.contested_by == nil then z.contested_by, z.contest_started = params[1], now(); return true, 1 end
+            return true, 0
+        end
+        if has('SET contested_by = NULL, contest_started = NULL WHERE name = ? AND owner_gang = ? AND contested_by IS NOT NULL') then
+            z = T.zones[params[1]]
+            if z and z.owner == params[2] and z.contested_by ~= nil then z.contested_by, z.contest_started = nil, nil; return true, 1 end
+            return true, 0
+        end
+        if has('SET owner_gang = ?, claimed_at = NOW(), contested_by = NULL, contest_started = NULL') and has('INTERVAL ? MINUTE') then
+            z = T.zones[params[2]]
+            if z and z.owner == params[3] and z.contested_by == params[4] and z.contest_started and z.contest_started <= now() - params[5] * 60 then
+                z.owner = params[1]; z.contested_by, z.contest_started = nil, nil
+                return true, 1
+            end
+            return true, 0
+        end
+    end
+    return false
+end
+
 local function fail(query)
     error('tests/mocks/mysql.lua: unhandled query: ' .. query, 3)
 end
@@ -408,6 +460,7 @@ function M.single(query, params)
     do local handled, value = social('single', query, params); if handled then return value end end
     do local handled, value = city('single', query, params); if handled then return value end end
     do local handled, value = heist('single', query, params); if handled then return value end end
+    do local handled, value = turf('single', query, params); if handled then return value end end
     if query:find('FROM som_properties WHERE slug = ?', 1, true) then
         for _, p in ipairs(M.db.properties) do
             if p.slug == params[1] then return copy(p) end
@@ -478,6 +531,7 @@ function M.scalar(query, params)
     do local handled, value = social('scalar', query, params); if handled then return value end end
     do local handled, value = city('scalar', query, params); if handled then return value end end
     do local handled, value = heist('scalar', query, params); if handled then return value end end
+    do local handled, value = turf('scalar', query, params); if handled then return value end end
     if query:find('SELECT role FROM som_property_owners WHERE property_id = ? AND citizenid = ?', 1, true) then
         local o = findOwner(params[1], params[2])
         return o and o.role or nil
@@ -576,6 +630,7 @@ function M.update(query, params)
     do local handled, value = social('update', query, params); if handled then return value end end
     do local handled, value = city('update', query, params); if handled then return value end end
     do local handled, value = heist('update', query, params); if handled then return value end end
+    do local handled, value = turf('update', query, params); if handled then return value end end
     if query:find('SET for_sale = 0 WHERE id = ? AND for_sale = 1', 1, true) then
         local p = findProperty(tonumber(params[1]))
         if p and tonumber(p.for_sale) == 1 then
@@ -915,6 +970,7 @@ function M.insert(query, params)
     do local handled, value = social('insert', query, params); if handled then return value end end
     do local handled, value = city('insert', query, params); if handled then return value end end
     do local handled, value = heist('insert', query, params); if handled then return value end end
+    do local handled, value = turf('insert', query, params); if handled then return value end end
     if query:find('INSERT INTO som_property_owners', 1, true) then
         local propertyId, citizenid, role, grantedBy = params[1], params[2], params[3], params[4]
         local existing = findOwner(propertyId, citizenid)
