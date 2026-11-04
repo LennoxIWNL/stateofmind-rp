@@ -27,11 +27,14 @@ local function resetDb()
     mysql.db.properties = {}
     mysql.db.owners = {}
     mysql.db.finance = {}
-    mysql.db.nextId = { properties = 1, owners = 1, finance = 1 }
+    mysql.db.jailSentences = {}
+    mysql.db.jailBail = {}
+    mysql.db.nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1 }
+    mysql.fakeNow = nil
 end
 
 local function resetMocks()
-    Mocks.calls = { payWith = 0, addMoney = 0, businessSpend = 0 }
+    Mocks.calls = { payWith = 0, addMoney = 0, businessSpend = 0, dispatchAlert = 0 }
     Mocks.players = {}
     Mocks.payWithFails = false
     Mocks.businessSpendFails = false
@@ -65,6 +68,21 @@ local function loadHousing()
         'server/ownership.lua',
         'server/finance.lua',
     })
+end
+
+local function loadJail()
+    resetDb()
+    resetMocks()
+    return loader.loadResource(REPO .. 'som-jail', {
+        'shared/config.lua',
+        'server/jail.lua',
+        'server/bail.lua',
+    })
+end
+
+local function setCuffed(source, cuffed)
+    Mocks.players[source].metadata = Mocks.players[source].metadata or {}
+    Mocks.players[source].metadata.cuffed = cuffed
 end
 
 ----------------------------------------------------------------------
