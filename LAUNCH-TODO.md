@@ -32,6 +32,15 @@ Import `setup.sql` on a fresh database. A database created from an older version
 - [ ] `som_jail_webhook`, `som_court_webhook`, `som_evidence_webhook` (see `DISCORD_WEBHOOKS.md`).
 - [ ] The Discord webhooks that were once committed in plaintext have been regenerated in Discord.
 
+- [ ] `som_phone_pepper` set to a long random string (passcodes are hashed with it; changing it later resets every passcode).
+
+## Phone
+
+- [ ] `setup.sql` section 4b imported (new `som_phone_devices` and `som_phone_audit`; nothing existing changes).
+- [ ] The phone item is non-stacking in `ox_inventory` (it is today); each phone gets an imei written by the server on first use.
+- [ ] `ui/` rebuilt output is committed (`html/assets`); a change to `ui/apps/som-phone` needs `npm run build` there.
+- [ ] Not verified live: NUI focus and cursor, the hold animation, a banner arriving with the phone closed, unique phone metadata with real items.
+
 ## Jobs to whitelist and assign
 
 - [ ] `judge`, `prosecutor`, `defender` (court), `dispatcher` (dispatch). All four are `whitelisted`.

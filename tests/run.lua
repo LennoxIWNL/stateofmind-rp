@@ -36,6 +36,8 @@ local function resetDb()
     mysql.db.evidence = {}
     mysql.db.custody = {}
     mysql.db.profiles = {}
+    mysql.db.devices = {}
+    mysql.db.phoneAudit = {}
     mysql.db.bills = {}
     mysql.db.orders = {}
     mysql.db.nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
@@ -44,6 +46,7 @@ local function resetDb()
 end
 
 local function resetMocks()
+    ResetHandlers()
     Mocks.calls = { payWith = 0, addMoney = 0, businessSpend = 0, dispatchAlert = 0, businessTransact = 0 }
     Mocks.players = {}
     Mocks.payWithFails = false
@@ -52,6 +55,8 @@ local function resetMocks()
     Mocks.fines = {}
     Mocks.fineFails = false
     Mocks.exported = {}
+    Mocks.perks = {}
+    Mocks.metadataRefused = false
     Mocks.paid = 0
     Mocks.lastPaid = nil
     Mocks.addMoneyFails = false
@@ -141,6 +146,22 @@ local function loadLaunder()
         'server/wash.lua',
     })
     return launderEnv
+end
+
+local phoneEnv
+
+local function loadPhone()
+    resetDb()
+    resetMocks()
+    phoneEnv = loader.loadResource(REPO .. 'som-phone', {
+        'shared/config.lua',
+        'server/bank.lua',
+        'server/core.lua',
+        'server/device.lua',
+        'server/apps.lua',
+        'server/main.lua',
+    })
+    return phoneEnv
 end
 
 local evEnv
@@ -1718,6 +1739,196 @@ do
         if front.enabled or front.set then open = open + 1 end
     end
     check(open == 0, 'config: every shipped front is disabled until its coordinates are set')
+end
+
+----------------------------------------------------------------------
+-- som-phone: the action pipeline, devices and the lock
+----------------------------------------------------------------------
+local function phoneScene()
+    local env = loadPhone()
+    Mocks.players[1] = { citizenid = 'P1', job = { name = 'unemployed' }, charinfo = { firstname = 'Ann', lastname = 'One', phone = '555-0001' } }
+    Mocks.players[2] = { citizenid = 'P2', job = { name = 'police', onduty = true, grade = 1 }, charinfo = { firstname = 'Bo', lastname = 'Two', phone = '555-0002' } }
+    Mocks.inv[1] = { { name = 'phone', count = 1, slot = 1, metadata = {} } }
+    Mocks.inv[2] = { { name = 'phone', count = 1, slot = 1, metadata = {} } }
+    -- The bank's own queries are tested with the bank; here it only has to be reachable.
+    env.Bank.GetOverview = function() return { accountNo = '12345678' } end
+    env.Bank.ShareAccount = function() return false, 'nobody nearby' end
+    return env
+end
+
+local function act(source, app, action, payload) return RegisteredCallbacks['som-phone:server:action'](source, app, action, payload) end
+
+do
+    local env = phoneScene()
+    local r = act(1, 'system', 'open', {})
+    check(r.success == true and #r.apps >= 3 and r.number == '555-0001', 'phone: opening returns the apps the player may see')
+    local imei = Mocks.inv[1][1].metadata.imei
+    check(type(imei) == 'string' and #imei == 16 and mysql.db.devices[imei] ~= nil, 'device: the server writes an imei into the item and a row for it')
+    act(1, 'system', 'open', {})
+    check(Mocks.inv[1][1].metadata.imei == imei, 'device: the imei is kept, not reissued')
+
+    Mocks.inv[1] = {}
+    check(act(1, 'system', 'open', {}).success == false and act(1, 'bank', 'overview', {}).success == false,
+        'phone: no phone item, nothing works, not even a bank read')
+    Mocks.inv[1] = { { name = 'phone', count = 1, slot = 1, metadata = {} } }
+
+    Mocks.metadataRefused = true
+    check(act(2, 'system', 'open', {}).success == false, 'device: an inventory that refuses the imei write is not trusted')
+    Mocks.metadataRefused = false
+end
+
+do
+    local env = phoneScene()
+    Mocks.players[9] = nil
+    check(act(9, 'bank', 'overview', {}).success == false, 'pipeline: an unloaded player gets nothing')
+    check(act(1, 5, 'overview', {}).success == false and act(1, 'bank', {}, {}).success == false, 'pipeline: non string app or action is refused')
+    check(act(1, string.rep('a', 40), 'overview', {}).success == false, 'pipeline: an overlong app id is refused')
+    check(act(1, 'bank', 'overview', 'x').success == false, 'pipeline: a non table payload is refused')
+    check(act(1, 'nope', 'overview', {}).error == 'no such app', 'pipeline: an unknown app is refused')
+    check(act(1, 'bank', 'nope', {}).error == 'no such action', 'pipeline: an unknown action is refused')
+
+    local big = { text = string.rep('x', env.Config.Pipeline.maxPayload + 1) }
+    check(act(1, 'bank', 'bill', big).success == false, 'pipeline: an oversize payload is refused before the app runs')
+    local deep = { a = { b = { c = { d = { e = { f = { g = 1 } } } } } } }
+    check(act(1, 'bank', 'bill', deep).success == false, 'pipeline: a deeply nested payload is refused')
+    check(act(1, 'bank', 'bill', { [{}] = 1 }).success == false, 'pipeline: a table used as a key is refused')
+    check(act(1, 'bank', 'bill', { f = function() end }).success == false, 'pipeline: a function value is refused')
+end
+
+do
+    local env = phoneScene()
+    Mocks.downed[1] = true
+    check(act(1, 'system', 'open', {}).success == false and act(1, 'bank', 'overview', {}).success == false,
+        'pipeline: a downed player cannot use the phone')
+    Mocks.downed[1] = nil
+
+    env.Phone.Register({ id = 'police_only', label = 'PD', jobs = { 'police' }, handler = function() return { data = 1 } end })
+    check(act(1, 'police_only', 'x', {}).error == 'no such app', 'pipeline: an app for another job is hidden and refused')
+    check(act(2, 'police_only', 'x', {}).success == true, 'pipeline: the right job reaches the app')
+    local apps = act(1, 'system', 'open', {}).apps
+    local seen = false
+    for _, a in ipairs(apps) do if a.id == 'police_only' then seen = true end end
+    check(not seen, 'pipeline: the home screen lists only apps the player may see')
+
+    env.Phone.Register({ id = 'perked', label = 'P', perk = 'vip', handler = function() return {} end })
+    check(act(1, 'perked', 'x', {}).success == false, 'pipeline: a perk app is refused without the perk')
+    Mocks.perks[1] = { vip = true }
+    check(act(1, 'perked', 'x', {}).success == true, 'pipeline: and allowed with it')
+
+    check(env.Phone.Register({ id = 'bad id!' }) == false and env.Phone.Register('x') == false and env.Phone.Register({ id = 5 }) == false,
+        'host: a malformed app registration is refused')
+end
+
+do
+    local env = phoneScene()
+    env.Config.Pipeline.writesPerMinute = 3
+    env.Config.Pipeline.readsPerMinute = 5
+    local reads = 0
+    for _ = 1, 8 do if act(1, 'bank', 'overview', {}).success ~= false or true then reads = reads + 1 end end
+    local limited = act(1, 'bank', 'overview', {})
+    check(limited.error == 'slow down', 'pipeline: reads over the per minute limit are refused')
+
+    local writes = 0
+    for _ = 1, 5 do act(1, 'bank', 'share', {}) end
+    check(act(1, 'bank', 'share', {}).error == 'slow down', 'pipeline: writes over the per minute limit are refused')
+    check(act(2, 'bank', 'overview', {}).error ~= 'slow down', 'pipeline: one player hitting the limit does not limit another')
+end
+
+do
+    local env = phoneScene()
+    env.Phone.Register({ id = 'boom', label = 'B', actions = { go = { fn = function() error('bug') end } } })
+    check(act(1, 'boom', 'go', {}).error == 'something went wrong', 'pipeline: a failing handler is a refusal, not a crash')
+
+    env.Phone.Register({ id = 'ok', label = 'O', actions = {
+        read = { fn = function() return { data = 1 } end },
+        write = { writes = true, fn = function() return { data = 2 } end },
+        refuse = { writes = true, fn = function() return { error = 'no' } end },
+    } })
+    act(1, 'ok', 'read', {})
+    check(#mysql.db.phoneAudit == 0, 'audit: a read leaves no row')
+    act(1, 'ok', 'write', {})
+    act(1, 'ok', 'refuse', {})
+    check(#mysql.db.phoneAudit == 2 and mysql.db.phoneAudit[1].ok == 1 and mysql.db.phoneAudit[2].ok == 0 and mysql.db.phoneAudit[1].citizenid == 'P1',
+        'audit: a change leaves a row with the outcome, and a refused one is recorded as failed')
+
+    local hostResult = act(2, 'ok', 'read', {})
+    check(hostResult.success == true and hostResult.data == 1, 'pipeline: a handler result gains success when it did not set one')
+
+    env.Phone.Register({ id = 'ext', label = 'E', reads = { list = true }, handler = function(source, action) return { data = action } end })
+    act(1, 'ext', 'list', {})
+    check(#mysql.db.phoneAudit == 2, 'host: an external app action marked as a read is not audited')
+    act(1, 'ext', 'buy', {})
+    check(#mysql.db.phoneAudit == 3, 'host: an external app action not marked as a read is audited')
+end
+
+do
+    local env = phoneScene()
+    check(act(1, 'settings', 'setPasscode', { passcode = '12' }).success == false and act(1, 'settings', 'setPasscode', { passcode = 'abcd' }).success == false,
+        'lock: a passcode must be four digits')
+    check(act(1, 'settings', 'setPasscode', { passcode = '1234' }).success == true, 'lock: a passcode can be set')
+    local imei = Mocks.inv[1][1].metadata.imei
+    check(mysql.db.devices[imei].pass_hash ~= nil and mysql.db.devices[imei].pass_hash ~= '1234',
+        'lock: only a hash is stored')
+
+    act(1, 'system', 'lock', {})
+    local locked = act(1, 'bank', 'overview', {})
+    check(locked.locked == true and locked.success == false, 'lock: a locked phone runs nothing')
+    check(act(1, 'system', 'open', {}).success == true, 'lock: but it still opens so the code can be entered')
+
+    for _ = 1, env.Config.Lock.failsBeforeLock - 1 do
+        check(act(1, 'system', 'unlock', { passcode = '0000' }).error == 'Wrong passcode', 'lock: a wrong code is refused')
+    end
+    check(act(1, 'system', 'unlock', { passcode = '0000' }).success == false, 'lock: the last wrong code locks it out')
+    check(act(1, 'system', 'unlock', { passcode = '1234' }).error == 'Try again shortly', 'lock: even the right code is refused during the lockout')
+    check(act(1, 'bank', 'overview', {}).locked == true, 'lock: still locked')
+
+    env.Phone.ResetFails = nil
+end
+
+do
+    local env = phoneScene()
+    act(1, 'settings', 'setPasscode', { passcode = '4321' })
+    act(1, 'system', 'lock', {})
+    check(act(1, 'system', 'unlock', { passcode = '9999' }).success == false, 'lock: a wrong code does not unlock')
+    check(act(1, 'system', 'unlock', { passcode = 4321 }).success == false, 'lock: a number instead of a string is refused')
+    check(act(1, 'system', 'unlock', { passcode = '4321' }).success == true and act(1, 'bank', 'overview', {}).locked ~= true,
+        'lock: the right code opens it')
+    check(act(2, 'bank', 'overview', {}).locked ~= true, 'lock: another phone is unaffected')
+
+    act(1, 'system', 'lock', {})
+    _G.source = 1
+    Handlers['playerDropped']()
+    _G.source = nil
+    check(act(1, 'bank', 'overview', {}).locked == true, 'lock: unlocked state is dropped when the player leaves')
+
+    act(1, 'system', 'unlock', { passcode = '4321' })
+    check(act(1, 'settings', 'setPasscode', {}).success == true and act(1, 'bank', 'overview', {}).locked ~= true,
+        'lock: the passcode can be removed')
+end
+
+do
+    local env = phoneScene()
+    check(act(1, 'settings', 'setTheme', { theme = 'nope' }).success == false, 'settings: an unknown theme is refused')
+    check(act(1, 'settings', 'setTheme', { theme = 'midnight' }).success == false, 'settings: a perk theme is refused without the perk')
+    Mocks.perks[1] = { phoneTheme = true }
+    check(act(1, 'settings', 'setTheme', { theme = 'midnight' }).success == true, 'settings: and allowed with it')
+end
+
+do
+    local env = phoneScene()
+    local notified
+    local real = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, title, text, icon) if name == 'som-phone:client:banner' then notified = { target = target, title = title, text = text, icon = icon } end end
+    check(Mocks.exported.notifyApp(1, 'bank', 'Hello') == true and notified.title == 'Bank' and notified.icon == 'bank',
+        'exports: notifyApp still resolves a built-in app label and icon')
+    env.Phone.Register({ id = 'jobs', label = 'Jobs', icon = 'briefcase', handler = function() return {} end })
+    Mocks.exported.notifyApp(1, 'jobs', 'Offer')
+    check(notified.title == 'Jobs' and notified.icon == 'briefcase', 'exports: notifyApp resolves a registered app')
+    check(Mocks.exported.notifyApp(1, 'nope', 'x') == true and notified.title == 'System', 'exports: an unknown app falls back to System')
+    check(Mocks.exported.notifyApp(1, 'bank', '') == false and Mocks.exported.notifyApp(0, 'bank', 'x') == false, 'exports: empty text or a bad source is refused')
+    _G.TriggerClientEvent = real
+    check(type(Mocks.exported.billCitizen) == 'function' and type(Mocks.exported.registerApp) == 'function',
+        'exports: billCitizen and registerApp are still exported for other resources')
 end
 
 ----------------------------------------------------------------------

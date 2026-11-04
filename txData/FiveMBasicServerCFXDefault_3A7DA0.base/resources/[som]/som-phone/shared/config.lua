@@ -10,6 +10,22 @@ Config.RequireItem = true
 
 Config.OpenKey = 'M'
 
+-- The action pipeline: every request the phone makes goes through one server
+-- function that checks these before an app sees it.
+Config.Pipeline = {
+    maxPayload = 4096,        -- characters of strings and keys in one request, nesting included
+    maxDepth = 5,
+    readsPerMinute = 90,      -- per player per action
+    writesPerMinute = 20,
+}
+
+-- A passcode is four digits, stored as a salted hash. The pepper is a convar
+-- (som_phone_pepper) so it never sits in a file clients download.
+Config.Lock = {
+    failsBeforeLock = 5,
+    lockSeconds = 30,
+}
+
 -- ---------------------------------------------------------------------------
 -- Animation
 --
@@ -100,49 +116,6 @@ Config.Bank = {
         autoCollectDays = 7,
         -- How often the collector sweeps, in minutes.
         autoCollectInterval = 15,
-    },
-}
-
--- ---------------------------------------------------------------------------
--- Apps
---
--- The registry is the point of the architecture: other resources add their own
--- apps rather than this resource knowing about every feature. som-jobs and
--- som-gangs will use it, and it is how the Twitter app arrives in 4b-2.
---
--- `perk` gates an app behind a supporter entitlement, checked server side.
---
--- `icon` is a name from the ICONS table in html/app.js, not a glyph. Names
--- already drawn: bank, settings, message, phone, contacts, camera, twitter,
--- dispatch, briefcase. Anything unrecognised falls back to rendering the
--- string itself, so a third-party app passing an emoji still works.
--- ---------------------------------------------------------------------------
-
-Config.Apps = {
-    {
-        id = 'bank',
-        label = 'Bank',
-        icon = 'bank',
-        colour = '#2ecc71',
-        order = 10,
-    },
-    {
-        id = 'properties',
-        label = 'Properties',
-        -- briefcase is already in the ICONS table in html/app.js. An icon name
-        -- that is not there renders as the raw string, so this is checked
-        -- rather than chosen.
-        icon = 'briefcase',
-        colour = '#e0a13b',
-        -- Between bank at 10 and settings at 90, so money things sit together.
-        order = 20,
-    },
-    {
-        id = 'settings',
-        label = 'Settings',
-        icon = 'settings',
-        colour = '#8e8e93',
-        order = 90,
     },
 }
 

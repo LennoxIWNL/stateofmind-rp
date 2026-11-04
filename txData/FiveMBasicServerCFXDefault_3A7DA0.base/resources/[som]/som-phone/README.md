@@ -41,24 +41,46 @@ a third-party app passing an emoji keeps working.
 The phone opens **locked**. One click, and it is the difference between a menu
 and something that reads as a phone.
 
+## Architecture
+
+One door. Every request from the page is `(app, action, payload)` through a single
+client callback to `som-phone:server:action`, and `Phone.Action` in `server/core.lua`
+is the only place that decides whether it may run: the player is loaded, the phone
+item is in the bag, the player is not downed, the phone is not locked, the app is
+allowed for their job and perks, the payload is small and shallow, the per-action rate
+limit holds, and only then does the app handler run. A change leaves a row in
+`som_phone_audit`. Handlers are local functions, so there is no per-app net event a
+client could call directly, and a handler that errors is a refusal, not a crash.
+
+- `server/device.lua`: each phone item carries an `imei` the server writes and reads
+  back; `som_phone_devices` is the truth. An optional four digit passcode is a salted
+  hash with a pepper from the `som_phone_pepper` convar; five wrong tries lock it for 30 s.
+- `server/apps.lua`: the built-in apps (Bank, Properties, Settings).
+- The page is React in `ui/apps/som-phone`, built into `html/`. Apps import only
+  `@som/phone-sdk`, which a test enforces.
+
 ## The app registry
 
-Other resources ship their own apps rather than this resource knowing about
-every feature. This is how `som-jobs`, `som-gangs` and the Twitter app arrive.
+Another resource ships an app with `registerApp`, and its handler answers the phone's
+actions. The page shows it with a view description: plain data, no markup.
 
 ```lua
 exports['som-phone']:registerApp({
-    id = 'dispatch',
-    label = 'Dispatch',
-    icon = '!',
-    colour = '#4a9eff',
-    order = 20,
-    perk = nil,          -- or a supporter perk name to gate it
+    id = 'jobs', label = 'Jobs', icon = 'briefcase', colour = '#4a9eff', order = 30,
+    jobs = nil,            -- or { 'police' } to hide it from everyone else
+    perk = nil,            -- or a supporter perk, checked on the server
+    reads = { view = true },  -- actions that only read are not audited
+    handler = function(source, action, payload)
+        if action == 'view' then
+            return { view = { sections = { { title = 'Open', rows = { { title = 'A job', action = 'take', payload = { id = 3 } } } } } } }
+        end
+        return { success = true }
+    end,
 })
 ```
 
-`perk` is filtered **server side**. Sending an app and hiding it in the UI would
-let the client decide what it is entitled to.
+`handler` is called with a source the pipeline has already checked. `notifyApp` and
+`billCitizen` keep their signatures.
 
 ## Bank
 
@@ -110,8 +132,6 @@ against `som-core` entitlements server side. The selected accent overrides
 - **No Twitter**, so the custom handle and colourway perks in `patreon.md` are
   still unbuildable.
 - **No camera or gallery.** Deferred; `screenshot-basic` is already kept.
-- Apps registered by other resources appear on the home screen but have no view
-  container yet, so tapping one returns home. 4b-2.
 - **Custom phone numbers** (an Insider perk) are not implemented;
   `som_characters.phone` is still auto-generated.
 - No replacement shop, so `Config.Replacement` is unused and a lost phone

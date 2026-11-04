@@ -4,7 +4,7 @@ lua54 'yes'
 
 name 'som-phone'
 author 'State of Mind RP'
-description 'SOM phone: app framework, banking over the transaction ledger, settings'
+description 'SOM phone: the action pipeline, the app host, banking over the transaction ledger, settings'
 version '0.1.0'
 
 shared_scripts {
@@ -20,15 +20,20 @@ client_scripts {
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/bank.lua',
+    'server/core.lua',
+    'server/device.lua',
+    'server/apps.lua',
     'server/main.lua',
 }
 
 ui_page 'html/index.html'
 
+-- Built from ui/apps/som-phone. Do not edit html/ by hand, it is generated.
 files {
     'html/index.html',
-    'html/style.css',
-    'html/app.js',
+    'html/assets/*.js',
+    'html/assets/*.css',
+    'html/assets/*.map',
 }
 
 dependencies {
