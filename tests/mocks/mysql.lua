@@ -10,12 +10,29 @@ M.db = {
     properties = {},
     owners = {},
     finance = {},
-    nextId = { properties = 1, owners = 1, finance = 1 },
+    jailSentences = {},
+    jailBail = {},
+    nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1 },
 }
+
+-- Overridable "now" for jail/bail elapsed-time math, so a test can jump a
+-- sentence forward without a real wait. nil means use the real clock.
+M.fakeNow = nil
+
+local function now()
+    return M.fakeNow or os.time()
+end
 
 local function findProperty(id)
     for _, p in ipairs(M.db.properties) do
         if p.id == id then return p end
+    end
+    return nil
+end
+
+local function findSentence(id)
+    for _, s in ipairs(M.db.jailSentences) do
+        if s.id == id then return s end
     end
     return nil
 end
@@ -61,6 +78,17 @@ function M.single(query, params)
         end
         return nil
     end
+    -- bail.lua's activeWithRemaining: one sentence, with elapsed.
+    if query:find('FROM som_jail_sentences WHERE citizenid = ? AND status = ', 1, true) then
+        for _, s in ipairs(M.db.jailSentences) do
+            if s.citizenid == params[1] and s.status == 'serving' then
+                local row = copy(s)
+                row.elapsed = now() - s.booked_at
+                return row
+            end
+        end
+        return nil
+    end
     fail(query)
 end
 
@@ -82,6 +110,12 @@ function M.scalar(query, params)
             if o.citizenid == params[1] and o.role == 'owner' then n = n + 1 end
         end
         return n
+    end
+    if query:find('SELECT id FROM som_jail_bail WHERE sentence_id = ? AND status = ', 1, true) then
+        for _, b in ipairs(M.db.jailBail) do
+            if b.sentence_id == params[1] and b.status == 'posted' then return b.id end
+        end
+        return nil
     end
     fail(query)
 end
@@ -112,6 +146,58 @@ function M.update(query, params)
         M.db.owners = kept
         return before - #kept
     end
+    if query:find("UPDATE som_jail_bail SET status = 'forfeited' WHERE citizenid = ? AND status = 'posted'", 1, true) then
+        local n = 0
+        for _, b in ipairs(M.db.jailBail) do
+            if b.citizenid == params[1] and b.status == 'posted' then
+                b.status = 'forfeited'
+                n = n + 1
+            end
+        end
+        return n
+    end
+    if query:find('SET status = ?, released_at = CURRENT_TIMESTAMP, released_by = ?', 1, true) then
+        local s = findSentence(params[3])
+        if not s or s.status ~= 'serving' then return 0 end
+        s.status = params[1]
+        s.released_by = params[2]
+        return 1
+    end
+    if query:find('SET release_pending = 1 WHERE id = ?', 1, true) then
+        local s = findSentence(params[1])
+        if not s then return 0 end
+        s.release_pending = 1
+        return 1
+    end
+    if query:find('SET release_pending = 0 WHERE citizenid = ? AND release_pending = 1', 1, true) then
+        local n = 0
+        for _, s in ipairs(M.db.jailSentences) do
+            if s.citizenid == params[1] and s.release_pending == 1 then s.release_pending = 0; n = n + 1 end
+        end
+        return n
+    end
+    if query:find("SET status = 'serving', released_at = NULL", 1, true) then
+        local s = findSentence(params[1])
+        if not s or s.status ~= 'bailed' then return 0 end
+        s.status = 'serving'
+        return 1
+    end
+    if query:find("UPDATE som_jail_sentences SET status = 'absconded' WHERE id = ?", 1, true) then
+        local s = findSentence(params[1])
+        if not s or s.status ~= 'serving' then return 0 end
+        s.status = 'absconded'
+        return 1
+    end
+    if query:find("UPDATE som_jail_bail SET status = 'cleared' WHERE status = 'posted'", 1, true) then
+        local n = 0
+        for _, b in ipairs(M.db.jailBail) do
+            if b.status == 'posted' and b.appeal_due_at <= now() then
+                b.status = 'cleared'
+                n = n + 1
+            end
+        end
+        return n
+    end
     fail(query)
 end
 
@@ -140,10 +226,42 @@ function M.insert(query, params)
         }
         return id
     end
+    if query:find('INSERT INTO som_jail_sentences', 1, true) then
+        local id = M.db.nextId.jailSentences
+        M.db.nextId.jailSentences = id + 1
+        M.db.jailSentences[#M.db.jailSentences + 1] = {
+            id = id, citizenid = params[1], officer_cid = params[2], conviction_id = params[3],
+            charges = params[4], total_seconds = params[5], status = 'serving',
+            booked_at = now(), released_at = nil, released_by = nil, release_pending = 0,
+        }
+        return id
+    end
+    if query:find('INSERT INTO som_jail_bail', 1, true) then
+        local id = M.db.nextId.jailBail
+        M.db.nextId.jailBail = id + 1
+        M.db.jailBail[#M.db.jailBail + 1] = {
+            id = id, sentence_id = params[1], citizenid = params[2], amount = params[3],
+            status = 'posted', posted_at = now(), appeal_due_at = now() + (tonumber(params[4]) or 0) * 3600,
+        }
+        return id
+    end
     fail(query)
 end
 
 function M.query(query, params)
+    params = params or {}
+    -- jail.lua's sweep: every serving sentence, with elapsed.
+    if query:find("FROM som_jail_sentences WHERE status = 'serving'", 1, true) then
+        local out = {}
+        for _, s in ipairs(M.db.jailSentences) do
+            if s.status == 'serving' then
+                local row = copy(s)
+                row.elapsed = now() - s.booked_at
+                out[#out + 1] = row
+            end
+        end
+        return out
+    end
     fail(query)
 end
 

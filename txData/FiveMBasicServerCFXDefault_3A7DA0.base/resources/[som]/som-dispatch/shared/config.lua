@@ -109,6 +109,19 @@ Config.Alerts = {
         jobs = { 'police', 'ambulance' },
         blip = { sprite = 280, colour = 5, scale = 1.0, duration = 600 },
     },
+
+    -- Raised by som-jail's yard-radius check, not by detection. NOT
+    -- `reportable` for the same reason emergencyCall isn't: it has its own
+    -- trigger with its own validation.
+    inmateEscaped = {
+        label = 'Inmate Escaped',
+        code = '10-80',
+        priority = 1,
+        chance = 1.0,
+        cooldown = 20,
+        jobs = { 'police' },
+        blip = { sprite = 59, colour = 1, scale = 1.0, duration = 600 },
+    },
 }
 
 -- Weapons that never raise a shots-fired call. A stun gun is not gunfire, and

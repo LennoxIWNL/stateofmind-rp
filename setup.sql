@@ -1095,6 +1095,60 @@ SELECT NULL AS `citizenid`, NULL AS `name`, NULL AS `type`, NULL AS `label`
 FROM DUAL WHERE FALSE;
 
 -- ===========================================================================
+--  7e. JAIL AND BAIL (som-jail)
+--
+--  A sentence has no `remaining_seconds` column. Time served is computed on
+--  read as `total_seconds - TIMESTAMPDIFF(SECOND, booked_at, NOW())`, the
+--  same "the database is authority, not an in-memory countdown" choice
+--  som_property_finance already makes, so a restart cannot lose or stall a
+--  countdown and logging out is not a way to dodge a sentence.
+--
+--  No FK into `mdt_convictions`: that table is preserved third-party (see
+--  8c above), not som-owned, and its own schema can be dropped and
+--  recreated by its import at any time. `conviction_id` is a bare INT an
+--  officer may enter for their own traceability; nothing here reads it back.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_jail_sentences` (
+  `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`      VARCHAR(16) NOT NULL,
+  `officer_cid`    VARCHAR(16) NOT NULL,
+  `conviction_id`  INT UNSIGNED DEFAULT NULL,
+  `charges`        VARCHAR(255) DEFAULT NULL,
+  `total_seconds`  INT UNSIGNED NOT NULL,
+  -- absconded: left the yard radius while serving. Excluded from the
+  -- time-served sweep and from bail eligibility until an officer re-books.
+  `status`         ENUM('serving','released','bailed','absconded') NOT NULL DEFAULT 'serving',
+  `booked_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `released_at`    TIMESTAMP NULL DEFAULT NULL,
+  `released_by`    VARCHAR(16) DEFAULT NULL,
+  -- Set when a sentence ends while the citizen is offline, so the next login
+  -- sends them to the gate with their property instead of back into a cell.
+  `release_pending` TINYINT(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `idx_citizen_status` (`citizenid`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Bail is spent at payment time (it funds the department, like a fine does),
+-- not held in escrow, so `forfeited` is a record-keeping flag for an officer
+-- glancing at someone's history, not a second money movement. `cleared` just
+-- means the 72-hour window passed with no re-arrest; no money moves then
+-- either.
+CREATE TABLE IF NOT EXISTS `som_jail_bail` (
+  `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `sentence_id`    BIGINT UNSIGNED NOT NULL,
+  `citizenid`      VARCHAR(16) NOT NULL,
+  `amount`         BIGINT NOT NULL DEFAULT 0,
+  `status`         ENUM('posted','forfeited','cleared') NOT NULL DEFAULT 'posted',
+  `posted_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `appeal_due_at`  DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_citizen_status` (`citizenid`, `status`),
+  CONSTRAINT `fk_bail_sentence` FOREIGN KEY (`sentence_id`)
+    REFERENCES `som_jail_sentences` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
 --  9. SEED DATA
 --
 --  Opening balances are PLACEHOLDER FLOAT, not a balance decision. Businesses
