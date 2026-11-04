@@ -3,6 +3,8 @@ import { Icon, PhoneContext, callApp, closePhone, type PhoneApi } from '@som/pho
 import { Bank } from './apps/Bank'
 import { Contacts } from './apps/Contacts'
 import { Messages } from './apps/Messages'
+import { Chirp } from './apps/Chirp'
+import { Pages } from './apps/Pages'
 import { Phone } from './apps/Phone'
 import { Properties } from './apps/Properties'
 import { Settings } from './apps/Settings'
@@ -168,6 +170,8 @@ export function Shell() {
     if (id === 'contacts') return <Contacts />
     if (id === 'messages') return <Messages arg={arg} />
     if (id === 'phone') return <Phone arg={arg} />
+    if (id === 'chirp') return <Chirp />
+    if (id === 'pages') return <Pages />
     if (id === 'properties') return <Properties />
     if (id === 'settings') {
       return (

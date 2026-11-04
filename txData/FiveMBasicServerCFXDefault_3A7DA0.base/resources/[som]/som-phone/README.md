@@ -113,6 +113,39 @@ server id as the voice channel and have no busy check, no cleanup when a player 
 check that the acting player is the receiver; its messages take recipients from the client,
 have no length limit and no membership check. Each of those is a test here.
 
+## Chirp and Pages
+
+`server/social.lua`. Two apps on the same pipeline, so every action is owner, downed, lock,
+size and rate checked before it runs.
+
+**Chirp** is the public feed: 280 characters, replies one level deep, likes, report, delete
+your own. A handle is made from the character name on first use (`annone42`). A custom handle
+is the `twitterHandle` supporter perk (3 to 16 of `a-z0-9_`, unique in the database, cannot be
+or start with a reserved word such as `police`, `admin`, `gov`, changeable once a day); the
+`twitterColour` perk value is how many of `Config.Social.colours` are unlocked. A post
+can be made as a business only while the character is the on duty boss of a job that has a
+business, and the label comes from the server, never the client. Images are `https` URLs on
+`Config.Social.imageHosts` only (empty by default, so no images).
+
+**Pages** has two halves. Adverts (yellow pages): a category, title, description and optional
+price, at most one per category and three in total, expiring after 48 hours; the poster's number
+is shown only if they chose, and a Message button sends a normal text without revealing it.
+White pages: nobody is listed until they opt in; a search needs three characters, treats `%`
+and `_` as letters, returns at most ten names with numbers and never an id or an address.
+
+Moderation: staff run `/removepost post|advert <id>` (needs `som.mod`, written to
+`som_phone_audit`). Reports are rows in `som_phone_reports`; set the `som_phone_webhook`
+convar to also post each new report to Discord.
+
+### Prior art
+
+Read from source: npwd's twitter and marketplace services (the author's name came from the
+client, there was no length or rate limit, and a delete trusted the post id), plus the docs and
+READMEs of sky_phone, v-phone, peak-phone, sd-phone and z-phone for features. Their licences
+(GPL, AGPL, commercial) mean no code was taken, only ideas: yellow pages expiry and categories
+(peak), handles and a report queue (sky), a feed that is one table for people and businesses.
+Each weakness above is a test here.
+
 ## Bank
 
 **Full history, own account only.** The citizenid comes from `source`, never
@@ -158,10 +191,6 @@ against `som-core` entitlements server side. The selected accent overrides
 
 ## Known gaps
 
-- **No messages, contacts or calls.** 4b-2. Calls need pma-voice channel work,
-  which is the least predictable part.
-- **No Twitter**, so the custom handle and colourway perks in `patreon.md` are
-  still unbuildable.
 - **No camera or gallery.** Deferred; `screenshot-basic` is already kept.
 - **Custom phone numbers** (an Insider perk) are not implemented;
   `som_characters.phone` is still auto-generated.

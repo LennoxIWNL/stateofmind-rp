@@ -12,6 +12,7 @@ const PATHS: Record<string, string> = {
     dispatch: '<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
     briefcase: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
 
+    heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.2l7.8-7.7 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>',
     arrowDown: '<path d="M12 5v14M19 12l-7 7-7-7"/>',
     arrowUp: '<path d="M12 19V5M5 12l7-7 7 7"/>',
     check: '<path d="M20 6L9 17l-5-5"/>',

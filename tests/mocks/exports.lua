@@ -66,7 +66,8 @@ end
 function core:hasPermission(source, ace)
     return Mocks.admins[source] == true
 end
-function core:hasPerk(source, perk) return Mocks.perks[source] ~= nil and Mocks.perks[source][perk] == true end
+function core:hasPerk(source, perk) return Mocks.perks[source] ~= nil and Mocks.perks[source][perk] or false end
+function core:getJobs() return Mocks.jobs end
 function core:paymentOptions(source) return {} end
 function core:getMetadata(source, key)
     local player = Mocks.players[source]
@@ -90,6 +91,8 @@ function economy:businessSpend(name, amount, reason)
     Mocks.calls.businessSpend = Mocks.calls.businessSpend + 1
     return not Mocks.businessSpendFails
 end
+
+function economy:getBusiness(name) return Mocks.businesses[name] end
 
 local phone = {}
 function phone:billCitizen(citizenid, business, amount, reason, opts) return 1 end
@@ -178,7 +181,7 @@ _G.lib = {
     callback = {
         register = function(name, fn) libCallbacks[name] = fn end,
     },
-    addCommand = function() end,
+    addCommand = function(name, _, fn) Mocks.commands[name] = fn end,
 }
 
 return Mocks

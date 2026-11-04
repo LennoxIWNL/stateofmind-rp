@@ -28,6 +28,7 @@ M.db = {
     messages = {},
     phoneCalls = {},
     phoneAudit = {},
+    social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} },
     nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
                courtCases = 1, courtEvents = 1, courtWarrants = 1, service = 1, evidence = 1, custody = 1, orders = 1 },
 }
@@ -115,12 +116,188 @@ local function copy(t)
     return c
 end
 
+
+-- Chirp and Pages. Returns handled, value.
+local function social(kind, query, params)
+    local S = M.db.social
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    local function post(id) return S.posts[id] end
+
+    if kind == 'single' then
+        if has('SELECT handle, colour FROM som_phone_handles WHERE citizenid = ?') then
+            local h = S.handles[params[1]]
+            return true, h and { handle = h.handle, colour = h.colour } or nil
+        end
+        if has('AS day, COALESCE(MAX(UNIX_TIMESTAMP(created_at)), 0) AS last') then
+            local day, last = 0, 0
+            for _, x in ipairs(S.posts) do
+                if x.citizenid == params[1] and x.ts > now() - 86400 then day = day + 1; last = math.max(last, x.ts) end
+            end
+            return true, { day = day, last = last }
+        end
+        if has('SELECT citizenid, body FROM som_phone_posts WHERE id = ? AND removed = 0') then
+            local x = post(params[1])
+            return true, x and not x.removed and { citizenid = x.citizenid, body = x.body } or nil
+        end
+        if has('AS total, SUM(category = ?) AS here') then
+            local total, here = 0, 0
+            for _, a in ipairs(S.adverts) do
+                if a.citizenid == params[2] and a.status == 'active' and not a.expired then
+                    total = total + 1
+                    if a.category == params[1] then here = here + 1 end
+                end
+            end
+            return true, { total = total, here = here }
+        end
+        if has('SELECT a.citizenid, a.title, c.phone FROM som_phone_adverts a') then
+            local a = S.adverts[params[1]]
+            if not a or a.status ~= 'active' or a.expired then return true, nil end
+            return true, { citizenid = a.citizenid, title = a.title, phone = S.people[a.citizenid] and S.people[a.citizenid].phone }
+        end
+    elseif kind == 'scalar' then
+        if has('SELECT 1 FROM som_phone_likes WHERE post_id = ? AND citizenid = ?') then
+            return true, S.likes[params[1] .. '|' .. params[2]] and 1 or nil
+        end
+        if has('SELECT id FROM som_phone_posts WHERE id = ? AND removed = 0 AND reply_to IS NULL') then
+            local x = post(params[1])
+            return true, x and not x.removed and not x.reply_to and x.id or nil
+        end
+        if has('SELECT id FROM som_phone_posts WHERE id = ? AND removed = 0') then
+            local x = post(params[1])
+            return true, x and not x.removed and x.id or nil
+        end
+        if has('SELECT 1 FROM som_phone_handles WHERE citizenid = ? AND changed_at') then
+            local h = S.handles[params[1]]
+            return true, h and h.changed and 1 or nil
+        end
+        if has('SELECT phone FROM som_characters WHERE citizenid = ?') then
+            return true, S.people[params[1]] and S.people[params[1]].phone
+        end
+        if has('SELECT listed FROM som_phone_pages_optin WHERE citizenid = ?') then
+            return true, S.optin[params[1]]
+        end
+    elseif kind == 'insert' then
+        if has('INSERT INTO som_phone_handles (citizenid, handle)') then
+            for _, h in pairs(S.handles) do if h.handle == params[2] then error('Duplicate entry') end end
+            S.handles[params[1]] = { handle = params[2] }
+            return true, 1
+        end
+        if has('INSERT INTO som_phone_posts') then
+            local id = #S.posts + 1
+            S.posts[id] = { id = id, citizenid = params[1], business = params[2], body = params[3], image = params[4],
+                reply_to = params[5], likes = 0, removed = false, ts = now() }
+            return true, id
+        end
+        if has('INSERT INTO som_phone_adverts') then
+            local id = #S.adverts + 1
+            S.adverts[id] = { id = id, citizenid = params[1], category = params[2], title = params[3], body = params[4],
+                price = params[5], show_number = params[6], business = params[7], status = 'active', hours = params[8] }
+            return true, id
+        end
+        if has('INSERT INTO som_phone_pages_optin') then
+            S.optin[params[1]] = params[2]
+            return true, 1
+        end
+    elseif kind == 'update' then
+        if has('INSERT IGNORE INTO som_phone_likes') then
+            local key = params[1] .. '|' .. params[2]
+            if S.likes[key] then return true, 0 end
+            S.likes[key] = true
+            return true, 1
+        end
+        if has('UPDATE som_phone_posts SET likes = likes + 1') then post(params[1]).likes = post(params[1]).likes + 1; return true, 1 end
+        if has('UPDATE som_phone_posts SET likes = GREATEST(likes - 1, 0)') then post(params[1]).likes = math.max(0, post(params[1]).likes - 1); return true, 1 end
+        if has('DELETE FROM som_phone_likes WHERE post_id = ? AND citizenid = ?') then
+            local key = params[1] .. '|' .. params[2]
+            local had = S.likes[key]
+            S.likes[key] = nil
+            return true, had and 1 or 0
+        end
+        if has('UPDATE som_phone_posts SET removed = 1 WHERE id = ? AND citizenid = ? AND removed = 0') then
+            local x = post(params[1])
+            if x and x.citizenid == params[2] and not x.removed then x.removed = true; return true, 1 end
+            return true, 0
+        end
+        if has('UPDATE som_phone_posts SET removed = 1 WHERE id = ? AND removed = 0') then
+            local x = post(params[1])
+            if x and not x.removed then x.removed = true; return true, 1 end
+            return true, 0
+        end
+        if has('INSERT IGNORE INTO som_phone_reports') then
+            local key = params[1] .. '|' .. params[2]
+            if S.reports[key] then return true, 0 end
+            S.reports[key] = params[3]
+            return true, 1
+        end
+        if has('UPDATE som_phone_handles SET handle = ?, changed_at = NOW()') then
+            for cid, h in pairs(S.handles) do if h.handle == params[1] and cid ~= params[2] then error('Duplicate entry') end end
+            S.handles[params[2]].handle, S.handles[params[2]].changed = params[1], true
+            return true, 1
+        end
+        if has('UPDATE som_phone_handles SET colour = ? WHERE citizenid = ?') then
+            S.handles[params[2]].colour = params[1]
+            return true, 1
+        end
+        if has("UPDATE som_phone_adverts SET status = 'removed' WHERE id = ? AND citizenid = ?") then
+            local a = S.adverts[params[1]]
+            if a and a.citizenid == params[2] and a.status == 'active' then a.status = 'removed'; return true, 1 end
+            return true, 0
+        end
+        if has("UPDATE som_phone_adverts SET status = 'removed' WHERE id = ? AND status = 'active'") then
+            local a = S.adverts[params[1]]
+            if a and a.status == 'active' then a.status = 'removed'; return true, 1 end
+            return true, 0
+        end
+    elseif kind == 'query' then
+        if has('FROM som_phone_posts p JOIN som_phone_handles h') then
+            local out, threadOf = {}, has('p.id = ? OR p.reply_to = ?') and params[1]
+            for i = #S.posts, 1, -1 do
+                local x = S.posts[i]
+                local pick = not x.removed and ((threadOf and (x.id == threadOf or x.reply_to == threadOf)) or (not threadOf and not x.reply_to))
+                if pick then
+                    local h = S.handles[x.citizenid]
+                    local replies = 0
+                    for _, r in ipairs(S.posts) do if r.reply_to == x.id and not r.removed then replies = replies + 1 end end
+                    out[#out + 1] = { id = x.id, citizenid = x.citizenid, handle = h.handle, colour = h.colour, business = x.business,
+                        body = x.body, image = x.image, likes = x.likes, reply_to = x.reply_to, created_at = 'now', replies = replies }
+                end
+            end
+            if threadOf then table.sort(out, function(a, b) return a.id < b.id end) end
+            return true, out
+        end
+        if has('FROM som_phone_adverts a JOIN som_phone_handles h') then
+            local out = {}
+            for i = #S.adverts, 1, -1 do
+                local a = S.adverts[i]
+                if a.status == 'active' and not a.expired and (params[1] == nil or a.category == params[1]) then
+                    out[#out + 1] = { id = a.id, citizenid = a.citizenid, category = a.category, title = a.title, body = a.body, price = a.price,
+                        show_number = a.show_number, business = a.business, created_at = 'now', handle = S.handles[a.citizenid].handle }
+                end
+            end
+            return true, out
+        end
+        if has('FROM som_phone_pages_optin o') then
+            local needle = params[1]:gsub('\\', ''):gsub('^%%', ''):gsub('%%$', ''):lower()
+            local out = {}
+            for cid, listed in pairs(S.optin) do
+                local c = S.people[cid]
+                if listed == 1 and c and (c.firstname .. ' ' .. c.lastname):lower():find(needle, 1, true) then
+                    out[#out + 1] = { firstname = c.firstname, lastname = c.lastname, phone = c.phone }
+                end
+            end
+            return true, out
+        end
+    end
+    return false
+end
+
 local function fail(query)
     error('tests/mocks/mysql.lua: unhandled query: ' .. query, 3)
 end
 
 function M.single(query, params)
     params = params or {}
+    do local handled, value = social('single', query, params); if handled then return value end end
     if query:find('FROM som_properties WHERE slug = ?', 1, true) then
         for _, p in ipairs(M.db.properties) do
             if p.slug == params[1] then return copy(p) end
@@ -188,6 +365,7 @@ end
 
 function M.scalar(query, params)
     params = params or {}
+    do local handled, value = social('scalar', query, params); if handled then return value end end
     if query:find('SELECT role FROM som_property_owners WHERE property_id = ? AND citizenid = ?', 1, true) then
         local o = findOwner(params[1], params[2])
         return o and o.role or nil
@@ -283,6 +461,7 @@ end
 
 function M.update(query, params)
     params = params or {}
+    do local handled, value = social('update', query, params); if handled then return value end end
     if query:find('SET for_sale = 0 WHERE id = ? AND for_sale = 1', 1, true) then
         local p = findProperty(tonumber(params[1]))
         if p and tonumber(p.for_sale) == 1 then
@@ -619,6 +798,7 @@ end
 
 function M.insert(query, params)
     params = params or {}
+    do local handled, value = social('insert', query, params); if handled then return value end end
     if query:find('INSERT INTO som_property_owners', 1, true) then
         local propertyId, citizenid, role, grantedBy = params[1], params[2], params[3], params[4]
         local existing = findOwner(propertyId, citizenid)
@@ -773,6 +953,7 @@ end
 
 function M.query(query, params)
     params = params or {}
+    do local handled, value = social('query', query, params); if handled then return value end end
     -- jail.lua's sweep: every serving sentence, with elapsed.
     if query:find("FROM som_jail_sentences WHERE status = 'serving'", 1, true) then
         local out = {}

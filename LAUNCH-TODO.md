@@ -32,6 +32,7 @@ Import `setup.sql` on a fresh database. A database created from an older version
 - [ ] `som_jail_webhook`, `som_court_webhook`, `som_evidence_webhook` (see `DISCORD_WEBHOOKS.md`).
 - [ ] The Discord webhooks that were once committed in plaintext have been regenerated in Discord.
 
+- [ ] `som_phone_webhook` (optional): a Discord webhook that receives new Chirp reports.
 - [ ] `som_phone_pepper` set to a long random string (passcodes are hashed with it; changing it later resets every passcode).
 
 ## Phone
@@ -43,6 +44,13 @@ Import `setup.sql` on a fresh database. A database created from an older version
 
 - [ ] pma-voice hardening: its `pma-voice:setPlayerCall` net event lets a client join any call channel. Calls use random channels so this is hard to exploit, not closed. Decide whether to patch or replace pma-voice before launch.
 - [ ] Not verified live: the ring sound and loop, the Y and N key bindings, the call hold animation, a call with two real clients through pma-voice, `voice_enableCalls` is on.
+
+- [ ] Chirp and Pages: `setup.sql` 4b has six more tables (`som_phone_handles`, `_posts`, `_likes`, `_reports`, `_adverts`, `_pages_optin`).
+- [ ] `Config.Social.imageHosts` is empty, so posts cannot carry images. Pick one host (the same one the camera needs) and list it.
+- [ ] `Config.Social.reserved` is the handle blocklist (departments, staff words). Add the server's real department and business names.
+- [ ] Staff who moderate have the `som.mod` permission; `/removepost` is untested in game.
+- [ ] Nobody has chosen a Chirp moderation routine yet: reports only land in `som_phone_reports` and the optional webhook.
+- [ ] Not verified live: Chirp and Pages in a game client, the supporter handle and colour perks with a real entitlement.
 
 ## Jobs to whitelist and assign
 

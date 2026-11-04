@@ -23,6 +23,42 @@ Config.Messages = { maxLength = 280, threadLimit = 40, historyLimit = 60 }
 
 Config.Contacts = { max = 100, nameLength = 32 }
 
+-- The public feed ("Chirp") and Pages. Everything here is re-checked on the server.
+Config.Social = {
+    postLength = 280,
+    postGapSeconds = 20,       -- between two posts by one character
+    postsPerDay = 40,
+    feedSize = 30,
+    replySize = 40,
+    handleChangeHours = 24,
+
+    -- Images are shown by URL, so a viewer's client fetches them from that
+    -- host. Only hosts listed here are accepted; empty means no images. Set
+    -- this to the image host the server chose (see LAUNCH-TODO.md).
+    imageHosts = {},
+
+    -- A custom handle cannot be one of these or start with one, so nobody can
+    -- pose as a department or the staff.
+    reserved = { 'police', 'lspd', 'bcso', 'sasp', 'sheriff', 'ems', 'doj', 'court', 'judge', 'gov', 'mayor',
+        'admin', 'staff', 'mod', 'moderator', 'support', 'official', 'som', 'news', 'dispatch', 'system' },
+
+    -- A supporter with the twitterColour perk may pick from the first N of these
+    -- (N is the perk's value). Purely a text colour.
+    colours = { '#ff6b9d', '#4a9eff', '#2ecc71', '#f0932b', '#e566e8', '#f1c40f' },
+}
+
+Config.Pages = {
+    categories = { 'for_sale', 'wanted', 'services', 'business', 'property', 'vehicles', 'other' },
+    expireHours = 48,
+    maxActive = 3,
+    titleLength = 48,
+    bodyLength = 280,
+    priceLength = 24,
+    searchMin = 3,
+    searchLimit = 10,
+    feedSize = 40,
+}
+
 -- A call is a server record. The server picks the voice channel, and the
 -- number is large and random so a channel cannot be guessed: pma-voice
 -- registers its own net event that lets any client join any channel number,

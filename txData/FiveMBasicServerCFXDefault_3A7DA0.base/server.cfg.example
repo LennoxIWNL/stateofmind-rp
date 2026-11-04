@@ -41,6 +41,8 @@ set lac_webhook_connections "YOUR_DISCORD_WEBHOOK_URL"
 # som-phone: a secret mixed into passcode hashes. Never put this in a file in
 # the repo. Changing it invalidates every existing passcode.
 set som_phone_pepper "CHANGE_ME_TO_A_LONG_RANDOM_STRING"
+# som-phone: Chirp reports (optional).
+set som_phone_webhook "YOUR_DISCORD_WEBHOOK_URL"
 
 # som-launder: bills minted and washed.
 set som_launder_webhook "YOUR_DISCORD_WEBHOOK_URL"
