@@ -38,6 +38,10 @@ local function resetMocks()
     Mocks.players = {}
     Mocks.payWithFails = false
     Mocks.businessSpendFails = false
+    Mocks.admins = {}
+    Mocks.downed = {}
+    Mocks.inv = {}
+    Mocks.invFull = {}
     FakePeds = {}
 end
 
@@ -201,6 +205,7 @@ end
 ----------------------------------------------------------------------
 local function jailScene(months)
     local env = loadJail()
+    env.Config.BookCooldown = 0
     Mocks.players[1] = { citizenid = 'OFFICER', job = { name = 'police', onduty = true } }
     Mocks.players[2] = { citizenid = 'INMATE', job = { name = 'unemployed' } }
     placePed(1, 0.0, 0.0, 0.0)
@@ -340,6 +345,105 @@ do
     mysql.fakeNow = nil
     check(book(1, { target = 2, months = 3 }).success == true, 'book: re-arrest after bail should succeed')
     check(mysql.db.jailBail[1].status == 'forfeited', 'book: re-arrest inside the window forfeits the posted bail')
+end
+
+do
+    local env, book = jailScene(3)
+    local s = mysql.db.jailSentences[1]
+    local status = RegisteredCallbacks['som-jail:server:myStatus']
+    local yard = env.Config.Cell.yard
+
+    placePed(2, yard.x, yard.y, yard.z)
+    check(status(2).serving == true and status(2).spawn == nil, 'relog: an inmate inside the yard is not moved')
+    placePed(2, 0.0, 0.0, 0.0)
+    check(status(2).serving == true and status(2).spawn ~= nil, 'relog: an inmate outside the yard is sent back to a cell')
+
+    Mocks.downed[2] = true
+    env.Jail.Sweep()
+    check(s.status == 'serving' and Mocks.calls.dispatchAlert == 0,
+        'sweep: a downed inmate outside the yard is not flagged absconded')
+    Mocks.downed[2] = nil
+
+    local events = {}
+    local realTrigger = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, src) events[#events + 1] = name end
+    env.Jail.ReturnToYard(2)
+    check(events[#events] == 'som-jail:client:booked', 'revive: an inmate respawned outside the yard is returned to a cell')
+    placePed(2, yard.x, yard.y, yard.z)
+    events = {}
+    env.Jail.ReturnToYard(2)
+    check(#events == 0, 'revive: an inmate already in the yard is not moved')
+    _G.TriggerClientEvent = realTrigger
+end
+
+do
+    local env, book = jailScene(3)
+    local s = mysql.db.jailSentences[1]
+    local status = RegisteredCallbacks['som-jail:server:myStatus']
+    local yard = env.Config.Cell.yard
+    placePed(2, yard.x, yard.y, yard.z)
+
+    local player = Mocks.players[2]
+    Mocks.players[2] = nil
+    mysql.fakeNow = s.booked_at + s.total_seconds
+    env.Jail.Sweep()
+    check(s.status == 'released' and s.release_pending == 1, 'offline release: the sentence ends and is marked pending delivery')
+
+    Mocks.players[2] = player
+    check(status(2).freedom ~= nil, 'offline release: the next login is sent to the gate')
+    check(status(2).freedom == nil, 'offline release: the gate teleport is delivered only once')
+end
+
+do
+    local env, book = jailScene()
+    Mocks.inv[2] = {
+        { name = 'money', count = 500, slot = 1 },
+        { name = 'phone', count = 1, slot = 2 },
+    }
+    book(1, { target = 2, months = 3 })
+    local stash = Mocks.inv['jail_INMATE']
+    local function has(inv, name)
+        for _, item in pairs(inv or {}) do if item.name == name then return true end end
+        return false
+    end
+    check(has(stash, 'money') and not has(Mocks.inv[2], 'money'), 'property: cash is held in the jail stash on booking')
+    check(has(Mocks.inv[2], 'phone') and not has(stash, 'phone'), 'property: kept items stay with the inmate')
+
+    env.Jail.Release(mysql.db.jailSentences[1], 'released', nil)
+    check(has(Mocks.inv[2], 'money') and not has(Mocks.inv['jail_INMATE'], 'money'),
+        'property: held items are returned when the inmate is released while online')
+end
+
+do
+    local env, book = jailScene()
+    Mocks.inv[2] = { { name = 'money', count = 500, slot = 1 } }
+    Mocks.invFull['jail_INMATE'] = true
+    check(book(1, { target = 2, months = 3 }).success == true, 'property: a full stash does not block the booking')
+    check(Mocks.inv[2][1] ~= nil, 'property: an item that cannot be held stays with the inmate')
+end
+
+do
+    local env, book = jailScene(3)
+    local s = mysql.db.jailSentences[1]
+    local ok, err = env.Jail.Unjail(1, 2)
+    check(ok == false and err == 'no permission' and s.status == 'serving', 'unjail: a non admin is refused')
+    Mocks.admins[1] = true
+    check(env.Jail.Unjail(1, 2) == true and s.status == 'released' and s.released_by == 'OFFICER',
+        'unjail: an admin releases a serving inmate')
+    ok, err = env.Jail.Unjail(0, 2)
+    check(ok == false and err == 'they are not serving', 'unjail: console cannot release someone who is not serving')
+    check(select(2, env.Jail.Unjail(0, 99)) == 'they are not here', 'unjail: an unknown target is refused')
+end
+
+do
+    local env, book = jailScene()
+    env.Config.BookCooldown = 60
+    Mocks.players[3] = { citizenid = 'INMATE2', job = { name = 'unemployed' } }
+    placePed(3, 1.0, 0.0, 0.0)
+    setCuffed(3, true)
+    check(book(1, { target = 2, months = 3 }).success == true, 'cooldown: the first booking goes through')
+    check(book(1, { target = 3, months = 3 }).success == false, 'cooldown: a second booking inside the window is refused')
+    check(#mysql.db.jailSentences == 1, 'cooldown: a refused booking writes nothing')
 end
 
 ----------------------------------------------------------------------

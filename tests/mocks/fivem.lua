@@ -27,6 +27,8 @@ _G.AddEventHandler = function(name, fn) end
 _G.RegisterNetEvent = function(name) end
 _G.TriggerEvent = function(name, ...) end
 _G.TriggerClientEvent = function(name, source, ...) end
+_G.RegisterCommand = function(name, fn, restricted) end
+_G.PerformHttpRequest = function() end
 _G.GetConvar = function(name, default) return default end
 
 -- Player positions, settable per test via placePed() in run.lua.

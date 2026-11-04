@@ -163,6 +163,19 @@ function M.update(query, params)
         s.released_by = params[2]
         return 1
     end
+    if query:find('SET release_pending = 1 WHERE id = ?', 1, true) then
+        local s = findSentence(params[1])
+        if not s then return 0 end
+        s.release_pending = 1
+        return 1
+    end
+    if query:find('SET release_pending = 0 WHERE citizenid = ? AND release_pending = 1', 1, true) then
+        local n = 0
+        for _, s in ipairs(M.db.jailSentences) do
+            if s.citizenid == params[1] and s.release_pending == 1 then s.release_pending = 0; n = n + 1 end
+        end
+        return n
+    end
     if query:find("SET status = 'serving', released_at = NULL", 1, true) then
         local s = findSentence(params[1])
         if not s or s.status ~= 'bailed' then return 0 end
@@ -219,7 +232,7 @@ function M.insert(query, params)
         M.db.jailSentences[#M.db.jailSentences + 1] = {
             id = id, citizenid = params[1], officer_cid = params[2], conviction_id = params[3],
             charges = params[4], total_seconds = params[5], status = 'serving',
-            booked_at = now(), released_at = nil, released_by = nil,
+            booked_at = now(), released_at = nil, released_by = nil, release_pending = 0,
         }
         return id
     end

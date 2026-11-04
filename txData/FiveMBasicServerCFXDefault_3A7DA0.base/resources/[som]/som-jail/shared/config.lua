@@ -4,6 +4,7 @@
 Config = {}
 
 Config.Job = 'police' -- who may book someone
+Config.BookCooldown = 5 -- seconds between bookings by one officer
 Config.Business = 'lspd' -- receives bail, as a fine is paid to the department
 
 Config.Cell = {
@@ -26,6 +27,11 @@ Config.Cell = {
     -- sentence absconded. Not a hard lock (fighting the engine is out of
     -- scope); a real consequence instead of one.
     yardRadius = 120.0,
+
+    -- Held in a per-citizen stash while serving and handed back on release.
+    keepItems = { phone = true, id_card = true, driver_license = true, identification = true },
+    stashSlots = 100,
+    stashWeight = 1000000,
 
     maxMonths = 24,
     -- Tunable game/real-time compression, so "a month" has a concrete,

@@ -33,7 +33,9 @@ server_scripts {
 dependencies {
     'ox_lib',
     'oxmysql',
+    'ox_inventory',
     'som-core',
+    'som-medical',
     'som-interact',
     'som-dispatch',
     -- The input/alert dialog shim is loaded from it at start time, so its

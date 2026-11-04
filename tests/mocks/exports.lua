@@ -5,6 +5,10 @@
 local Mocks = {}
 
 Mocks.calls = { payWith = 0, addMoney = 0, businessSpend = 0, dispatchAlert = 0, businessTransact = 0 }
+Mocks.admins = {}
+Mocks.downed = {}
+Mocks.inv = {}              -- inventory id -> list of { name, count, metadata, slot }
+Mocks.invFull = {}          -- inventory id -> true when AddItem must fail
 Mocks.players = {}          -- players[source] = { citizenid = ..., job = ... }
 Mocks.payWithFails = false
 Mocks.businessSpendFails = false
@@ -37,6 +41,9 @@ function core:businessTransact(name, amount, reason)
     Mocks.lastTransact = { name = name, amount = amount }
     return true
 end
+function core:hasPermission(source, ace)
+    return Mocks.admins[source] == true
+end
 function core:paymentOptions(source) return {} end
 function core:getMetadata(source, key)
     local player = Mocks.players[source]
@@ -67,7 +74,30 @@ function dispatch:alert(source, alertType, extra)
     return 1
 end
 
+local medical = {}
+function medical:isDowned(ref) return Mocks.downed[ref] == true end
+
+local ox = {}
+function ox:RegisterStash(id) Mocks.inv[id] = Mocks.inv[id] or {} end
+function ox:GetInventoryItems(inv) return Mocks.inv[inv] end
+function ox:AddItem(inv, name, count, metadata)
+    if Mocks.invFull[inv] then return false end
+    Mocks.inv[inv] = Mocks.inv[inv] or {}
+    Mocks.slot = (Mocks.slot or 0) + 1
+    Mocks.inv[inv][Mocks.slot] = { name = name, count = count, metadata = metadata, slot = Mocks.slot }
+    return true
+end
+function ox:RemoveItem(inv, name, count, metadata, slot)
+    local list = Mocks.inv[inv] or {}
+    for k, item in pairs(list) do
+        if item.name == name and (slot == nil or item.slot == slot) then list[k] = nil; return true end
+    end
+    return false
+end
+
 local registry = {
+    ['som-medical'] = medical,
+    ['ox_inventory'] = ox,
     ['som-core'] = core,
     ['som-economy'] = economy,
     ['som-phone'] = phone,

@@ -34,6 +34,8 @@ end)
 RegisterNetEvent('som:client:playerLoaded', function()
     local res = lib.callback.await('som-jail:server:myStatus', false)
     serving = res and res.serving == true
+    if res and res.spawn then teleportTo(res.spawn) end
+    if res and res.freedom then teleportTo(res.freedom) end
 end)
 
 local function requestBail()

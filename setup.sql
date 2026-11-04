@@ -1122,6 +1122,9 @@ CREATE TABLE IF NOT EXISTS `som_jail_sentences` (
   `booked_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `released_at`    TIMESTAMP NULL DEFAULT NULL,
   `released_by`    VARCHAR(16) DEFAULT NULL,
+  -- Set when a sentence ends while the citizen is offline, so the next login
+  -- sends them to the gate with their property instead of back into a cell.
+  `release_pending` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   KEY `idx_citizen_status` (`citizenid`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
