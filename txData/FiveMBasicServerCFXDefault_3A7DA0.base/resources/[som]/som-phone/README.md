@@ -146,6 +146,20 @@ READMEs of sky_phone, v-phone, peak-phone, sd-phone and z-phone for features. Th
 (peak), handles and a report queue (sky), a feed that is one table for people and businesses.
 Each weakness above is a test here.
 
+## Garage, Services and Notes
+
+`server/city.lua`. **Garage** lists the character's own vehicles from `som_vehicles` (model, plate,
+where it is) and does nothing else; locating and recalling a car wait for a client side waypoint.
+**Services** shows how many people are on duty for the services in `Config.City.services` and
+raises a 911 call: the server types it (`emergencyCall`), names the caller and number, and leaves the
+position to dispatch, which reads the ped. Police and ambulance counts are never listed on purpose,
+because staffing is what a heist crew wants to read. The phone keeps its own 30 second gap per
+character because dispatch's cooldown lives behind its net event. **Notes** are private to the
+character (30 each, 40 character titles, 2000 character bodies).
+
+Camera and Gallery are not built: they need an image host and a `screenshot-basic` upload flow that
+nobody has chosen yet (`LAUNCH-TODO.md`).
+
 ## Bank
 
 **Full history, own account only.** The citizenid comes from `source`, never
@@ -191,7 +205,7 @@ against `som-core` entitlements server side. The selected accent overrides
 
 ## Known gaps
 
-- **No camera or gallery.** Deferred; `screenshot-basic` is already kept.
+- **No camera or gallery.** Deferred until an image host is chosen; `screenshot-basic` is already kept.
 - **Custom phone numbers** (an Insider perk) are not implemented;
   `som_characters.phone` is still auto-generated.
 - No replacement shop, so `Config.Replacement` is unused and a lost phone

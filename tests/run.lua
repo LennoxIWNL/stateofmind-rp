@@ -43,6 +43,8 @@ local function resetDb()
     mysql.db.messages = {}
     mysql.db.phoneCalls = {}
     mysql.db.phoneAudit = {}
+    mysql.db.notes = {}
+    mysql.db.vehicles = {}
     mysql.db.social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} }
     mysql.db.bills = {}
     mysql.db.orders = {}
@@ -62,7 +64,7 @@ local function resetMocks()
     Mocks.fineFails = false
     Mocks.exported = {}
     Mocks.perks = {}
-    Mocks.jobs = { police = { business = 'lspd' }, mechanic = { business = 'bennys' } }
+    Mocks.jobs = { police = { business = 'lspd' }, mechanic = { business = 'bennys' }, taxi = {}, ambulance = { business = 'ems' } }
     Mocks.businesses = { lspd = { label = 'LSPD' }, bennys = { label = "Benny's" } }
     Mocks.commands = {}
     Mocks.voice = {}
@@ -171,6 +173,7 @@ local function loadPhone()
         'server/apps.lua',
         'server/comms.lua',
         'server/social.lua',
+        'server/city.lua',
         'server/main.lua',
     })
     return phoneEnv
@@ -2304,6 +2307,69 @@ do
     remove(2, { kind = 'nope', id = 1 })
     check(said[#said] == 'Use post or advert', 'moderation: an unknown kind is refused')
     _G.TriggerClientEvent = real
+end
+
+
+----------------------------------------------------------------------
+-- som-phone: Garage, Services, Notes
+----------------------------------------------------------------------
+do
+    socialScene()
+    mysql.db.vehicles = {
+        { citizenid = 'P1', plate = 'AAA111', model = 'sultan', garage = 'legion', state = 'garaged' },
+        { citizenid = 'P2', plate = 'BBB222', model = 'felon', garage = 'impound', state = 'impounded' },
+    }
+    local list = act(1, 'garage', 'list').vehicles
+    check(#list == 1 and list[1].plate == 'AAA111' and list[1].state == 'garaged', 'garage: the list is the caller\'s own vehicles')
+    check(#act(2, 'garage', 'list').vehicles == 1 and act(2, 'garage', 'list').vehicles[1].plate == 'BBB222', 'garage: nobody sees anyone else\'s')
+    check(act(1, 'garage', 'move', { plate = 'AAA111' }).success == false, 'garage: it is read only')
+end
+
+do
+    local env = socialScene()
+    Mocks.players[3].job = { name = 'mechanic', onduty = true }
+    Mocks.players[1].job = { name = 'mechanic', onduty = false }
+    local rows = act(1, 'services', 'list').services
+    local mech
+    for _, r in ipairs(rows) do if r.job == 'mechanic' then mech = r end end
+    check(mech and mech.onDuty == 1, 'services: a counted service shows who is on duty')
+    local leaked = false
+    for _, r in ipairs(rows) do if r.job == 'police' or r.job == 'ambulance' then leaked = true end end
+    check(not leaked, 'services: police and ambulance staffing is never listed')
+    check(#rows == 2, 'services: a service whose job does not exist is skipped')
+
+    check(act(1, 'services', 'emergency', { message = '' }).success == false and act(1, 'services', 'emergency', { message = 'x' }).success == false, 'services: a call needs a message')
+    check(act(1, 'services', 'emergency', { message = 'shots <b>fired</b> at legion' }).success == true, 'services: a 911 call is passed to dispatch')
+    check(Mocks.lastAlertType == 'emergencyCall' and Mocks.lastAlertExtra.message == '911: shots bfired/b at legion', 'services: the message is cleaned and typed by the server')
+    check(Mocks.lastAlertExtra.information == 'Caller: Ann One, 555-0001' and Mocks.lastAlertExtra.coords == nil, 'services: the caller is named and the position is left to dispatch')
+    check(act(1, 'services', 'emergency', { message = 'again' }).error == 'you have already called that in', 'services: a second call inside the gap is refused')
+    check(act(2, 'services', 'emergency', { message = string.rep('y', 400) }).success == true and #Mocks.lastAlertExtra.message == 5 + 140, 'services: the message is cut to the limit and callers are tracked separately')
+    Mocks.alertFails = true
+    check(act(3, 'services', 'emergency', { message = 'help' }).success == false, 'services: a refused alert is reported')
+    Mocks.alertFails = false
+    check(act(3, 'services', 'emergency', { message = 'help' }).success == true, 'services: a failed call does not start the cooldown')
+end
+
+do
+    local env = socialScene()
+    check(act(1, 'notes', 'save', { title = '  ', body = 'x' }).success == false, 'notes: a title is required')
+    local id = act(1, 'notes', 'save', { title = 'Plan <b>1</b>', body = 'line one\nline <i>two</i>' }).id
+    check(mysql.db.notes[id].title == 'Plan b1/b' and mysql.db.notes[id].body == 'line one\nline itwo/i', 'notes: markup is stripped and line breaks survive')
+    check(act(1, 'notes', 'save', { title = 'Empty' }).success == true, 'notes: a note may have no body')
+    local list = act(1, 'notes', 'list').notes
+    check(#list == 2 and list[1].title == 'Empty', 'notes: the list is newest first')
+    check(#act(2, 'notes', 'list').notes == 0, 'notes: they are private')
+    check(act(2, 'notes', 'save', { id = id, title = 'hijack' }).success == false and mysql.db.notes[id].title == 'Plan b1/b', 'notes: nobody else can edit one')
+    check(act(1, 'notes', 'save', { id = id, title = 'Plan 2', body = 'updated' }).success == true and mysql.db.notes[id].body == 'updated', 'notes: the owner can edit')
+    check(act(1, 'notes', 'save', { id = 999, title = 'x' }).success == false, 'notes: editing a missing note is refused')
+    check(act(2, 'notes', 'remove', { id = id }).success == false and #act(1, 'notes', 'list').notes == 2, 'notes: nobody else can delete one')
+    check(act(1, 'notes', 'remove', { id = id }).success == true and #act(1, 'notes', 'list').notes == 1, 'notes: the owner can delete')
+    env.Config.City.notes.max = 1
+    check(act(1, 'notes', 'save', { title = 'Third' }).error == 'you have too many notes', 'notes: the limit holds')
+    env.Config.City.notes.max = 30
+    act(1, 'notes', 'save', { title = string.rep('t', 90), body = string.rep('b', 3000) })
+    local last = mysql.db.notes[#mysql.db.notes]
+    check(#last.title == 40 and #last.body == 2000, 'notes: title and body are cut to the limits')
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))

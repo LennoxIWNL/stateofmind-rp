@@ -59,6 +59,23 @@ Config.Pages = {
     feedSize = 40,
 }
 
+-- Garage, Services and Notes.
+Config.City = {
+    -- Counts are only shown where knowing them gives no one an edge. Police and
+    -- ambulance staffing is the thing a heist crew would love to read.
+    services = {
+        { job = 'mechanic', label = 'Mechanic', showCount = true },
+        { job = 'taxi', label = 'Taxi', showCount = true },
+        { job = 'realtor', label = 'Real estate', showCount = true },
+        { job = 'cardealer', label = 'Car dealer', showCount = true },
+    },
+    emergencyGapSeconds = 30,
+    emergencyLength = 140,
+
+    notes = { max = 30, titleLength = 40, bodyLength = 2000 },
+    vehicleLimit = 60,
+}
+
 -- A call is a server record. The server picks the voice channel, and the
 -- number is large and random so a channel cannot be guessed: pma-voice
 -- registers its own net event that lets any client join any channel number,

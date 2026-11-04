@@ -621,6 +621,16 @@ CREATE TABLE IF NOT EXISTS `som_phone_pages_optin` (
   PRIMARY KEY (`citizenid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS `som_phone_notes` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `title`      VARCHAR(40) NOT NULL,
+  `body`       VARCHAR(2000) NOT NULL DEFAULT '',
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_owner` (`citizenid`, `updated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Theme and wallpaper are supporter perks, so what is stored here is validated
 -- server side against the player's entitlements rather than trusted.
 CREATE TABLE IF NOT EXISTS `som_phone_settings` (
