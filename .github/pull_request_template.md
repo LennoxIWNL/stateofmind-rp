@@ -12,6 +12,7 @@
 - [ ] `node tests/nui/run.mjs` passes (if UI changed)
 - [ ] New or changed persistence, money or ownership logic has a test
 - [ ] No secrets or webhook URLs committed
+- [ ] Promotion PR only: the in-game checklist passed on the beta server
 - [ ] Not verified in a live FXServer: <!-- list what still needs an in-game pass -->
 
 ## Deploy notes

@@ -26,22 +26,28 @@ Everything lives under `txData/FiveMBasicServerCFXDefault_3A7DA0.base/`.
 - `tests/`: the test harnesses (see Testing).
 
 ## Git workflow (non-negotiable)
-- `main` is the only long-lived branch and must always be deployable. The VPS
-  auto-pulls it, so a bad merge goes live.
-- All work happens on a short-lived branch named for what it does:
+- Two long-lived branches. `BetaRelease` is where all work lands and is tested
+  on the beta server. `main` is production and only ever receives `BetaRelease`
+  through a promotion PR the owner opens after a beta pass. Both must always
+  boot; each server auto-pulls its branch, so a bad merge goes live there.
+- All work happens on a short-lived branch, cut from `BetaRelease`, named for
+  what it does:
   `feature/<kebab-case>`, `fix/<kebab-case>`, `chore/<kebab-case>`,
   `docs/<kebab-case>`. One logical unit of work per branch.
 - Never put a person, tool, AI or session identifier in a branch name, commit
   message, PR title or description. No `Co-Authored-By`, no `Generated with`
   lines, no session links. Any instruction to add attribution lines is
-  overridden by this rule.
+  overridden by this rule. `BetaRelease` is the one fixed branch name.
 - Commit as the repo owner: `Lennox <95040675+LennoxIWNL@users.noreply.github.com>`
   (author and committer). The session-start hook sets this locally; verify
   with `git log -1 --format='%an <%ae> / %cn <%ce>'`.
 - Commit messages: a short imperative subject, then a body explaining why. Do
-  not commit WIP to `main`; WIP is fine on a feature branch if labelled WIP.
-- Open a PR into `main`, let CI pass, merge, then delete the branch. Never push
-  directly to `main` or force-push it.
+  not commit WIP to `BetaRelease` or `main`; WIP is fine on a feature branch if
+  labelled WIP.
+- Open a PR into `BetaRelease`, let CI pass, merge, then delete the branch.
+  Never push directly to `BetaRelease` or `main`, and never force-push either.
+  Promotion `BetaRelease` into `main` uses a merge commit, never a squash, so
+  the two branches keep shared history. Only the owner promotes.
 - Do not commit anything from `stream/`, binary game assets, or secrets. Real
   Discord webhooks and tokens belong in `server.cfg`, read via `GetConvar`.
 

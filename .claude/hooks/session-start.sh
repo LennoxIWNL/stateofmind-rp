@@ -15,10 +15,10 @@ fi
 
 branch="$(git branch --show-current 2>/dev/null)"
 echo "Repo rules are in CLAUDE.md and CONTRIBUTING.md."
-echo "Branch: ${branch:-detached}. Work on feature/|fix/|chore/|docs/<kebab-case> branched from main; never commit to main directly."
+echo "Branch: ${branch:-detached}. Work on feature/|fix/|chore/|docs/<kebab-case> branched from BetaRelease; never commit to BetaRelease or main directly."
 echo "Commits are authored as Lennox with no co-author, tool, AI or session lines."
 case "$branch" in
-  main) echo "WARNING: you are on main. Create a branch before editing." ;;
+  main|BetaRelease) echo "WARNING: you are on $branch. Create a branch before editing." ;;
   claude/*) echo "WARNING: branch name has a tool identifier; rename it to a descriptive feature/ or fix/ name." ;;
 esac
 exit 0
