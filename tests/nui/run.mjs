@@ -277,7 +277,7 @@ async function main() {
     answers['jobs:view'] = { success: false, error: 'locked' };
     await phone.locator('.back').click();
     await phone.locator('.app', { hasText: 'Jobs' }).click();
-    await phone.waitForSelector('.empty');
+    await phone.waitForFunction(() => document.querySelector('.empty')?.textContent === 'locked', null, { timeout: 2000 }).catch(() => {});
     check((await phone.locator('.empty').textContent()) === 'locked', 'host: a refused view shows the reason');
 
     await send({ action: 'banner', title: 'Bank', text: 'Purchase  -$20', icon: 'bank' });
