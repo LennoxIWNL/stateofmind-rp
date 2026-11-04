@@ -517,6 +517,45 @@ CREATE TABLE IF NOT EXISTS `som_phone_audit` (
   KEY `idx_citizen` (`citizenid`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS `som_phone_contacts` (
+  `citizenid` VARCHAR(16) NOT NULL,
+  `number`    VARCHAR(16) NOT NULL,
+  `name`      VARCHAR(32) NOT NULL,
+  PRIMARY KEY (`citizenid`, `number`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_phone_blocks` (
+  `citizenid` VARCHAR(16) NOT NULL,
+  `number`    VARCHAR(16) NOT NULL,
+  PRIMARY KEY (`citizenid`, `number`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Keyed by phone NUMBER, not citizen, so a message still reaches a character
+-- whose phone item was lost and replaced.
+CREATE TABLE IF NOT EXISTS `som_phone_messages` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `from_number` VARCHAR(16) NOT NULL,
+  `to_number`   VARCHAR(16) NOT NULL,
+  `body`        VARCHAR(280) NOT NULL,
+  `created_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `read_at`     TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_to` (`to_number`, `from_number`),
+  KEY `idx_from` (`from_number`, `to_number`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_phone_calls` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `from_number` VARCHAR(16) NOT NULL,
+  `to_number`   VARCHAR(16) NOT NULL,
+  `status`      ENUM('answered','missed','declined','unavailable') NOT NULL,
+  `answered`    TINYINT(1) NOT NULL DEFAULT 0,
+  `created_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_from` (`from_number`),
+  KEY `idx_to` (`to_number`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Theme and wallpaper are supporter perks, so what is stored here is validated
 -- server side against the player's entitlements rather than trusted.
 CREATE TABLE IF NOT EXISTS `som_phone_settings` (

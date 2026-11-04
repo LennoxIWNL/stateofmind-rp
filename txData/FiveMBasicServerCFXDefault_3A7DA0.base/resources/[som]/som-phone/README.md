@@ -82,6 +82,37 @@ exports['som-phone']:registerApp({
 `handler` is called with a source the pipeline has already checked. `notifyApp` and
 `billCitizen` keep their signatures.
 
+## Contacts, messages and calls
+
+All three are apps on the pipeline, resolved from phone numbers on the server (a client
+never names a player).
+
+- **Contacts**: per character, names are stripped of markup, capped at `Config.Contacts.max`.
+  Block and unblock a number.
+- **Messages**: one row per message keyed by phone number, so a lost and replaced phone keeps
+  its history. Text is stripped of markup and control characters and cut to 280. A blocked
+  sender is told it sent and nothing is stored, so a block cannot be probed. An online
+  receiver who carries a phone gets a banner; otherwise it waits as unread.
+- **Calls**: a call is a server record. Ringing times out after `Config.Calls.ringSeconds`.
+  On answer the server picks a large random channel and puts both players on it with
+  pma-voice's server export `setPlayerCall`; ending, a dropped player or a downed player
+  frees it. Busy lines, blocked callers and offline numbers are refused and logged. The client
+  only rings, shows the call bar and relays Y (answer) and N (decline or end).
+
+### A pma-voice limit this cannot fix
+
+pma-voice registers its own net event, `pma-voice:setPlayerCall`, that lets ANY client join ANY
+call channel. This resource cannot change third-party code, so the defence is that channels are
+random numbers up to two billion rather than player ids, which makes one hard to guess but not
+impossible. Hardening it means patching or replacing pma-voice (see `LAUNCH-TODO.md`).
+
+### Prior art
+
+Read from source before writing: npwd's call and message services. Its calls use the caller's
+server id as the voice channel and have no busy check, no cleanup when a player drops and no
+check that the acting player is the receiver; its messages take recipients from the client,
+have no length limit and no membership check. Each of those is a test here.
+
 ## Bank
 
 **Full history, own account only.** The citizenid comes from `source`, never

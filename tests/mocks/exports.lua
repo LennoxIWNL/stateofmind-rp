@@ -7,6 +7,7 @@ local Mocks = {}
 Mocks.calls = { payWith = 0, addMoney = 0, businessSpend = 0, dispatchAlert = 0, businessTransact = 0 }
 Mocks.admins = {}
 Mocks.perks = {}
+Mocks.voice = {}
 Mocks.metadataRefused = false
 Mocks.fines = {}
 Mocks.fineFails = false
@@ -92,7 +93,9 @@ end
 
 local phone = {}
 function phone:billCitizen(citizenid, business, amount, reason, opts) return 1 end
-function phone:notifyApp(source, app, message) end
+function phone:notifyApp(source, app, message)
+    if Mocks.exported.notifyApp then return Mocks.exported.notifyApp(source, app, message) end
+end
 
 local dispatch = {}
 function dispatch:alert(source, alertType, extra)
@@ -141,11 +144,8 @@ function ox:RemoveItem(inv, name, count, metadata, slot)
 end
 
 local registry = {
+    ['pma-voice'] = { setPlayerCall = function(_, source, channel) Mocks.voice[source] = channel end },
     ['som-medical'] = medical,
-    ['som-phone'] = setmetatable({}, { __index = function(_, name)
-        local fn = Mocks.exported[name]
-        return fn and function(_, ...) return fn(...) end or nil
-    end }),
     ['som-evidence'] = setmetatable({}, { __index = function(_, name)
         local fn = Mocks.exported[name]
         return fn and function(_, ...) return fn(...) end or nil

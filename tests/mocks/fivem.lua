@@ -23,7 +23,8 @@ _G.vec4 = vec4
 -- doesn't need a working MySQL connection to not crash.
 _G.CreateThread = function(fn) end
 _G.Wait = function(ms) end
-_G.SetTimeout = function(ms, fn) end
+_G.PendingTimeouts = {}
+_G.SetTimeout = function(ms, fn) _G.PendingTimeouts[#_G.PendingTimeouts + 1] = { ms = ms, fn = fn } end
 _G.Handlers = {}
 local handlerLists = {}
 _G.AddEventHandler = function(name, fn)
@@ -36,7 +37,7 @@ _G.AddEventHandler = function(name, fn)
     end
     list[#list + 1] = fn
 end
-_G.ResetHandlers = function() handlerLists = {}; _G.Handlers = {} end
+_G.ResetHandlers = function() handlerLists = {}; _G.Handlers = {}; _G.PendingTimeouts = {} end
 _G.RegisteredEvents = {}
 _G.RegisterNetEvent = function(name, fn) if fn then _G.RegisteredEvents[name] = fn end end
 _G.GetGameTimer = function() return (_G.Mocks and _G.Mocks.clock) or 0 end

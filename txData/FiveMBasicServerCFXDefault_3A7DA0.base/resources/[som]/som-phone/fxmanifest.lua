@@ -23,6 +23,7 @@ server_scripts {
     'server/core.lua',
     'server/device.lua',
     'server/apps.lua',
+    'server/comms.lua',
     'server/main.lua',
 }
 

@@ -876,3 +876,26 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 }
 .key:hover { background: var(--accent-soft); }
 .key:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Messages, dialer, call overlay. */
+.chat { display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow: auto; padding: 4px 0 8px; }
+.bubble { max-width: 78%; padding: 8px 12px; border-radius: 16px; font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
+.bubble--mine { align-self: flex-end; background: var(--accent-deep); }
+.bubble--theirs { align-self: flex-start; background: rgba(255, 255, 255, 0.12); }
+.form--inline { flex-direction: row; gap: 8px; align-items: center; }
+.form--inline .input { flex: 1; min-width: 0; }
+.rowbtn { display: block; width: 100%; text-align: left; }
+.dialer { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 8px; }
+.dialer__number { min-height: 30px; font-family: var(--som-font-mono); font-size: 24px; letter-spacing: 0.08em; }
+.key--call { background: var(--som-success); color: #06120a; }
+.key--call:disabled { opacity: 0.4; cursor: default; }
+.callbar {
+    position: absolute; left: 10px; right: 10px; top: 56px; z-index: 40;
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    border-radius: 16px; background: rgba(20, 20, 28, 0.96); border: 1px solid var(--accent-soft);
+}
+.callbar__who { flex: 1; min-width: 0; }
+.callbar__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.callbar__state { font-size: 12px; opacity: 0.7; }
+.key svg, .btn svg { width: 20px; height: 20px; }
+.btn--sm svg { width: 16px; height: 16px; }

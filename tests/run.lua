@@ -37,6 +37,11 @@ local function resetDb()
     mysql.db.custody = {}
     mysql.db.profiles = {}
     mysql.db.devices = {}
+    mysql.db.characters = {}
+    mysql.db.contacts = {}
+    mysql.db.blocks = {}
+    mysql.db.messages = {}
+    mysql.db.phoneCalls = {}
     mysql.db.phoneAudit = {}
     mysql.db.bills = {}
     mysql.db.orders = {}
@@ -56,6 +61,7 @@ local function resetMocks()
     Mocks.fineFails = false
     Mocks.exported = {}
     Mocks.perks = {}
+    Mocks.voice = {}
     Mocks.metadataRefused = false
     Mocks.paid = 0
     Mocks.lastPaid = nil
@@ -159,6 +165,7 @@ local function loadPhone()
         'server/core.lua',
         'server/device.lua',
         'server/apps.lua',
+        'server/comms.lua',
         'server/main.lua',
     })
     return phoneEnv
@@ -1929,6 +1936,173 @@ do
     _G.TriggerClientEvent = real
     check(type(Mocks.exported.billCitizen) == 'function' and type(Mocks.exported.registerApp) == 'function',
         'exports: billCitizen and registerApp are still exported for other resources')
+end
+
+----------------------------------------------------------------------
+-- som-phone: contacts, messages, calls
+----------------------------------------------------------------------
+local function commsScene()
+    local env = phoneScene()
+    mysql.db.characters = { ['555-0001'] = 'P1', ['555-0002'] = 'P2', ['555-0003'] = 'P3' }
+    Mocks.players[3] = { citizenid = 'P3', job = { name = 'unemployed' }, charinfo = { firstname = 'Cy', lastname = 'Three', phone = '555-0003' } }
+    Mocks.inv[3] = { { name = 'phone', count = 1, slot = 1, metadata = {} } }
+    env.Config.Pipeline.writesPerMinute = 1000
+    env.Config.Pipeline.readsPerMinute = 1000
+    return env
+end
+
+local function pushes()
+    local seen = {}
+    local real = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, payload)
+        if name == 'som-phone:client:call' then seen[#seen + 1] = { target = target, state = payload.state, number = payload.number, name = payload.name } end
+    end
+    return seen, function() _G.TriggerClientEvent = real end
+end
+
+do
+    commsScene()
+    check(act(1, 'contacts', 'save', { name = '', number = '5550003' }).success == false, 'contacts: a name is required')
+    check(act(1, 'contacts', 'save', { name = 'Cy', number = '123' }).success == false and act(1, 'contacts', 'save', { name = 'Cy', number = { 1 } }).success == false,
+        'contacts: a bad number is refused')
+    check(act(1, 'contacts', 'save', { name = '<b>Cy</b>', number = '555-0003' }).success == true, 'contacts: a contact can be saved with a dashed number')
+    check(mysql.db.contacts['P1|555-0003'] == 'bCy/b', 'contacts: markup is stripped from names and numbers are stored one way')
+    act(1, 'contacts', 'save', { name = 'Cyrus', number = '5550003' })
+    check(mysql.db.contacts['P1|555-0003'] == 'Cyrus', 'contacts: saving the same number renames it')
+    local list = act(1, 'contacts', 'list')
+    check(#list.contacts == 1 and list.contacts[1].name == 'Cyrus', 'contacts: the list is the caller\'s own')
+    check(#act(2, 'contacts', 'list').contacts == 0, 'contacts: nobody else sees them')
+    act(1, 'contacts', 'remove', { number = '5550003' })
+    check(#act(1, 'contacts', 'list').contacts == 0, 'contacts: a contact can be removed')
+
+    phoneEnv.Config.Contacts.max = 2
+    act(1, 'contacts', 'save', { name = 'A', number = '5550010' })
+    act(1, 'contacts', 'save', { name = 'B', number = '5550011' })
+    check(act(1, 'contacts', 'save', { name = 'C', number = '5550012' }).success == false, 'contacts: the contact limit holds')
+    check(act(1, 'contacts', 'save', { name = 'B2', number = '5550011' }).success == true, 'contacts: renaming still works at the limit')
+end
+
+do
+    commsScene()
+    local sent = {}
+    local real = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, title, text) if name == 'som-phone:client:banner' then sent[#sent + 1] = { target = target, title = title, text = text } end end
+
+    check(act(1, 'messages', 'send', { number = '5550002', body = '' }).success == false, 'messages: an empty message is refused')
+    check(act(1, 'messages', 'send', { number = 'x', body = 'hi' }).success == false, 'messages: a bad number is refused')
+    check(act(1, 'messages', 'send', { number = '555-0001', body = 'hi' }).success == false, 'messages: you cannot message yourself')
+    check(act(1, 'messages', 'send', { number = '5559999', body = 'hi' }).error == 'no such number', 'messages: a number nobody has is refused')
+    check(#mysql.db.messages == 0, 'messages: refusals store nothing')
+
+    check(act(1, 'messages', 'send', { number = '5550002', body = 'hello <script>x</script>\nthere' }).success == true, 'messages: a message is sent')
+    check(mysql.db.messages[1].body == 'hello scriptx/script there', 'messages: markup and control characters are stripped')
+    check(#sent == 1 and sent[1].target == 2 and sent[1].title == 'Messages', 'messages: an online receiver with a phone is notified')
+
+    act(1, 'messages', 'send', { number = '5550002', body = string.rep('x', 500) })
+    check(#mysql.db.messages[2].body == phoneEnv.Config.Messages.maxLength, 'messages: a message is cut to the limit')
+
+    Mocks.inv[2] = {}
+    act(1, 'messages', 'send', { number = '5550002', body = 'no phone on them' })
+    check(#sent == 2 and #mysql.db.messages == 3, 'messages: a receiver without a phone gets it stored but no banner')
+
+    mysql.db.characters['555-0004'] = 'P4'
+    check(act(1, 'messages', 'send', { number = '5550004', body = 'offline' }).success == true and #sent == 2, 'messages: an offline number stores it quietly')
+
+    Mocks.inv[2] = { { name = 'phone', count = 1, slot = 1, metadata = {} } }
+    local box = act(2, 'messages', 'threads')
+    check(#box.threads == 1 and box.threads[1].other == '555-0001' and box.threads[1].unread == 3, 'messages: the inbox shows the thread with its unread count')
+    local thread = act(2, 'messages', 'thread', { number = '5550001' })
+    check(#thread.messages == 3 and thread.messages[1].mine == false and thread.messages[3].body == 'no phone on them', 'messages: a thread is oldest first')
+    check(act(2, 'messages', 'threads').threads[1].unread == 0, 'messages: opening a thread marks it read')
+
+    act(2, 'contacts', 'block', { number = '5550001' })
+    local before = #mysql.db.messages
+    check(act(1, 'messages', 'send', { number = '5550002', body = 'blocked?' }).success == true and #mysql.db.messages == before,
+        'messages: a blocked sender is told it sent but nothing is stored')
+    act(2, 'contacts', 'block', { number = '5550001', blocked = false })
+    act(1, 'messages', 'send', { number = '5550002', body = 'unblocked' })
+    check(#mysql.db.messages == before + 1, 'messages: unblocking lets messages through again')
+    _G.TriggerClientEvent = real
+end
+
+do
+    local env = commsScene()
+    local seen, restore = pushes()
+    check(act(1, 'phone', 'dial', { number = '123' }).success == false, 'calls: a bad number is refused')
+    check(act(1, 'phone', 'dial', { number = '5550001' }).success == false, 'calls: you cannot call yourself')
+    mysql.db.characters['555-0004'] = 'P4'
+    check(act(1, 'phone', 'dial', { number = '5550004' }).error == 'that number is not available' and mysql.db.phoneCalls[1].status == 'unavailable',
+        'calls: an offline number is unavailable and logged')
+    Mocks.inv[2] = {}
+    check(act(1, 'phone', 'dial', { number = '5550002' }).success == false, 'calls: someone without a phone cannot be reached')
+    Mocks.inv[2] = { { name = 'phone', count = 1, slot = 1, metadata = {} } }
+
+    act(2, 'contacts', 'block', { number = '5550001' })
+    check(act(1, 'phone', 'dial', { number = '5550002' }).success == false, 'calls: a blocked caller cannot get through')
+    act(2, 'contacts', 'block', { number = '5550001', blocked = false })
+
+    check(act(1, 'phone', 'dial', { number = '5550002' }).success == true, 'calls: a call to a reachable number rings')
+    check(#seen == 2 and seen[1].state == 'dialling' and seen[1].target == 1 and seen[2].state == 'ringing' and seen[2].target == 2 and seen[2].number == '555-0001',
+        'calls: the caller sees dialling and the receiver sees ringing with the caller')
+    check(Mocks.voice[1] == nil and Mocks.voice[2] == nil, 'calls: nobody is on a voice channel while it rings')
+    check(act(1, 'phone', 'dial', { number = '5550003' }).error == 'you are already on a call', 'calls: you cannot start a second call')
+    check(act(3, 'phone', 'dial', { number = '5550002' }).error == 'that line is busy' and mysql.db.phoneCalls[#mysql.db.phoneCalls].status == 'missed',
+        'calls: a busy line is refused and logged as missed')
+    check(act(1, 'phone', 'answer').success == false, 'calls: the caller cannot answer their own call')
+    check(act(3, 'phone', 'answer').success == false, 'calls: a stranger cannot answer')
+
+    check(act(2, 'phone', 'answer').success == true, 'calls: the receiver can answer')
+    local channel = Mocks.voice[1]
+    check(channel and channel == Mocks.voice[2] and channel >= env.Config.Calls.channelMin and channel <= env.Config.Calls.channelMax,
+        'calls: both sides are put on one server chosen channel in the random range')
+    check(channel ~= 1 and channel ~= 2, 'calls: the channel is not a player id')
+    check(act(2, 'phone', 'answer').success == false, 'calls: a call is answered once')
+
+    check(act(3, 'phone', 'hangup').success == false, 'calls: someone not on the call cannot end it')
+    check(act(2, 'phone', 'hangup').success == true, 'calls: either side can hang up')
+    check(Mocks.voice[1] == 0 and Mocks.voice[2] == 0, 'calls: ending frees the voice channel for both')
+    local last = mysql.db.phoneCalls[#mysql.db.phoneCalls]
+    check(last.status == 'answered' and last.answered == 1, 'calls: an answered call is logged as answered')
+    check(seen[#seen].state == 'ended' and seen[#seen - 1].state == 'ended', 'calls: both sides are told it ended')
+    check(act(1, 'phone', 'dial', { number = '5550003' }).success == true, 'calls: a line is free again after hanging up')
+    act(1, 'phone', 'hangup')
+
+    local recents = act(1, 'phone', 'recents').recents
+    check(#recents >= 3 and recents[1].outgoing == true and recents[1].number == '555-0003' and recents[1].from_number == nil, 'calls: recents show the other number and direction')
+    restore()
+end
+
+do
+    local env = commsScene()
+    local seen, restore = pushes()
+    act(1, 'phone', 'dial', { number = '5550002' })
+    local ring = PendingTimeouts[#PendingTimeouts]
+    check(ring and ring.ms == env.Config.Calls.ringSeconds * 1000, 'calls: an unanswered call has a ring timeout')
+    ring.fn()
+    check(act(1, 'phone', 'hangup').success == false and mysql.db.phoneCalls[#mysql.db.phoneCalls].status == 'missed', 'calls: ringing out ends it as missed')
+
+    act(1, 'phone', 'dial', { number = '5550002' })
+    PendingTimeouts[#PendingTimeouts].fn()
+    act(1, 'phone', 'dial', { number = '5550003' })
+    act(3, 'phone', 'answer')
+    local stale = PendingTimeouts[#PendingTimeouts - 1]
+    stale.fn()
+    check(Mocks.voice[1] ~= 0 and Mocks.voice[1] ~= nil, 'calls: an old ring timer does not end a call that was answered')
+
+    _G.source = 3
+    Handlers['playerDropped']()
+    _G.source = nil
+    check(Mocks.voice[1] == 0 and mysql.db.phoneCalls[#mysql.db.phoneCalls].status == 'answered', 'calls: a player who drops ends the call and frees the channel')
+
+    act(1, 'phone', 'dial', { number = '5550002' })
+    act(2, 'phone', 'answer')
+    Handlers['som:server:playerDowned'](2)
+    check(Mocks.voice[2] == 0 and act(1, 'phone', 'hangup').success == false, 'calls: going down ends the call')
+
+    act(1, 'phone', 'dial', { number = '5550002' })
+    act(2, 'phone', 'hangup')
+    check(mysql.db.phoneCalls[#mysql.db.phoneCalls].status == 'declined', 'calls: declining a ring is logged as declined')
+    restore()
 end
 
 ----------------------------------------------------------------------

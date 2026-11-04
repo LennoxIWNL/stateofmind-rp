@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Icon, PhoneContext, callApp, closePhone, type PhoneApi } from '@som/phone-sdk'
 import { Bank } from './apps/Bank'
+import { Contacts } from './apps/Contacts'
+import { Messages } from './apps/Messages'
+import { Phone } from './apps/Phone'
 import { Properties } from './apps/Properties'
 import { Settings } from './apps/Settings'
 import { HostApp } from './HostApp'
@@ -25,7 +28,8 @@ const shade = (c: { r: number; g: number; b: number }, amount: number) => {
 }
 
 const BANNER_HOLD_MS = 4900
-type View = { kind: 'lock' } | { kind: 'home' } | { kind: 'app'; id: string }
+type View = { kind: 'lock' } | { kind: 'home' } | { kind: 'app'; id: string; arg?: string }
+interface CallInfo { state: string; number?: string; name?: string }
 
 function useClock() {
   const [now, setNow] = useState(() => new Date())
@@ -48,6 +52,7 @@ export function Shell() {
   const [toast, setToast] = useState<{ text: string; error: boolean } | null>(null)
   const [code, setCode] = useState('')
   const [lockMessage, setLockMessage] = useState('')
+  const [call, setCall] = useState<CallInfo | null>(null)
   const nextBanner = useRef(1)
   const now = useClock()
 
@@ -60,6 +65,7 @@ export function Shell() {
       setTimeout(() => setToast(null), 3200)
     },
     home: () => setView({ kind: 'home' }),
+    open: (id, arg) => setView({ kind: 'app', id, arg }),
     badge: (appId, count) => setBadges((b) => ({ ...b, [appId]: count })),
   }), [])
 
@@ -94,6 +100,12 @@ export function Shell() {
         // Three at a time, oldest first, so a burst cannot cover the screen.
         setBanners((b) => [...b, banner].slice(-3))
         setTimeout(() => setBanners((b) => b.filter((x) => x.id !== id)), BANNER_HOLD_MS)
+        return
+      }
+
+      if (msg.action === 'call') {
+        const c = msg.data as CallInfo
+        setCall(c && c.state !== 'ended' ? c : null)
         return
       }
 
@@ -151,8 +163,11 @@ export function Shell() {
   const tiles: AppTile[] = data?.apps || []
   const appLabel = view.kind === 'app' ? tiles.find((a) => a.id === view.id)?.label || view.id : ''
 
-  const renderApp = (id: string) => {
+  const renderApp = (id: string, arg?: string) => {
     if (id === 'bank') return <Bank />
+    if (id === 'contacts') return <Contacts />
+    if (id === 'messages') return <Messages arg={arg} />
+    if (id === 'phone') return <Phone arg={arg} />
     if (id === 'properties') return <Properties />
     if (id === 'settings') {
       return (
@@ -238,10 +253,25 @@ export function Shell() {
                     </button>
                     <h2 className="app-view__title">{appLabel}</h2>
                   </div>
-                  {renderApp(view.id)}
+                  {renderApp(view.id, view.arg)}
                 </section>
               )}
             </main>
+
+            {call && (
+              <div className="callbar" role="status">
+                <div className="callbar__who">
+                  <div className="callbar__name">{call.name || call.number || 'Unknown'}</div>
+                  <div className="callbar__state">{call.state === 'ringing' ? 'Incoming call' : call.state === 'dialling' ? 'Calling' : 'On a call'}</div>
+                </div>
+                {call.state === 'ringing' && (
+                  <button type="button" className="btn btn--primary btn--sm" onClick={() => void callApp('phone', 'answer')}>Answer</button>
+                )}
+                <button type="button" className="btn btn--danger btn--sm" onClick={() => void callApp('phone', 'hangup')}>
+                  {call.state === 'ringing' ? 'Decline' : 'End'}
+                </button>
+              </div>
+            )}
 
             {toast && <div className={`toast${toast.error ? ' toast--error' : ''}`}>{toast.text}</div>}
 
