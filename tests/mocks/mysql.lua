@@ -28,6 +28,8 @@ M.db = {
     messages = {},
     phoneCalls = {},
     phoneAudit = {},
+    notes = {},
+    vehicles = {},
     social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} },
     nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
                courtCases = 1, courtEvents = 1, courtWarrants = 1, service = 1, evidence = 1, custody = 1, orders = 1 },
@@ -291,6 +293,51 @@ local function social(kind, query, params)
     return false
 end
 
+local function city(kind, query, params)
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    if kind == 'query' then
+        if has('SELECT plate, model, garage, state FROM som_vehicles WHERE citizenid = ?') then
+            local out = {}
+            for _, v in ipairs(M.db.vehicles) do
+                if v.citizenid == params[1] and #out < params[2] then out[#out + 1] = { plate = v.plate, model = v.model, garage = v.garage, state = v.state } end
+            end
+            return true, out
+        end
+        if has('SELECT id, title, body FROM som_phone_notes WHERE citizenid = ?') then
+            local out = {}
+            for i = #M.db.notes, 1, -1 do
+                local n = M.db.notes[i]
+                if n.citizenid == params[1] and #out < params[2] then out[#out + 1] = { id = n.id, title = n.title, body = n.body } end
+            end
+            return true, out
+        end
+    elseif kind == 'scalar' then
+        if has('SELECT COUNT(*) FROM som_phone_notes WHERE citizenid = ?') then
+            local n = 0
+            for _, x in ipairs(M.db.notes) do if x.citizenid == params[1] then n = n + 1 end end
+            return true, n
+        end
+    elseif kind == 'insert' then
+        if has('INSERT INTO som_phone_notes') then
+            local id = #M.db.notes + 1
+            M.db.notes[id] = { id = id, citizenid = params[1], title = params[2], body = params[3] }
+            return true, id
+        end
+    elseif kind == 'update' then
+        if has('UPDATE som_phone_notes SET title = ?, body = ? WHERE id = ? AND citizenid = ?') then
+            local n = M.db.notes[params[3]]
+            if n and n.citizenid == params[4] then n.title, n.body = params[1], params[2]; return true, 1 end
+            return true, 0
+        end
+        if has('DELETE FROM som_phone_notes WHERE id = ? AND citizenid = ?') then
+            local n = M.db.notes[params[1]]
+            if n and n.citizenid == params[2] then M.db.notes[params[1]] = { id = params[1], citizenid = '' }; return true, 1 end
+            return true, 0
+        end
+    end
+    return false
+end
+
 local function fail(query)
     error('tests/mocks/mysql.lua: unhandled query: ' .. query, 3)
 end
@@ -298,6 +345,7 @@ end
 function M.single(query, params)
     params = params or {}
     do local handled, value = social('single', query, params); if handled then return value end end
+    do local handled, value = city('single', query, params); if handled then return value end end
     if query:find('FROM som_properties WHERE slug = ?', 1, true) then
         for _, p in ipairs(M.db.properties) do
             if p.slug == params[1] then return copy(p) end
@@ -366,6 +414,7 @@ end
 function M.scalar(query, params)
     params = params or {}
     do local handled, value = social('scalar', query, params); if handled then return value end end
+    do local handled, value = city('scalar', query, params); if handled then return value end end
     if query:find('SELECT role FROM som_property_owners WHERE property_id = ? AND citizenid = ?', 1, true) then
         local o = findOwner(params[1], params[2])
         return o and o.role or nil
@@ -462,6 +511,7 @@ end
 function M.update(query, params)
     params = params or {}
     do local handled, value = social('update', query, params); if handled then return value end end
+    do local handled, value = city('update', query, params); if handled then return value end end
     if query:find('SET for_sale = 0 WHERE id = ? AND for_sale = 1', 1, true) then
         local p = findProperty(tonumber(params[1]))
         if p and tonumber(p.for_sale) == 1 then
@@ -799,6 +849,7 @@ end
 function M.insert(query, params)
     params = params or {}
     do local handled, value = social('insert', query, params); if handled then return value end end
+    do local handled, value = city('insert', query, params); if handled then return value end end
     if query:find('INSERT INTO som_property_owners', 1, true) then
         local propertyId, citizenid, role, grantedBy = params[1], params[2], params[3], params[4]
         local existing = findOwner(propertyId, citizenid)
@@ -954,6 +1005,7 @@ end
 function M.query(query, params)
     params = params or {}
     do local handled, value = social('query', query, params); if handled then return value end end
+    do local handled, value = city('query', query, params); if handled then return value end end
     -- jail.lua's sweep: every serving sentence, with elapsed.
     if query:find("FROM som_jail_sentences WHERE status = 'serving'", 1, true) then
         local out = {}

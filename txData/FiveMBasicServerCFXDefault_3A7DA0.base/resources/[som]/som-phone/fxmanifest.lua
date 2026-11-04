@@ -25,6 +25,7 @@ server_scripts {
     'server/apps.lua',
     'server/comms.lua',
     'server/social.lua',
+    'server/city.lua',
     'server/main.lua',
 }
 

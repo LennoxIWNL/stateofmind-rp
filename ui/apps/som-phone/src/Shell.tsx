@@ -5,6 +5,9 @@ import { Contacts } from './apps/Contacts'
 import { Messages } from './apps/Messages'
 import { Chirp } from './apps/Chirp'
 import { Pages } from './apps/Pages'
+import { Garage } from './apps/Garage'
+import { Services } from './apps/Services'
+import { Notes } from './apps/Notes'
 import { Phone } from './apps/Phone'
 import { Properties } from './apps/Properties'
 import { Settings } from './apps/Settings'
@@ -172,6 +175,9 @@ export function Shell() {
     if (id === 'phone') return <Phone arg={arg} />
     if (id === 'chirp') return <Chirp />
     if (id === 'pages') return <Pages />
+    if (id === 'garage') return <Garage />
+    if (id === 'services') return <Services />
+    if (id === 'notes') return <Notes />
     if (id === 'properties') return <Properties />
     if (id === 'settings') {
       return (

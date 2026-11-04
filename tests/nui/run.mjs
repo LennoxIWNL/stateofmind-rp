@@ -485,6 +485,64 @@ async function main() {
         'white pages: a result shows the name and number');
     await phone.screenshot({ path: path.join(SCREENSHOT_DIR, 'phone-whitepages.png') });
 
+    // --- som-phone city: Garage, Services, Notes. ---
+    await phone.locator('.back', { hasText: 'Home' }).click();
+    await send({ action: 'open', data: openData({ apps: [
+        { id: 'garage', label: 'Garage', icon: 'car', colour: '#5e5ce6', order: 40 },
+        { id: 'services', label: 'Services', icon: 'dispatch', colour: '#ff453a', order: 45 },
+        { id: 'notes', label: 'Notes', icon: 'note', colour: '#ffd60a', order: 50 },
+    ] }) });
+    await phone.locator('.lock').click();
+    await phone.waitForSelector('.apps .app');
+
+    answers['garage:list'] = { success: true, vehicles: [
+        { plate: 'AAA111', model: 'sultan', garage: 'legion', state: 'garaged' },
+        { plate: 'BBB222', model: 'felon', garage: 'impound', state: 'impounded' },
+    ] };
+    await phone.locator('.app', { hasText: 'Garage' }).click();
+    await phone.waitForSelector('.row__title');
+    check((await phone.locator('.row').count()) === 2 && (await phone.locator('.row__sub').first().textContent()) === 'Stored at legion' &&
+        (await phone.locator('.row__sub').nth(1).textContent()) === 'Impounded', 'garage: each vehicle shows where it is');
+    check((await phone.locator('.row button, .row input').count()) === 0, 'garage: it offers no actions');
+    await phone.screenshot({ path: path.join(SCREENSHOT_DIR, 'phone-garage.png') });
+
+    await phone.locator('.back', { hasText: 'Home' }).click();
+    answers['services:list'] = { success: true, services: [{ job: 'mechanic', label: 'Mechanic', onDuty: 2 }, { job: 'taxi', label: 'Taxi', onDuty: 0 }] };
+    await phone.locator('.app', { hasText: 'Services' }).click();
+    await phone.waitForSelector('.row__title');
+    check((await phone.locator('.row__sub').first().textContent()) === '2 on duty' && (await phone.locator('.row__sub').nth(1).textContent()) === 'Nobody on duty',
+        'services: counts come from the server');
+    calls.length = 0;
+    await phone.locator('input[aria-label="What is happening"]').fill('shots fired at legion');
+    await phone.locator('.btn', { hasText: 'Call 911' }).click();
+    await phone.waitForTimeout(150);
+    const sos = calls.find((c) => c.body.app === 'services' && c.body.action === 'emergency');
+    check(sos && sos.body.payload.message === 'shots fired at legion' && Object.keys(sos.body.payload).length === 1,
+        'services: a 911 call sends the message only, no position or caller');
+    await phone.screenshot({ path: path.join(SCREENSHOT_DIR, 'phone-services.png') });
+
+    await phone.locator('.back', { hasText: 'Home' }).click();
+    answers['notes:list'] = { success: true, notes: [{ id: 4, title: 'Plan <b>A</b>', body: 'first line\nsecond' }] };
+    await phone.locator('.app', { hasText: 'Notes' }).click();
+    await phone.waitForSelector('.rowbtn');
+    check((await phone.locator('.row__title').textContent()) === 'Plan <b>A</b>' && (await phone.locator('.row__title b').count()) === 0 &&
+        (await phone.locator('.row__sub').textContent()) === 'first line', 'notes: a title is text and the list shows the first line');
+    await phone.locator('.rowbtn').click();
+    await phone.waitForSelector('textarea[aria-label="Note"]');
+    check((await phone.locator('textarea[aria-label="Note"]').inputValue()) === 'first line\nsecond', 'notes: opening a note loads its body');
+    calls.length = 0;
+    await phone.locator('textarea[aria-label="Note"]').fill('changed');
+    await phone.locator('.btn', { hasText: 'Save' }).click();
+    await phone.waitForTimeout(150);
+    check(calls.some((c) => c.body.app === 'notes' && c.body.action === 'save' && c.body.payload.id === 4 && c.body.payload.body === 'changed'), 'notes: saving names the note and the new text');
+    await phone.locator('.btn', { hasText: 'New note' }).click();
+    calls.length = 0;
+    await phone.locator('input[aria-label="Title"]').fill('Fresh');
+    await phone.locator('.btn', { hasText: 'Save' }).click();
+    await phone.waitForTimeout(150);
+    check(calls.some((c) => c.body.action === 'save' && c.body.payload.id === undefined && c.body.payload.title === 'Fresh'), 'notes: a new note carries no id');
+    await phone.screenshot({ path: path.join(SCREENSHOT_DIR, 'phone-notes.png') });
+
     // Apps may import only the SDK, React and the shared types, so an app can
     // never reach around the one door to the server.
     const allowed = /^(react|@som\/phone-sdk|\.\.\/types)$/;

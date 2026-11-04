@@ -52,6 +52,11 @@ Import `setup.sql` on a fresh database. A database created from an older version
 - [ ] Nobody has chosen a Chirp moderation routine yet: reports only land in `som_phone_reports` and the optional webhook.
 - [ ] Not verified live: Chirp and Pages in a game client, the supporter handle and colour perks with a real entitlement.
 
+- [ ] Garage, Services, Notes: `setup.sql` 4b adds `som_phone_notes`. `Config.City.services` lists the jobs shown with a count; check they match the real jobs.
+- [ ] 911 from the phone uses `som-dispatch`'s `emergencyCall`; confirm in game that the call arrives with the caller's name and number and the right position.
+- [ ] Camera and Gallery are not built. They need the image host (same one as `Config.Social.imageHosts`) and a `screenshot-basic` upload endpoint.
+- [ ] Garage cannot locate or recall a vehicle yet.
+
 ## Jobs to whitelist and assign
 
 - [ ] `judge`, `prosecutor`, `defender` (court), `dispatcher` (dispatch). All four are `whitelisted`.

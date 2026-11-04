@@ -104,6 +104,8 @@ local dispatch = {}
 function dispatch:alert(source, alertType, extra)
     Mocks.calls.dispatchAlert = Mocks.calls.dispatchAlert + 1
     Mocks.lastAlertType = alertType
+    Mocks.lastAlertExtra = extra
+    if Mocks.alertFails then return nil end
     return 1
 end
 
