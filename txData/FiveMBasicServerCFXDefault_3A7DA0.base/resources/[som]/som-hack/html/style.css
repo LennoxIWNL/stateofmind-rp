@@ -1,0 +1,121 @@
+/* Colours and type come from som-assets/tokens.css. Nothing is redefined here. */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    background: transparent;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    user-select: none;
+    font-family: var(--som-font);
+    color: var(--som-text);
+}
+
+.hack {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.hack[hidden] { display: none; }
+
+.hack__card {
+    width: min(460px, 92vw);
+    background: var(--som-card);
+    border: var(--som-border);
+    border-radius: var(--som-radius-lg);
+    box-shadow: var(--som-shadow), var(--som-glow);
+    padding: 20px;
+}
+
+.hack__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 16px;
+}
+
+.hack__title {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--som-pink);
+}
+
+.hack__note { font-size: 14px; color: var(--som-text-dim); }
+
+.hack__body { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+
+.hack__foot {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 16px;
+    font-size: 14px;
+    color: var(--som-text-dim);
+}
+
+.hack__status.is-ok { color: var(--som-success); }
+.hack__status.is-bad { color: var(--som-danger); }
+
+.grid { display: grid; gap: 8px; }
+
+.cell {
+    width: 64px;
+    height: 64px;
+    border-radius: var(--som-radius);
+    border: var(--som-border);
+    background: var(--som-card-hover);
+    color: var(--som-text);
+    font-family: var(--som-font-mono);
+    font-size: 24px;
+    cursor: pointer;
+    transition: background var(--som-transition), box-shadow var(--som-transition);
+}
+
+.cell:hover:not(:disabled) { background: var(--som-card-lift); }
+.cell:focus-visible, .key:focus-visible { outline: 2px solid var(--som-pink); outline-offset: 2px; }
+.cell:disabled { cursor: default; }
+.cell.is-shown { background: var(--som-pink-a25); box-shadow: var(--som-glow); }
+.cell.is-picked { background: var(--som-pink-a45); }
+
+.slots { display: flex; gap: 8px; }
+
+.slot {
+    width: 48px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--som-radius);
+    border: var(--som-border);
+    font-family: var(--som-font-mono);
+    font-size: 26px;
+    background: var(--som-card-hover);
+}
+
+.slot.hit { background: var(--som-success); color: #06120a; }
+.slot.near { background: var(--som-warning); color: #1a0f00; }
+.slot.miss { background: var(--som-card-lift); color: var(--som-text-dim); }
+
+.history { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow: auto; }
+
+.keypad { display: grid; grid-template-columns: repeat(5, 52px); gap: 6px; }
+
+.key {
+    height: 44px;
+    border-radius: var(--som-radius);
+    border: var(--som-border);
+    background: var(--som-card-hover);
+    color: var(--som-text);
+    font-family: var(--som-font-mono);
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.key:hover { background: var(--som-card-lift); }
+.key--go { background: var(--som-pink-a45); }
