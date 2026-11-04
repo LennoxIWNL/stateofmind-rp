@@ -55,6 +55,24 @@ local function ruleDialog(case)
     })
 end
 
+local function showEvidence(case)
+    local res = lib.callback.await('som-court:server:evidence', false, case.id)
+    if not res or not res.success then return notify(res and res.error or 'Request failed', 'error') end
+
+    local options = {}
+    for _, row in ipairs(res.evidence) do
+        options[#options + 1] = {
+            title = ('#%d %s'):format(row.id, row.label),
+            description = row.analysed_at and 'analysed' or 'not analysed',
+            disabled = true,
+        }
+    end
+    if #options == 0 then options[1] = { title = 'No evidence linked', disabled = true } end
+
+    lib.registerContext({ id = 'court_evidence', title = ('Evidence for #%d'):format(case.id), options = options })
+    lib.showContext('court_evidence')
+end
+
 local function actionsFor(role, case)
     local out = {}
     local function add(label, fn) out[#out + 1] = { title = label, onSelect = fn } end
@@ -95,6 +113,8 @@ local function actionsFor(role, case)
     elseif role == 'defender' then
         add('Take the case', function() act('som-court:server:defend', case.id) end)
     end
+
+    add('Evidence', function() showEvidence(case) end)
 
     return out
 end

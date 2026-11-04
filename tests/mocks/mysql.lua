@@ -16,8 +16,11 @@ M.db = {
     courtEvents = {},
     courtWarrants = {},
     service = {},
+    evidence = {},
+    custody = {},
+    profiles = {},
     nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
-               courtCases = 1, courtEvents = 1, courtWarrants = 1, service = 1 },
+               courtCases = 1, courtEvents = 1, courtWarrants = 1, service = 1, evidence = 1, custody = 1 },
 }
 
 -- Overridable "now" for jail/bail elapsed-time math, so a test can jump a
@@ -46,6 +49,13 @@ end
 local function findCase(id)
     for _, c in ipairs(M.db.courtCases) do
         if c.id == tonumber(id) then return c end
+    end
+    return nil
+end
+
+local function findEvidence(id)
+    for _, r in ipairs(M.db.evidence) do
+        if r.id == tonumber(id) then return r end
     end
     return nil
 end
@@ -133,6 +143,9 @@ function M.single(query, params)
     if query:find("FROM som_community_service WHERE citizenid = ? AND status = 'active'", 1, true) then
         return copy(activeService(params[1]))
     end
+    if query:find('SELECT * FROM som_evidence WHERE id = ?', 1, true) then
+        return copy(findEvidence(params[1]))
+    end
     fail(query)
 end
 
@@ -171,6 +184,27 @@ function M.scalar(query, params)
     if query:find("SELECT id FROM som_court_warrants WHERE case_id = ?", 1, true) then
         for _, w in ipairs(M.db.courtWarrants) do
             if w.case_id == params[1] and liveWarrant(w) then return w.id end
+        end
+        return nil
+    end
+    if query:find('SELECT code FROM som_evidence_profiles WHERE citizenid = ?', 1, true) then
+        return M.db.profiles[params[1]]
+    end
+    if query:find("kind = 'casing' AND status = 'scene' AND source_cid = ?", 1, true) then
+        local n = 0
+        for _, r in ipairs(M.db.evidence) do
+            if r.kind == 'casing' and r.status == 'scene' and r.source_cid == params[1]
+                and r.x >= params[2] and r.x <= params[3] and r.y >= params[4] and r.y <= params[5] then n = n + 1 end
+        end
+        return n
+    end
+    if query:find('SELECT 1 FROM som_evidence WHERE id = ? AND analysed_at <= NOW()', 1, true) then
+        local r = findEvidence(params[1])
+        return r and r.analysed_at and r.analysed_at <= now() and 1 or nil
+    end
+    if query:find('SELECT source_cid FROM som_evidence WHERE kind = ? AND profile = ?', 1, true) then
+        for _, r in ipairs(M.db.evidence) do
+            if r.kind == params[1] and r.profile == params[2] and r.status ~= 'destroyed' then return r.source_cid end
         end
         return nil
     end
@@ -381,6 +415,63 @@ function M.update(query, params)
         r.status = 'absconded'
         return 1
     end
+    if query:find("SET status = 'collected', holder_cid = ?, station = NULL", 1, true) then
+        local r = findEvidence(params[2])
+        if not r or r.status ~= 'stored' or r.station ~= params[3] then return 0 end
+        r.status, r.holder_cid, r.station = 'collected', params[1], nil
+        return 1
+    end
+    if query:find("SET status = 'collected', holder_cid = ?", 1, true) then
+        local r = findEvidence(params[2])
+        if not r or r.status ~= 'scene' or r.expires_at <= now() then return 0 end
+        r.status, r.holder_cid = 'collected', params[1]
+        return 1
+    end
+    if query:find("SET status = 'scene', holder_cid = NULL", 1, true) then
+        local r = findEvidence(params[1])
+        if not r or r.status ~= 'collected' then return 0 end
+        r.status, r.holder_cid = 'scene', nil
+        return 1
+    end
+    if query:find("SET status = 'stored', station = ?, holder_cid = NULL", 1, true) then
+        local r = findEvidence(params[2])
+        if not r or r.status ~= 'collected' or r.holder_cid ~= params[3] then return 0 end
+        r.status, r.station, r.holder_cid = 'stored', params[1], nil
+        return 1
+    end
+    if query:find("SET status = 'stored', holder_cid = NULL, station = ?", 1, true) then
+        local r = findEvidence(params[2])
+        if not r or r.status ~= 'collected' then return 0 end
+        r.status, r.holder_cid, r.station = 'stored', nil, params[1]
+        return 1
+    end
+    if query:find("SET analysed_at = DATE_ADD(NOW(), INTERVAL ? MINUTE)", 1, true) then
+        local r = findEvidence(params[2])
+        if not r or r.analysed_at or not (r.status == 'collected' or r.status == 'stored') then return 0 end
+        if not (r.holder_cid == params[3] or r.station == params[4]) then return 0 end
+        r.analysed_at = now() + params[1] * 60
+        return 1
+    end
+    if query:find("UPDATE som_evidence SET case_id = ?", 1, true) then
+        local r = findEvidence(params[2])
+        if not r or r.case_id or not (r.status == 'collected' or r.status == 'stored') then return 0 end
+        if not (r.holder_cid == params[3] or r.station == params[4]) then return 0 end
+        r.case_id = params[1]
+        return 1
+    end
+    if query:find("SET status = 'destroyed' WHERE id = ?", 1, true) then
+        local r = findEvidence(params[1])
+        if not r then return 0 end
+        r.status = 'destroyed'
+        return 1
+    end
+    if query:find("SET status = 'destroyed' WHERE status = 'scene' AND expires_at <= NOW()", 1, true) then
+        local n = 0
+        for _, r in ipairs(M.db.evidence) do
+            if r.status == 'scene' and r.expires_at <= now() then r.status = 'destroyed'; n = n + 1 end
+        end
+        return n
+    end
     fail(query)
 end
 
@@ -463,6 +554,35 @@ function M.insert(query, params)
         }
         return id
     end
+    if query:find('INSERT IGNORE INTO som_evidence_profiles', 1, true) then
+        for cid, code in pairs(M.db.profiles) do
+            if cid == params[1] or code == params[2] then return 0 end
+        end
+        M.db.profiles[params[1]] = params[2]
+        return 1
+    end
+    if query:find("VALUES (?, ?, ?, ?, 'collected'", 1, true) and query:find('INSERT INTO som_evidence', 1, true) then
+        local id = M.db.nextId.evidence
+        M.db.nextId.evidence = id + 1
+        M.db.evidence[#M.db.evidence + 1] = {
+            id = id, kind = params[1], x = params[2], y = params[3], z = params[4], status = 'collected',
+            holder_cid = params[5], source_cid = params[6], profile = params[7], expires_at = now() + 10 * 365 * 86400,
+        }
+        return id
+    end
+    if query:find('INSERT INTO som_evidence_custody', 1, true) then
+        M.db.custody[#M.db.custody + 1] = { evidence_id = params[1], actor_cid = params[2], action = params[3], detail = params[4] }
+        return #M.db.custody
+    end
+    if query:find('INSERT INTO som_evidence (kind, x, y, z, source_cid', 1, true) then
+        local id = M.db.nextId.evidence
+        M.db.nextId.evidence = id + 1
+        M.db.evidence[#M.db.evidence + 1] = {
+            id = id, kind = params[1], x = params[2], y = params[3], z = params[4], status = 'scene',
+            source_cid = params[5], profile = params[6], weapon_serial = params[7], expires_at = now() + params[8] * 60,
+        }
+        return id
+    end
     fail(query)
 end
 
@@ -524,6 +644,37 @@ function M.query(query, params)
         local out = {}
         for _, r in ipairs(M.db.service) do
             if r.status == 'active' then out[#out + 1] = copy(r) end
+        end
+        return out
+    end
+    if query:find('SELECT id, kind, x, y, z FROM som_evidence', 1, true) then
+        local out = {}
+        for _, r in ipairs(M.db.evidence) do
+            if r.status == 'scene' and r.expires_at > now()
+                and r.x >= params[1] and r.x <= params[2] and r.y >= params[3] and r.y <= params[4] then
+                out[#out + 1] = copy(r)
+            end
+        end
+        return out
+    end
+    if query:find("WHERE holder_cid = ? AND status = 'collected' LIMIT 25", 1, true) then
+        local out = {}
+        for _, r in ipairs(M.db.evidence) do
+            if r.holder_cid == params[1] and r.status == 'collected' then out[#out + 1] = copy(r) end
+        end
+        return out
+    end
+    if query:find("WHERE station = ? AND status = 'stored' ORDER BY", 1, true) then
+        local out = {}
+        for _, r in ipairs(M.db.evidence) do
+            if r.station == params[1] and r.status == 'stored' then out[#out + 1] = copy(r) end
+        end
+        return out
+    end
+    if query:find("FROM som_evidence WHERE case_id = ? AND status <> 'destroyed'", 1, true) then
+        local out = {}
+        for _, r in ipairs(M.db.evidence) do
+            if r.case_id == params[1] and r.status ~= 'destroyed' then out[#out + 1] = copy(r) end
         end
         return out
     end

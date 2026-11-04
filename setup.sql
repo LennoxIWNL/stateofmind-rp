@@ -1237,6 +1237,56 @@ CREATE TABLE IF NOT EXISTS `som_community_service` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ===========================================================================
+--  7h. EVIDENCE (som-evidence)
+--
+--  The bag an officer carries holds only an evidence id; everything else lives
+--  here, so a bag cannot be forged. `profile` is an opaque per-citizen code
+--  (som_evidence_profiles), so a lab result can match a sample without ever
+--  printing a citizen id. Custody rows are only ever inserted.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_evidence_profiles` (
+  `citizenid` VARCHAR(16) NOT NULL,
+  `code`      CHAR(8) NOT NULL,
+  PRIMARY KEY (`citizenid`),
+  UNIQUE KEY `uniq_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_evidence` (
+  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `kind`          ENUM('casing','blood','fingerprint','dna_sample','print_sample') NOT NULL,
+  `status`        ENUM('scene','collected','stored','destroyed') NOT NULL DEFAULT 'scene',
+  `x`             DOUBLE NOT NULL,
+  `y`             DOUBLE NOT NULL,
+  `z`             DOUBLE NOT NULL,
+  `holder_cid`    VARCHAR(16) DEFAULT NULL,
+  `source_cid`    VARCHAR(16) DEFAULT NULL,
+  `profile`       CHAR(8) DEFAULT NULL,
+  `weapon_serial` VARCHAR(32) DEFAULT NULL,
+  `case_id`       BIGINT UNSIGNED DEFAULT NULL,
+  `station`       VARCHAR(32) DEFAULT NULL,
+  `created_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `expires_at`    DATETIME NOT NULL,
+  `analysed_at`   DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_scene` (`status`, `x`, `y`),
+  KEY `idx_holder` (`holder_cid`, `status`),
+  KEY `idx_case` (`case_id`),
+  KEY `idx_profile` (`kind`, `profile`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_evidence_custody` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `evidence_id` BIGINT UNSIGNED NOT NULL,
+  `actor_cid`   VARCHAR(16) NOT NULL,
+  `action`      VARCHAR(32) NOT NULL,
+  `detail`      VARCHAR(255) DEFAULT NULL,
+  `created_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_evidence` (`evidence_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
 --  9. SEED DATA
 --
 --  Opening balances are PLACEHOLDER FLOAT, not a balance decision. Businesses
