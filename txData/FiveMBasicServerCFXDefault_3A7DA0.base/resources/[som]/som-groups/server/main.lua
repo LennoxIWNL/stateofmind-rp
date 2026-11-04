@@ -58,6 +58,7 @@ local function remove(group, citizenid)
 
     if memberCount(group) == 0 then
         groups[group.id] = nil
+        TriggerEvent('som-groups:server:changed', group.id)
         return
     end
 
@@ -253,13 +254,9 @@ end)
 -- For job resources
 -- ---------------------------------------------------------------------------
 
----@param source number
----@return table|nil { id, leader, allReady, busy, members = { { source, citizenid, name, ready } } }
-local function describe(source)
-    local player = core:getPlayer(source)
-    local group = player and groupOf(player)
-    if not group then return nil end
-
+---@param group table
+---@return table { id, leader, allReady, busy, members = { { source, citizenid, name, ready } } }
+local function describeGroup(group)
     local out = { id = group.id, busy = group.busy, allReady = true, members = {} }
     for cid, m in pairs(group.members) do
         local member = core:getPlayerByCitizenId(cid)
@@ -271,7 +268,22 @@ local function describe(source)
     return out
 end
 
+---@param source number
+---@return table|nil
+local function describe(source)
+    local player = core:getPlayer(source)
+    local group = player and groupOf(player)
+    return group and describeGroup(group) or nil
+end
+
 exports('getGroup', describe)
+
+---@param groupId number
+---@return table|nil
+exports('getGroupById', function(groupId)
+    local group = groups[groupId]
+    return group and describeGroup(group) or nil
+end)
 
 ---Marks a group as on a job (nil clears it). Blocks invites and ready changes
 ---while set. Returns false if the group is gone.

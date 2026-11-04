@@ -63,6 +63,13 @@ Import `setup.sql` on a fresh database. A database created from an older version
 - [ ] Group size (6) and invite time (120 s) are my defaults, not from a real server. Adjust in `som-groups/shared/config.lua`.
 - [ ] Not verified live: the Groups app with two real clients (invite banner, accept, ready, kick, leave on disconnect).
 
+## Job board
+
+- [ ] `som-jobboard` is in `som.cfg` after `som-groups`.
+- [ ] The lottery numbers (draw every 20 s, 3 minute offer, weight up to 4 after 30 minutes, lock 15 minutes after 2 refusals) are my defaults. Tune after playtests.
+- [ ] A refusal lock follows the group id, so leaving and regrouping clears it.
+- [ ] No provider ships yet, so the Jobs app lists nothing until the courier run branch lands.
+
 ## Jobs to whitelist and assign
 
 - [ ] `judge`, `prosecutor`, `defender` (court), `dispatcher` (dispatch). All four are `whitelisted`.

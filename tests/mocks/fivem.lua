@@ -41,11 +41,11 @@ _G.ResetHandlers = function() handlerLists = {}; _G.Handlers = {}; _G.PendingTim
 _G.RegisteredEvents = {}
 _G.RegisterNetEvent = function(name, fn) if fn then _G.RegisteredEvents[name] = fn end end
 _G.GetGameTimer = function() return (_G.Mocks and _G.Mocks.clock) or 0 end
-_G.TriggerEvent = function(name, ...) end
+_G.TriggerEvent = function(name, ...) local h = _G.Handlers[name]; if h then h(...) end end
 _G.TriggerClientEvent = function(name, source, ...) end
 _G.RegisterCommand = function(name, fn, restricted) end
 _G.GetResourceState = function(name) return 'started' end
-_G.GetInvokingResource = function() return 'test' end
+_G.GetInvokingResource = function() return (_G.Mocks and _G.Mocks.invoking) or 'test' end
 _G.PerformHttpRequest = function() end
 _G.GetConvar = function(name, default) return default end
 
