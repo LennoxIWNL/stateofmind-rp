@@ -32,8 +32,8 @@ Built: the connection gate (`som_whitelist` convar, `/whitelist`), player report
 Designed in AUDIT.md section 18, Phase 6. Not built because it needs decisions only the owner can make:
 - Discord application form: the questions, who reviews, how a decision reaches the game (a bot command that inserts the identifier into an allow table, read by the connect handler). The `[discord]` bot's source is not in this repo, so the bot half cannot be edited here.
 - Staff tools: teleport, spectate, noclip, a report queue and a staff action audit. Existing pieces are `/removepost`, `/givedongle` and the police and court tools. A single staff resource with an audit table is the next build once the permission groups are agreed.
-- Anti-cheat rule coverage review of `Lennox-Anticheat` against speed, noclip, godmode, weapon spawn and money injection.
-- Rules text written to the enforceable standard in AUDIT.md.
+- Anti-cheat: coverage reviewed on paper in `ANTICHEAT-REVIEW.md`; a live false positive pass is still needed.
+- Rules: `RULES-DRAFT.md` is a draft in enforceable terms; the owner approves it.
 
 ## Load test with real players (not done)
 
