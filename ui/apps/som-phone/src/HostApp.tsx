@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Empty, Row, Section, callApp, usePhone } from '@som/phone-sdk'
 
 /**
@@ -7,7 +7,14 @@ import { Empty, Row, Section, callApp, usePhone } from '@som/phone-sdk'
  * and checked there. Text is set through React, never as HTML.
  */
 interface HostRow { title: string; sub?: string; action?: string; payload?: Record<string, unknown> }
-interface HostButton { label: string; action: string; payload?: Record<string, unknown>; danger?: boolean }
+interface HostButton {
+  label: string
+  action: string
+  payload?: Record<string, unknown>
+  danger?: boolean
+  /** Asks for one line of text first and sends it under `field`. */
+  prompt?: { field: string; label: string; maxLength?: number }
+}
 interface HostView {
   sections?: { title?: string; rows?: HostRow[] }[]
   buttons?: HostButton[]
@@ -18,6 +25,8 @@ export function HostApp({ id }: { id: string }) {
   const { toast } = usePhone()
   const [view, setView] = useState<HostView | null>(null)
   const [error, setError] = useState('')
+  const [asking, setAsking] = useState<number | null>(null)
+  const [text, setText] = useState('')
 
   const load = useCallback(async () => {
     const res = await callApp<{ success: boolean; error?: string; view?: HostView }>(id, 'view')
@@ -32,6 +41,14 @@ export function HostApp({ id }: { id: string }) {
     const res = await callApp(id, action, payload || {})
     if (!res.success) toast(String(res.error || 'Could not do that'), true)
     await load()
+  }
+
+  const submit = async (e: FormEvent, b: HostButton) => {
+    e.preventDefault()
+    if (!b.prompt) return
+    await act(b.action, { ...(b.payload || {}), [b.prompt.field]: text })
+    setAsking(null)
+    setText('')
   }
 
   if (error) return <div className="app-view__body"><div className="empty">{error}</div></div>
@@ -59,7 +76,15 @@ export function HostApp({ id }: { id: string }) {
         </div>
       ))}
       {(view.buttons || []).map((b, i) => (
-        <button key={i} type="button" className={`btn ${b.danger ? 'btn--danger' : 'btn--primary'}`} onClick={() => act(b.action, b.payload)}>{String(b.label).slice(0, 40)}</button>
+        asking === i && b.prompt ? (
+          <form key={i} className="form form--inline" onSubmit={(e) => void submit(e, b)}>
+            <input className="input" aria-label={String(b.prompt.label).slice(0, 40)} maxLength={Math.min(b.prompt.maxLength || 40, 120)} value={text} onChange={(e) => setText(e.target.value)} />
+            <button className="btn btn--primary" type="submit">Send</button>
+          </form>
+        ) : (
+          <button key={i} type="button" className={`btn ${b.danger ? 'btn--danger' : 'btn--primary'}`}
+            onClick={() => (b.prompt ? setAsking(i) : void act(b.action, b.payload))}>{String(b.label).slice(0, 40)}</button>
+        )
       ))}
     </div>
   )

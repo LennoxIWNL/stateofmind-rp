@@ -543,6 +543,26 @@ async function main() {
     check(calls.some((c) => c.body.action === 'save' && c.body.payload.id === undefined && c.body.payload.title === 'Fresh'), 'notes: a new note carries no id');
     await phone.screenshot({ path: path.join(SCREENSHOT_DIR, 'phone-notes.png') });
 
+    // --- A host app button that asks for one line of text. ---
+    await phone.locator('.back', { hasText: 'Home' }).click();
+    await send({ action: 'open', data: openData({ apps: [{ id: 'groups', label: 'Groups', icon: 'contacts', colour: '#64d2ff', order: 60 }] }) });
+    await phone.locator('.lock').click();
+    await phone.waitForSelector('.apps .app');
+    answers['groups:view'] = { success: true, view: {
+        sections: [{ title: 'Your group', rows: [{ title: 'Ann One (leader)', sub: 'Ready' }, { title: 'Bo Two', sub: 'Not ready', action: 'kick', payload: { member: 2 } }] }],
+        buttons: [{ label: 'Invite by number', action: 'invite', prompt: { field: 'number', label: 'Phone number', maxLength: 8 } }, { label: 'Leave group', action: 'leave', danger: true }],
+    } };
+    await phone.locator('.app', { hasText: 'Groups' }).click();
+    await phone.waitForSelector('.row__title');
+    calls.length = 0;
+    await phone.locator('.btn', { hasText: 'Invite by number' }).click();
+    check(calls.length === 0, 'host: a prompt button sends nothing until text is entered');
+    await phone.locator('input[aria-label="Phone number"]').fill('555-0003');
+    await phone.locator('.btn', { hasText: 'Send' }).click();
+    await phone.waitForTimeout(150);
+    check(calls.some((c) => c.body.app === 'groups' && c.body.action === 'invite' && c.body.payload.number === '555-0003'), 'host: the entered text is sent under the field name');
+    await phone.screenshot({ path: path.join(SCREENSHOT_DIR, 'phone-groups.png') });
+
     // Apps may import only the SDK, React and the shared types, so an app can
     // never reach around the one door to the server.
     const allowed = /^(react|@som\/phone-sdk|\.\.\/types)$/;

@@ -57,6 +57,12 @@ Import `setup.sql` on a fresh database. A database created from an older version
 - [ ] Camera and Gallery are not built. They need the image host (same one as `Config.Social.imageHosts`) and a `screenshot-basic` upload endpoint.
 - [ ] Garage cannot locate or recall a vehicle yet.
 
+## Groups
+
+- [ ] `som-groups` is in `som.cfg` after `som-launder`; confirm the boot order with the new resource.
+- [ ] Group size (6) and invite time (120 s) are my defaults, not from a real server. Adjust in `som-groups/shared/config.lua`.
+- [ ] Not verified live: the Groups app with two real clients (invite banner, accept, ready, kick, leave on disconnect).
+
 ## Jobs to whitelist and assign
 
 - [ ] `judge`, `prosecutor`, `defender` (court), `dispatcher` (dispatch). All four are `whitelisted`.

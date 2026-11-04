@@ -64,6 +64,7 @@ local function resetMocks()
     Mocks.fineFails = false
     Mocks.exported = {}
     Mocks.perks = {}
+    Mocks.apps = {}
     Mocks.jobs = { police = { business = 'lspd' }, mechanic = { business = 'bennys' }, taxi = {}, ambulance = { business = 'ems' } }
     Mocks.businesses = { lspd = { label = 'LSPD' }, bennys = { label = "Benny's" } }
     Mocks.commands = {}
@@ -177,6 +178,15 @@ local function loadPhone()
         'server/main.lua',
     })
     return phoneEnv
+end
+
+local groupsEnv
+
+local function loadGroups()
+    resetDb()
+    resetMocks()
+    groupsEnv = loader.loadResource(REPO .. 'som-groups', { 'shared/config.lua', 'server/main.lua' })
+    return groupsEnv
 end
 
 local evEnv
@@ -2370,6 +2380,119 @@ do
     act(1, 'notes', 'save', { title = string.rep('t', 90), body = string.rep('b', 3000) })
     local last = mysql.db.notes[#mysql.db.notes]
     check(#last.title == 40 and #last.body == 2000, 'notes: title and body are cut to the limits')
+end
+
+
+----------------------------------------------------------------------
+-- som-groups
+----------------------------------------------------------------------
+local function groupScene()
+    local env = loadGroups()
+    for i, n in ipairs({ { 'Ann', 'One' }, { 'Bo', 'Two' }, { 'Cy', 'Three' }, { 'Di', 'Four' } }) do
+        Mocks.players[i] = { citizenid = 'P' .. i, job = { name = 'unemployed' }, charinfo = { firstname = n[1], lastname = n[2], phone = '555-000' .. i } }
+        mysql.db.characters['555-000' .. i] = 'P' .. i
+    end
+    return env
+end
+
+local function g(source, action, payload)
+    return Mocks.apps.groups.handler(source, action, payload or {})
+end
+
+local function rowsOf(source)
+    local rows = {}
+    for _, s in ipairs(g(source, 'view').view.sections) do
+        for _, r in ipairs(s.rows or {}) do rows[#rows + 1] = r end
+    end
+    return rows
+end
+
+do
+    local env = groupScene()
+    check(Mocks.apps.groups ~= nil and Mocks.apps.groups.reads.view == true, 'groups: the app registers with the phone and marks view as a read')
+    check(g(1, 'nope').success == false and g(1, 5).success == false and Mocks.apps.groups.handler(99, 'view', {}).success == false, 'groups: an unknown action, a bad action and an unloaded player are refused')
+    check(#g(1, 'view').view.buttons == 1 and g(1, 'view').view.buttons[1].action == 'create', 'groups: with no group the only offer is to create one')
+    check(g(1, 'leave').success == false and g(1, 'ready', { ready = true }).success == false and g(1, 'invite', { number = '5550002' }).success == false,
+        'groups: nothing works without a group')
+
+    check(g(1, 'create').success == true and g(1, 'create').success == false, 'groups: a group is created once')
+    check(#rowsOf(1) == 1 and rowsOf(1)[1].title == 'Ann One (leader)' and rowsOf(1)[1].sub == 'Not ready', 'groups: the creator is the leader')
+    check(g(2, 'invite', { number = '5550003' }).success == false, 'groups: a non member cannot invite')
+    check(g(1, 'invite', { number = '5559' }).success == false and g(1, 'invite', { number = { 1 } }).success == false, 'groups: a bad number is refused')
+    check(g(1, 'invite', { number = '5550001' }).error == 'that is you', 'groups: you cannot invite yourself')
+    check(g(1, 'invite', { number = '5550009' }).error == 'that person is not around', 'groups: an unknown number is refused')
+    Mocks.players[2] = nil
+    check(g(1, 'invite', { number = '5550002' }).error == 'that person is not around', 'groups: an offline person is refused')
+    Mocks.players[2] = { citizenid = 'P2', job = { name = 'unemployed' }, charinfo = { firstname = 'Bo', lastname = 'Two', phone = '555-0002' } }
+
+    local told = {}
+    Mocks.exported.notifyApp = function(source, app, text) told[#told + 1] = { source = source, app = app, text = text } return true end
+    check(g(1, 'invite', { number = '555 0002' }).success == true and told[1].source == 2 and told[1].app == 'groups', 'groups: an invite notifies the person')
+    check(g(2, 'view').view.sections[1].title == 'Invitation' and g(2, 'view').view.sections[1].rows[1].action == 'accept', 'groups: the invited person sees the invitation')
+    check(g(3, 'accept').success == false, 'groups: only the invited can accept')
+    check(g(2, 'accept').success == true and #rowsOf(2) == 2, 'groups: accepting joins')
+    check(g(2, 'accept').success == false, 'groups: an invitation is used once')
+    check(g(2, 'invite', { number = '5550003' }).success == false, 'groups: a member who is not the leader cannot invite')
+    check(g(3, 'create').success == true and g(1, 'invite', { number = '5550003' }).error == 'they are already in a group', 'groups: someone in a group cannot be invited')
+    g(3, 'leave')
+
+    env.Config.maxSize = 2
+    check(g(1, 'invite', { number = '5550003' }).error == 'the group is full', 'groups: the size limit holds')
+    env.Config.maxSize = 6
+
+    g(1, 'invite', { number = '5550003' })
+    env.Config.inviteSeconds = 120
+    local real = os.time
+    os.time = function() return real() + 500 end
+    check(g(3, 'accept').error == 'that invitation is gone', 'groups: an invitation expires')
+    os.time = real
+    g(1, 'invite', { number = '5550003' })
+    check(g(3, 'decline').success == true and g(3, 'accept').success == false, 'groups: an invitation can be declined')
+
+    check(g(2, 'ready', { ready = 'yes' }).success == false, 'groups: ready must be a boolean')
+    check(g(2, 'ready', { ready = true }).success == true and rowsOf(1)[2].sub == 'Ready', 'groups: a member can ready up and the leader sees it')
+    check(g(2, 'kick', { member = 1 }).success == false, 'groups: a member cannot remove anyone')
+    check(g(1, 'kick', { member = 1 }).success == false, 'groups: the leader cannot remove themselves')
+    check(g(1, 'kick', { member = 999 }).success == false, 'groups: removing a stranger is refused')
+    check(g(2, 'view').view.sections[1].rows[1].action == nil and g(1, 'view').view.sections[1].rows[2].action == 'kick', 'groups: only the leader is offered removal')
+    local memberId = g(1, 'view').view.sections[1].rows[2].payload.member
+    check(g(1, 'kick', { member = memberId }).success == true and #rowsOf(2) == 0 and g(2, 'view').view.buttons[1].action == 'create', 'groups: the leader can remove a member')
+    check(told[#told].source == 2 and told[#told].text == 'You were removed from the group', 'groups: the removed person is told')
+end
+
+do
+    groupScene()
+    local told = {}
+    Mocks.exported.notifyApp = function(source, _, text) told[#told + 1] = { source = source, text = text } return true end
+    g(1, 'create')
+    for _, n in ipairs({ '5550002', '5550003' }) do g(1, 'invite', { number = n }) end
+    g(2, 'accept'); g(3, 'accept')
+
+    check(g(1, 'leave').success == true and g(2, 'view').view.sections[1].rows[1].title == 'Bo Two (leader)', 'groups: when the leader leaves the longest member leads')
+    check(told[#told].source == 2 and told[#told].text == 'You are now the group leader', 'groups: the new leader is told')
+    Handlers['som:server:playerUnloaded'](2, 'P2')
+    check(g(3, 'view').view.sections[1].rows[1].title == 'Cy Three (leader)' and #rowsOf(3) == 1, 'groups: dropping out of the game leaves the group')
+    Handlers['som:server:playerUnloaded'](3, 'P3')
+    check(g(3, 'view').view.buttons[1].action == 'create', 'groups: an emptied group is gone')
+    Handlers['som:server:playerUnloaded'](3, 5)
+end
+
+do
+    groupScene()
+    local getGroup, setBusy = Mocks.exported.getGroup, Mocks.exported.setBusy
+    check(getGroup(1) == nil, 'groups exports: no group, no answer')
+    g(1, 'create')
+    g(1, 'invite', { number = '5550002' }); g(2, 'accept')
+    local info = getGroup(2)
+    check(info.leader == 1 and #info.members == 2 and info.allReady == false and info.members[1].source ~= nil, 'groups exports: a job resource can read the members and the leader')
+    g(1, 'ready', { ready = true }); g(2, 'ready', { ready = true })
+    check(getGroup(1).allReady == true, 'groups exports: allReady is true once everyone is ready')
+
+    check(setBusy(info.id, 'Delivery run') == true and getGroup(1).busy == 'Delivery run', 'groups exports: a group can be marked busy')
+    check(g(2, 'ready', { ready = false }).success == false and g(1, 'invite', { number = '5550003' }).success == false, 'groups: a busy group cannot change ready or invite')
+    g(1, 'leave')
+    check(setBusy(info.id, nil) == true and getGroup(2).busy == nil and getGroup(2).allReady == false, 'groups exports: clearing busy resets everyone to not ready')
+    check(setBusy(999, 'x') == false, 'groups exports: an unknown group is refused')
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))
