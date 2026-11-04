@@ -3,7 +3,7 @@ name: ci
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, BetaRelease]
 
 jobs:
   rules:
@@ -19,6 +19,9 @@ jobs:
           case "${{ github.head_ref }}" in
             claude/*|ai/*|bot/*) echo "branch name must describe the work (feature/, fix/, chore/, docs/)"; exit 1 ;;
           esac
+          if [ "${{ github.head_ref }}" = "BetaRelease" ] && [ "${{ github.base_ref }}" = "main" ]; then
+            exit 0
+          fi
           if ! echo "${{ github.head_ref }}" | grep -Eq '^(feature|fix|chore|docs)/[a-z0-9]+(-[a-z0-9]+)*$'; then
             echo "branch must be feature|fix|chore|docs/<kebab-case>"; exit 1
           fi

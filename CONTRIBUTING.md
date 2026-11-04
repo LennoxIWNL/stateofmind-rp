@@ -1,12 +1,15 @@
 # Contributing
 
-This repo is a FiveM server. `main` is what the VPS runs: a push to `main`
-triggers an automatic pull on the live server, so `main` must always boot.
+This repo is a FiveM server. Each server auto-pulls its branch on push:
+the beta server runs `BetaRelease`, the live server runs `main`. Both must
+always boot.
 
 ## Branches
 
-One long-lived branch (`main`), everything else short-lived and named for what
-it does:
+Two long-lived branches: `BetaRelease` (all work lands here and is tested)
+and `main` (production, receives only `BetaRelease` after a beta pass).
+Everything else is short-lived, cut from `BetaRelease`, and named for what it
+does:
 
 | Prefix | Use | Example |
 |---|---|---|
@@ -21,14 +24,22 @@ merged.
 
 ## Making a change
 
-1. Branch from an up-to-date `main`.
+1. Branch from an up-to-date `BetaRelease`.
 2. Read `CLAUDE.md` (the rules) and the relevant `AUDIT.md` section.
 3. Keep the change to one logical unit. Add or extend tests for anything that
    touches money, ownership, sentencing or other persistence.
 4. Run the checks locally (below).
-5. Open a PR into `main`. CI must pass. Merge, then delete the branch.
+5. Open a PR into `BetaRelease`. CI must pass. Merge, then delete the branch.
 
-Never push directly to `main` and never force-push it.
+## Promoting to production
+
+When the beta server has passed the in-game checklist in the PRs, the owner
+opens a PR from `BetaRelease` into `main` and merges it with a merge commit
+(not squash), so the branches never diverge. If production needs a fix before
+the next promotion, open the `fix/` PR into `main` and merge `main` back into
+`BetaRelease` straight after.
+
+Never push directly to `BetaRelease` or `main` and never force-push either.
 
 ## Commits
 
