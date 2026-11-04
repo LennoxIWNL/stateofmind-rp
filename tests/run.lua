@@ -48,6 +48,7 @@ local function resetDb()
     mysql.db.turf = { zones = {}, events = {}, market = {} }
     mysql.db.whitelist = {}
     mysql.db.staff = { reports = {}, audit = {} }
+    mysql.db.gangs = { chars = {}, log = {} }
     mysql.db.vehicles = {}
     mysql.db.social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} }
     mysql.db.bills = {}
@@ -3201,6 +3202,103 @@ do
     Mocks.commands.spectate(3, { target = 2 })
     check(spec.target == 3 and spec.arg == 2 and mysql.db.staff.audit[5].action == 'spectate', 'staff: spectate sends the target to staff only and is audited')
     _G.TriggerClientEvent = realT
+end
+
+-- ---------------------------------------------------------------------------
+-- Gang management
+-- ---------------------------------------------------------------------------
+
+local function gangScene()
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-turf', { 'shared/config.lua', 'server/gang.lua' })
+    local function ballas(grade) return { name = 'ballas', label = 'Ballas', grade = grade, isboss = grade == 4 } end
+    local none = { name = 'none', label = 'No Gang', grade = 0, isboss = false }
+    local function char(first, last, phone, gang, grade)
+        return { citizenid = 'G' .. phone, job = { name = 'unemployed' }, gang = gang, charinfo = { firstname = first, lastname = last, phone = phone } }
+    end
+    Mocks.players = {
+        [1] = char('Big', 'Boss', '555-0001', ballas(4)),
+        [2] = char('Mem', 'Ber', '555-0002', ballas(1)),
+        [3] = char('New', 'Guy', '555-0003', none),
+        [4] = char('Sec', 'Ond', '555-0004', ballas(4)),
+    }
+    mysql.db.characters = { ['555-0001'] = 'G555-0001', ['555-0002'] = 'G555-0002', ['555-0003'] = 'G555-0003', ['555-0004'] = 'G555-0004' }
+    mysql.db.gangs.chars = {
+        ['G555-0001'] = { gang = 'ballas', grade = 4, first = 'Big', last = 'Boss' },
+        ['G555-0002'] = { gang = 'ballas', grade = 1, first = 'Mem', last = 'Ber' },
+        ['G555-0003'] = { gang = 'none', grade = 0, first = 'New', last = 'Guy' },
+        ['G555-0009'] = { gang = 'ballas', grade = 2, first = 'Off', last = 'Line' },
+    }
+    for i, p in pairs(Mocks.players) do p.source = i end
+    Mocks.gangFunds, Mocks.bank, Mocks.gangLedger, Mocks.gangFails = {}, { [1] = 1000 }, {}, false
+    for i = 1, 4 do FakePeds[i] = vec3(0, 0, 0) end
+    return env
+end
+
+local function gact(source, action, payload) return Mocks.apps.gang.handler(source, action, payload or {}) end
+
+do
+    local env = gangScene()
+    local v = gact(2, 'view').view
+    check(#v.buttons == 1 and v.buttons[1].action == 'leave', 'gang: a member sees only leave')
+    v = gact(1, 'view').view
+    check(#v.sections[1].rows == 3 and v.sections[1].rows[1].title:find('Big Boss'), 'gang: a boss sees the roster, offline members included, boss first')
+    check(#v.buttons == 6, 'gang: a boss gets the management buttons')
+    check(gact(3, 'view').view.empty == 'You are not in a gang', 'gang: a civilian sees an empty state')
+
+    check(gact(2, 'invite', { number = '5550003' }).error == 'only a boss can invite', 'gang: a member cannot invite')
+    check(gact(1, 'invite', { number = 'abc' }).error == 'that is not a phone number', 'gang: the number is validated')
+    check(gact(1, 'invite', { number = '5559999' }).error == 'that person is not around', 'gang: an unknown number is refused')
+    check(gact(1, 'invite', { number = '5550002' }).error == 'they are already in a gang', 'gang: someone in a gang cannot be invited')
+    FakePeds[3] = vec3(500, 0, 0)
+    check(gact(1, 'invite', { number = '5550003' }).error == 'they need to be next to you', 'gang: invites need distance')
+    FakePeds[3] = vec3(0, 0, 0)
+    local inv = gact(1, 'invite', { number = '555-0003' })
+    check(inv.success == true, 'gang: a boss can invite a nearby civilian')
+    check(gact(3, 'view').view.sections[1].title == 'Invitation', 'gang: the invitee sees the invitation')
+    check(gact(3, 'accept').success == true and mysql.db.gangs.chars['G555-0003'].gang == 'ballas' and Mocks.players[3].gang.name == 'ballas', 'gang: accepting joins at the lowest rank, in the database and live')
+    check(gact(3, 'accept').error == 'you are already in a gang' and mysql.db.gangs.log[1].action == 'join', 'gang: joining is logged and not repeatable')
+
+    gact(1, 'view')
+    local rows = gact(1, 'view').view.sections[1].rows
+    local function indexOf(name) for i, r in ipairs(rows) do if r.title:find(name) then return tostring(i) end end end
+    local mem, off = indexOf('Mem Ber'), indexOf('Off Line')
+    check(gact(1, 'rank', { step = 2, member = mem }).error == 'bad request', 'gang: rank steps are validated')
+    check(gact(1, 'rank', { step = 1, member = mem }).success == true and mysql.db.gangs.chars['G555-0002'].grade == 2 and Mocks.players[2].gang.grade == 2, 'gang: a boss can promote an online member')
+    check(gact(1, 'rank', { step = -1, member = off }).success == true and mysql.db.gangs.chars['G555-0009'].grade == 1, 'gang: an offline member can be demoted')
+    check(gact(1, 'rank', { step = 1, member = indexOf('Big Boss') }).error == 'that is you', 'gang: a boss cannot rank themselves')
+    check(gact(2, 'rank', { step = 1, member = mem }).error == 'only a boss can change ranks', 'gang: a member cannot rank anyone')
+    check(gact(1, 'rank', { step = 1, member = '99' }).error == 'open the app again, then pick a member', 'gang: an unknown member number is refused')
+
+    mysql.db.gangs.chars['G555-0002'].grade = 4
+    Mocks.players[2].gang = { name = 'ballas', label = 'Ballas', grade = 4, isboss = true }
+    check(gact(1, 'kick', { member = mem }).error == 'they outrank you or match your rank', 'gang: a boss cannot touch a peer')
+    mysql.db.gangs.chars['G555-0002'].grade = 2
+    Mocks.players[2].gang = { name = 'ballas', label = 'Ballas', grade = 2, isboss = false }
+    rows = gact(1, 'view').view.sections[1].rows
+    mem, off = indexOf('Mem Ber'), indexOf('Off Line')
+    check(gact(1, 'kick', { member = mem }).success == true and mysql.db.gangs.chars['G555-0002'].gang == 'none' and Mocks.players[2].gang.name == 'none', 'gang: a boss can remove a member')
+    check(gact(1, 'kick', { member = off }).success == true and mysql.db.gangs.chars['G555-0009'].gang == 'none', 'gang: an offline member can be removed')
+    check(gact(1, 'kick', { member = off }).error == 'they are not in the gang any more', 'gang: a stale removal does nothing')
+
+    check(gact(1, 'leave').error == 'promote someone to boss before you leave', 'gang: the last boss cannot walk away')
+end
+
+do
+    local env = gangScene()
+    check(gact(2, 'deposit', { amount = '100' }).error == 'only a boss can pay in', 'gang: a member cannot deposit')
+    check(gact(1, 'deposit', { amount = '1.5' }).success == false and gact(1, 'deposit', { amount = '-5' }).success == false and gact(1, 'deposit', { amount = '999999' }).success == false, 'gang: deposit amounts are validated')
+    check(gact(1, 'deposit', { amount = '5000' }).error == 'not enough in your bank', 'gang: you cannot deposit what you do not have')
+    check(gact(1, 'deposit', { amount = '400' }).success == true and Mocks.bank[1] == 600 and Mocks.gangFunds.ballas == 400, 'gang: a deposit moves money from the boss to the account')
+    Mocks.gangFails = true
+    local paid0 = Mocks.paid or 0
+    check(gact(1, 'deposit', { amount = '100' }).success == false and (Mocks.paid or 0) == paid0 + 100, 'gang: a failed credit refunds the boss')
+    Mocks.gangFails = false
+    check(mysql.db.gangs.log[#mysql.db.gangs.log].action == 'deposit', 'gang: deposits are logged')
+    check(gact(1, 'leave').error ~= nil, 'gang: (setup) a lone boss cannot leave')
+    gact(4, 'view')
+    mysql.db.gangs.chars['G555-0004'] = { gang = 'ballas', grade = 4, first = 'Sec', last = 'Ond' }
+    check(gact(1, 'leave').success == true and Mocks.players[1].gang.name == 'none', 'gang: a boss can leave when another boss remains')
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))

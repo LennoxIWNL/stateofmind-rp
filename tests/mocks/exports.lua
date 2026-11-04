@@ -70,6 +70,35 @@ function core:addMoney(source, account, amount, reason)
     Mocks.lastPaid = { account = account, amount = amount, reason = reason }
     return true
 end
+Mocks.gangDefs = {
+    none = { label = 'No Gang', grades = { [0] = { name = 'Unaffiliated' } } },
+    ballas = { label = 'Ballas', grades = { [0] = { name = 'Recruit' }, [1] = { name = 'Member' }, [2] = { name = 'Shot Caller' }, [3] = { name = 'Lieutenant' }, [4] = { name = 'Boss', isboss = true } } },
+}
+Mocks.gangFunds = {}
+Mocks.bank = {}
+function core:getGangs() return Mocks.gangDefs end
+function core:setGang(source, gang, grade)
+    local def = Mocks.gangDefs[gang]
+    local p = Mocks.players[source]
+    if not def or not p or not def.grades[grade] then return false end
+    p.gang = { name = gang, label = def.label, grade = grade, gradeLabel = def.grades[grade].name, isboss = def.grades[grade].isboss or false }
+    return true
+end
+function core:getGangBalance(gang) return Mocks.gangFunds[gang] or 0 end
+function core:gangTransact(gang, amount, reason)
+    if Mocks.gangFails then return false, 'refused' end
+    local balance = (Mocks.gangFunds[gang] or 0) + amount
+    if balance < 0 then return false, 'insufficient gang funds' end
+    Mocks.gangFunds[gang] = balance
+    Mocks.gangLedger = Mocks.gangLedger or {}
+    Mocks.gangLedger[#Mocks.gangLedger + 1] = { gang = gang, amount = amount, reason = reason }
+    return true
+end
+function core:removeMoney(source, account, amount, reason)
+    if (Mocks.bank[source] or 0) < amount then return false, 'insufficient funds' end
+    Mocks.bank[source] = Mocks.bank[source] - amount
+    return true
+end
 function core:businessTransact(name, amount, reason)
     Mocks.calls.businessTransact = Mocks.calls.businessTransact + 1
     Mocks.lastTransact = { name = name, amount = amount }
