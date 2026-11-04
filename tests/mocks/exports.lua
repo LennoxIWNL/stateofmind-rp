@@ -63,6 +63,12 @@ function core:businessTransact(name, amount, reason)
     Mocks.lastTransact = { name = name, amount = amount }
     return true
 end
+function core:treasuryTransact(delta, reason)
+    Mocks.treasury = Mocks.treasury or 0
+    if Mocks.treasury + delta < 0 then return false, 'insufficient treasury funds' end
+    Mocks.treasury = Mocks.treasury + delta
+    return true
+end
 function core:hasPermission(source, ace)
     return Mocks.admins[source] == true
 end
@@ -166,6 +172,18 @@ local registry = {
         return fn and function(_, ...) return fn(...) end or nil
     end }),
     ['som-groups'] = setmetatable({}, { __index = function(_, name)
+        local fn = Mocks.exported[name]
+        return fn and function(_, ...) return fn(...) end or nil
+    end }),
+    ['som-hack'] = setmetatable({}, { __index = function(_, name)
+        local fn = Mocks.exported[name]
+        return fn and function(_, ...) return fn(...) end or nil
+    end }),
+    ['som-launder'] = setmetatable({}, { __index = function(_, name)
+        local fn = Mocks.exported[name]
+        return fn and function(_, ...) return fn(...) end or nil
+    end }),
+    ['ox_doorlock'] = setmetatable({}, { __index = function(_, name)
         local fn = Mocks.exported[name]
         return fn and function(_, ...) return fn(...) end or nil
     end }),

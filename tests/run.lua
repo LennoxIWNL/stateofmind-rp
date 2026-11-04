@@ -44,6 +44,7 @@ local function resetDb()
     mysql.db.phoneCalls = {}
     mysql.db.phoneAudit = {}
     mysql.db.notes = {}
+    mysql.db.heist = { dongles = {}, runs = {} }
     mysql.db.vehicles = {}
     mysql.db.social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} }
     mysql.db.bills = {}
@@ -64,6 +65,7 @@ local function resetMocks()
     Mocks.fineFails = false
     Mocks.exported = {}
     Mocks.perks = {}
+    Mocks.treasury = 0
     Mocks.apps = {}
     Mocks.jobs = { police = { business = 'lspd' }, mechanic = { business = 'bennys' }, taxi = {}, ambulance = { business = 'ems' } }
     Mocks.businesses = { lspd = { label = 'LSPD' }, bennys = { label = "Benny's" } }
@@ -2784,6 +2786,195 @@ do
     g(2, 'leave')
     check(seen[#seen].target == 2 and seen[#seen].goal == nil and interact(2, 'pickup').error == 'you have no delivery', 'courier: a member who leaves the group is dropped from the run and cleared')
     check(interact(1, 'pickup').success == true, 'courier: the rest of the crew carries on')
+    restore()
+end
+
+
+----------------------------------------------------------------------
+-- som-heists
+----------------------------------------------------------------------
+local heistEnv
+
+local function heistScene(open)
+    boardScene()
+    heistEnv = loader.loadResource(REPO .. 'som-heists', { 'shared/config.lua', 'server/main.lua' })
+    Mocks.players[5] = { citizenid = 'P5', job = { name = 'police', onduty = true }, charinfo = { firstname = 'Po', lastname = 'Lice', phone = '555-0005' } }
+    Mocks.treasury = 50000
+    Mocks.inv[1], Mocks.inv[2] = {}, {}
+    Mocks.hackResult = true
+    Mocks.hacks, Mocks.doors, Mocks.minted = {}, {}, {}
+    Mocks.exported.run = function(_, kind, level) Mocks.hacks[#Mocks.hacks + 1] = kind .. ':' .. level; return Mocks.hackResult end
+    Mocks.exported.getDoorFromName = function(name) return { id = name == 'vault_door' and 7 or nil } end
+    Mocks.exported.setDoorState = function(id, state) Mocks.doors[#Mocks.doors + 1] = { id = id, state = state } end
+    Mocks.exported.mintBills = function(_, worths, tag) Mocks.minted[#Mocks.minted + 1] = { worths = worths, tag = tag }; return { 'x' } end
+    if open ~= false then
+        local site = heistEnv.Config.sites[1]
+        site.enabled, site.terminal, site.doors = true, vec3(0, 0, 0), { 'vault_door' }
+        site.lootPoints = { vec3(50, 0, 0), vec3(100, 0, 0) }
+    end
+    local seen = {}
+    local real = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, payload)
+        if name == 'som-heists:client:objective' then seen[#seen + 1] = { target = target, goal = payload } end
+    end
+    return heistEnv, seen, function() _G.TriggerClientEvent = real end
+end
+
+local function hinteract(source, kind) return RegisteredCallbacks['som-heists:server:interact'](source, kind) end
+
+local function heistCrew(size, withDongle)
+    crew(size)
+    if withDongle ~= false then Mocks.exported.mintDongle(1, 'test') end
+end
+
+do
+    local env, _, restore = heistScene(false)
+    heistCrew(1, true)
+    check(j(1, 'queue', { provider = 'heist_store' }).error == 'no sites are open yet', 'heist: every site ships disabled, so nothing can start')
+    restore()
+end
+
+do
+    local env, seen, restore = heistScene()
+    crew(1)
+    check(j(1, 'queue', { provider = 'heist_store' }).error == 'the leader needs a Trojan USB', 'heist: a run needs a dongle')
+    Mocks.inv[1][90] = { name = 'trojan_usb', count = 1, slot = 90, metadata = { uid = '0123456789ABCDEF' } }
+    check(j(1, 'queue', { provider = 'heist_store' }).error == 'the leader needs a Trojan USB', 'heist: a forged dongle with no ledger row does nothing')
+    Mocks.inv[1][90] = nil
+    Mocks.inv[1][91] = { name = 'trojan_usb', count = 1, slot = 91, metadata = {} }
+    check(j(1, 'queue', { provider = 'heist_store' }).error == 'the leader needs a Trojan USB', 'heist: a dongle with no uid does nothing')
+    Mocks.inv[1][91] = nil
+
+    Mocks.players[5] = nil
+    Mocks.exported.mintDongle(1, 'test')
+    check(j(1, 'queue', { provider = 'heist_store' }).error == 'the city is too quiet for this', 'heist: not enough police on duty means no heist')
+    Mocks.players[5] = { citizenid = 'P5', job = { name = 'police', onduty = true }, charinfo = { firstname = 'Po', lastname = 'Lice', phone = '555-0005' } }
+    check(j(1, 'queue', { provider = 'heist_store' }).success == true, 'heist: with a dongle, police and an open site a group can wait')
+
+    local uid
+    for u in pairs(mysql.db.heist.dongles) do uid = u end
+    local picked = boardEnv.JobBoard.Draw('heist_store')
+    check(j(1, 'accept').success == true and mysql.db.heist.dongles[uid].status == 'used', 'heist: starting spends the dongle in the ledger')
+    check(Mocks.exported.getGroup(1).busy == 'Store robbery' and #seen == 1 and seen[1].goal.kind == 'hack', 'heist: the crew is sent to the terminal')
+    local copies = 0
+    for _, it in pairs(Mocks.inv[1]) do if it.name == 'trojan_usb' then copies = copies + 1 end end
+    check(copies == 0, 'heist: the item is taken from the leader')
+    Mocks.inv[1][92] = { name = 'trojan_usb', count = 1, slot = 92, metadata = { uid = uid } }
+    check(Mocks.exported.finish(picked) == true, 'heist: (setup) end the run to test the copy')
+    check(j(1, 'view').view.sections[1].rows[1].action == nil, 'heist: a duplicated, already used dongle cannot start another run')
+    restore()
+end
+
+do
+    local env, seen, restore = heistScene()
+    heistCrew(1)
+    j(1, 'queue', { provider = 'heist_store' }); boardEnv.JobBoard.Draw('heist_store'); j(1, 'accept')
+    FakePeds[1] = vec3(0, 0, 0)
+
+    check(hinteract(1, 'loot').error == 'not yet' and hinteract(1, 'nope').success == false and hinteract(9, 'hack').error == 'you are not on a job', 'heist: stages are in order and outsiders are refused')
+    FakePeds[1] = vec3(500, 0, 0)
+    check(hinteract(1, 'hack').error == 'you are too far away', 'heist: the server checks the distance to the terminal')
+    FakePeds[1] = vec3(0, 0, 0)
+
+    Mocks.hackResult = false
+    check(hinteract(1, 'hack').error == 'that did not work', 'heist: a failed hack is a failed hack')
+    check(Mocks.calls.dispatchAlert == 1 and Mocks.lastAlertType == 'heistInProgress' and Mocks.lastAlertExtra.coords.x == 0, 'heist: the alarm goes to dispatch at the site, once')
+    Mocks.hackResult = true
+    check(hinteract(1, 'hack').success == true and Mocks.calls.dispatchAlert == 1, 'heist: a later success does not raise a second alarm')
+    check(Mocks.hacks[1] == 'memory:easy' and #Mocks.doors == 1 and Mocks.doors[1].id == 7 and Mocks.doors[1].state == 0, 'heist: the tier picks the puzzle and the vault door opens')
+    check(seen[#seen].goal.kind == 'loot' and seen[#seen].goal.index == 1, 'heist: the loot objective follows the hack')
+    check(hinteract(1, 'hack').error == 'not yet', 'heist: the hack cannot be repeated for free')
+
+    local treasury0, paid0 = Mocks.treasury, Mocks.calls.addMoney
+    FakePeds[1] = vec3(0, 0, 0)
+    check(hinteract(1, 'loot').error == 'you are too far away', 'heist: loot needs you at the loot point')
+    FakePeds[1] = vec3(50, 0, 0)
+    check(hinteract(1, 'loot').success == true, 'heist: taking loot works at the loot point')
+    local cleanPaid = treasury0 - Mocks.treasury
+    check(cleanPaid > 0 and Mocks.calls.addMoney == paid0 + 1 and Mocks.lastPaid.amount == cleanPaid, 'heist: clean cash comes out of the treasury, exactly what the player receives')
+    check(#Mocks.minted == 1 and Mocks.minted[1].worths[1] == 300 and Mocks.minted[1].tag == 'heist:store_1', 'heist: marked bills are minted through the launder ledger')
+    check(Mocks.treasury == treasury0 - cleanPaid, 'heist: the treasury is not charged for marked bills')
+    FakePeds[1] = vec3(100, 0, 0)
+    hinteract(1, 'loot')
+    check(Mocks.exported.getGroup(1).busy == nil and mysql.db.heist.runs[1].status == 'done', 'heist: the last point ends the run and frees the group')
+    check(hinteract(1, 'loot').error == 'you are not on a job' and seen[#seen].goal == nil, 'heist: nothing more to take, clients are cleared')
+
+    heistCrew(1, false)
+    Mocks.exported.mintDongle(1, 'test')
+    g(1, 'ready', { ready = true })
+    check(j(1, 'queue', { provider = 'heist_store' }).success == true, 'heist: (setup) a second group queues')
+    boardEnv.JobBoard.Draw('heist_store')
+    check(j(1, 'accept').success == false and Mocks.exported.getGroup(1).busy == nil, 'heist: the site is on cooldown after a run')
+    local spentAfter
+    for _, d in pairs(mysql.db.heist.dongles) do if d.status == 'issued' then spentAfter = true end end
+    check(spentAfter == true, 'heist: a dongle is not spent when no site could be claimed')
+    restore()
+end
+
+do
+    local env, seen, restore = heistScene()
+    heistCrew(1)
+    j(1, 'queue', { provider = 'heist_store' }); boardEnv.JobBoard.Draw('heist_store'); j(1, 'accept')
+    FakePeds[1] = vec3(0, 0, 0)
+    Mocks.hackResult = false
+    hinteract(1, 'hack')
+    check(hinteract(1, 'hack').error == 'the system locked you out' and mysql.db.heist.runs[1].status == 'failed' and Mocks.exported.getGroup(1).busy == nil,
+        'heist: two failed hacks lock the crew out and end the run')
+    restore()
+
+    env, seen, restore = heistScene()
+    env.Config.tiers.store.hourlyCleanCap = 100
+    heistCrew(1)
+    j(1, 'queue', { provider = 'heist_store' }); boardEnv.JobBoard.Draw('heist_store'); j(1, 'accept')
+    FakePeds[1] = vec3(0, 0, 0); hinteract(1, 'hack')
+    local t0 = Mocks.treasury
+    FakePeds[1] = vec3(50, 0, 0); hinteract(1, 'loot')
+    FakePeds[1] = vec3(100, 0, 0); hinteract(1, 'loot')
+    check(t0 - Mocks.treasury == 100, 'heist: the hourly clean cash cap holds across a run')
+    restore()
+
+    env, seen, restore = heistScene()
+    Mocks.treasury = 0
+    heistCrew(1)
+    j(1, 'queue', { provider = 'heist_store' }); boardEnv.JobBoard.Draw('heist_store'); j(1, 'accept')
+    FakePeds[1] = vec3(0, 0, 0); hinteract(1, 'hack')
+    local m0 = Mocks.calls.addMoney
+    FakePeds[1] = vec3(50, 0, 0); hinteract(1, 'loot')
+    check(Mocks.calls.addMoney == m0 and Mocks.treasury == 0 and #Mocks.minted == 1, 'heist: an empty treasury pays no clean cash and creates none, bills are unaffected')
+    restore()
+
+    env, seen, restore = heistScene()
+    heistCrew(1)
+    j(1, 'queue', { provider = 'heist_store' }); boardEnv.JobBoard.Draw('heist_store'); j(1, 'accept')
+    FakePeds[1] = vec3(0, 0, 0); hinteract(1, 'hack')
+    Mocks.addMoneyFails = true
+    local before = Mocks.treasury
+    FakePeds[1] = vec3(50, 0, 0); hinteract(1, 'loot')
+    check(Mocks.treasury == before, 'heist: a failed credit returns the money to the treasury')
+    Mocks.addMoneyFails = false
+    restore()
+end
+
+do
+    local env, seen, restore = heistScene()
+    heistCrew(1)
+    j(1, 'queue', { provider = 'heist_store' }); boardEnv.JobBoard.Draw('heist_store'); j(1, 'accept')
+    local real = os.time
+    os.time = function() return real() + env.Config.minutes * 60 + 5 end
+    env.Heists.Sweep()
+    os.time = real
+    check(mysql.db.heist.runs[1].status == 'failed' and Mocks.exported.getGroup(1).busy == nil, 'heist: a run that runs out of time fails and frees the group')
+
+    local cmd = Mocks.commands.givedongle
+    local said
+    local realT = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, text) if name == 'som:client:notify' then said = text end end
+    cmd(2, { target = 2 })
+    check(said == 'You do not have permission to do that', 'heist: only an admin can issue a dongle')
+    Mocks.admins[2] = true
+    cmd(2, { target = 2 })
+    check(said:find('Issued dongle'), 'heist: an admin can issue a ledger backed dongle')
+    _G.TriggerClientEvent = realT
     restore()
 end
 

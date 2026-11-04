@@ -77,6 +77,18 @@ Import `setup.sql` on a fresh database. A database created from an older version
 - [ ] The carry animation and the blip sprite 478 are unchecked guesses.
 - [ ] Not verified live: a crew doing a full run, the zone and progress bar, pay arriving per member.
 
+## Heists
+
+- [ ] `setup.sql` 7j: `som_heist_dongles` and `som_heist_runs`.
+- [ ] EVERY site in `som-heists/shared/config.lua` is disabled with no coordinates. For each of store, small bank and vault: terminal, loot points, `ox_doorlock` door names, then set `enabled = true` and test a full run.
+- [ ] Tier numbers (police 1 / 3 / 5, cooldowns 45 / 90 / 240 min, clean cash and hourly caps, marked bill counts) are my defaults. Tune them against the real economy.
+- [ ] The treasury balance starts at 0, so clean cash pays nothing until it holds money.
+- [ ] Dongles only come from `/givedongle` and `exports['som-heists']:mintDongle`. Decide the in-world source (fence, crafting with a ledger row, drug economy). ox_inventory's own crafting recipe for `trojan_usb` produces a copy with no ledger row, so it does nothing: remove or repoint it.
+- [ ] Check `ox_doorlock`'s `setDoorState` works when called from another resource's server code (it reads the event `source`).
+- [ ] Optional convar `som_heist_webhook` for heist start and end logs.
+- [ ] Not verified live: any part of a heist in a game.
+- [ ] Not built: intel rows and per-heist custom stages (hack then loot is the only shape).
+
 ## Jobs to whitelist and assign
 
 - [ ] `judge`, `prosecutor`, `defender` (court), `dispatcher` (dispatch). All four are `whitelisted`.
