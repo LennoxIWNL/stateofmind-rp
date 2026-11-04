@@ -47,7 +47,13 @@ _G.RegisterCommand = function(name, fn, restricted) end
 _G.GetResourceState = function(name) return 'started' end
 _G.GetInvokingResource = function() return (_G.Mocks and _G.Mocks.invoking) or 'test' end
 _G.PerformHttpRequest = function() end
-_G.GetConvar = function(name, default) return default end
+_G.GetConvar = function(name, default)
+    local v = _G.Mocks and _G.Mocks.convars and _G.Mocks.convars[name]
+    if v ~= nil then return v end
+    return default
+end
+_G.GetNumPlayerIdentifiers = function(source) return #((_G.Mocks and _G.Mocks.identifiers and _G.Mocks.identifiers[source]) or {}) end
+_G.GetPlayerIdentifier = function(source, i) return _G.Mocks.identifiers[source][i + 1] end
 
 -- Player positions, settable per test via placePed() in run.lua.
 _G.FakePeds = {}

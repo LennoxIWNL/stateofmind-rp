@@ -31,6 +31,7 @@ M.db = {
     notes = {},
     heist = { dongles = {}, runs = {} },
     turf = { zones = {}, events = {}, market = {} },
+    whitelist = {},
     vehicles = {},
     social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} },
     nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
@@ -400,6 +401,22 @@ local function heist(kind, query, params)
     return false
 end
 
+local function whitelist(kind, query, params)
+    local W = M.db.whitelist
+    if kind == 'update' and query:find('INSERT IGNORE INTO som_whitelist', 1, true) then
+        if W[params[1]] then return true, 0 end
+        W[params[1]] = { note = params[2], added_by = params[3] }
+        return true, 1
+    elseif kind == 'update' and query:find('DELETE FROM som_whitelist WHERE identifier = ?', 1, true) then
+        local had = W[params[1]] ~= nil
+        W[params[1]] = nil
+        return true, had and 1 or 0
+    elseif kind == 'scalar' and query:find('SELECT 1 FROM som_whitelist WHERE identifier = ?', 1, true) then
+        return true, W[params[1]] and 1 or nil
+    end
+    return false
+end
+
 local function turf(kind, query, params)
     local T = M.db.turf
     local function has(text) return query:find(text, 1, true) ~= nil end
@@ -532,6 +549,7 @@ function M.scalar(query, params)
     do local handled, value = city('scalar', query, params); if handled then return value end end
     do local handled, value = heist('scalar', query, params); if handled then return value end end
     do local handled, value = turf('scalar', query, params); if handled then return value end end
+    do local handled, value = whitelist('scalar', query, params); if handled then return value end end
     if query:find('SELECT role FROM som_property_owners WHERE property_id = ? AND citizenid = ?', 1, true) then
         local o = findOwner(params[1], params[2])
         return o and o.role or nil
@@ -631,6 +649,7 @@ function M.update(query, params)
     do local handled, value = city('update', query, params); if handled then return value end end
     do local handled, value = heist('update', query, params); if handled then return value end end
     do local handled, value = turf('update', query, params); if handled then return value end end
+    do local handled, value = whitelist('update', query, params); if handled then return value end end
     if query:find('SET for_sale = 0 WHERE id = ? AND for_sale = 1', 1, true) then
         local p = findProperty(tonumber(params[1]))
         if p and tonumber(p.for_sale) == 1 then
