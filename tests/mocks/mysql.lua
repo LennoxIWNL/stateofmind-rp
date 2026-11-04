@@ -156,16 +156,22 @@ function M.update(query, params)
         end
         return n
     end
-    if query:find('UPDATE som_jail_sentences SET status = ?, released_at', 1, true) then
+    if query:find('SET status = ?, released_at = CURRENT_TIMESTAMP, released_by = ?', 1, true) then
         local s = findSentence(params[3])
-        if not s then return 0 end
+        if not s or s.status ~= 'serving' then return 0 end
         s.status = params[1]
         s.released_by = params[2]
         return 1
     end
+    if query:find("SET status = 'serving', released_at = NULL", 1, true) then
+        local s = findSentence(params[1])
+        if not s or s.status ~= 'bailed' then return 0 end
+        s.status = 'serving'
+        return 1
+    end
     if query:find("UPDATE som_jail_sentences SET status = 'absconded' WHERE id = ?", 1, true) then
         local s = findSentence(params[1])
-        if not s then return 0 end
+        if not s or s.status ~= 'serving' then return 0 end
         s.status = 'absconded'
         return 1
     end

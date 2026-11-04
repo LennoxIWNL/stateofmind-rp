@@ -4,7 +4,7 @@
 
 local Mocks = {}
 
-Mocks.calls = { payWith = 0, addMoney = 0, businessSpend = 0, dispatchAlert = 0 }
+Mocks.calls = { payWith = 0, addMoney = 0, businessSpend = 0, dispatchAlert = 0, businessTransact = 0 }
 Mocks.players = {}          -- players[source] = { citizenid = ..., job = ... }
 Mocks.payWithFails = false
 Mocks.businessSpendFails = false
@@ -30,6 +30,11 @@ function core:payWith(source, account, amount, reason)
 end
 function core:addMoney(source, account, amount, reason)
     Mocks.calls.addMoney = Mocks.calls.addMoney + 1
+    return true
+end
+function core:businessTransact(name, amount, reason)
+    Mocks.calls.businessTransact = Mocks.calls.businessTransact + 1
+    Mocks.lastTransact = { name = name, amount = amount }
     return true
 end
 function core:paymentOptions(source) return {} end

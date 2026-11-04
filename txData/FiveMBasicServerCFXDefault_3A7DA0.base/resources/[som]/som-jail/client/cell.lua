@@ -1,9 +1,5 @@
---- The cell itself: arriving, the bail prompt, leaving.
----
---- No bucket, no void. Bolingbroke is real, shared, vanilla world geometry,
---- so there is nothing to build here beyond the teleport and a key prompt —
---- see shared/config.lua's header for why isolating inmates the way
---- som-housing isolates shells would be worse for this, not better.
+--- The cell: arriving, the bail prompt, leaving. Bolingbroke is shared vanilla
+--- geometry, so there is no bucket or void, only a teleport and a key prompt.
 
 local serving = false
 
@@ -34,16 +30,11 @@ RegisterNetEvent('som-jail:client:released', function(freedom)
     teleportTo(freedom)
 end)
 
---- Asked on spawn, not assumed false, so a relog mid-sentence still shows
---- the bail prompt — see server/jail.lua's myStatus callback.
+--- Asked on spawn so a relog mid-sentence still shows the bail prompt.
 RegisterNetEvent('som:client:playerLoaded', function()
     local res = lib.callback.await('som-jail:server:myStatus', false)
     serving = res and res.serving == true
 end)
-
--- ---------------------------------------------------------------------------
--- Request Bail
--- ---------------------------------------------------------------------------
 
 local function requestBail()
     local quote = lib.callback.await('som-jail:server:bailQuote', false)
@@ -67,9 +58,8 @@ local function requestBail()
     end
 end
 
---- No fixed anchor to aim at (a shared yard, not a door), so a key prompt
---- rather than a som-interact zone — the same choice som-housing's
---- shell-exit makes and for the same reason.
+--- No fixed anchor in a shared yard, so a key prompt rather than a som-interact
+--- zone, as with som-housing's shell exit.
 CreateThread(function()
     while true do
         local wait = 500

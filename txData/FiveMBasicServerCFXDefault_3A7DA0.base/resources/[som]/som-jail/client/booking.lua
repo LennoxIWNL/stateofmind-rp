@@ -1,9 +1,5 @@
---- The officer side: "Book into jail" on a cuffed player.
----
---- The eye is left alone deliberately, same note som-police's custody.lua
---- makes: canInteract here is a cheap client-side filter, not the real
---- check. The server re-validates on-duty, distance and cuffed state
---- itself, the same as every other verb in this codebase.
+--- The officer side: "Book into jail" on a cuffed player. The server
+--- re-validates duty, distance and cuffed state.
 
 local function serverIdOf(entity)
     local player = NetworkGetPlayerIndexFromPed(entity)

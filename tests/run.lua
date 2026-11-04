@@ -34,7 +34,7 @@ local function resetDb()
 end
 
 local function resetMocks()
-    Mocks.calls = { payWith = 0, addMoney = 0, businessSpend = 0, dispatchAlert = 0 }
+    Mocks.calls = { payWith = 0, addMoney = 0, businessSpend = 0, dispatchAlert = 0, businessTransact = 0 }
     Mocks.players = {}
     Mocks.payWithFails = false
     Mocks.businessSpendFails = false
@@ -194,6 +194,152 @@ do
     check(r.commission == 0, 'mortgage: commission should be reported as 0 when the business debit fails')
     check(Mocks.calls.addMoney == addMoneyBefore,
         'mortgage: the realtor must never be paid when the business debit fails (no minted money)')
+end
+
+----------------------------------------------------------------------
+-- som-jail: booking, sweep, abscond, bail
+----------------------------------------------------------------------
+local function jailScene(months)
+    local env = loadJail()
+    Mocks.players[1] = { citizenid = 'OFFICER', job = { name = 'police', onduty = true } }
+    Mocks.players[2] = { citizenid = 'INMATE', job = { name = 'unemployed' } }
+    placePed(1, 0.0, 0.0, 0.0)
+    placePed(2, 1.0, 0.0, 0.0)
+    setCuffed(2, true)
+    local book = RegisteredCallbacks['som-jail:server:book']
+    local res = months and book(1, { target = 2, months = months }) or nil
+    return env, book, res
+end
+
+do
+    local env, book = jailScene()
+    check(book(1, { target = 2, months = 0 }).success == false, 'book: 0 months should be refused')
+    check(book(1, { target = 2, months = 25 }).success == false, 'book: over maxMonths should be refused')
+    check(book(1, { target = 2, months = 'x' }).success == false, 'book: non-numeric months should be refused')
+    check(book(1, 'junk').success == false, 'book: a non-table payload should be refused')
+    check(#mysql.db.jailSentences == 0, 'book: refused requests must write no sentence')
+
+    Mocks.players[1].job.onduty = false
+    check(book(1, { target = 2, months = 3 }).success == false, 'book: an off duty officer should be refused')
+    Mocks.players[1].job.onduty = true
+
+    Mocks.players[1].job.name = 'unemployed'
+    check(book(1, { target = 2, months = 3 }).success == false, 'book: a non officer should be refused')
+    Mocks.players[1].job.name = 'police'
+
+    placePed(2, 50.0, 0.0, 0.0)
+    check(book(1, { target = 2, months = 3 }).success == false, 'book: a target out of reach should be refused')
+    placePed(2, 1.0, 0.0, 0.0)
+
+    setCuffed(2, false)
+    check(book(1, { target = 2, months = 3 }).success == false, 'book: an uncuffed target should be refused')
+    setCuffed(2, true)
+    check(#mysql.db.jailSentences == 0, 'book: no refusal path may leave a sentence behind')
+end
+
+do
+    local env, book, res = jailScene(3)
+    check(res.success == true, 'book: a valid booking should succeed')
+    local s = mysql.db.jailSentences[1]
+    check(s and s.status == 'serving' and s.total_seconds == 3 * env.Config.Cell.secondsPerMonth,
+        'book: sentence length must be derived server side from months')
+    check(Mocks.players[2].metadata.cuffed == false, 'book: booking should clear the cuffed flag')
+
+    setCuffed(2, true)
+    check(book(1, { target = 2, months = 3 }).success == false, 'book: an inmate already serving cannot be booked twice')
+    check(#mysql.db.jailSentences == 1, 'book: double booking must not add a second row')
+end
+
+do
+    local env = jailScene(3)
+    local s = mysql.db.jailSentences[1]
+    mysql.fakeNow = s.booked_at + s.total_seconds - 1
+    placePed(2, env.Config.Cell.yard.x, env.Config.Cell.yard.y, env.Config.Cell.yard.z)
+    env.Jail.Sweep()
+    check(s.status == 'serving', 'sweep: a sentence not yet served stays serving')
+
+    mysql.fakeNow = s.booked_at + s.total_seconds
+    env.Jail.Sweep()
+    check(s.status == 'released', 'sweep: a served sentence is released')
+end
+
+do
+    local env, book = jailScene(3)
+    local s = mysql.db.jailSentences[1]
+    placePed(2, 0.0, 0.0, 0.0)
+    env.Jail.Sweep()
+    check(s.status == 'absconded', 'sweep: leaving the yard radius flags the sentence absconded')
+    check(Mocks.calls.dispatchAlert == 1 and Mocks.lastAlertType == env.Config.AbscondAlert,
+        'sweep: an absconder raises exactly one dispatch alert')
+    env.Jail.Sweep()
+    check(Mocks.calls.dispatchAlert == 1, 'sweep: an absconded sentence is not alerted again')
+
+    setCuffed(2, true)
+    check(book(1, { target = 2, months = 2 }).success == true, 'book: an absconder can be booked again by an officer')
+end
+
+do
+    local env, book = jailScene(2)
+    local quote = RegisteredCallbacks['som-jail:server:bailQuote']
+    local request = RegisteredCallbacks['som-jail:server:requestBail']
+    check(quote(2).success == false, 'bail: a sentence under the felony threshold is not bailable')
+    check(request(2).success == false and Mocks.calls.payWith == 0,
+        'bail: an ineligible request must never charge')
+end
+
+do
+    local env, book = jailScene(12)
+    local s = mysql.db.jailSentences[1]
+    local cfg = env.Config
+    local quote = RegisteredCallbacks['som-jail:server:bailQuote']
+    local request = RegisteredCallbacks['som-jail:server:requestBail']
+
+    local q = quote(2)
+    local expected = math.max(cfg.Bail.minAmount, s.total_seconds * cfg.Bail.rateMultiplier)
+    check(q.success and q.amount == expected, 'bail: the quote is derived from time remaining on the server')
+
+    Mocks.payWithFails = true
+    check(request(2).success == false, 'bail: a failed payment refuses bail')
+    check(s.status == 'serving' and #mysql.db.jailBail == 0,
+        'bail: a failed payment leaves the sentence serving and writes no bail row')
+    Mocks.payWithFails = false
+
+    local r = request(2)
+    check(r.success == true and r.amount == expected, 'bail: a valid request posts at the server amount')
+    check(s.status == 'bailed' and mysql.db.jailBail[1].status == 'posted', 'bail: sentence is bailed, bail row posted')
+    check(Mocks.calls.payWith == 2 and Mocks.calls.businessTransact == 1
+        and Mocks.lastTransact.name == cfg.Business and Mocks.lastTransact.amount == expected,
+        'bail: the money is credited to the department exactly once')
+
+    check(request(2).success == false and Mocks.calls.payWith == 2,
+        'bail: a second request after release must not charge again')
+
+    mysql.fakeNow = mysql.db.jailBail[1].appeal_due_at - 1
+    env.Bail.Sweep()
+    check(mysql.db.jailBail[1].status == 'posted', 'bail sweep: inside the appeal window the bail stays posted')
+    mysql.fakeNow = mysql.db.jailBail[1].appeal_due_at
+    env.Bail.Sweep()
+    check(mysql.db.jailBail[1].status == 'cleared', 'bail sweep: after the appeal window the bail is cleared')
+end
+
+do
+    local env, book = jailScene(12)
+    local request = RegisteredCallbacks['som-jail:server:requestBail']
+    local s = mysql.db.jailSentences[1]
+    env.Jail.Claim(s, 'released', nil)
+    check(request(2).success == false and Mocks.calls.payWith == 0,
+        'bail: a sentence the sweep already released must not be charged for')
+end
+
+do
+    local env, book = jailScene(12)
+    local s = mysql.db.jailSentences[1]
+    local request = RegisteredCallbacks['som-jail:server:requestBail']
+    request(2)
+    setCuffed(2, true)
+    mysql.fakeNow = nil
+    check(book(1, { target = 2, months = 3 }).success == true, 'book: re-arrest after bail should succeed')
+    check(mysql.db.jailBail[1].status == 'forfeited', 'book: re-arrest inside the window forfeits the posted bail')
 end
 
 ----------------------------------------------------------------------

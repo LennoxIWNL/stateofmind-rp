@@ -1,19 +1,10 @@
---- som-jail configuration.
----
---- Real Bolingbroke Penitentiary coordinates, qb-prison's own shipped
---- defaults (the adoption candidate this resource's logic is modelled on) —
---- by a wide margin the most-copied jail location in the FiveM/QBCore
---- ecosystem, since it is the framework's own official default that most
---- QBCore-descended servers never bothered to relocate. No custom
---- interior/MLO: this is vanilla world geometry, always loaded for every
---- player, so there is nothing to stream and nothing to isolate inmates
---- into. Multiple real inmates sharing the yard is better for RP than the
---- per-property void instancing som-housing uses for shells, which exists
---- there for privacy a jail has no reason to want.
+--- Bolingbroke Penitentiary coordinates (qb-prison's shipped defaults). Vanilla
+--- world geometry, always loaded, so there is nothing to stream or isolate.
 
 Config = {}
 
 Config.Job = 'police' -- who may book someone
+Config.Business = 'lspd' -- receives bail, as a fine is paid to the department
 
 Config.Cell = {
     freedom = vec4(1740.88, 2476.57, 44.85, 299.49), -- release point

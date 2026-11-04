@@ -1,12 +1,10 @@
---- Bail: a quote, then a commit, same shape som-housing's mortgage flow
---- already uses. Forfeiture itself lives in jail.lua's book handler, not
---- here — see its comment for why that's not a second money movement.
+--- Bail: a quote, then a commit, the same shape som-housing's mortgage flow
+--- uses. The client never sends an amount or an account.
 
 local core = exports['som-core']
 
 Bail = {}
 
----The caller's own active sentence plus its remaining seconds, or nil.
 ---@param citizenid string
 ---@return table|nil sentence, number|nil remaining
 local function activeWithRemaining(citizenid)
@@ -17,16 +15,11 @@ local function activeWithRemaining(citizenid)
 
     if not sentence then return nil, nil end
 
-    local remaining = sentence.total_seconds - (tonumber(sentence.elapsed) or 0)
-    if remaining < 0 then remaining = 0 end
-
-    return sentence, remaining
+    return sentence, math.max(0, sentence.total_seconds - (tonumber(sentence.elapsed) or 0))
 end
 
----Eligibility plus the amount, re-derived every time rather than cached —
----the client never gets to hand this number back.
 ---@param citizenid string
----@return boolean eligible, number|string amountOrError
+---@return boolean eligible, number|string amountOrError, table|nil sentence
 local function quote(citizenid)
     local sentence, remaining = activeWithRemaining(citizenid)
     if not sentence then return false, 'not currently serving a sentence' end
@@ -40,8 +33,7 @@ local function quote(citizenid)
         { sentence.id })
     if existing then return false, 'bail already posted' end
 
-    local amount = math.max(Config.Bail.minAmount, remaining * Config.Bail.rateMultiplier)
-    return true, amount, sentence
+    return true, math.max(Config.Bail.minAmount, remaining * Config.Bail.rateMultiplier), sentence
 end
 
 lib.callback.register('som-jail:server:bailQuote', function(source)
@@ -54,42 +46,41 @@ lib.callback.register('som-jail:server:bailQuote', function(source)
     return { success = true, amount = amountOrError }
 end)
 
-lib.callback.register('som-jail:server:requestBail', function(source, data)
+lib.callback.register('som-jail:server:requestBail', function(source)
     local player = core:getPlayer(source)
     if not player then return { success = false, error = 'not loaded' } end
 
-    -- Re-derived from scratch. The client sends nothing usable here — not
-    -- even an account, since this always pays from bank, matching how a
-    -- fine is paid — the same discipline som-housing's mortgage flow uses:
-    -- "the client sends a slug, never a price."
     local eligible, amount, sentence = quote(player.citizenid)
     if not eligible then return { success = false, error = amount } end
 
-    local paid, payErr = core:payWith(source, 'bank', amount,
-        ('bail:%d'):format(sentence.id))
+    -- Claim before charging so a concurrent sweep or second request cannot
+    -- release or charge the same sentence twice.
+    if not Jail.Claim(sentence, 'bailed', nil) then
+        return { success = false, error = 'not currently serving a sentence' }
+    end
+
+    local reason = ('bail:%d'):format(sentence.id)
+    local paid, payErr = core:payWith(source, 'bank', amount, reason)
 
     if not paid then
+        Jail.Unclaim(sentence)
         return { success = false, error = payErr or 'could not pay' }
     end
+
+    core:businessTransact(Config.Business, amount, reason)
 
     MySQL.insert.await([[
         INSERT INTO som_jail_bail (sentence_id, citizenid, amount, status, appeal_due_at)
         VALUES (?, ?, ?, 'posted', DATE_ADD(NOW(), INTERVAL ? HOUR))
     ]], { sentence.id, player.citizenid, amount, Config.Bail.appealHours })
 
-    Jail.Release(sentence, 'bailed', nil)
+    Jail.Free(sentence)
 
     return { success = true, amount = amount }
 end)
 
--- ---------------------------------------------------------------------------
--- The appeal-window sweep
--- ---------------------------------------------------------------------------
-
---- No money moves here. Bail was already spent at payment time; a window
---- passing with no re-arrest just tidies the row for queries, the same way
---- jail.lua's own sweep tidies served sentences.
-local function sweep()
+--- Tidies rows whose window passed with no re-arrest. No money moves.
+function Bail.Sweep()
     MySQL.update.await(
         "UPDATE som_jail_bail SET status = 'cleared' WHERE status = 'posted' AND appeal_due_at <= NOW()")
 end
@@ -99,6 +90,6 @@ CreateThread(function()
 
     while true do
         Wait(60000)
-        pcall(sweep)
+        pcall(Bail.Sweep)
     end
 end)
