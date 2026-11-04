@@ -17,6 +17,7 @@ client_scripts {
     '@som-ui/client/dialog.lua',
     'client/main.lua',
     'client/grow.lua',
+    'client/lab.lua',
 }
 
 server_scripts {
@@ -26,6 +27,7 @@ server_scripts {
     'server/payroll.lua',
     'server/app.lua',
     'server/grow.lua',
+    'server/lab.lua',
 }
 
 dependencies {

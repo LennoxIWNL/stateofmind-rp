@@ -48,6 +48,7 @@ local function resetDb()
     mysql.db.turf = { zones = {}, events = {}, market = {} }
     mysql.db.whitelist = {}
     mysql.db.plants = {}
+    mysql.db.lab = {}
     mysql.db.staff = { reports = {}, audit = {} }
     mysql.db.gangs = { chars = {}, log = {} }
     mysql.db.vehicles = {}
@@ -3420,6 +3421,49 @@ do
     check(cb['som-turf:server:bag'](1, 'weed_skunk_seed').error == 'you need an empty bag', 'grow: bagging needs an empty bag')
     give(1, 'empty_weed_bag')
     check(cb['som-turf:server:bag'](1, 'weed_skunk_seed').success == true and count(1, 'weed_skunk') == 1 and count(1, 'weedbud') == buds - G.budsPerBag and count(1, 'empty_weed_bag') == 0, 'grow: bagging turns buds and a bag into a strain baggy')
+end
+
+-- ---------------------------------------------------------------------------
+-- Labs
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-turf', { 'shared/config.lua', 'server/main.lua', 'server/lab.lua' })
+    Mocks.players = { [1] = { citizenid = 'L1', gang = { name = 'ballas', grade = 1 } }, [2] = { citizenid = 'L2', gang = { name = 'vagos', grade = 1 } }, [3] = { citizenid = 'L3', gang = { name = 'none', grade = 0 } } }
+    Mocks.inv = { [1] = {}, [2] = {}, [3] = {} }
+    mysql.fakeNow = 5000000
+    for i = 1, 3 do FakePeds[i] = vec3(0, 0, 0) end
+    local cb = RegisteredCallbacks
+    local slot = 200
+    local function give(src, name, n) slot = slot + 1; Mocks.inv[src][slot] = { name = name, count = n or 1, slot = slot } end
+    local function count(src, name) local n = 0; for _, it in pairs(Mocks.inv[src]) do if it.name == name then n = n + (it.count or 1) end end; return n end
+
+    give(1, 'coke_small_brick')
+    check(cb['som-turf:server:labStart'](1, 'lab_1', 'cut_coke').error == 'there is no lab here', 'lab: every lab ships disabled')
+    local L = env.Config.labs[1]
+    L.enabled, L.coords = true, vec3(0, 0, 0)
+    check(#cb['som-turf:server:labInfo'](1).recipes == 2, 'lab: only enabled recipes are offered')
+    check(cb['som-turf:server:labStart'](3, 'lab_1', 'cut_coke').error == 'you are not in a gang', 'lab: only gang members cook')
+    check(cb['som-turf:server:labStart'](1, 'lab_1', 'cook_meth').error == 'you do not know that one', 'lab: a disabled recipe cannot be started')
+    check(cb['som-turf:server:labStart'](1, 'lab_1', 'nope').error == 'you do not know that one', 'lab: an unknown recipe is refused')
+    FakePeds[1] = vec3(100, 0, 0)
+    check(cb['som-turf:server:labStart'](1, 'lab_1', 'cut_coke').error == 'there is no lab here', 'lab: the server checks distance')
+    FakePeds[1] = vec3(0, 0, 0)
+
+    check(cb['som-turf:server:labStart'](2, 'lab_1', 'cut_coke').error == 'you are missing ingredients', 'lab: ingredients are required')
+    check(cb['som-turf:server:labStart'](1, 'lab_1', 'cut_coke').success == true and count(1, 'coke_small_brick') == 0, 'lab: starting takes the ingredients')
+    give(2, 'coke_small_brick')
+    check(cb['som-turf:server:labStart'](2, 'lab_1', 'cut_coke').error == 'the lab is busy' and count(2, 'coke_small_brick') == 1, 'lab: a busy lab refuses and returns the ingredients')
+
+    check(cb['som-turf:server:labCollect'](1, 'lab_1').error == 'it is not done yet', 'lab: you cannot collect early')
+    check(cb['som-turf:server:labCollect'](2, 'lab_1').error == 'you have nothing cooking here', 'lab: only the cook can collect')
+    mysql.fakeNow = mysql.fakeNow + 11 * 60
+    Mocks.invFull[1] = true
+    check(cb['som-turf:server:labCollect'](1, 'lab_1').error == 'you cannot carry it' and mysql.db.lab[1].status == 'cooking', 'lab: a full pack keeps the cook waiting')
+    Mocks.invFull[1] = false
+    check(cb['som-turf:server:labCollect'](1, 'lab_1').success == true and count(1, 'cokebaggy') == 4, 'lab: a finished cook is collected')
+    check(cb['som-turf:server:labCollect'](1, 'lab_1').error == 'you have nothing cooking here', 'lab: a cook is collected once')
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))

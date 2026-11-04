@@ -1643,3 +1643,17 @@ CREATE TABLE IF NOT EXISTS `som_plants` (
   KEY `idx_status` (`status`),
   KEY `idx_owner` (`citizenid`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Lab cooks (som-turf). ready_at comes from the database clock.
+CREATE TABLE IF NOT EXISTS `som_lab_jobs` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `lab`        VARCHAR(32) NOT NULL,
+  `recipe`     VARCHAR(32) NOT NULL,
+  `status`     ENUM('cooking','collected') NOT NULL DEFAULT 'cooking',
+  `ready_at`   TIMESTAMP NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_lab` (`lab`, `status`),
+  KEY `idx_owner` (`citizenid`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -32,6 +32,7 @@ M.db = {
     heist = { dongles = {}, runs = {} },
     turf = { zones = {}, events = {}, market = {} },
     whitelist = {},
+    lab = {},
     plants = {},
     gangs = { chars = {}, log = {} },
     staff = { reports = {}, audit = {} },
@@ -420,6 +421,37 @@ local function whitelist(kind, query, params)
     return false
 end
 
+local function lab(kind, query, params)
+    local L = M.db.lab
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    if kind == 'scalar' and has("SELECT COUNT(*) FROM som_lab_jobs WHERE citizenid = ?") then
+        local n = 0
+        for _, j in ipairs(L) do if j.citizenid == params[1] and j.status == 'cooking' then n = n + 1 end end
+        return true, n
+    elseif kind == 'insert' and has('INSERT INTO som_lab_jobs') then
+        for _, j in ipairs(L) do if j.lab == params[5] and j.status == 'cooking' then return true, 0 end end
+        local id = #L + 1
+        L[id] = { id = id, citizenid = params[1], lab = params[2], recipe = params[3], status = 'cooking', ready = M.fakeNow + params[4] * 60 }
+        return true, id
+    elseif kind == 'single' and has('FROM som_lab_jobs WHERE lab = ? AND citizenid = ?') then
+        for _, j in ipairs(L) do
+            if j.lab == params[1] and j.citizenid == params[2] and j.status == 'cooking' then
+                return true, { id = j.id, recipe = j.recipe, ready = j.ready <= M.fakeNow and 1 or 0 }
+            end
+        end
+        return true, nil
+    elseif kind == 'update' and has("SET status = 'collected' WHERE id = ? AND status = 'cooking'") then
+        local j = L[params[1]]
+        if j and j.status == 'cooking' then j.status = 'collected'; return true, 1 end
+        return true, 0
+    elseif kind == 'update' and has("SET status = 'cooking' WHERE id = ? AND status = 'collected'") then
+        local j = L[params[1]]
+        if j and j.status == 'collected' then j.status = 'cooking'; return true, 1 end
+        return true, 0
+    end
+    return false
+end
+
 local function plants(kind, query, params)
     local P = M.db.plants
     local function has(text) return query:find(text, 1, true) ~= nil end
@@ -602,6 +634,7 @@ function M.single(query, params)
     do local handled, value = heist('single', query, params); if handled then return value end end
     do local handled, value = turf('single', query, params); if handled then return value end end
     do local handled, value = plants('single', query, params); if handled then return value end end
+    do local handled, value = lab('single', query, params); if handled then return value end end
     if query:find('FROM som_properties WHERE slug = ?', 1, true) then
         for _, p in ipairs(M.db.properties) do
             if p.slug == params[1] then return copy(p) end
@@ -675,6 +708,7 @@ function M.scalar(query, params)
     do local handled, value = turf('scalar', query, params); if handled then return value end end
     do local handled, value = gangs('scalar', query, params); if handled then return value end end
     do local handled, value = plants('scalar', query, params); if handled then return value end end
+    do local handled, value = lab('scalar', query, params); if handled then return value end end
     do local handled, value = whitelist('scalar', query, params); if handled then return value end end
     if query:find('SELECT role FROM som_property_owners WHERE property_id = ? AND citizenid = ?', 1, true) then
         local o = findOwner(params[1], params[2])
@@ -779,6 +813,7 @@ function M.update(query, params)
     do local handled, value = staff('update', query, params); if handled then return value end end
     do local handled, value = gangs('update', query, params); if handled then return value end end
     do local handled, value = plants('update', query, params); if handled then return value end end
+    do local handled, value = lab('update', query, params); if handled then return value end end
     if query:find('SET for_sale = 0 WHERE id = ? AND for_sale = 1', 1, true) then
         local p = findProperty(tonumber(params[1]))
         if p and tonumber(p.for_sale) == 1 then
@@ -1122,6 +1157,7 @@ function M.insert(query, params)
     do local handled, value = staff('insert', query, params); if handled then return value end end
     do local handled, value = gangs('insert', query, params); if handled then return value end end
     do local handled, value = plants('insert', query, params); if handled then return value end end
+    do local handled, value = lab('insert', query, params); if handled then return value end end
     if query:find('INSERT INTO som_property_owners', 1, true) then
         local propertyId, citizenid, role, grantedBy = params[1], params[2], params[3], params[4]
         local existing = findOwner(propertyId, citizenid)
