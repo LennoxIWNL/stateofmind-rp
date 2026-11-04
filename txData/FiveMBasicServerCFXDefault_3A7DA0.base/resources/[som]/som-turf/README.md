@@ -15,9 +15,16 @@ Turf and the street drug market as one system (AUDIT 17 and 18): owning a zone i
 | NoPixel / EchoRP / ProdigyRP notes (AUDIT 17) | n/a | turf gates drug income, a spray tag as the claim, low and high intensity conflict | reputation or heat scores (deliberately not built) |
 | qb-drugs / qb-weed / elixir-drugs | mixed | the item set | flat prices, client trusted sales |
 
+## Also in this resource
+- **Gang app** (`gang`): roster, invites, ranks, removal, deposits to the gang account.
+- **Payroll**: hourly, from the gang account, for gangs holding a zone.
+- **Turf app** (`turf`): read only owners, contests, prices.
+- **Weed growing**: plants, tending, harvest, bagging (`server/grow.lua`).
+- **Labs**: timed recipe cooks (`server/lab.lua`); the coke chain works with existing items, the meth recipe is disabled.
+
 ## Scope cuts
-- No passive per-interval gang payment from turf (the gang `payment` field in `shared/gangs.lua` stays unused).
-- No phone app and no turf HUD. `control_points` on `som_turf` is unused.
 - No NPC buyers; selling is an interaction with the zone, not a ped.
-- No growing, processing or supply chain; it sells items that already exist.
-- Every zone ships disabled with no coordinates.
+- No meth chain: it needs precursor items and icons that do not exist yet.
+- No phone HUD or score of any kind, on purpose.
+- `control_points` on `som_turf` is unused.
+- Every zone, grow spot, bagging table and lab ships disabled with no coordinates.

@@ -179,3 +179,12 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Every grow spot (`Config.grow.spots`) and bagging table (`Config.grow.bagTables`) ships disabled with no coordinates. Without a spot, plants can still go inside a zone a gang holds, so enable zones with care.
 - [ ] Uses existing items: the five `weed_*_seed` seeds, `water_bottle`, `weed_nutrition`, `weedbud`, `empty_weed_bag` and the `weed_*` baggies (all have icons). Grow time 60 min, wither after 120 min without water, yield 3 to 6 buds (+2 fed), 3 buds per bag, 6 plants per character: defaults, untuned. Baggies are what the street sale already buys.
 - [ ] Planting raises the low-chance `drugDeal` dispatch call. The prop `prop_weed_01` and the progress bars have never been seen in a client.
+
+## Labs (som-turf)
+
+- [ ] Import the `som_lab_jobs` table (end of `setup.sql`) on an existing database.
+- [ ] `Config.labs` ships disabled with no coordinates. Enable and place one or more.
+- [ ] Recipes: `press_brick` (coke_brick to 3 coke_small_brick, 15 min) and `cut_coke` (coke_small_brick to 4 cokebaggy, 10 min) use existing items. Nothing in the game hands out `coke_brick` yet (not a heist payout, not a shop), so decide the source, or the chain starts only from admin-issued items.
+- [ ] `cook_meth` is disabled with empty inputs: it needs precursor items and icons, which would be new ox_inventory items.
+- [ ] One cook per lab at a time and one per character; a cook is collected only by whoever started it. Starting raises the low-chance `drugDeal` dispatch call.
+- [ ] Never run in a client: the lab zone, dialog and progress bar.

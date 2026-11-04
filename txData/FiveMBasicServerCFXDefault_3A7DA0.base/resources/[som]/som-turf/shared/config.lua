@@ -71,4 +71,22 @@ Config = {
             { name = 'bag_1', label = 'Bagging table', enabled = false, coords = nil },
         },
     },
+
+    -- Labs turn items into other items over time. Inputs are consumed at the
+    -- start; outputs are collected by the same character once the time is up.
+    -- Every lab ships disabled with no coordinates. Only recipes made of items
+    -- that already exist are enabled; the meth chain needs precursor items and
+    -- icons that do not exist yet, so it ships disabled (LAUNCH-TODO.md).
+    labs = {
+        { name = 'lab_1', label = 'Back room lab', enabled = false, coords = nil },
+    },
+    recipes = {
+        cut_coke = { label = 'Cut and bag coke', enabled = true, minutes = 10,
+            inputs = { coke_small_brick = 1 }, outputs = { cokebaggy = 4 } },
+        press_brick = { label = 'Break down a brick', enabled = true, minutes = 15,
+            inputs = { coke_brick = 1 }, outputs = { coke_small_brick = 3 } },
+        cook_meth = { label = 'Cook meth', enabled = false, minutes = 30,
+            inputs = {}, outputs = { meth = 5 } },
+    },
+    lab = { distance = 3.0, maxActive = 1 },
 }
