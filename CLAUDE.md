@@ -136,3 +136,6 @@ scope cuts in the PR description so they are not silently dropped.
 - No literal webhook URL or secret in tracked files.
 - State what was and was not verified, including anything only checkable in a
   live FXServer.
+- Anything the change leaves unset or unverified (coordinates, maps, job
+  whitelists, convars, schema statements, placeholder assets) is added to
+  `LAUNCH-TODO.md`.

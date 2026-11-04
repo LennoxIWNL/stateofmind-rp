@@ -65,6 +65,11 @@ section next to the feature they belong to, make them safe to re-run
 (`CREATE TABLE IF NOT EXISTS`), and note in the PR that the live database
 needs the new section imported before the resource starts.
 
+## Before launch
+
+`LAUNCH-TODO.md` lists everything that must be set, installed or verified before
+`BetaRelease` is promoted. Add to it whenever a change leaves something unset.
+
 ## Secrets
 
 Never commit tokens, passwords or webhook URLs. Put them in `server.cfg`
