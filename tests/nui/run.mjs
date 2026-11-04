@@ -392,6 +392,99 @@ async function main() {
     await phone.waitForFunction(() => !document.querySelector('.callbar'), null, { timeout: 2000 });
     check(true, 'calls: the call bar goes when the server says it ended');
 
+    // --- som-phone social: Chirp and Pages. ---
+    await phone.locator('.back', { hasText: 'Home' }).click().catch(() => {});
+    await send({ action: 'open', data: openData({ apps: [
+        { id: 'chirp', label: 'Chirp', icon: 'twitter', colour: '#1da1f2', order: 25 },
+        { id: 'pages', label: 'Pages', icon: 'inbox', colour: '#f2c94c', order: 28 },
+    ] }) });
+    await phone.locator('.lock').click();
+    await phone.waitForSelector('.apps .app');
+
+    answers['chirp:feed'] = { success: true, me: { handle: 'annone42', business: 'LSPD' }, posts: [
+        { id: 2, handle: 'bo', colour: '#2ecc71', body: 'hi <img src=x onerror=alert(1)>', likes: 1, replies: 1, mine: false, liked: false },
+        { id: 1, handle: 'annone42', body: 'my post', likes: 0, replies: 0, mine: true, liked: false },
+    ] };
+    await phone.locator('.app', { hasText: 'Chirp' }).click();
+    await phone.waitForSelector('.post');
+    check((await phone.locator('.post').count()) === 2, 'chirp: the feed lists the posts the server returned');
+    check((await phone.locator('.post__body').first().textContent()) === 'hi <img src=x onerror=alert(1)>' && (await phone.locator('.post__body img').count()) === 0,
+        'chirp: a post body is text, never markup');
+    check((await phone.locator('.post__head strong').first().textContent()) === '@bo', 'chirp: the author shows as a handle');
+    check((await phone.locator('.post').nth(1).locator('.link', { hasText: 'Delete' }).count()) === 1 &&
+        (await phone.locator('.post').nth(0).locator('.link', { hasText: 'Report' }).count()) === 1, 'chirp: my post offers delete, anyone else\'s offers report');
+    check((await phone.locator('.check', { hasText: 'As LSPD' }).count()) === 1, 'chirp: the business box shows only when the server says the character can speak for one');
+
+    calls.length = 0;
+    await phone.locator('textarea[aria-label="New post"]').fill('hello world');
+    await phone.locator('.check input').check();
+    await phone.locator('.btn', { hasText: 'Post' }).click();
+    await phone.waitForTimeout(150);
+    const postCall = calls.find((c) => c.body.app === 'chirp' && c.body.action === 'post');
+    check(postCall && postCall.body.payload.body === 'hello world' && postCall.body.payload.asBusiness === true && postCall.body.payload.business === undefined,
+        'chirp: a post sends text and a business flag, never a handle or a business name');
+    await phone.screenshot({ path: path.join(SCREENSHOT_DIR, 'phone-chirp.png') });
+
+    calls.length = 0;
+    await phone.locator('.post').first().locator('.link').first().click();
+    await phone.waitForTimeout(150);
+    check(calls.some((c) => c.body.app === 'chirp' && c.body.action === 'like' && c.body.payload.id === 2), 'chirp: a like names the post id only');
+
+    answers['chirp:thread'] = { success: true, posts: [
+        { id: 2, handle: 'bo', body: 'root', likes: 1, replies: 1, mine: false, liked: false },
+        { id: 3, handle: 'cy', body: 'a reply', likes: 0, replies: 0, reply_to: 2, mine: false, liked: false },
+    ] };
+    await phone.locator('.post').first().locator('.link').nth(1).click();
+    await phone.waitForSelector('textarea[aria-label="Reply"]');
+    check((await phone.locator('.post').count()) === 2, 'chirp: opening a post shows it with its replies');
+    calls.length = 0;
+    await phone.locator('textarea[aria-label="Reply"]').fill('thanks');
+    await phone.locator('.btn', { hasText: 'Reply' }).click();
+    await phone.waitForTimeout(150);
+    check(calls.some((c) => c.body.action === 'post' && c.body.payload.replyTo === 2 && c.body.payload.body === 'thanks'), 'chirp: a reply names its parent');
+    await phone.locator('.back', { hasText: 'Feed' }).click();
+
+    await phone.locator('.back', { hasText: 'Home' }).click();
+    answers['pages:adverts'] = { success: true, categories: ['for_sale', 'wanted'], business: null, adverts: [
+        { id: 7, handle: 'bo', category: 'for_sale', title: 'Bike <b>x</b>', body: 'Nice bike', price: '$500', number: '555-0002', mine: false },
+        { id: 8, handle: 'annone42', category: 'wanted', title: 'Need a ride', body: 'Please', mine: true },
+    ] };
+    await phone.locator('.app', { hasText: 'Pages' }).click();
+    await phone.waitForSelector('.post');
+    check((await phone.locator('.post').count()) === 2 && (await phone.locator('.post__head strong b').count()) === 0, 'pages: adverts render as text');
+    check((await phone.locator('.post .muted').first().textContent()).includes('555-0002'), 'pages: a shared number is shown');
+    check((await phone.locator('.check', { hasText: 'As ' }).count()) === 0, 'pages: no business option unless the server offers one');
+    calls.length = 0;
+    await phone.locator('.post').first().locator('.link', { hasText: 'Message' }).click();
+    await phone.locator('input[aria-label="Message"]').fill('still available?');
+    await phone.locator('.post .btn', { hasText: 'Send' }).click();
+    await phone.waitForTimeout(150);
+    check(calls.some((c) => c.body.app === 'pages' && c.body.action === 'contact' && c.body.payload.id === 7 && c.body.payload.body === 'still available?'),
+        'pages: contacting an advert sends its id and the text only');
+    await phone.screenshot({ path: path.join(SCREENSHOT_DIR, 'phone-pages.png') });
+
+    calls.length = 0;
+    await phone.locator('.btn', { hasText: 'Place an advert' }).click();
+    await phone.locator('input[aria-label="Title"]').fill('Sofa');
+    await phone.locator('textarea[aria-label="Description"]').fill('Comfy');
+    await phone.locator('.btn', { hasText: 'Publish' }).click();
+    await phone.waitForTimeout(150);
+    const adCall = calls.find((c) => c.body.app === 'pages' && c.body.action === 'post');
+    check(adCall && adCall.body.payload.title === 'Sofa' && adCall.body.payload.category === 'for_sale' && adCall.body.payload.showNumber === false,
+        'pages: placing an advert keeps the number private by default');
+
+    answers['pages:listing'] = { success: true, listed: false };
+    await phone.locator('.segment__item', { hasText: 'People' }).click();
+    await phone.waitForSelector('.check input');
+    check(!(await phone.locator('.check input').isChecked()), 'white pages: listing is off by default');
+    answers['pages:search'] = { success: true, people: [{ firstname: 'Bo', lastname: 'Two', phone: '555-0002' }] };
+    await phone.locator('input[aria-label="Search by name"]').fill('Two');
+    await phone.locator('.btn', { hasText: 'Search' }).click();
+    await phone.waitForSelector('.row__title');
+    check((await phone.locator('.row__title').textContent()) === 'Bo Two' && (await phone.locator('.row__sub').textContent()) === '555-0002',
+        'white pages: a result shows the name and number');
+    await phone.screenshot({ path: path.join(SCREENSHOT_DIR, 'phone-whitepages.png') });
+
     // Apps may import only the SDK, React and the shared types, so an app can
     // never reach around the one door to the server.
     const allowed = /^(react|@som\/phone-sdk|\.\.\/types)$/;

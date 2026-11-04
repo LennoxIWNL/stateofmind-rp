@@ -556,6 +556,71 @@ CREATE TABLE IF NOT EXISTS `som_phone_calls` (
   KEY `idx_to` (`to_number`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- One handle per character. `handle` is unique, so two characters can never
+-- hold the same one whatever order they race in.
+CREATE TABLE IF NOT EXISTS `som_phone_handles` (
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `handle`     VARCHAR(16) NOT NULL,
+  `colour`     VARCHAR(7)  DEFAULT NULL,
+  `changed_at` TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (`citizenid`),
+  UNIQUE KEY `uniq_handle` (`handle`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_phone_posts` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `business`   VARCHAR(64) DEFAULT NULL,
+  `body`       VARCHAR(280) NOT NULL,
+  `image`      VARCHAR(255) DEFAULT NULL,
+  `reply_to`   BIGINT UNSIGNED DEFAULT NULL,
+  `likes`      INT UNSIGNED NOT NULL DEFAULT 0,
+  `removed`    TINYINT(1) NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_feed` (`removed`, `reply_to`, `id`),
+  KEY `idx_reply` (`reply_to`),
+  KEY `idx_author` (`citizenid`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_phone_likes` (
+  `post_id`   BIGINT UNSIGNED NOT NULL,
+  `citizenid` VARCHAR(16) NOT NULL,
+  PRIMARY KEY (`post_id`, `citizenid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_phone_reports` (
+  `post_id`    BIGINT UNSIGNED NOT NULL,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `reason`     VARCHAR(120) NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`post_id`, `citizenid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_phone_adverts` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`   VARCHAR(16) NOT NULL,
+  `category`    VARCHAR(16) NOT NULL,
+  `title`       VARCHAR(48) NOT NULL,
+  `body`        VARCHAR(280) NOT NULL,
+  `price`       VARCHAR(24) DEFAULT NULL,
+  `show_number` TINYINT(1) NOT NULL DEFAULT 0,
+  `business`    VARCHAR(64) DEFAULT NULL,
+  `status`      ENUM('active','removed') NOT NULL DEFAULT 'active',
+  `created_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `expires_at`  DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_active` (`status`, `expires_at`),
+  KEY `idx_owner` (`citizenid`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- White pages: a character is findable by name only if they opted in.
+CREATE TABLE IF NOT EXISTS `som_phone_pages_optin` (
+  `citizenid` VARCHAR(16) NOT NULL,
+  `listed`    TINYINT(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`citizenid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Theme and wallpaper are supporter perks, so what is stored here is validated
 -- server side against the player's entitlements rather than trusted.
 CREATE TABLE IF NOT EXISTS `som_phone_settings` (

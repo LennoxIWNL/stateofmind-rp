@@ -24,6 +24,7 @@ server_scripts {
     'server/device.lua',
     'server/apps.lua',
     'server/comms.lua',
+    'server/social.lua',
     'server/main.lua',
 }
 

@@ -43,6 +43,7 @@ local function resetDb()
     mysql.db.messages = {}
     mysql.db.phoneCalls = {}
     mysql.db.phoneAudit = {}
+    mysql.db.social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} }
     mysql.db.bills = {}
     mysql.db.orders = {}
     mysql.db.nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
@@ -61,6 +62,9 @@ local function resetMocks()
     Mocks.fineFails = false
     Mocks.exported = {}
     Mocks.perks = {}
+    Mocks.jobs = { police = { business = 'lspd' }, mechanic = { business = 'bennys' } }
+    Mocks.businesses = { lspd = { label = 'LSPD' }, bennys = { label = "Benny's" } }
+    Mocks.commands = {}
     Mocks.voice = {}
     Mocks.metadataRefused = false
     Mocks.paid = 0
@@ -166,6 +170,7 @@ local function loadPhone()
         'server/device.lua',
         'server/apps.lua',
         'server/comms.lua',
+        'server/social.lua',
         'server/main.lua',
     })
     return phoneEnv
@@ -2106,5 +2111,200 @@ do
 end
 
 ----------------------------------------------------------------------
+
+----------------------------------------------------------------------
+-- som-phone: Chirp and Pages
+----------------------------------------------------------------------
+local function socialScene()
+    local env = commsScene()
+    local S = mysql.db.social
+    S.people = {
+        P1 = { firstname = 'Ann', lastname = 'One', phone = '555-0001' },
+        P2 = { firstname = 'Bo', lastname = 'Two', phone = '555-0002' },
+        P3 = { firstname = 'Cy', lastname = 'Three', phone = '555-0003' },
+    }
+    env.Config.Social.postGapSeconds = 20
+    return env
+end
+
+local function age(seconds)
+    for _, x in ipairs(mysql.db.social.posts) do x.ts = x.ts - seconds end
+end
+
+do
+    local env = socialScene()
+    local S = mysql.db.social
+    local feed = act(1, 'chirp', 'feed')
+    check(feed.me.handle:match('^annone%d%d$') ~= nil, 'chirp: a handle is made from the name on first use')
+    check(act(1, 'chirp', 'feed').me.handle == feed.me.handle, 'chirp: the handle is kept')
+
+    check(act(1, 'chirp', 'post', { body = '   ' }).success == false and act(1, 'chirp', 'post', { body = { 1 } }).success == false, 'chirp: an empty or non text post is refused')
+    check(act(1, 'chirp', 'post', { body = 'hello <b>world</b>\nline' }).success == true, 'chirp: a post is accepted')
+    check(S.posts[1].body == 'hello bworld/b line', 'chirp: markup and control characters are stripped')
+    check(act(1, 'chirp', 'post', { body = 'again' }).error == 'slow down', 'chirp: the gap between posts holds')
+    age(60)
+    act(1, 'chirp', 'post', { body = string.rep('x', 500) })
+    check(#S.posts[2].body == 280, 'chirp: a post is cut to the limit')
+
+    age(60)
+    check(act(1, 'chirp', 'post', { body = 'pic', image = 'https://evil.example/a.png' }).success == false, 'chirp: an image is refused while no host is allowed')
+    env.Config.Social.imageHosts = { 'img.example.com' }
+    check(act(1, 'chirp', 'post', { body = 'pic', image = 'http://img.example.com/a.png' }).success == false, 'chirp: a plain http image is refused')
+    check(act(1, 'chirp', 'post', { body = 'pic', image = 'https://img.example.com/a.png"onerror=x' }).success == false, 'chirp: an image url with quotes is refused')
+    check(act(1, 'chirp', 'post', { body = 'pic', image = 'https://img.example.com.evil.io/a.png' }).success == false, 'chirp: a lookalike host is refused')
+    check(act(1, 'chirp', 'post', { body = 'pic', image = 'https://img.example.com/a.png' }).success == true and S.posts[3].image == 'https://img.example.com/a.png',
+        'chirp: an image on an allowed host is kept')
+
+    age(60)
+    check(act(2, 'chirp', 'post', { body = 'reply', replyTo = 999 }).success == false, 'chirp: replying to nothing is refused')
+    check(act(2, 'chirp', 'post', { body = 'a reply', replyTo = 1 }).success == true, 'chirp: a reply is accepted')
+    age(60)
+    check(act(1, 'chirp', 'post', { body = 'nested', replyTo = 4 }).success == false, 'chirp: replies do not nest')
+
+    local list = act(2, 'chirp', 'feed').posts
+    check(#list == 3 and list[1].id == 3 and list[3].replies == 1, 'chirp: the feed lists top level posts newest first with reply counts')
+    check(list[1].citizenid == nil and list[1].mine == false and act(1, 'chirp', 'feed').posts[1].mine == true, 'chirp: ids of authors are never sent, ownership is a flag')
+    local thread = act(2, 'chirp', 'thread', { id = 1 }).posts
+    check(#thread == 2 and thread[1].id == 1 and thread[2].reply_to == 1, 'chirp: a thread is the post and its replies')
+    check(act(2, 'chirp', 'thread', { id = 999 }).success == false, 'chirp: an unknown thread is refused')
+
+    check(act(2, 'chirp', 'like', { id = 1 }).liked == true and S.posts[1].likes == 1, 'chirp: a like counts')
+    check(act(2, 'chirp', 'like', { id = 1 }).liked == false and S.posts[1].likes == 0, 'chirp: liking again takes it back')
+    act(2, 'chirp', 'like', { id = 1 })
+    check(act(1, 'chirp', 'like', { id = 1 }).liked == true and S.posts[1].likes == 2, 'chirp: likes are per character')
+    check(act(2, 'chirp', 'like', { id = 999 }).success == false, 'chirp: liking a missing post is refused')
+
+    check(act(2, 'chirp', 'remove', { id = 1 }).success == false and S.posts[1].removed == false, 'chirp: only the author can remove a post')
+    check(act(1, 'chirp', 'report', { id = 1 }).success == false, 'chirp: you cannot report your own post')
+    check(act(2, 'chirp', 'report', { id = 1, reason = 'spam' }).success == true and S.reports['1|P2'] == 'spam', 'chirp: a report is recorded')
+    local count = 0
+    for _ in pairs(S.reports) do count = count + 1 end
+    act(2, 'chirp', 'report', { id = 1, reason = 'again' })
+    local after = 0
+    for _ in pairs(S.reports) do after = after + 1 end
+    check(count == after and S.reports['1|P2'] == 'spam', 'chirp: one report per character per post')
+    check(act(1, 'chirp', 'remove', { id = 1 }).success == true and #act(2, 'chirp', 'feed').posts == 2, 'chirp: the author can remove their post and it leaves the feed')
+end
+
+do
+    local env = socialScene()
+    local S = mysql.db.social
+    act(1, 'chirp', 'feed'); act(2, 'chirp', 'feed')
+    check(act(1, 'chirp', 'setHandle', { handle = 'annie' }).success == false, 'chirp: a custom handle needs the supporter perk')
+    Mocks.perks[1] = { twitterHandle = true }
+    for _, bad in ipairs({ 'ab', 'has space', 'waytoolonghandle12345', 'Bad!', 'police', 'lspd_chief', 'admin1' }) do
+        check(act(1, 'chirp', 'setHandle', { handle = bad }).success == false, 'chirp: handle "' .. bad .. '" is refused')
+    end
+    check(act(1, 'chirp', 'setHandle', { handle = { 1 } }).success == false, 'chirp: a non text handle is refused')
+    Mocks.perks[2] = { twitterHandle = true }
+    check(act(1, 'chirp', 'setHandle', { handle = 'Annie_1' }).success == true and S.handles.P1.handle == 'annie_1', 'chirp: a valid handle is saved lowercase')
+    check(act(2, 'chirp', 'setHandle', { handle = 'annie_1' }).error == 'that handle is taken', 'chirp: two characters cannot share a handle')
+    check(act(1, 'chirp', 'setHandle', { handle = 'annie_2' }).error == 'you changed your handle recently', 'chirp: handle changes are rate limited')
+
+    check(act(1, 'chirp', 'setColour', { colour = '#ff6b9d' }).success == false, 'chirp: a colour needs the perk')
+    Mocks.perks[1].twitterColour = 3
+    check(act(1, 'chirp', 'setColour', { colour = '#2ecc71' }).success == true and S.handles.P1.colour == '#2ecc71', 'chirp: an unlocked colour is saved')
+    check(act(1, 'chirp', 'setColour', { colour = '#f0932b' }).success == false, 'chirp: a colour beyond the tier is refused')
+    check(act(1, 'chirp', 'setColour', { colour = 'red;x' }).success == false, 'chirp: an arbitrary colour string is refused')
+    check(act(1, 'chirp', 'setColour', {}).success == true and S.handles.P1.colour == nil, 'chirp: the colour can be cleared')
+end
+
+do
+    socialScene()
+    local S = mysql.db.social
+    Mocks.players[2].job = { name = 'police', onduty = true, isboss = false }
+    act(2, 'chirp', 'feed')
+    check(act(2, 'chirp', 'post', { body = 'official', asBusiness = true }).success == false, 'chirp: a non boss cannot post as a business')
+    Mocks.players[2].job = { name = 'police', onduty = false, isboss = true }
+    check(act(2, 'chirp', 'post', { body = 'official', asBusiness = true }).success == false, 'chirp: an off duty boss cannot post as a business')
+    Mocks.players[2].job = { name = 'unemployed', onduty = true, isboss = true }
+    check(act(2, 'chirp', 'post', { body = 'official', asBusiness = true }).success == false, 'chirp: a job with no business cannot post as one')
+    Mocks.players[2].job = { name = 'police', onduty = true, isboss = true }
+    check(act(2, 'chirp', 'post', { body = 'official', asBusiness = true }).success == true and S.posts[1].business == 'LSPD', 'chirp: an on duty boss posts as the business the server chose')
+    age(60)
+    act(2, 'chirp', 'post', { body = 'fake', business = 'Fake Co' })
+    check(S.posts[2].business == nil, 'chirp: a business sent by the client is ignored')
+
+    local day = socialScene()
+    mysql.db.social.posts = {}
+    day.Config.Social.postsPerDay = 2
+    day.Config.Social.postGapSeconds = 0
+    act(1, 'chirp', 'post', { body = 'one' }); act(1, 'chirp', 'post', { body = 'two' })
+    check(act(1, 'chirp', 'post', { body = 'three' }).error == 'you have posted enough for today', 'chirp: the daily cap holds')
+end
+
+do
+    local env = socialScene()
+    local S = mysql.db.social
+    act(1, 'chirp', 'feed')
+    check(act(1, 'pages', 'post', { category = 'nope', title = 'x', body = 'y' }).success == false, 'pages: an unknown category is refused')
+    check(act(1, 'pages', 'post', { category = 'for_sale', title = '', body = 'y' }).success == false, 'pages: a title is needed')
+    check(act(1, 'pages', 'post', { category = 'for_sale', title = 'Bike <b>', body = 'Nice', price = '$500', showNumber = true }).success == true, 'pages: an advert is posted')
+    check(S.adverts[1].title == 'Bike b' and S.adverts[1].show_number == 1 and S.adverts[1].hours == env.Config.Pages.expireHours, 'pages: text is cleaned and the expiry comes from config')
+    check(act(1, 'pages', 'post', { category = 'for_sale', title = 'Another', body = 'Nice' }).error == 'you already have an advert in that category', 'pages: one advert per category')
+    act(1, 'pages', 'post', { category = 'wanted', title = 'W', body = 'b' })
+    act(1, 'pages', 'post', { category = 'services', title = 'S', body = 'b' })
+    check(act(1, 'pages', 'post', { category = 'other', title = 'O', body = 'b' }).error == 'you already have the most adverts allowed', 'pages: the total cap holds')
+    check(act(1, 'pages', 'post', { category = 'other', title = 'O', body = 'b', asBusiness = true }).success == false, 'pages: the cap applies to business adverts too')
+
+    local list = act(2, 'pages', 'adverts', {})
+    check(#list.adverts == 3 and list.adverts[3].number == '555-0001' and list.adverts[1].number == nil, 'pages: a number shows only when the poster chose to share it')
+    check(list.adverts[1].citizenid == nil and list.adverts[3].mine == false, 'pages: poster ids are never sent')
+    check(#act(2, 'pages', 'adverts', { category = 'wanted' }).adverts == 1, 'pages: a category filter works')
+    check(#act(2, 'pages', 'adverts', { category = "x' OR 1=1" }).adverts == 3, 'pages: an unknown filter is ignored, not injected')
+
+    S.adverts[2].expired = true
+    check(#act(2, 'pages', 'adverts', {}).adverts == 2, 'pages: an expired advert disappears')
+    check(act(1, 'pages', 'post', { category = 'wanted', title = 'W2', body = 'b' }).success == true, 'pages: an expired advert frees its category')
+
+    check(act(2, 'pages', 'remove', { id = 1 }).success == false and S.adverts[1].status == 'active', 'pages: only the poster can remove an advert')
+    check(act(1, 'pages', 'remove', { id = 1 }).success == true and S.adverts[1].status == 'removed', 'pages: the poster can remove their advert')
+
+    local seen = {}
+    local real = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, title, text) if name == 'som-phone:client:banner' then seen[#seen + 1] = { target = target, text = text } end end
+    check(act(1, 'pages', 'contact', { id = 3, body = 'mine?' }).success == false, 'pages: you cannot contact your own advert')
+    check(act(2, 'pages', 'contact', { id = 3, body = '' }).success == false, 'pages: an empty message is refused')
+    check(act(2, 'pages', 'contact', { id = 1, body = 'hi' }).success == false, 'pages: a removed advert cannot be contacted')
+    check(act(2, 'pages', 'contact', { id = 3, body = 'still there?' }).success == true, 'pages: a buyer can message the poster')
+    local m = mysql.db.messages[#mysql.db.messages]
+    check(m.from_number == '555-0002' and m.to_number == '555-0001' and m.body == '[S] still there?', 'pages: the message carries the advert title and goes to the poster\'s number')
+    check(#seen >= 1 and seen[1].target == 1, 'pages: an online poster is notified')
+    _G.TriggerClientEvent = real
+end
+
+do
+    local env = socialScene()
+    local S = mysql.db.social
+    check(act(1, 'pages', 'search', { q = 'Bo' }).success == false, 'white pages: a short search is refused')
+    check(#act(1, 'pages', 'search', { q = 'Two' }).people == 0, 'white pages: nobody is listed until they opt in')
+    check(act(2, 'pages', 'listing').listed == false, 'white pages: listing defaults to off')
+    check(act(2, 'pages', 'list', { listed = true }).listed == true, 'white pages: a character can opt in')
+    local found = act(1, 'pages', 'search', { q = 'bo tw' }).people
+    check(#found == 1 and found[1].firstname == 'Bo' and found[1].phone == '555-0002' and found[1].citizenid == nil, 'white pages: search returns name and number only')
+    check(#act(1, 'pages', 'search', { q = '%%%' }).people == 0 and #act(1, 'pages', 'search', { q = '___' }).people == 0, 'white pages: wildcards are literals')
+    check(act(2, 'pages', 'list', { listed = false }).listed == false and #act(1, 'pages', 'search', { q = 'Two' }).people == 0, 'white pages: opting out removes the listing')
+end
+
+do
+    socialScene()
+    local S = mysql.db.social
+    act(1, 'chirp', 'feed')
+    act(1, 'chirp', 'post', { body = 'bad post' })
+    local remove = Mocks.commands.removepost
+    local said = {}
+    local real = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, text) if name == 'som:client:notify' then said[#said + 1] = text end end
+    remove(2, { kind = 'post', id = 1 })
+    check(S.posts[1].removed == false and said[1] == 'You do not have permission to do that', 'moderation: a non staff character cannot remove a post')
+    Mocks.admins[2] = true
+    remove(2, { kind = 'post', id = 1 })
+    check(S.posts[1].removed == true and said[#said] == 'Removed', 'moderation: staff can remove any post')
+    check(mysql.db.phoneAudit[#mysql.db.phoneAudit].action == 'remove post 1', 'moderation: a removal is written to the audit')
+    remove(2, { kind = 'nope', id = 1 })
+    check(said[#said] == 'Use post or advert', 'moderation: an unknown kind is refused')
+    _G.TriggerClientEvent = real
+end
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)
