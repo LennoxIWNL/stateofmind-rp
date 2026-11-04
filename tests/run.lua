@@ -2495,5 +2495,168 @@ do
     check(setBusy(999, 'x') == false, 'groups exports: an unknown group is refused')
 end
 
+
+----------------------------------------------------------------------
+-- som-jobboard
+----------------------------------------------------------------------
+local boardEnv
+
+local function boardScene()
+    groupScene()
+    Mocks.invoking = nil
+    boardEnv = loader.loadResource(REPO .. 'som-jobboard', { 'shared/config.lua', 'server/main.lua' })
+    Mocks.exported.notifyApp = function() return true end
+    return boardEnv
+end
+
+local function j(source, action, payload) return Mocks.apps.jobs.handler(source, action, payload or {}) end
+
+local function crew(size)
+    g(1, 'create')
+    for i = 2, size do
+        g(1, 'invite', { number = '555000' .. i })
+        g(i, 'accept')
+    end
+    for i = 1, size do g(i, 'ready', { ready = true }) end
+end
+
+local function provider(overrides)
+    local started = {}
+    local def = { id = 'courier', label = 'Courier run', minSize = 1, maxSize = 3, slots = 1,
+        start = function(info) started[#started + 1] = info.id return true end }
+    for k, v in pairs(overrides or {}) do def[k] = v end
+    return def, started
+end
+
+do
+    boardScene()
+    local register = Mocks.exported.registerProvider
+    check(register({}) == false and register({ id = 'x y', label = 'X', start = function() end }) == false and register({ id = 'x', label = 'X' }) == false,
+        'board: a provider needs a clean id, a label and a start function')
+    check(j(1, 'view').view.empty == 'Create or join a group in Groups first', 'board: without a group there is nothing to do')
+    local def = provider()
+    check(register(def) == true, 'board: a provider can register')
+    crew(2)
+    local rows = j(1, 'view').view.sections[1].rows
+    check(#rows == 1 and rows[1].action == 'queue' and rows[1].payload.provider == 'courier', 'board: a ready group is offered the job to wait on')
+    check(j(2, 'queue', { provider = 'courier' }).error == 'only the leader can do that', 'board: only the leader can queue')
+    check(j(1, 'queue', { provider = 'nope' }).error == 'no such job' and j(1, 'queue', { provider = { 1 } }).success == false, 'board: an unknown provider is refused')
+    g(2, 'ready', { ready = false })
+    check(j(1, 'queue', { provider = 'courier' }).error == 'everyone must be ready', 'board: a group that is not ready cannot wait')
+    check(j(1, 'view').view.sections[1].rows[1].action == nil, 'board: the view does not offer a job the group cannot wait on')
+    g(2, 'ready', { ready = true })
+    Mocks.exported.registerProvider(provider({ id = 'big', label = 'Big job', minSize = 4, maxSize = 6 }))
+    check(j(1, 'queue', { provider = 'big' }).error == 'this job takes 4 to 6 people', 'board: group size must fit the job')
+    check(j(1, 'queue', { provider = 'courier' }).success == true and j(1, 'queue', { provider = 'courier' }).success == false, 'board: a group waits once')
+    check(j(1, 'view').view.sections[1].title == 'Waiting', 'board: the view shows the wait')
+    g(2, 'ready', { ready = false })
+    check(j(1, 'view').view.sections[1].title ~= 'Waiting', 'board: a member un-readying takes the group out of the queue')
+    g(2, 'ready', { ready = true })
+    j(1, 'queue', { provider = 'courier' })
+    check(j(1, 'unqueue').success == true and j(1, 'view').view.sections[1].title ~= 'Waiting', 'board: the leader can stop waiting')
+end
+
+do
+    boardScene()
+    local def, started = provider()
+    Mocks.exported.registerProvider(def)
+    crew(2)
+    check(boardEnv.JobBoard.Draw('courier') == nil, 'lottery: nobody waiting, nobody drawn')
+    j(1, 'queue', { provider = 'courier' })
+    local picked = boardEnv.JobBoard.Draw('courier')
+    check(picked ~= nil and j(1, 'view').view.sections[1].title == 'Offer', 'lottery: a waiting group is drawn and offered the job')
+    check(boardEnv.JobBoard.Draw('courier') == nil, 'lottery: a group with an offer is not drawn again')
+    check(j(2, 'accept').success == false, 'lottery: only the leader can accept')
+    check(j(1, 'accept').success == true and #started == 1 and started[1] == picked, 'lottery: accepting starts the job through the provider')
+    check(Mocks.exported.getGroup(1).busy == 'Courier run' and j(1, 'view').view.sections[1].title == 'In progress', 'lottery: the group is marked busy while it runs')
+
+    g(1, 'leave')
+    g(2, 'create')
+    g(3, 'create')
+    g(2, 'ready', { ready = true }); g(3, 'ready', { ready = true })
+    j(2, 'queue', { provider = 'courier' }); j(3, 'queue', { provider = 'courier' })
+    check(boardEnv.JobBoard.Draw('courier') == nil, 'lottery: no slot is free while a job runs')
+
+    Mocks.invoking = 'someone-else'
+    check(Mocks.exported.finish(picked) == false, 'lottery: another resource cannot end a provider\'s job')
+    Mocks.invoking = 'test'
+    check(Mocks.exported.finish(picked) == true and Mocks.exported.finish(picked) == false, 'lottery: the provider ends its own job once')
+    check(boardEnv.JobBoard.Draw('courier') ~= nil, 'lottery: the slot is free again after finish')
+end
+
+do
+    boardScene()
+    local def = provider({ slots = 1 })
+    Mocks.exported.registerProvider(def)
+    -- Two single groups; the longer waiter should be drawn far more often.
+    local oldWins, trials = 0, 400
+    local realTime = os.time
+    for i = 1, trials do
+        boardScene()
+        Mocks.exported.registerProvider(provider())
+        g(1, 'create'); g(2, 'create')
+        g(1, 'ready', { ready = true }); g(2, 'ready', { ready = true })
+        local now = realTime()
+        os.time = function() return now - 40 * 60 end
+        j(1, 'queue', { provider = 'courier' })
+        os.time = function() return now end
+        j(2, 'queue', { provider = 'courier' })
+        local picked = boardEnv.JobBoard.Draw('courier')
+        if Mocks.exported.getGroup(1).id == picked then oldWins = oldWins + 1 end
+    end
+    os.time = realTime
+    check(oldWins > trials * 0.65 and oldWins < trials * 0.95, 'lottery: waiting raises the odds (4 to 1) but never makes a win certain, got ' .. oldWins .. ' of ' .. trials)
+end
+
+do
+    local env = boardScene()
+    local def, started = provider()
+    Mocks.exported.registerProvider(def)
+    crew(1)
+    j(1, 'queue', { provider = 'courier' }); env.JobBoard.Draw('courier')
+    check(j(1, 'decline').success == true and j(1, 'view').view.sections[1].title == 'Jobs for your group', 'offer: declining returns to the list')
+    j(1, 'queue', { provider = 'courier' }); env.JobBoard.Draw('courier')
+    j(1, 'decline')
+    check(j(1, 'queue', { provider = 'courier' }).error == 'your group is locked out for a while' and j(1, 'view').view.empty:find('Try again in'), 'offer: two refusals lock the group out')
+    local real = os.time
+    os.time = function() return real() + env.Config.lockSeconds + 5 end
+    check(j(1, 'queue', { provider = 'courier' }).success == true, 'offer: the lock lifts after its time')
+    os.time = real
+
+    env = boardScene()
+    Mocks.exported.registerProvider(provider())
+    crew(1)
+    j(1, 'queue', { provider = 'courier' }); env.JobBoard.Draw('courier')
+    os.time = function() return real() + env.Config.offerSeconds + 1 end
+    check(j(1, 'accept').error == 'the offer ran out', 'offer: an old offer cannot be accepted')
+    env.JobBoard.Tick()
+    os.time = real
+    check(j(1, 'view').view.sections[1].title ~= 'Offer', 'offer: the tick clears an expired offer and counts it as a refusal')
+
+    env = boardScene()
+    Mocks.exported.registerProvider(provider({ start = function() return false end }))
+    crew(1)
+    j(1, 'queue', { provider = 'courier' }); env.JobBoard.Draw('courier')
+    check(j(1, 'accept').error == 'that job could not start' and Mocks.exported.getGroup(1).busy == nil, 'offer: a provider that cannot start leaves the group free')
+
+    env = boardScene()
+    Mocks.exported.registerProvider(provider({ start = function() error('boom') end }))
+    crew(1)
+    j(1, 'queue', { provider = 'courier' }); env.JobBoard.Draw('courier')
+    check(j(1, 'accept').success == false and Mocks.exported.getGroup(1).busy == nil, 'offer: a provider that errors does not crash the board')
+
+    env = boardScene()
+    Mocks.exported.registerProvider(provider({ canStart = function() return false, 'the city is closed' end }))
+    crew(1)
+    check(j(1, 'queue', { provider = 'courier' }).error == 'the city is closed', 'board: a provider can refuse a group with a reason')
+
+    env = boardScene()
+    Mocks.exported.registerProvider(provider())
+    crew(2)
+    j(1, 'queue', { provider = 'courier' }); env.JobBoard.Draw('courier')
+    g(2, 'leave'); g(1, 'leave')
+    check(env.JobBoard.Draw('courier') == nil and j(1, 'view').view.empty ~= nil, 'board: a group that disbands loses its queue and offer')
+end
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)

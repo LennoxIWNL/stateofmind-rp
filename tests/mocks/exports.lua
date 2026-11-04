@@ -161,6 +161,10 @@ local registry = {
         local fn = Mocks.exported[name]
         return fn and function(_, ...) return fn(...) end or nil
     end }),
+    ['som-groups'] = setmetatable({}, { __index = function(_, name)
+        local fn = Mocks.exported[name]
+        return fn and function(_, ...) return fn(...) end or nil
+    end }),
     ['ox_inventory'] = ox,
     ['som-core'] = core,
     ['som-economy'] = economy,
