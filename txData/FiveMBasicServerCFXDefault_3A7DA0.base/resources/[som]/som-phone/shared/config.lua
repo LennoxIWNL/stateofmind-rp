@@ -19,6 +19,16 @@ Config.Pipeline = {
     writesPerMinute = 20,
 }
 
+Config.Messages = { maxLength = 280, threadLimit = 40, historyLimit = 60 }
+
+Config.Contacts = { max = 100, nameLength = 32 }
+
+-- A call is a server record. The server picks the voice channel, and the
+-- number is large and random so a channel cannot be guessed: pma-voice
+-- registers its own net event that lets any client join any channel number,
+-- which this resource cannot change.
+Config.Calls = { ringSeconds = 30, historyLimit = 30, channelMin = 100000, channelMax = 2000000000 }
+
 -- A passcode is four digits, stored as a salted hash. The pepper is a convar
 -- (som_phone_pepper) so it never sits in a file clients download.
 Config.Lock = {

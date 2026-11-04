@@ -307,6 +307,91 @@ async function main() {
     await phone.waitForFunction(() => !document.querySelector('.phone') || document.querySelector('.root.is-banners-only'), null, { timeout: 2000 });
     check(calls.some((c) => c.endpoint === 'close'), 'phone: Escape tells the game to close it');
 
+    // --- som-phone comms: contacts, messages, the dialer and the call bar. ---
+    await send({ action: 'open', data: openData({ apps: [
+        { id: 'phone', label: 'Phone', icon: 'phone', colour: '#34c759', order: 5 },
+        { id: 'messages', label: 'Messages', icon: 'message', colour: '#30d158', order: 15 },
+        { id: 'contacts', label: 'Contacts', icon: 'contacts', colour: '#34c759', order: 30 },
+    ] }) });
+    await phone.locator('.lock').click();
+    await phone.waitForSelector('.apps .app');
+
+    answers['contacts:list'] = { success: true, contacts: [{ number: '555-0003', name: 'Cyrus' }] };
+    await phone.locator('.app', { hasText: 'Contacts' }).click();
+    await phone.waitForSelector('.row__title');
+    check((await phone.locator('.row__title').textContent()) === 'Cyrus', 'contacts: the list comes from the server');
+    calls.length = 0;
+    await phone.locator('#contact-name').fill('Dee');
+    await phone.locator('#contact-number').fill('555-0004');
+    await phone.locator('.btn', { hasText: 'Save' }).click();
+    await phone.waitForTimeout(150);
+    const saveCall = calls.find((c) => c.body.action === 'save');
+    check(saveCall && saveCall.body.payload.number === '5550004' && saveCall.body.payload.name === 'Dee', 'contacts: the number is reduced to digits before it is sent');
+    calls.length = 0;
+    await phone.locator('button[aria-label="Call Cyrus"]').click();
+    await phone.waitForTimeout(150);
+    check(calls.some((c) => c.body.app === 'phone' && c.body.action === 'dial' && c.body.payload.number === '555-0003'), 'contacts: the call button dials through the phone app');
+    await phone.screenshot({ path: path.join(SCREENSHOT_DIR, 'phone-contacts.png') });
+
+    calls.length = 0;
+    await phone.locator('button[aria-label="Message Cyrus"]').click();
+    await phone.waitForSelector('.chat');
+    check(calls.some((c) => c.body.app === 'messages' && c.body.action === 'thread' && c.body.payload.number === '555-0003'),
+        'contacts: the message button opens that thread');
+
+    answers['messages:thread'] = { success: true, number: '555-0003', name: 'Cyrus', messages: [
+        { id: 1, mine: false, body: 'hi <b>there</b>' }, { id: 2, mine: true, body: 'hello' },
+    ] };
+    answers['messages:threads'] = { success: true, threads: [{ other: '555-0003', name: 'Cyrus', body: 'hello', mine: true, unread: 2 }] };
+    await phone.locator('.back', { hasText: 'All messages' }).click();
+    await phone.waitForSelector('.rowbtn');
+    check((await phone.locator('.rowbtn .pill').textContent()) === '2', 'messages: the inbox shows the unread count');
+    await phone.locator('.rowbtn').click();
+    await phone.waitForSelector('.bubble');
+    check((await phone.locator('.bubble').first().textContent()) === 'hi <b>there</b>' && (await phone.locator('.bubble b').count()) === 0,
+        'messages: a message body is text, never markup');
+    check((await phone.locator('.bubble--mine').count()) === 1, 'messages: my messages sit on my side');
+    calls.length = 0;
+    await phone.locator('input[aria-label="Message"]').fill('on my way');
+    await phone.locator('.btn', { hasText: 'Send' }).click();
+    await phone.waitForTimeout(150);
+    check(calls.some((c) => c.body.app === 'messages' && c.body.action === 'send' && c.body.payload.body === 'on my way' && c.body.payload.number === '555-0003'),
+        'messages: sending names the number and the text only');
+    await phone.screenshot({ path: path.join(SCREENSHOT_DIR, 'phone-messages.png') });
+
+    await phone.locator('.back', { hasText: 'Home' }).click();
+    answers['phone:recents'] = { success: true, recents: [{ number: '555-0003', name: 'Cyrus', status: 'missed', outgoing: false }] };
+    await phone.locator('.app', { hasText: 'Phone' }).click();
+    await phone.waitForSelector('.dialer');
+    check((await phone.locator('.rowbtn .row__title').textContent()) === 'Cyrus', 'phone: recent calls show the contact name');
+    check(await phone.locator('.key--call').isDisabled(), 'phone: the call key is off until seven digits are entered');
+    for (const d of ['5', '5', '5', '0', '0', '0', '4']) await phone.locator('.dialer .key', { hasText: new RegExp(`^${d}$`) }).click();
+    check((await phone.locator('.dialer__number').textContent()) === '5550004', 'phone: the keypad builds the number');
+    calls.length = 0;
+    await phone.locator('.key--call').click();
+    await phone.waitForTimeout(150);
+    check(calls.some((c) => c.body.app === 'phone' && c.body.action === 'dial' && c.body.payload.number === '5550004'), 'phone: dialling sends the number');
+    await phone.screenshot({ path: path.join(SCREENSHOT_DIR, 'phone-dialer.png') });
+
+    await send({ action: 'call', data: { state: 'ringing', number: '555-0003', name: 'Cyrus' } });
+    await phone.waitForSelector('.callbar');
+    check((await phone.locator('.callbar__state').textContent()) === 'Incoming call' && (await phone.locator('.callbar__name').textContent()) === 'Cyrus',
+        'calls: an incoming call shows who is calling');
+    calls.length = 0;
+    await phone.locator('.callbar .btn', { hasText: 'Answer' }).click();
+    await phone.waitForTimeout(150);
+    check(calls.some((c) => c.body.app === 'phone' && c.body.action === 'answer'), 'calls: Answer goes to the server');
+    await send({ action: 'call', data: { state: 'active', number: '555-0003', name: 'Cyrus' } });
+    await phone.waitForFunction(() => document.querySelector('.callbar__state')?.textContent === 'On a call', null, { timeout: 2000 });
+    check((await phone.locator('.callbar .btn', { hasText: 'Answer' }).count()) === 0, 'calls: an active call offers only End');
+    await phone.screenshot({ path: path.join(SCREENSHOT_DIR, 'phone-call.png') });
+    await phone.locator('.callbar .btn', { hasText: 'End' }).click();
+    await phone.waitForTimeout(150);
+    check(calls.some((c) => c.body.action === 'hangup'), 'calls: End goes to the server');
+    await send({ action: 'call', data: { state: 'ended' } });
+    await phone.waitForFunction(() => !document.querySelector('.callbar'), null, { timeout: 2000 });
+    check(true, 'calls: the call bar goes when the server says it ended');
+
     // Apps may import only the SDK, React and the shared types, so an app can
     // never reach around the one door to the server.
     const allowed = /^(react|@som\/phone-sdk|\.\.\/types)$/;

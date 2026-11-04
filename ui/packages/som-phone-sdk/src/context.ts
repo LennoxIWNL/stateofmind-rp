@@ -5,6 +5,8 @@ export interface PhoneApi {
   toast: (text: string, isError?: boolean) => void
   /** Back to the home screen. */
   home: () => void
+  /** Open another app, optionally with a number to start on. */
+  open: (appId: string, arg?: string) => void
   /** Set the unread count shown on an app's tile. */
   badge: (appId: string, count: number) => void
 }
@@ -12,6 +14,7 @@ export interface PhoneApi {
 export const PhoneContext = createContext<PhoneApi>({
   toast: () => {},
   home: () => {},
+  open: () => {},
   badge: () => {},
 })
 

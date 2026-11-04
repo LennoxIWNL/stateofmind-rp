@@ -22,6 +22,11 @@ M.db = {
     bills = {},
     orders = {},
     devices = {},
+    characters = {},
+    contacts = {},
+    blocks = {},
+    messages = {},
+    phoneCalls = {},
     phoneAudit = {},
     nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
                courtCases = 1, courtEvents = 1, courtWarrants = 1, service = 1, evidence = 1, custody = 1, orders = 1 },
@@ -168,6 +173,16 @@ function M.single(query, params)
         return d and { imei = params[1], pass_hash = d.pass_hash } or nil
     end
     if query:find('FROM som_phone_settings WHERE citizenid = ?', 1, true) then return nil end
+    if query:find('SELECT citizenid FROM som_characters WHERE phone = ?', 1, true) then
+        local cid = M.db.characters[params[1]]
+        return cid and { citizenid = cid } or nil
+    end
+    if query:find('SELECT body, from_number FROM som_phone_messages WHERE id = ?', 1, true) then
+        for _, x in ipairs(M.db.messages) do
+            if x.id == params[1] then return { body = x.body, from_number = x.from_number } end
+        end
+        return nil
+    end
     fail(query)
 end
 
@@ -252,6 +267,17 @@ function M.scalar(query, params)
         return 'H:' .. params[1] .. ':' .. params[2] .. ':' .. params[3]
     end
     if query:find('SELECT COUNT(*) FROM som_phone_bills', 1, true) then return 0 end
+    if query:find('SELECT 1 FROM som_phone_blocks WHERE citizenid = ? AND number = ?', 1, true) then
+        return M.db.blocks[params[1] .. '|' .. params[2]] and 1 or nil
+    end
+    if query:find('SELECT name FROM som_phone_contacts WHERE citizenid = ? AND number = ?', 1, true) then
+        return M.db.contacts[params[1] .. '|' .. params[2]]
+    end
+    if query:find('SELECT COUNT(*) FROM som_phone_contacts WHERE citizenid = ?', 1, true) then
+        local n = 0
+        for k in pairs(M.db.contacts) do if k:find('^' .. params[1] .. '|') then n = n + 1 end end
+        return n
+    end
     fail(query)
 end
 
@@ -571,6 +597,23 @@ function M.update(query, params)
         d.pass_hash, d.pass_salt = params[1], params[2]
         return 1
     end
+    if query:find('DELETE FROM som_phone_contacts WHERE citizenid = ? AND number = ?', 1, true) then
+        local key = params[1] .. '|' .. params[2]
+        local had = M.db.contacts[key] ~= nil
+        M.db.contacts[key] = nil
+        return had and 1 or 0
+    end
+    if query:find('DELETE FROM som_phone_blocks WHERE citizenid = ? AND number = ?', 1, true) then
+        M.db.blocks[params[1] .. '|' .. params[2]] = nil
+        return 1
+    end
+    if query:find('UPDATE som_phone_messages SET read_at = NOW() WHERE to_number = ?', 1, true) then
+        local n = 0
+        for _, x in ipairs(M.db.messages) do
+            if x.to_number == params[1] and x.from_number == params[2] and not x.read then x.read = true; n = n + 1 end
+        end
+        return n
+    end
     fail(query)
 end
 
@@ -708,6 +751,23 @@ function M.insert(query, params)
         M.db.phoneSettings[params[1]] = params[2]
         return 1
     end
+    if query:find('INSERT INTO som_phone_contacts', 1, true) then
+        M.db.contacts[params[1] .. '|' .. params[2]] = params[3]
+        return 1
+    end
+    if query:find('INSERT IGNORE INTO som_phone_blocks', 1, true) then
+        M.db.blocks[params[1] .. '|' .. params[2]] = true
+        return 1
+    end
+    if query:find('INSERT INTO som_phone_messages', 1, true) then
+        local id = #M.db.messages + 1
+        M.db.messages[id] = { id = id, from_number = params[1], to_number = params[2], body = params[3], read = false }
+        return id
+    end
+    if query:find('INSERT INTO som_phone_calls', 1, true) then
+        M.db.phoneCalls[#M.db.phoneCalls + 1] = { from_number = params[1], to_number = params[2], status = params[3], answered = params[4] }
+        return #M.db.phoneCalls
+    end
     fail(query)
 end
 
@@ -810,6 +870,51 @@ function M.query(query, params)
                 local row = copy(o)
                 row.ready = o.ready_at <= now() and 1 or 0
                 out[#out + 1] = row
+            end
+        end
+        return out
+    end
+    if query:find('SELECT number, name FROM som_phone_contacts WHERE citizenid = ?', 1, true) then
+        local out = {}
+        for k, name in pairs(M.db.contacts) do
+            local cid, number = k:match('^(.-)|(.*)$')
+            if cid == params[1] then out[#out + 1] = { number = number, name = name } end
+        end
+        table.sort(out, function(a, b) return a.name < b.name end)
+        return out
+    end
+    if query:find('SELECT other, MAX(id) AS last_id', 1, true) then
+        local me, byOther = params[1], {}
+        for _, x in ipairs(M.db.messages) do
+            if x.from_number == me or x.to_number == me then
+                local other = x.from_number == me and x.to_number or x.from_number
+                local t = byOther[other] or { other = other, last_id = 0, unread = 0 }
+                byOther[other] = t
+                if x.id > t.last_id then t.last_id = x.id end
+                if x.to_number == me and not x.read then t.unread = t.unread + 1 end
+            end
+        end
+        local out = {}
+        for _, t in pairs(byOther) do out[#out + 1] = t end
+        table.sort(out, function(a, b) return a.last_id > b.last_id end)
+        return out
+    end
+    if query:find('SELECT id, from_number, body, created_at FROM som_phone_messages', 1, true) then
+        local me, other, out = params[1], params[2], {}
+        for i = #M.db.messages, 1, -1 do
+            local x = M.db.messages[i]
+            if (x.from_number == me and x.to_number == other) or (x.from_number == other and x.to_number == me) then
+                out[#out + 1] = { id = x.id, from_number = x.from_number, body = x.body, created_at = 'now' }
+            end
+        end
+        return out
+    end
+    if query:find('SELECT from_number, to_number, status, created_at FROM som_phone_calls', 1, true) then
+        local out = {}
+        for i = #M.db.phoneCalls, 1, -1 do
+            local c = M.db.phoneCalls[i]
+            if c.from_number == params[1] or c.to_number == params[1] then
+                out[#out + 1] = { from_number = c.from_number, to_number = c.to_number, status = c.status, created_at = 'now' }
             end
         end
         return out

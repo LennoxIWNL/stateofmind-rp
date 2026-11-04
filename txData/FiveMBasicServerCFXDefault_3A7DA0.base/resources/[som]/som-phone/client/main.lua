@@ -87,6 +87,52 @@ RegisterNetEvent('som-phone:client:banner', function(title, text, iconName)
     })
 end)
 
+-- ---------------------------------------------------------------------------
+-- Calls. The server owns the call and the voice channel; this only rings,
+-- shows who is calling, and relays answer and hang up.
+-- ---------------------------------------------------------------------------
+
+local callState = nil
+
+local function callAction(action)
+    lib.callback('som-phone:server:action', false, function() end, 'phone', action, {})
+end
+
+RegisterNetEvent('som-phone:client:call', function(call)
+    if type(call) ~= 'table' or type(call.state) ~= 'string' then return end
+
+    local was = callState
+    callState = call.state ~= 'ended' and call.state or nil
+
+    SendNUIMessage({ action = 'call', data = call })
+
+    if call.state == 'ringing' then
+        CreateThread(function()
+            while callState == 'ringing' do
+                playSound('call')
+                Wait(3000)
+            end
+        end)
+        TriggerEvent('som:client:notify', ('Incoming call: %s  (Y answer, N decline)'):format(call.name or call.number or 'Unknown'), 'inform', 8000)
+    elseif call.state == 'active' then
+        Anim.Play('call')
+    elseif call.state == 'ended' then
+        if not isOpen then Anim.Stop() end
+        if was then TriggerEvent('som:client:notify', 'Call ended', 'inform') end
+    end
+end)
+
+RegisterCommand('phoneanswer', function()
+    if callState == 'ringing' then callAction('answer') end
+end, false)
+
+RegisterCommand('phonehangup', function()
+    if callState then callAction('hangup') end
+end, false)
+
+RegisterKeyMapping('phoneanswer', 'Answer a call', 'keyboard', 'Y')
+RegisterKeyMapping('phonehangup', 'Decline or end a call', 'keyboard', 'N')
+
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
     if isOpen then SetNuiFocus(false, false) end
