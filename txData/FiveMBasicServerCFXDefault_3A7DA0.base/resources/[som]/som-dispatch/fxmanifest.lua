@@ -21,6 +21,9 @@ shared_scripts {
 }
 
 client_scripts {
+    '@som-ui/client/context.lua',
+    '@som-ui/client/dialog.lua',
+    'client/panel.lua',
     'client/detect.lua',
     'client/alerts.lua',
     -- The client half of the ps-dispatch export surface. ps-mdt calls
@@ -53,4 +56,5 @@ files {
 dependencies {
     'ox_lib',
     'som-core',
+    'som-ui',
 }

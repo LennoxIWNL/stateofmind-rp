@@ -20,6 +20,18 @@ Mocks.businessSpendFails = false
 local core = {}
 function core:getPlayer(source) return Mocks.players[source] end
 function core:getPlayers() return {} end
+function core:getPlayersByJob(job, onDutyOnly)
+    local out = {}
+    for source, player in pairs(Mocks.players) do
+        if player.job and player.job.name == job and (not onDutyOnly or player.job.onduty) then
+            local copy = {}
+            for k, v in pairs(player) do copy[k] = v end
+            copy.source = source
+            out[#out + 1] = copy
+        end
+    end
+    return out
+end
 function core:getPlayerByCitizenId(citizenid)
     for source, player in pairs(Mocks.players) do
         if player.citizenid == citizenid then

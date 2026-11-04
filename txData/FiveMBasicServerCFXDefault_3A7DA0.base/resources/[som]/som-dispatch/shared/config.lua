@@ -11,6 +11,25 @@ Config = {}
 -- as history in the call list.
 Config.CallLifetime = 30 * 60   -- seconds
 
+-- Repeat reports of the same detected crime close together are one call with a
+-- count, not a new call each. At `escalateAt` reports a routine call is raised
+-- one priority step, so a sustained incident is noticed without a flood.
+Config.Merge = { radius = 40.0, window = 120, escalateAt = 3 }
+
+-- A call nobody has attached to for this long is flagged unattended.
+Config.UnattendedAfter = 120
+
+-- Detected reports one player may send per minute, across every alert type.
+Config.ReportBudget = 30
+
+-- The dispatcher job hears every call and may assign, close and declare a major
+-- incident. Responders at or above SupervisorGrade may declare and close too.
+Config.DispatcherJob = 'dispatcher'
+Config.SupervisorGrade = 4
+
+-- Closed calls leave the board this long after the last service closed.
+Config.ClosedKeep = 120
+
 -- Hard cap on stored calls. A busy night must not grow this without bound,
 -- because the whole table is serialised to every MDT that opens.
 Config.MaxCalls = 100
@@ -61,6 +80,8 @@ Config.Alerts = {
         -- Raised by client detection, so the report event may carry it.
         reportable = true,
         label = 'Fight In Progress',
+        -- The blip is a search area, so repeat reports cannot be averaged to the exact spot.
+        offset = 60.0,
         code = '10-10',
         priority = 2,
         chance = 0.4,
@@ -73,6 +94,7 @@ Config.Alerts = {
         -- Raised by client detection, so the report event may carry it.
         reportable = true,
         label = 'Vehicle Theft In Progress',
+        offset = 60.0,
         code = '10-35',
         priority = 2,
         chance = 0.6,
