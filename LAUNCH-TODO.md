@@ -166,3 +166,9 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Ranks are changed one step at a time, never above the boss's own rank, and never for someone at or above it. The last boss cannot leave.
 - [ ] The app has never been opened in a real phone UI; the view is the same host format as Groups.
 - [ ] `Money.GangTransact` (som-core) exercised on the real database only as plain SQL, not through a running player.
+
+## Gang payroll and the turf app (som-turf)
+
+- [ ] Payroll runs hourly (`Config.payrollMinutes`), pays online members of gangs that hold a zone the `payment` of their grade from `som-core/shared/gangs.lua` (20 to 75 an hour as shipped), capped at `Config.payrollCap`. The money comes out of the gang account, which only boss deposits fill. Decide whether those pay figures are right for your economy.
+- [ ] The `turf` phone app is read only: zone owners and contests for everyone, street prices and recent gang activity for gang members. It reuses the `briefcase` icon; a dedicated icon needs a UI rebuild.
+- [ ] Payroll never ran with a real player and the real `gangTransact`; only SQL and the mock harness.

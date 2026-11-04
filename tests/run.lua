@@ -3301,5 +3301,64 @@ do
     check(gact(1, 'leave').success == true and Mocks.players[1].gang.name == 'none', 'gang: a boss can leave when another boss remains')
 end
 
+-- ---------------------------------------------------------------------------
+-- Gang payroll and the turf view
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-turf', { 'shared/config.lua', 'server/main.lua', 'server/payroll.lua', 'server/app.lua' })
+    local function member(grade, pay) return { name = 'ballas', label = 'Ballas', grade = grade, payment = pay, isboss = false } end
+    Mocks.players = {
+        [1] = { citizenid = 'W1', gang = member(1, 20) },
+        [2] = { citizenid = 'W2', gang = member(2, 35) },
+        [3] = { citizenid = 'W3', gang = { name = 'none', grade = 0, payment = 0 } },
+        [4] = { citizenid = 'W4', gang = member(0, 0) },
+    }
+    Mocks.gangFunds, Mocks.gangLedger, Mocks.gangFails = { ballas = 100 }, {}, false
+    Mocks.paid, Mocks.calls.addMoney = 0, 0
+
+    check(env.Turf.Payroll() == 0 and Mocks.gangFunds.ballas == 100, 'payroll: a gang with no turf is not paid')
+
+    mysql.db.turf.zones.grove = { owner = 'ballas' }
+    check(env.Turf.Payroll() == 55 and Mocks.gangFunds.ballas == 45, 'payroll: members of a gang with turf are paid out of the gang account')
+    check(Mocks.calls.addMoney == 2 and Mocks.lastPaid.reason == 'gang_pay:ballas', 'payroll: a grade with no pay and non-members get nothing')
+
+    Mocks.gangFunds.ballas = 30
+    Mocks.paid, Mocks.calls.addMoney = 0, 0
+    local paid = env.Turf.Payroll()
+    check(paid <= 30 and Mocks.gangFunds.ballas >= 0, 'payroll: the account never goes below zero')
+
+    Mocks.gangFunds.ballas = 0
+    check(env.Turf.Payroll() == 0, 'payroll: an empty account pays nobody')
+
+    Mocks.gangFunds.ballas = 100
+    Mocks.addMoneyFails = true
+    check(env.Turf.Payroll() == 0 and Mocks.gangFunds.ballas == 100, 'payroll: a failed credit refunds the gang account')
+    Mocks.addMoneyFails = false
+
+    env.Config.payrollCap = 10
+    Mocks.gangFunds.ballas = 100
+    check(env.Turf.Payroll() == 20 and Mocks.gangFunds.ballas == 80, 'payroll: pay is capped per member')
+    env.Config.payrollCap = 5000
+
+    local z = env.Config.zones[1]
+    z.enabled, z.center, z.radius, z.tag = true, vec3(0, 0, 0), 50.0, vec3(10, 0, 0)
+    mysql.db.turf.zones.grove = { owner = 'ballas', contested_by = 'vagos' }
+    mysql.db.turf.events = { { gang = 'ballas', action = 'claim', zone = 'Grove Street' }, { gang = 'ballas', action = 'sale', zone = 'Grove Street' } }
+    mysql.fakeNow = 5000000
+    mysql.db.turf.market.joint = { units = 10, ts = 5000000 }
+    Mocks.exported.getGangs = nil
+    local civ = Mocks.apps.turf.handler(3, 'view', {}).view
+    check(#civ.sections == 1 and civ.sections[1].rows[1].sub:find('contested by'), 'turf app: everyone sees who holds a zone and a contest')
+    local gv = Mocks.apps.turf.handler(1, 'view', {}).view
+    check(#gv.sections == 3 and gv.sections[2].title == 'Street prices', 'turf app: gang members also see the street prices')
+    local price
+    for _, r in ipairs(gv.sections[2].rows) do if r.title == 'Joint' then price = r.sub end end
+    check(price == '$32', 'turf app: prices reflect the market (40 base, 10 sold)')
+    check(#gv.sections[3].rows == 1 and gv.sections[3].rows[1].sub == 'claim', 'turf app: recent activity leaves sales out')
+    check(Mocks.apps.turf.handler(1, 'delete', {}).success == false, 'turf app: it has no actions')
+end
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)
