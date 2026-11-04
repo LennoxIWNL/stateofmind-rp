@@ -49,6 +49,8 @@ jobs:
         run: tools/check-lua.sh
       - name: Server tests
         run: lua5.4 tests/run.lua
+      - name: Every inventory item has an icon
+        run: python3 tools/check-item-icons.py
 
   nui:
     runs-on: ubuntu-latest
