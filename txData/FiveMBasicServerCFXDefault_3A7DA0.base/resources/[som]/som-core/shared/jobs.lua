@@ -86,6 +86,22 @@ Jobs = {
         },
     },
 
+    -- Radio dispatch. Hears every call, and assigns, closes and declares major
+    -- incidents through som-dispatch. Paid by the department it works for.
+    dispatcher = {
+        label = 'Emergency Dispatch',
+        type = 'leo',
+        business = 'lspd',
+        whitelisted = true,
+        defaultDuty = false,
+        offDutyPay = false,
+        grades = {
+            [0] = { name = 'Dispatcher', payment = 1500 },
+            [1] = { name = 'Senior Dispatcher', payment = 2200 },
+            [2] = { name = 'Dispatch Supervisor', payment = 2800, isboss = true },
+        },
+    },
+
     -- The DOJ is three jobs, not three grades of one. A single ladder lets a
     -- defender be promoted onto the bench, which is the separation of powers
     -- this department exists to keep. som-court gates each power with one

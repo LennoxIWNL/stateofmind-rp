@@ -15,6 +15,7 @@ local function vec4(x, y, z, w)
 end
 
 _G.vec3 = vec3
+_G.vector3 = vec3
 _G.vec4 = vec4
 
 -- Boot-time CreateThread bodies (seeding/retiring config rows) never run;

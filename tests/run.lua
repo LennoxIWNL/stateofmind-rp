@@ -101,6 +101,18 @@ local function loadCourt()
     return courtEnv
 end
 
+local dispEnv
+
+local function loadDispatch()
+    resetDb()
+    resetMocks()
+    dispEnv = loader.loadResource(REPO .. 'som-dispatch', {
+        'shared/config.lua',
+        'server/main.lua',
+    })
+    return dispEnv
+end
+
 local evEnv
 
 local function loadEvidence()
@@ -1139,6 +1151,213 @@ do
     check(ev('gsr', 1, 2).positive == true, 'gsr: someone who just fired tests positive')
     check(ev('gsr', 1, 2).success == false, 'gsr: no kit, no test')
     check(ev('gsr', 2, 1).success == false, 'gsr: a civilian cannot test')
+end
+
+----------------------------------------------------------------------
+-- som-dispatch: merging, offsets, working a call, major incidents
+----------------------------------------------------------------------
+local function person(cid, job, onduty, grade)
+    return {
+        citizenid = cid,
+        charinfo = { firstname = cid, lastname = 'Test' },
+        job = { name = job, onduty = onduty, grade = grade or 0 },
+    }
+end
+
+local function dispScene()
+    local env = loadDispatch()
+    for _, alert in pairs(env.Config.Alerts) do alert.chance = 1.0 end
+    Mocks.players[21] = person('R1', 'unemployed', false)
+    Mocks.players[22] = person('R2', 'unemployed', false)
+    Mocks.players[23] = person('R3', 'unemployed', false)
+    Mocks.players[31] = person('COP1', 'police', true, 1)
+    Mocks.players[32] = person('SGT', 'police', true, 4)
+    Mocks.players[33] = person('MEDIC', 'ambulance', true, 0)
+    Mocks.players[34] = person('DISP', 'dispatcher', true, 0)
+    Mocks.players[35] = person('CIV', 'unemployed', false)
+    for _, id in ipairs({ 21, 22, 23 }) do placePed(id, 100.0 + id, 100.0, 30.0) end
+    return env
+end
+
+local function report(source, alert)
+    _G.source = source
+    RegisteredEvents['som-dispatch:server:report'](alert, {})
+    _G.source = nil
+end
+
+local function allCalls() return Mocks.exported.getCalls() end
+local function firstCall()
+    for _, call in pairs(allCalls()) do return call end
+end
+
+local function capture(fn)
+    local seen = {}
+    local real = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, ...) seen[#seen + 1] = { name = name, target = target } end
+    fn()
+    _G.TriggerClientEvent = real
+    return seen
+end
+
+local function sentTo(seen, name, target)
+    for _, e in ipairs(seen) do
+        if e.name == name and e.target == target then return true end
+    end
+    return false
+end
+
+do
+    local env = dispScene()
+    report(21, 'meleeAttack')
+    local call = firstCall()
+    check(call and call.count == 1 and call.priority == 2, 'merge: the first report raises a call')
+    report(22, 'meleeAttack')
+    check(call.count == 2, 'merge: a nearby repeat joins the call')
+    local n = 0
+    for _ in pairs(allCalls()) do n = n + 1 end
+    check(n == 1, 'merge: a repeat does not make a second call')
+    report(23, 'meleeAttack')
+    check(call.count == 3 and call.priority == 1, 'merge: enough reports raise the priority one step')
+
+    Mocks.players[24] = person('R4', 'unemployed', false)
+    Mocks.players[25] = person('R5', 'unemployed', false)
+    placePed(24, 5000.0, 5000.0, 30.0)
+    report(24, 'meleeAttack')
+    n = 0
+    for _ in pairs(allCalls()) do n = n + 1 end
+    check(n == 2, 'merge: a report far away is its own call')
+
+    placePed(25, 100.0, 100.0, 30.0)
+    call.createdAt = os.time() - env.Config.Merge.window - 5
+    report(25, 'meleeAttack')
+    n = 0
+    for _ in pairs(allCalls()) do n = n + 1 end
+    check(n == 3, 'merge: an old call is not merged into')
+end
+
+do
+    local env = dispScene()
+    placePed(21, 1000.0, 2000.0, 30.0)
+    report(21, 'meleeAttack')
+    local call = firstCall()
+    local dx, dy = call.coords.x - 1000.0, call.coords.y - 2000.0
+    check(call.offset == env.Config.Alerts.meleeAttack.offset and math.abs(dx) <= call.offset and math.abs(dy) <= call.offset,
+        'offset: the shown position is within the search radius of the real one')
+    check(dx ~= 0 or dy ~= 0, 'offset: the shown position is not the real one')
+    placePed(22, 1000.0, 2000.0, 30.0)
+    report(22, 'meleeAttack')
+    check(call.count == 2, 'offset: repeats still merge on the real position')
+    report(21, 'shotsFired')
+    local shots
+    for _, c in pairs(allCalls()) do if c.alertType == 'shotsFired' then shots = c end end
+    check(shots and shots.coords.x == 1000.0, 'offset: other alert types are shown exactly')
+end
+
+do
+    local env = dispScene()
+    env.Config.ReportBudget = 2
+    report(21, 'meleeAttack'); report(21, 'vehicleTheft'); report(21, 'explosion')
+    local n = 0
+    for _ in pairs(allCalls()) do n = n + 1 end
+    check(n == 2, 'budget: a player over their reports per minute is ignored')
+end
+
+do
+    local env = dispScene()
+    local seen = capture(function() report(21, 'shotsFired') end)
+    check(sentTo(seen, 'som-dispatch:client:call', 31) and sentTo(seen, 'som-dispatch:client:call', 34),
+        'routing: on duty police and the dispatcher hear a call')
+    check(not sentTo(seen, 'som-dispatch:client:call', 33) and not sentTo(seen, 'som-dispatch:client:call', 35),
+        'routing: other services and civilians do not')
+end
+
+do
+    dispScene()
+    report(21, 'shotsFired')
+    local call = firstCall()
+    local attach, detach = RegisteredCallbacks['som-dispatch:server:attach'], RegisteredCallbacks['som-dispatch:server:detach']
+    check(attach(35, call.id).success == false, 'attach: a civilian cannot')
+    check(attach(34, call.id).success == false, 'attach: a dispatcher does not take the field')
+    check(attach(33, call.id).success == false, 'attach: a service the call is not for cannot')
+    check(attach(31, 999).success == false, 'attach: an unknown call is refused')
+    check(attach(31, call.id).success == true and #call.units == 1 and call.services.police.status == 'responding',
+        'attach: an officer responds')
+    check(attach(31, call.id).success == false, 'attach: twice is refused')
+    check(detach(31, call.id).success == true and #call.units == 0, 'detach: an officer can leave')
+    check(detach(31, call.id).success == false, 'detach: leaving twice is refused')
+end
+
+do
+    dispScene()
+    report(21, 'shotsFired')
+    local call = firstCall()
+    local assign = RegisteredCallbacks['som-dispatch:server:assign']
+    local attach = RegisteredCallbacks['som-dispatch:server:attach']
+    check(assign(31, call.id, 32).success == false, 'assign: a plain officer cannot assign')
+    check(assign(34, call.id, 35).success == false, 'assign: a civilian cannot be assigned')
+    check(assign(34, call.id, 33).success == false, 'assign: a service not on the call cannot be assigned')
+    check(assign(34, call.id, 31).success == true and #call.units == 1, 'assign: a dispatcher puts an officer on a call')
+    check(assign(34, call.id, 31).success == false, 'assign: the same officer twice is refused')
+    check(assign(32, call.id, 32).success == true, 'assign: a supervisor can assign')
+    check(attach(32, call.id).success == false, 'assign: an assigned unit is already attached')
+end
+
+do
+    dispScene()
+    report(21, 'shotsFired')
+    local call = firstCall()
+    local close = RegisteredCallbacks['som-dispatch:server:close']
+    local attach = RegisteredCallbacks['som-dispatch:server:attach']
+    check(close(35, call.id).success == false, 'close: a civilian cannot')
+    check(close(31, call.id).success == false, 'close: a unit not on the call cannot')
+    attach(31, call.id)
+    check(close(31, call.id).success == true and call.status == 'closed', 'close: a unit on the call closes it')
+    check(close(31, call.id).success == false and attach(32, call.id).success == false, 'close: a closed call takes no more work')
+
+    report(22, 'explosion')
+    local blast
+    for _, c in pairs(allCalls()) do if c.alertType == 'explosion' then blast = c end end
+    attach(31, blast.id)
+    close(31, blast.id)
+    check(blast.status ~= 'closed' and blast.services.police.status == 'closed' and blast.services.ambulance.status ~= 'closed',
+        'close: closing your own service leaves the other open')
+    check(close(34, blast.id).success == true and blast.status == 'closed', 'close: a dispatcher closes every service')
+end
+
+do
+    local env = dispScene()
+    report(21, 'shotsFired')
+    local call = firstCall()
+    local major = RegisteredCallbacks['som-dispatch:server:major']
+    local attach = RegisteredCallbacks['som-dispatch:server:attach']
+    check(major(31, call.id, true).success == false, 'major: a plain officer cannot declare')
+    attach(31, call.id)
+    local seen = capture(function() check(major(32, call.id, true).success == true and call.major, 'major: a supervisor declares') end)
+    check(sentTo(seen, 'som:client:notify', 31) and sentTo(seen, 'som:client:notify', 34), 'major: every on duty responder hears it')
+    check(major(32, call.id, true).success == false, 'major: declaring twice is refused')
+
+    placePed(22, 800.0, 800.0, 30.0)
+    local routine = capture(function() report(22, 'meleeAttack') end)
+    check(not sentTo(routine, 'som-dispatch:client:call', 31) and sentTo(routine, 'som-dispatch:client:call', 32),
+        'major: units on the incident are spared routine calls')
+    placePed(23, 1800.0, 1800.0, 30.0)
+    local urgent = capture(function() report(23, 'explosion') end)
+    check(sentTo(urgent, 'som-dispatch:client:call', 31), 'major: priority one traffic still reaches them')
+    check(major(34, call.id, false).success == true and not call.major, 'major: a dispatcher can stand it down')
+end
+
+do
+    local env = dispScene()
+    report(21, 'shotsFired')
+    placePed(22, 3000.0, 3000.0, 30.0)
+    report(22, 'explosion')
+    local board = RegisteredCallbacks['som-dispatch:server:board']
+    check(board(35).success == false, 'board: a civilian has no board')
+    check(#board(31).calls == 2 and #board(33).calls == 1, 'board: a unit sees only calls for its service')
+    check(#board(34).calls == 2 and board(34).role == 'dispatcher', 'board: a dispatcher sees them all')
+    check(board(31).calls[1].unattended == false, 'board: a fresh call is not unattended')
+    for _, call in pairs(allCalls()) do call.createdAt = os.time() - env.Config.UnattendedAfter - 1 end
+    check(board(31).calls[1].unattended == true, 'board: a call nobody took for too long is flagged')
 end
 
 ----------------------------------------------------------------------
