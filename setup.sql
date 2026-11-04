@@ -1590,3 +1590,27 @@ CREATE TABLE IF NOT EXISTS `som_whitelist` (
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`identifier`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_reports` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `name`       VARCHAR(64) NOT NULL,
+  `message`    VARCHAR(200) NOT NULL,
+  `status`     ENUM('open','claimed','closed') NOT NULL DEFAULT 'open',
+  `claimed_by` VARCHAR(32) DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_status` (`status`, `id`),
+  KEY `idx_citizen` (`citizenid`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_staff_audit` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `staff`      VARCHAR(32) NOT NULL,
+  `action`     VARCHAR(32) NOT NULL,
+  `target`     VARCHAR(48) DEFAULT NULL,
+  `detail`     VARCHAR(200) DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_staff` (`staff`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

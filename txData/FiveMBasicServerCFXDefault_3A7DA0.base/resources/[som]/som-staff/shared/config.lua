@@ -5,4 +5,8 @@ Config = {
     deniedMessage = 'You are not on the whitelist. Apply in our Discord.',
     -- Identifier kinds that may be listed. A licence is the normal one.
     identifierKinds = { license = true, license2 = true, discord = true, steam = true },
+
+    reportMax = 200,
+    reportCooldown = 60,   -- seconds between reports for one character
+    listMax = 30,
 }
