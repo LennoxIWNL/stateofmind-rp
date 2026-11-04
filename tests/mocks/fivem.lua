@@ -25,13 +25,26 @@ _G.CreateThread = function(fn) end
 _G.Wait = function(ms) end
 _G.SetTimeout = function(ms, fn) end
 _G.Handlers = {}
-_G.AddEventHandler = function(name, fn) _G.Handlers[name] = fn end
+local handlerLists = {}
+_G.AddEventHandler = function(name, fn)
+    local list = handlerLists[name]
+    if not list then
+        list = {}
+        handlerLists[name] = list
+        -- Every handler for an event runs, in order, as the real runtime does.
+        _G.Handlers[name] = function(...) for _, h in ipairs(list) do h(...) end end
+    end
+    list[#list + 1] = fn
+end
+_G.ResetHandlers = function() handlerLists = {}; _G.Handlers = {} end
 _G.RegisteredEvents = {}
 _G.RegisterNetEvent = function(name, fn) if fn then _G.RegisteredEvents[name] = fn end end
 _G.GetGameTimer = function() return (_G.Mocks and _G.Mocks.clock) or 0 end
 _G.TriggerEvent = function(name, ...) end
 _G.TriggerClientEvent = function(name, source, ...) end
 _G.RegisterCommand = function(name, fn, restricted) end
+_G.GetResourceState = function(name) return 'started' end
+_G.GetInvokingResource = function() return 'test' end
 _G.PerformHttpRequest = function() end
 _G.GetConvar = function(name, default) return default end
 

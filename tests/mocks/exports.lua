@@ -6,6 +6,8 @@ local Mocks = {}
 
 Mocks.calls = { payWith = 0, addMoney = 0, businessSpend = 0, dispatchAlert = 0, businessTransact = 0 }
 Mocks.admins = {}
+Mocks.perks = {}
+Mocks.metadataRefused = false
 Mocks.fines = {}
 Mocks.fineFails = false
 Mocks.exported = {}        -- name -> function, filled by exports(name, fn) in loaded resources
@@ -63,6 +65,7 @@ end
 function core:hasPermission(source, ace)
     return Mocks.admins[source] == true
 end
+function core:hasPerk(source, perk) return Mocks.perks[source] ~= nil and Mocks.perks[source][perk] == true end
 function core:paymentOptions(source) return {} end
 function core:getMetadata(source, key)
     local player = Mocks.players[source]
@@ -112,6 +115,12 @@ function ox:Search(inv, mode, name)
     end
     return mode == 'count' and count or slots
 end
+function ox:SetMetadata(inv, slot, metadata)
+    if Mocks.metadataRefused then return end
+    for _, item in pairs(Mocks.inv[inv] or {}) do
+        if item.slot == slot then item.metadata = metadata end
+    end
+end
 function ox:GetCurrentWeapon(inv) return Mocks.weapons[inv] end
 function ox:RegisterStash(id) Mocks.inv[id] = Mocks.inv[id] or {} end
 function ox:GetInventoryItems(inv) return Mocks.inv[inv] end
@@ -133,6 +142,10 @@ end
 
 local registry = {
     ['som-medical'] = medical,
+    ['som-phone'] = setmetatable({}, { __index = function(_, name)
+        local fn = Mocks.exported[name]
+        return fn and function(_, ...) return fn(...) end or nil
+    end }),
     ['som-evidence'] = setmetatable({}, { __index = function(_, name)
         local fn = Mocks.exported[name]
         return fn and function(_, ...) return fn(...) end or nil
@@ -165,6 +178,7 @@ _G.lib = {
     callback = {
         register = function(name, fn) libCallbacks[name] = fn end,
     },
+    addCommand = function() end,
 }
 
 return Mocks

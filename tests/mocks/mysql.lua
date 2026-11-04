@@ -21,6 +21,8 @@ M.db = {
     profiles = {},
     bills = {},
     orders = {},
+    devices = {},
+    phoneAudit = {},
     nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
                courtCases = 1, courtEvents = 1, courtWarrants = 1, service = 1, evidence = 1, custody = 1, orders = 1 },
 }
@@ -161,6 +163,11 @@ function M.single(query, params)
     if query:find('SELECT * FROM som_launder_orders WHERE id = ?', 1, true) then
         return copy(findOrder(params[1]))
     end
+    if query:find('SELECT imei, pass_hash FROM som_phone_devices WHERE imei = ?', 1, true) then
+        local d = M.db.devices[params[1]]
+        return d and { imei = params[1], pass_hash = d.pass_hash } or nil
+    end
+    if query:find('FROM som_phone_settings WHERE citizenid = ?', 1, true) then return nil end
     fail(query)
 end
 
@@ -237,6 +244,14 @@ function M.scalar(query, params)
         end
         return sum
     end
+    if query:find('SELECT pass_salt FROM som_phone_devices WHERE imei = ?', 1, true) then
+        local d = M.db.devices[params[1]]
+        return d and d.pass_salt or nil
+    end
+    if query:find('SELECT SHA2(CONCAT(?, ?, ?), 256)', 1, true) then
+        return 'H:' .. params[1] .. ':' .. params[2] .. ':' .. params[3]
+    end
+    if query:find('SELECT COUNT(*) FROM som_phone_bills', 1, true) then return 0 end
     fail(query)
 end
 
@@ -544,6 +559,18 @@ function M.update(query, params)
         end
         return n
     end
+    if query:find('UPDATE som_phone_devices SET pass_hash = NULL', 1, true) then
+        local d = M.db.devices[params[1]]
+        if not d then return 0 end
+        d.pass_hash, d.pass_salt = nil, nil
+        return 1
+    end
+    if query:find('UPDATE som_phone_devices SET pass_hash = ?, pass_salt = ?', 1, true) then
+        local d = M.db.devices[params[3]]
+        if not d then return 0 end
+        d.pass_hash, d.pass_salt = params[1], params[2]
+        return 1
+    end
     fail(query)
 end
 
@@ -667,6 +694,19 @@ function M.insert(query, params)
             status = 'washing', created_at = now(), ready_at = now() + params[5] * 60,
         }
         return id
+    end
+    if query:find('INSERT INTO som_phone_devices', 1, true) then
+        M.db.devices[params[1]] = {}
+        return 1
+    end
+    if query:find('INSERT INTO som_phone_audit', 1, true) then
+        M.db.phoneAudit[#M.db.phoneAudit + 1] = { citizenid = params[1], app = params[2], action = params[3], ok = params[4] }
+        return #M.db.phoneAudit
+    end
+    if query:find('INSERT INTO som_phone_settings', 1, true) then
+        M.db.phoneSettings = M.db.phoneSettings or {}
+        M.db.phoneSettings[params[1]] = params[2]
+        return 1
     end
     fail(query)
 end

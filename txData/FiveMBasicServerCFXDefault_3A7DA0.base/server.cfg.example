@@ -38,6 +38,10 @@ set lac_webhook_events "YOUR_DISCORD_WEBHOOK_URL"
 set lac_webhook_connections "YOUR_DISCORD_WEBHOOK_URL"
 
 # ps-mdt's webhooks (mug shots, clock-in notifications).
+# som-phone: a secret mixed into passcode hashes. Never put this in a file in
+# the repo. Changing it invalidates every existing passcode.
+set som_phone_pepper "CHANGE_ME_TO_A_LONG_RANDOM_STRING"
+
 # som-launder: bills minted and washed.
 set som_launder_webhook "YOUR_DISCORD_WEBHOOK_URL"
 

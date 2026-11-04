@@ -493,6 +493,30 @@ CREATE TABLE IF NOT EXISTS `som_phone_accounts` (
   PRIMARY KEY (`citizenid`, `account_no`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- One row per phone ITEM, keyed by the imei the server writes into the item's
+-- metadata. The passcode is a salted SHA-256 with a pepper from a convar; the
+-- hash is never sent to the page.
+CREATE TABLE IF NOT EXISTS `som_phone_devices` (
+  `imei`       CHAR(16) NOT NULL,
+  `pass_hash`  CHAR(64) DEFAULT NULL,
+  `pass_salt`  CHAR(12) DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`imei`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Every action that changes something, and whether it worked. Reads are not
+-- recorded. The pipeline writes this; nothing else does.
+CREATE TABLE IF NOT EXISTS `som_phone_audit` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `app`        VARCHAR(32) NOT NULL,
+  `action`     VARCHAR(32) NOT NULL,
+  `ok`         TINYINT(1) NOT NULL DEFAULT 1,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_citizen` (`citizenid`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Theme and wallpaper are supporter perks, so what is stored here is validated
 -- server side against the player's entitlements rather than trusted.
 CREATE TABLE IF NOT EXISTS `som_phone_settings` (
