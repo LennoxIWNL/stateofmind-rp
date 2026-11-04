@@ -172,3 +172,10 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Payroll runs hourly (`Config.payrollMinutes`), pays online members of gangs that hold a zone the `payment` of their grade from `som-core/shared/gangs.lua` (20 to 75 an hour as shipped), capped at `Config.payrollCap`. The money comes out of the gang account, which only boss deposits fill. Decide whether those pay figures are right for your economy.
 - [ ] The `turf` phone app is read only: zone owners and contests for everyone, street prices and recent gang activity for gang members. It reuses the `briefcase` icon; a dedicated icon needs a UI rebuild.
 - [ ] Payroll never ran with a real player and the real `gangTransact`; only SQL and the mock harness.
+
+## Weed growing (som-turf)
+
+- [ ] Import the `som_plants` table (end of `setup.sql`) on an existing database.
+- [ ] Every grow spot (`Config.grow.spots`) and bagging table (`Config.grow.bagTables`) ships disabled with no coordinates. Without a spot, plants can still go inside a zone a gang holds, so enable zones with care.
+- [ ] Uses existing items: the five `weed_*_seed` seeds, `water_bottle`, `weed_nutrition`, `weedbud`, `empty_weed_bag` and the `weed_*` baggies (all have icons). Grow time 60 min, wither after 120 min without water, yield 3 to 6 buds (+2 fed), 3 buds per bag, 6 plants per character: defaults, untuned. Baggies are what the street sale already buys.
+- [ ] Planting raises the low-chance `drugDeal` dispatch call. The prop `prop_weed_01` and the progress bars have never been seen in a client.

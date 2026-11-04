@@ -47,6 +47,7 @@ local function resetDb()
     mysql.db.heist = { dongles = {}, runs = {} }
     mysql.db.turf = { zones = {}, events = {}, market = {} }
     mysql.db.whitelist = {}
+    mysql.db.plants = {}
     mysql.db.staff = { reports = {}, audit = {} }
     mysql.db.gangs = { chars = {}, log = {} }
     mysql.db.vehicles = {}
@@ -3358,6 +3359,67 @@ do
     check(price == '$32', 'turf app: prices reflect the market (40 base, 10 sold)')
     check(#gv.sections[3].rows == 1 and gv.sections[3].rows[1].sub == 'claim', 'turf app: recent activity leaves sales out')
     check(Mocks.apps.turf.handler(1, 'delete', {}).success == false, 'turf app: it has no actions')
+end
+
+-- ---------------------------------------------------------------------------
+-- Weed growing
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-turf', { 'shared/config.lua', 'server/main.lua', 'server/grow.lua' })
+    local G = env.Config.grow
+    Mocks.players = { [1] = { citizenid = 'Q1', gang = { name = 'ballas', grade = 1 } }, [2] = { citizenid = 'Q2', gang = { name = 'none', grade = 0 } } }
+    Mocks.inv = { [1] = {}, [2] = {} }
+    mysql.fakeNow = 5000000
+    FakePeds[1], FakePeds[2] = vec3(0, 0, 0), vec3(0, 0, 0)
+    local cb = RegisteredCallbacks
+    local nextSlot = 100
+    local function give(src, name, count, meta) nextSlot = nextSlot + 1; Mocks.inv[src][nextSlot] = { name = name, count = count or 1, slot = nextSlot, metadata = meta } end
+    local function count(src, name) local n = 0; for _, it in pairs(Mocks.inv[src]) do if it.name == name then n = n + (it.count or 1) end end; return n end
+
+    give(1, 'weed_skunk_seed')
+    check(cb['som-turf:server:plant'](1, 'weed_skunk_seed').error == 'nothing will grow here', 'grow: seeds only go in a grow spot or your own turf')
+    check(count(1, 'weed_skunk_seed') == 1, 'grow: a refused planting keeps the seed')
+
+    G.spots[1].enabled, G.spots[1].center, G.spots[1].radius = true, vec3(0, 0, 0), 20.0
+    check(cb['som-turf:server:plant'](1, 'iron').error == 'that is not a seed', 'grow: only listed seeds plant')
+    check(cb['som-turf:server:plant'](2, 'weed_skunk_seed').error == 'you have no seed', 'grow: you need the seed')
+    check(cb['som-turf:server:plant'](1, 'weed_skunk_seed').success == true and #mysql.db.plants == 1 and count(1, 'weed_skunk_seed') == 0, 'grow: planting takes the seed and writes a plant')
+
+    for i = 1, G.maxPlants do give(1, 'weed_skunk_seed'); cb['som-turf:server:plant'](1, 'weed_skunk_seed') end
+    give(1, 'weed_skunk_seed')
+    check(cb['som-turf:server:plant'](1, 'weed_skunk_seed').error == 'you are tending enough already', 'grow: plants per character are capped')
+
+    check(cb['som-turf:server:harvest'](1, 1).error == 'it is not ready', 'grow: an unripe plant cannot be harvested')
+    FakePeds[1] = vec3(100, 0, 0)
+    check(cb['som-turf:server:harvest'](1, 1).error == 'there is nothing to harvest here', 'grow: tending needs distance')
+    FakePeds[1] = vec3(0, 0, 0)
+    check(cb['som-turf:server:tend'](1, 1, 'poison').error == 'bad request', 'grow: tend kinds are validated')
+    check(cb['som-turf:server:tend'](1, 1, 'water').success == false, 'grow: watering needs water')
+    give(1, 'water_bottle'); give(1, 'weed_nutrition')
+    check(cb['som-turf:server:tend'](1, 1, 'water').success == true and cb['som-turf:server:tend'](1, 1, 'feed').success == true, 'grow: water and feed work')
+    give(1, 'weed_nutrition')
+    check(cb['som-turf:server:tend'](1, 1, 'feed').error == 'it is already fed' and count(1, 'weed_nutrition') == 1, 'grow: feeding twice refunds the item')
+
+    mysql.fakeNow = mysql.fakeNow + G.growMinutes * 60 + 1
+    mysql.db.plants[1].watered = mysql.fakeNow
+    local r = cb['som-turf:server:harvest'](1, 1)
+    check(r.success == true and r.count >= G.yield.min + G.yield.fedBonus and count(1, 'weedbud') == r.count, 'grow: a ripe fed plant yields buds with a bonus')
+    check(cb['som-turf:server:harvest'](1, 1).error == 'there is nothing to harvest here', 'grow: a plant is harvested once')
+
+    mysql.fakeNow = mysql.fakeNow + G.witherMinutes * 60 + 1
+    local pl = cb['som-turf:server:plants'](1)
+    check(#pl == 0 and mysql.db.plants[2].status == 'withered', 'grow: neglected plants wither by timestamp')
+
+    check(cb['som-turf:server:bag'](1, 'weed_skunk_seed').error == 'you need a bagging table', 'grow: bagging needs a table')
+    G.bagTables[1].enabled, G.bagTables[1].coords = true, vec3(0, 0, 0)
+    check(cb['som-turf:server:bag'](1, 'weed_ogkush_seed').error:find('buds'), 'grow: bagging needs enough buds of that strain')
+    local buds = count(1, 'weedbud')
+    for _, it in pairs(Mocks.inv[1]) do if it.name == 'weedbud' then it.metadata = { strain = 'weed_skunk_seed' } end end
+    check(cb['som-turf:server:bag'](1, 'weed_skunk_seed').error == 'you need an empty bag', 'grow: bagging needs an empty bag')
+    give(1, 'empty_weed_bag')
+    check(cb['som-turf:server:bag'](1, 'weed_skunk_seed').success == true and count(1, 'weed_skunk') == 1 and count(1, 'weedbud') == buds - G.budsPerBag and count(1, 'empty_weed_bag') == 0, 'grow: bagging turns buds and a bag into a strain baggy')
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))
