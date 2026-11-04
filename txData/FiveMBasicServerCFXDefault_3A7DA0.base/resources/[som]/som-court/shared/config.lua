@@ -19,9 +19,9 @@ Config.Grades = {
 
 -- A court can lower a sentence, never raise it, so these are hard ceilings.
 Config.Classes = {
-    infraction  = { label = 'Infraction',  maxMonths = 0,  maxFine = 5000 },
-    misdemeanor = { label = 'Misdemeanor', maxMonths = 6,  maxFine = 15000 },
-    felony      = { label = 'Felony',      maxMonths = 24, maxFine = 100000 },
+    infraction  = { label = 'Infraction',  maxMonths = 0,  maxFine = 5000,   maxTasks = 20 },
+    misdemeanor = { label = 'Misdemeanor', maxMonths = 6,  maxFine = 15000,  maxTasks = 40 },
+    felony      = { label = 'Felony',      maxMonths = 24, maxFine = 100000, maxTasks = 0 },
 }
 
 Config.MaxOpenPerDefendant = 3

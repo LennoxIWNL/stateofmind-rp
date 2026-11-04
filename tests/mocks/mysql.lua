@@ -15,8 +15,9 @@ M.db = {
     courtCases = {},
     courtEvents = {},
     courtWarrants = {},
+    service = {},
     nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
-               courtCases = 1, courtEvents = 1, courtWarrants = 1 },
+               courtCases = 1, courtEvents = 1, courtWarrants = 1, service = 1 },
 }
 
 -- Overridable "now" for jail/bail elapsed-time math, so a test can jump a
@@ -45,6 +46,20 @@ end
 local function findCase(id)
     for _, c in ipairs(M.db.courtCases) do
         if c.id == tonumber(id) then return c end
+    end
+    return nil
+end
+
+local function findService(id)
+    for _, r in ipairs(M.db.service) do
+        if r.id == id then return r end
+    end
+    return nil
+end
+
+local function activeService(cid)
+    for _, r in ipairs(M.db.service) do
+        if r.citizenid == cid and r.status == 'active' then return r end
     end
     return nil
 end
@@ -114,6 +129,9 @@ function M.single(query, params)
     end
     if query:find('FROM som_court_cases WHERE id = ?', 1, true) then
         return copy(findCase(params[1]))
+    end
+    if query:find("FROM som_community_service WHERE citizenid = ? AND status = 'active'", 1, true) then
+        return copy(activeService(params[1]))
     end
     fail(query)
 end
@@ -268,10 +286,10 @@ function M.update(query, params)
         return 1
     end
     if query:find("SET status = ?, ruled_at = NOW(), judge_cid = ?", 1, true) then
-        local c = findCase(params[7])
+        local c = findCase(params[8])
         if not c or c.status ~= 'scheduled' or not c.hearing_at or c.hearing_at > now() then return 0 end
-        c.status, c.judge_cid, c.sentence_months, c.fine, c.bail_amount, c.notes =
-            params[1], params[2], params[3], params[4], params[5], params[6]
+        c.status, c.judge_cid, c.sentence_months, c.service_tasks, c.fine, c.bail_amount, c.notes =
+            params[1], params[2], params[3], params[4], params[5], params[6], params[7]
         return 1
     end
     if query:find("SET status = 'scheduled', ruled_at = NULL", 1, true) then
@@ -306,7 +324,7 @@ function M.update(query, params)
     end
     if query:find("SET status = 'sentenced' WHERE id = ? AND defendant_cid = ?", 1, true) then
         local c = findCase(params[1])
-        if not c or c.defendant_cid ~= params[2] or c.status ~= 'convicted' or c.sentence_months < 1 then return 0 end
+        if not c or c.defendant_cid ~= params[2] or c.status ~= 'convicted' or (c.sentence_months < 1 and (c.service_tasks or 0) < 1) then return 0 end
         c.status = 'sentenced'
         return 1
     end
@@ -329,6 +347,39 @@ function M.update(query, params)
             if w.status == 'active' and w.expires_at <= now() then w.status = 'expired'; n = n + 1 end
         end
         return n
+    end
+    if query:find("UPDATE som_community_service SET status = 'cancelled'", 1, true) then
+        local r = activeService(params[1])
+        if not r then return 0 end
+        r.status = 'cancelled'
+        return 1
+    end
+    if query:find("UPDATE som_community_service SET status = 'completed'", 1, true) then
+        local r = findService(params[1])
+        if not r or r.status ~= 'active' or r.tasks_done < r.tasks_total then return 0 end
+        r.status = 'completed'
+        return 1
+    end
+    if query:find("SET tasks_done = tasks_done + 1", 1, true) then
+        local r = activeService(params[1])
+        if not r or r.tasks_done >= r.tasks_total then return 0 end
+        if r.last_task_at and r.last_task_at > now() - params[2] then return 0 end
+        r.tasks_done, r.last_task_at = r.tasks_done + 1, now()
+        return 1
+    end
+    if query:find("SET tasks_total = LEAST(tasks_total + ?, ?)", 1, true) then
+        local r = findService(params[3])
+        if not r or r.status ~= 'active' then return 0 end
+        if r.last_penalty_at and r.last_penalty_at > now() - params[4] then return 0 end
+        r.tasks_total = math.min(r.tasks_total + params[1], params[2])
+        r.strikes, r.last_penalty_at = r.strikes + 1, now()
+        return 1
+    end
+    if query:find("UPDATE som_community_service SET status = 'absconded'", 1, true) then
+        local r = findService(params[1])
+        if not r or r.status ~= 'active' then return 0 end
+        r.status = 'absconded'
+        return 1
     end
     fail(query)
 end
@@ -382,7 +433,7 @@ function M.insert(query, params)
         M.db.nextId.courtCases = id + 1
         M.db.courtCases[#M.db.courtCases + 1] = {
             id = id, defendant_cid = params[1], filed_by = params[2], incident_id = params[3],
-            charges = params[4], class = params[5], status = 'filed', sentence_months = 0, fine = 0,
+            charges = params[4], class = params[5], status = 'filed', sentence_months = 0, service_tasks = 0, fine = 0,
         }
         return id
     end
@@ -400,6 +451,15 @@ function M.insert(query, params)
         M.db.courtWarrants[#M.db.courtWarrants + 1] = {
             id = id, citizenid = params[1], case_id = params[2], reason = params[3], issued_by = params[4],
             status = 'active', expires_at = now() + params[5] * 3600,
+        }
+        return id
+    end
+    if query:find('INSERT INTO som_community_service', 1, true) then
+        local id = M.db.nextId.service
+        M.db.nextId.service = id + 1
+        M.db.service[#M.db.service + 1] = {
+            id = id, citizenid = params[1], case_id = params[2], issued_by = params[3], tasks_total = params[4],
+            tasks_done = 0, strikes = 0, status = 'active',
         }
         return id
     end
@@ -446,17 +506,24 @@ function M.query(query, params)
     if query:find('FROM som_court_cases WHERE defendant_cid = ? ORDER BY', 1, true) then
         return cases(function(c) return c.defendant_cid == params[1] end)
     end
-    if query:find("OR (status = 'convicted' AND sentence_months > 0)", 1, true) then
+    if query:find("(sentence_months > 0 OR service_tasks > 0)", 1, true) then
         return cases(function(c)
             return c.defendant_cid == params[1]
                 and (inList(c.status, 'filed', 'accepted', 'scheduled')
-                    or (c.status == 'convicted' and c.sentence_months > 0))
+                    or (c.status == 'convicted' and (c.sentence_months > 0 or (c.service_tasks or 0) > 0)))
         end)
     end
     if query:find("FROM som_court_warrants WHERE citizenid = ? AND status = 'active'", 1, true) then
         local out = {}
         for _, w in ipairs(M.db.courtWarrants) do
             if w.citizenid == params[1] and liveWarrant(w) then out[#out + 1] = copy(w) end
+        end
+        return out
+    end
+    if query:find("FROM som_community_service WHERE status = 'active'", 1, true) then
+        local out = {}
+        for _, r in ipairs(M.db.service) do
+            if r.status == 'active' then out[#out + 1] = copy(r) end
         end
         return out
     end

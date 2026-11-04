@@ -33,6 +33,7 @@ local function ruleDialog(case)
         { type = 'select', label = 'Verdict', required = true, default = 'guilty',
           options = { { value = 'guilty', label = 'Guilty' }, { value = 'not', label = 'Not guilty' } } },
         { type = 'number', label = 'Months', min = 0, max = caps.maxMonths, default = 0 },
+        { type = 'number', label = 'Community service tasks', min = 0, max = caps.maxTasks, default = 0 },
         { type = 'number', label = 'Fine', min = 0, max = caps.maxFine, default = 0 },
         { type = 'input', label = 'Notes', required = false },
     }
@@ -47,9 +48,10 @@ local function ruleDialog(case)
         id = case.id,
         guilty = answer[1] == 'guilty',
         months = answer[2],
-        fine = answer[3],
-        notes = answer[4],
-        bail = (answer[5] or 0) > 0 and answer[5] or nil,
+        tasks = answer[3],
+        fine = answer[4],
+        notes = answer[5],
+        bail = (answer[6] or 0) > 0 and answer[6] or nil,
     })
 end
 

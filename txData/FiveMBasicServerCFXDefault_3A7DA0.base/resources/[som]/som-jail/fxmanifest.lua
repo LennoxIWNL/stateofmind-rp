@@ -17,8 +17,10 @@ client_scripts {
     -- only, so it cannot go in shared_scripts, and first, so every file
     -- below sees the replacement: the booking dialog and the bail confirm.
     '@som-ui/client/dialog.lua',
+    '@som-ui/client/progressbar.lua',
     'client/booking.lua',
     'client/cell.lua',
+    'client/service.lua',
 }
 
 server_scripts {
@@ -28,6 +30,7 @@ server_scripts {
     -- ownership.lua and finance.lua.
     'server/jail.lua',
     'server/bail.lua',
+    'server/service.lua',
 }
 
 dependencies {

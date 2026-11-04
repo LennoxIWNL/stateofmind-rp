@@ -24,7 +24,9 @@ _G.CreateThread = function(fn) end
 _G.Wait = function(ms) end
 _G.SetTimeout = function(ms, fn) end
 _G.AddEventHandler = function(name, fn) end
-_G.RegisterNetEvent = function(name) end
+_G.RegisteredEvents = {}
+_G.RegisterNetEvent = function(name, fn) if fn then _G.RegisteredEvents[name] = fn end end
+_G.GetGameTimer = function() return (_G.Mocks and _G.Mocks.clock) or 0 end
 _G.TriggerEvent = function(name, ...) end
 _G.TriggerClientEvent = function(name, source, ...) end
 _G.RegisterCommand = function(name, fn, restricted) end

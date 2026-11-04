@@ -32,8 +32,9 @@ local function resetDb()
     mysql.db.courtCases = {}
     mysql.db.courtEvents = {}
     mysql.db.courtWarrants = {}
+    mysql.db.service = {}
     mysql.db.nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
-                        courtCases = 1, courtEvents = 1, courtWarrants = 1 }
+                        courtCases = 1, courtEvents = 1, courtWarrants = 1, service = 1 }
     mysql.fakeNow = nil
 end
 
@@ -46,6 +47,7 @@ local function resetMocks()
     Mocks.fines = {}
     Mocks.fineFails = false
     Mocks.exported = {}
+    Mocks.clock = 0
     Mocks.downed = {}
     Mocks.inv = {}
     Mocks.invFull = {}
@@ -101,6 +103,7 @@ local function loadJail()
         'shared/config.lua',
         'server/jail.lua',
         'server/bail.lua',
+        'server/service.lua',
     })
 end
 
@@ -109,7 +112,7 @@ local function addCase(overrides)
     mysql.db.nextId.courtCases = id + 1
     local case = {
         id = id, defendant_cid = 'INMATE', filed_by = 'OFFICER', charges = 'Armed robbery',
-        class = 'felony', status = 'convicted', sentence_months = 12, fine = 0,
+        class = 'felony', status = 'convicted', sentence_months = 12, service_tasks = 0, fine = 0,
     }
     for k, v in pairs(overrides or {}) do case[k] = v end
     mysql.db.courtCases[#mysql.db.courtCases + 1] = case
@@ -702,6 +705,181 @@ do
         'bookOptions: the officer is told about an active warrant')
     book(1, { target = 2, months = 2 })
     check(mysql.db.courtWarrants[1].status == 'served', 'book: booking serves the warrant')
+end
+
+----------------------------------------------------------------------
+-- Community service
+----------------------------------------------------------------------
+local function svcScene()
+    local env = jailScene()
+    mysql.fakeNow = os.time()
+    env.Config.BookCooldown = 0
+    return env
+end
+
+local function startService(env, tasks)
+    return env.Service.IssueByOfficer(1, 2, tasks or 3, true)
+end
+
+local function workTask(env, spotId)
+    local spot = env.Config.Service.spots[spotId or 1]
+    placePed(2, spot.coords.x, spot.coords.y, spot.coords.z)
+    local began = RegisteredCallbacks['som-jail:server:svc:begin'](2, spot.id)
+    if began.success then Mocks.clock = Mocks.clock + began.duration end
+    return began, RegisteredCallbacks['som-jail:server:svc:finish'](2)
+end
+
+do
+    local env = svcScene()
+    Mocks.inv[2] = { { name = 'money', count = 500, slot = 1 }, { name = 'phone', count = 1, slot = 2 } }
+    local limit = env.Config.Service.officerMaxTasks
+    check(select(1, env.Service.IssueByOfficer(2, 2, 3, true)) == false, 'service: a civilian cannot order service')
+    Mocks.players[1].job.onduty = false
+    check(select(1, env.Service.IssueByOfficer(1, 2, 3, true)) == false, 'service: an off duty officer cannot')
+    Mocks.players[1].job.onduty = true
+    check(select(1, startService(env, 0)) == false and select(1, startService(env, limit + 1)) == false,
+        'service: task counts outside what an officer may order are refused')
+    check(select(1, env.Service.IssueByOfficer(1, 1, 3, true)) == false, 'service: an officer cannot order their own')
+    placePed(2, 90.0, 0.0, 0.0)
+    check(select(1, startService(env)) == false, 'service: a target out of reach is refused')
+    check(env.Service.IssueByOfficer(1, 2, 3, false) == true, 'service: the MDT path needs no reach')
+    placePed(2, 1.0, 0.0, 0.0)
+    env.Service.Cancel('INMATE')
+
+    check(startService(env, 3) == true, 'service: a valid order starts service')
+    check(mysql.db.service[2].tasks_total == 3 and mysql.db.service[2].status == 'active', 'service: the row records the tasks')
+    local held, kept = false, false
+    for _, item in pairs(Mocks.inv['jail_INMATE'] or {}) do held = held or item.name == 'money' end
+    for _, item in pairs(Mocks.inv[2] or {}) do kept = kept or item.name == 'phone' end
+    check(held and kept, 'service: items are held except phone and ID')
+    check(select(1, startService(env, 3)) == false, 'service: a second order while working is refused')
+end
+
+do
+    local env = svcScene()
+    local begin = RegisteredCallbacks['som-jail:server:svc:begin']
+    local finish = RegisteredCallbacks['som-jail:server:svc:finish']
+    check(begin(2, 1).success == false, 'task: no service, no task')
+    startService(env, 3)
+    check(begin(2, 99).success == false, 'task: an unknown spot is refused')
+    placePed(2, 500.0, 0.0, 0.0)
+    check(begin(2, 1).success == false, 'task: too far from the spot is refused')
+    local spot = env.Config.Service.spots[1]
+    placePed(2, spot.coords.x, spot.coords.y, spot.coords.z)
+    Mocks.downed[2] = true
+    check(begin(2, 1).success == false, 'task: a downed worker cannot work')
+    Mocks.downed[2] = nil
+    check(finish(2).success == false, 'task: finishing without starting is refused')
+
+    local r = begin(2, 1)
+    check(r.success and r.duration == env.Config.Service.kinds[spot.kind].duration, 'task: the server sets the duration')
+    check(finish(2).success == false and mysql.db.service[1].tasks_done == 0, 'task: an instant finish is refused')
+    check(finish(2).success == false, 'task: a refused finish also spends the token')
+
+    local _, done = workTask(env, 1)
+    check(done.success and mysql.db.service[1].tasks_done == 1 and done.remaining == 2, 'task: a real task counts once')
+    check(select(1, workTask(env, 1)).success == false, 'task: the same spot twice in a row is refused')
+    local _, quick = workTask(env, 2)
+    check(quick.success == false and mysql.db.service[1].tasks_done == 1, 'task: a task inside the minimum gap does not count')
+    mysql.fakeNow = mysql.fakeNow + env.Config.Service.minGap + 1
+    local _, second = workTask(env, 3)
+    check(second.success == true and mysql.db.service[1].tasks_done == 2, 'task: a task after the gap counts')
+
+    mysql.fakeNow = mysql.fakeNow + env.Config.Service.minGap + 1
+    local _, last = workTask(env, 1)
+    check(last.done == true and mysql.db.service[1].status == 'completed', 'task: the last task completes the service')
+    local back = false
+    for _, item in pairs(Mocks.inv[2] or {}) do back = back or item.name == 'money' end
+    check(next(Mocks.inv['jail_INMATE'] or {}) == nil or back, 'task: completion returns held items')
+    check(begin(2, 1).success == false, 'task: nothing to do once complete')
+end
+
+do
+    local env = svcScene()
+    startService(env, 5)
+    local row = mysql.db.service[1]
+    local zone = env.Config.Service.zone.center
+    placePed(2, zone.x, zone.y, zone.z)
+    env.Service.Sweep()
+    check(row.tasks_total == 5, 'sweep: a worker in the zone is left alone')
+
+    placePed(2, 900.0, 0.0, 0.0)
+    Mocks.downed[2] = true
+    env.Service.Sweep()
+    check(row.tasks_total == 5, 'sweep: a downed worker is not penalised')
+    Mocks.downed[2] = nil
+
+    env.Service.Sweep()
+    check(row.tasks_total == 5 + env.Config.Service.escapePenalty and row.strikes == 1, 'sweep: leaving the zone adds tasks')
+    env.Service.Sweep()
+    check(row.strikes == 1, 'sweep: penalties are rate limited')
+
+    for _ = 1, env.Config.Service.maxStrikes do
+        mysql.fakeNow = mysql.fakeNow + env.Config.Service.penaltyGap + 1
+        env.Service.Sweep()
+    end
+    check(row.status == 'absconded' and Mocks.calls.dispatchAlert == 1, 'sweep: repeated escapes abscond and alert police')
+    check(row.tasks_total <= env.Config.Service.maxTasks, 'sweep: the task count stays under the cap')
+end
+
+do
+    local env, book = svcScene()
+    local case = addCase({ class = 'misdemeanor', sentence_months = 0, service_tasks = 8 })
+    book = RegisteredCallbacks['som-jail:server:book']
+    local r = book(1, { target = 2, caseId = case.id })
+    check(r.success == true and r.service == 8 and #mysql.db.jailSentences == 0, 'book: a service sentence starts service, not jail')
+    check(case.status == 'sentenced' and mysql.db.service[1].tasks_total == 8, 'book: the case is claimed and the tasks come from it')
+
+    setCuffed(2, true)
+    local again = addCase({ class = 'misdemeanor', sentence_months = 0, service_tasks = 4 })
+    check(book(1, { target = 2, caseId = again.id }).success == false and again.status == 'convicted',
+        'book: service already running refuses another and gives the case back')
+
+    setCuffed(2, true)
+    check(book(1, { target = 2, months = 2 }).success == true and mysql.db.service[1].status == 'cancelled',
+        'book: jailing someone cancels their service')
+end
+
+do
+    local env = svcScene()
+    startService(env, 4)
+    local status = RegisteredCallbacks['som-jail:server:myStatus']
+    placePed(2, 900.0, 0.0, 0.0)
+    local r = status(2)
+    check(r.service and r.service.remaining == 4 and r.spawn ~= nil, 'relog: a worker outside the zone is sent back with the count')
+
+    local legacy = RegisteredEvents['qb-communityservice:server:StartCommunityService']
+    env.Service.Cancel('INMATE')
+    _G.source = 2
+    legacy(2, 3)
+    check(mysql.db.service[#mysql.db.service].status == 'cancelled', 'legacy: a civilian forging the MDT event does nothing')
+    _G.source = 1
+    legacy(2, 3)
+    check(mysql.db.service[#mysql.db.service].status == 'active', 'legacy: an on duty officer can use the MDT event')
+    _G.source = 1
+    env.Service.Cancel('INMATE')
+    legacy(2, 999)
+    check(mysql.db.service[#mysql.db.service].status == 'cancelled', 'legacy: an oversized order is refused')
+    _G.source = nil
+
+    placePed(2, 1.0, 0.0, 0.0)
+    startService(env, 2)
+    check(select(1, env.Service.End(2, 2)) == false, 'endservice: a non admin is refused')
+    Mocks.admins[1] = true
+    check(env.Service.End(1, 2) == true and mysql.db.service[#mysql.db.service].status == 'cancelled', 'endservice: an admin ends it')
+    check(select(1, env.Service.End(0, 2)) == false, 'endservice: nothing to end is reported')
+end
+
+do
+    courtScene()
+    local rule = cb('rule')
+    local mis = dueCase('misdemeanor')
+    check(rule(10, { id = mis.id, guilty = true, months = 1, tasks = 5 }).success == false, 'rule: custody and service together are refused')
+    check(rule(10, { id = mis.id, guilty = true, months = 0, fine = 0, tasks = 41 }).success == false, 'rule: tasks above the class cap are refused')
+    check(rule(10, { id = mis.id, guilty = true, months = 0, fine = 0, tasks = 10 }).success == true and mis.status == 'convicted' and mis.service_tasks == 10,
+        'rule: a service sentence convicts and keeps the tasks')
+    local fel = dueCase('felony')
+    check(rule(10, { id = fel.id, guilty = true, months = 0, fine = 0, tasks = 1 }).success == false, 'rule: a felony cannot be sentenced to service')
 end
 
 ----------------------------------------------------------------------

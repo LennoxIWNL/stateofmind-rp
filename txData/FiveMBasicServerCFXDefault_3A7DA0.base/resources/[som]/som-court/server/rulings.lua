@@ -54,7 +54,9 @@ lib.callback.register('som-court:server:rule', function(source, data)
     end
 
     local months, fine = amount(data.months, caps.maxMonths), amount(data.fine, caps.maxFine)
-    if not months or not fine then return fail('outside what this charge allows') end
+    local tasks = amount(data.tasks or 0, caps.maxTasks)
+    if not months or not fine or not tasks then return fail('outside what this charge allows') end
+    if months > 0 and tasks > 0 then return fail('choose custody or community service, not both') end
 
     local bail
     if data.bail ~= nil then
@@ -68,9 +70,9 @@ lib.callback.register('som-court:server:rule', function(source, data)
 
     local won = MySQL.update.await([[
         UPDATE som_court_cases
-        SET status = ?, ruled_at = NOW(), judge_cid = ?, sentence_months = ?, fine = ?, bail_amount = ?, notes = ?
+        SET status = ?, ruled_at = NOW(), judge_cid = ?, sentence_months = ?, service_tasks = ?, fine = ?, bail_amount = ?, notes = ?
         WHERE id = ? AND status = 'scheduled' AND hearing_at <= NOW()
-    ]], { months > 0 and 'convicted' or 'sentenced', judge.citizenid, months, fine, bail, notes, case.id })
+    ]], { (months > 0 or tasks > 0) and 'convicted' or 'sentenced', judge.citizenid, months, tasks, fine, bail, notes, case.id })
     if won ~= 1 then return fail('this case is not ready for a ruling') end
 
     if fine > 0 then
@@ -84,7 +86,7 @@ lib.callback.register('som-court:server:rule', function(source, data)
         end
     end
 
-    Court.Event(case.id, judge.citizenid, 'convicted', ('%d mo, $%d'):format(months, fine))
+    Court.Event(case.id, judge.citizenid, 'convicted', ('%d mo, %d tasks, $%d'):format(months, tasks, fine))
     return { success = true }
 end)
 
@@ -167,8 +169,8 @@ end)
 exports('casesFor', function(citizenid)
     if type(citizenid) ~= 'string' then return {} end
     return MySQL.query.await(
-        "SELECT id, class, status, charges, sentence_months, bail_amount FROM som_court_cases "
-        .. "WHERE defendant_cid = ? AND (status IN ('filed','accepted','scheduled') OR (status = 'convicted' AND sentence_months > 0)) "
+        "SELECT id, class, status, charges, sentence_months, service_tasks, bail_amount FROM som_court_cases "
+        .. "WHERE defendant_cid = ? AND (status IN ('filed','accepted','scheduled') OR (status = 'convicted' AND (sentence_months > 0 OR service_tasks > 0))) "
         .. "ORDER BY id DESC LIMIT 10",
         { citizenid }) or {}
 end)
@@ -183,7 +185,7 @@ exports('claimForSentence', function(caseId, citizenid, officer)
     if not caseId or type(citizenid) ~= 'string' then return nil end
 
     local won = MySQL.update.await(
-        "UPDATE som_court_cases SET status = 'sentenced' WHERE id = ? AND defendant_cid = ? AND status = 'convicted' AND sentence_months > 0",
+        "UPDATE som_court_cases SET status = 'sentenced' WHERE id = ? AND defendant_cid = ? AND status = 'convicted' AND (sentence_months > 0 OR service_tasks > 0)",
         { caseId, citizenid })
     if won ~= 1 then return nil end
 

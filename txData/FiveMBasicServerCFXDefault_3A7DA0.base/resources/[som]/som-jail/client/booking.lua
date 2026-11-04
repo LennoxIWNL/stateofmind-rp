@@ -29,7 +29,8 @@ CreateThread(function()
                     choices[#choices + 1] = {
                         value = case.id,
                         label = ('#%d %s: %s (%s)'):format(case.id, case.class, case.charges:sub(1, 40),
-                            custody and (case.sentence_months .. ' mo, carry out') or 'hold pending trial'),
+                            custody and (case.service_tasks > 0 and (case.service_tasks .. ' service tasks, carry out')
+                                or (case.sentence_months .. ' mo, carry out')) or 'hold pending trial'),
                     }
                 end
 
@@ -49,7 +50,9 @@ CreateThread(function()
 
                 if res and res.success then
                     TriggerEvent('som:client:notify',
-                        res.remand and 'Held pending trial' or ('Booked for %d month(s)'):format(res.months), 'success')
+                        res.service and ('Community service: %d tasks'):format(res.service)
+                            or res.remand and 'Held pending trial'
+                            or ('Booked for %d month(s)'):format(res.months), 'success')
                 else
                     TriggerEvent('som:client:notify',
                         res and res.error or 'could not book them', 'error')

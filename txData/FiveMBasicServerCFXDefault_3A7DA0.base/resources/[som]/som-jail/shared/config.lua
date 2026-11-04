@@ -55,6 +55,38 @@ Config.Jail = {
     remandHours = 2,
 }
 
+-- Community service. Every coordinate here is UNVERIFIED (taken from a script
+-- written for another map layout); walk the area and correct it. /pdcoords
+-- prints a position formatted for a config file.
+Config.Service = {
+    maxTasks = 60,
+    officerMaxTasks = 10,    -- what an officer may hand out without a court case
+    zone = { center = vec3(170.43, -990.70, 30.09), radius = 70.0 },
+    spawn = vec4(170.43, -990.70, 30.09, 0.0),
+    release = vec4(427.33, -979.51, 30.20, 90.0),
+
+    range = 3.0,             -- how close to a spot a task may be started and finished
+    minGap = 6,              -- seconds between two counted tasks
+    tolerance = 1500,        -- ms a task may finish early (latency)
+    escapePenalty = 3,       -- tasks added when the worker is found outside the zone
+    penaltyGap = 60,         -- seconds between two penalties
+    maxStrikes = 4,          -- penalties before the worker counts as absconded
+
+    kinds = {
+        clean  = { label = 'Sweeping', duration = 9000,  scenario = 'WORLD_HUMAN_JANITOR' },
+        garden = { label = 'Planting', duration = 12000, scenario = 'WORLD_HUMAN_GARDENER_PLANT' },
+    },
+
+    spots = {
+        { id = 1, kind = 'clean',  coords = vec3(176.2, -993.5, 29.3) },
+        { id = 2, kind = 'clean',  coords = vec3(163.9, -988.4, 29.5) },
+        { id = 3, kind = 'clean',  coords = vec3(170.8, -1001.2, 29.3) },
+        { id = 4, kind = 'garden', coords = vec3(182.4, -985.6, 29.9) },
+        { id = 5, kind = 'garden', coords = vec3(158.1, -996.9, 29.4) },
+        { id = 6, kind = 'garden', coords = vec3(172.5, -977.3, 30.1) },
+    },
+}
+
 -- The dispatch alert raised when an inmate leaves the yard. A key of
 -- som-dispatch's own Config.Alerts, added there alongside this resource
 -- since dispatch is reused rather than a second alert system invented here.
