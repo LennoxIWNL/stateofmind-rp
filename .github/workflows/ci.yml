@@ -1,0 +1,60 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Branch name has no tool or session identifier
+        if: github.event_name == 'pull_request'
+        run: |
+          case "${{ github.head_ref }}" in
+            claude/*|ai/*|bot/*) echo "branch name must describe the work (feature/, fix/, chore/, docs/)"; exit 1 ;;
+          esac
+          if ! echo "${{ github.head_ref }}" | grep -Eq '^(feature|fix|chore|docs)/[a-z0-9]+(-[a-z0-9]+)*$'; then
+            echo "branch must be feature|fix|chore|docs/<kebab-case>"; exit 1
+          fi
+
+      - name: Commits carry no attribution lines
+        if: github.event_name == 'pull_request'
+        run: |
+          range="origin/${{ github.base_ref }}..HEAD"
+          if git log --format=%B "$range" | grep -Eiq 'Co-Authored-By|Claude-Session|noreply@anthropic|Generated with'; then
+            echo "commit messages must not contain co-author, tool or session attribution"; exit 1
+          fi
+
+      - name: No committed Discord webhook URLs
+        run: |
+          if grep -rEn 'discord(app)?\.com/api/webhooks/[0-9]' --include='*.lua' --include='*.js' --include='*.mjs' --include='*.json' --include='*.md' . --exclude-dir=node_modules --exclude-dir=.git; then
+            echo "real webhook URL committed; use GetConvar and server.cfg"; exit 1
+          fi
+
+  lua:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y lua5.4
+      - name: Syntax check our Lua
+        run: tools/check-lua.sh
+      - name: Server tests
+        run: lua5.4 tests/run.lua
+
+  nui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save playwright
+      - run: npx playwright install --with-deps chromium
+      - name: NUI tests
+        run: node tests/nui/run.mjs
