@@ -132,6 +132,18 @@ Config.Alerts = {
         blip = { sprite = 280, colour = 5, scale = 1.0, duration = 600 },
     },
 
+    -- Raised by som-heists when a terminal is touched. NOT `reportable`: the
+    -- server raises it with the site's own coordinates.
+    heistInProgress = {
+        label = 'Alarm Triggered',
+        code = '10-90',
+        priority = 1,
+        chance = 1.0,
+        cooldown = 30,
+        jobs = { 'police' },
+        blip = { sprite = 161, colour = 1, scale = 1.2, duration = 600 },
+    },
+
     -- Raised by som-jail's yard-radius check, not by detection. NOT
     -- `reportable` for the same reason emergencyCall isn't: it has its own
     -- trigger with its own validation.

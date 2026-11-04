@@ -1534,3 +1534,32 @@ INSERT IGNORE INTO `som_gangs` (`name`, `label`, `color`) VALUES
   ('cartel',  'Cartel',       '#b8860b');
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- ===========================================================================
+--  7j. HEISTS (som-heists)
+--
+--  A dongle is an item that points at a row here; the row decides whether it
+--  still works. A run row claims a site with one conditional insert and doubles
+--  as the cooldown and the hourly clean cash cap.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_heist_dongles` (
+  `uid`        CHAR(16) NOT NULL,
+  `status`     ENUM('issued','used','void') NOT NULL DEFAULT 'issued',
+  `source_tag` VARCHAR(32) NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`uid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_heist_runs` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `site`       VARCHAR(32) NOT NULL,
+  `tier`       ENUM('store','bank','vault') NOT NULL,
+  `group_id`   INT UNSIGNED NOT NULL,
+  `status`     ENUM('active','done','failed') NOT NULL DEFAULT 'active',
+  `clean_paid` BIGINT NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_site` (`site`, `created_at`),
+  KEY `idx_tier` (`tier`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

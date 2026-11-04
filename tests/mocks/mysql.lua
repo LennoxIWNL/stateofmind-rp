@@ -29,6 +29,7 @@ M.db = {
     phoneCalls = {},
     phoneAudit = {},
     notes = {},
+    heist = { dongles = {}, runs = {} },
     vehicles = {},
     social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} },
     nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
@@ -338,6 +339,66 @@ local function city(kind, query, params)
     return false
 end
 
+local function heist(kind, query, params)
+    local H = M.db.heist
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    if kind == 'insert' then
+        if has('INSERT INTO som_heist_dongles') then
+            H.dongles[params[1]] = { status = 'issued', tag = params[2] }
+            return true, 1
+        end
+        if has('INSERT INTO som_heist_runs') then
+            local site, tier, group, cooldown = params[1], params[2], params[3], params[5]
+            for _, r in ipairs(H.runs) do
+                if r.site == site and not r.deleted and (r.status == 'active' or r.ts > now() - cooldown * 60) then return true, 0 end
+            end
+            local id = #H.runs + 1
+            H.runs[id] = { id = id, site = site, tier = tier, group = group, status = 'active', clean_paid = 0, ts = now() }
+            return true, id
+        end
+    elseif kind == 'scalar' then
+        if has('SELECT status FROM som_heist_dongles WHERE uid = ?') then
+            return true, H.dongles[params[1]] and H.dongles[params[1]].status or nil
+        end
+        if has('SELECT COALESCE(SUM(clean_paid), 0) FROM som_heist_runs WHERE tier = ?') then
+            local sum = 0
+            for _, r in ipairs(H.runs) do
+                if r.tier == params[1] and not r.deleted and r.ts > now() - 3600 then sum = sum + r.clean_paid end
+            end
+            return true, sum
+        end
+    elseif kind == 'update' then
+        if has("UPDATE som_heist_dongles SET status = 'used' WHERE uid = ? AND status = 'issued'") then
+            local d = H.dongles[params[1]]
+            if d and d.status == 'issued' then d.status = 'used'; return true, 1 end
+            return true, 0
+        end
+        if has("UPDATE som_heist_dongles SET status = 'void' WHERE uid = ? AND status = 'issued'") then
+            local d = H.dongles[params[1]]
+            if d and d.status == 'issued' then d.status = 'void'; return true, 1 end
+            return true, 0
+        end
+        if has("UPDATE som_heist_runs SET status = ? WHERE id = ? AND status = 'active'") then
+            local r = H.runs[params[2]]
+            if r and r.status == 'active' then r.status = params[1]; return true, 1 end
+            return true, 0
+        end
+        if has('UPDATE som_heist_runs SET clean_paid = clean_paid + ? WHERE id = ?') then
+            H.runs[params[2]].clean_paid = H.runs[params[2]].clean_paid + params[1]
+            return true, 1
+        end
+        if has("UPDATE som_heist_runs SET status = 'failed' WHERE status = 'active'") then
+            for _, r in ipairs(H.runs) do if r.status == 'active' then r.status = 'failed' end end
+            return true, 1
+        end
+        if has('DELETE FROM som_heist_runs WHERE id = ?') then
+            if H.runs[params[1]] then H.runs[params[1]].deleted = true end
+            return true, 1
+        end
+    end
+    return false
+end
+
 local function fail(query)
     error('tests/mocks/mysql.lua: unhandled query: ' .. query, 3)
 end
@@ -346,6 +407,7 @@ function M.single(query, params)
     params = params or {}
     do local handled, value = social('single', query, params); if handled then return value end end
     do local handled, value = city('single', query, params); if handled then return value end end
+    do local handled, value = heist('single', query, params); if handled then return value end end
     if query:find('FROM som_properties WHERE slug = ?', 1, true) then
         for _, p in ipairs(M.db.properties) do
             if p.slug == params[1] then return copy(p) end
@@ -415,6 +477,7 @@ function M.scalar(query, params)
     params = params or {}
     do local handled, value = social('scalar', query, params); if handled then return value end end
     do local handled, value = city('scalar', query, params); if handled then return value end end
+    do local handled, value = heist('scalar', query, params); if handled then return value end end
     if query:find('SELECT role FROM som_property_owners WHERE property_id = ? AND citizenid = ?', 1, true) then
         local o = findOwner(params[1], params[2])
         return o and o.role or nil
@@ -512,6 +575,7 @@ function M.update(query, params)
     params = params or {}
     do local handled, value = social('update', query, params); if handled then return value end end
     do local handled, value = city('update', query, params); if handled then return value end end
+    do local handled, value = heist('update', query, params); if handled then return value end end
     if query:find('SET for_sale = 0 WHERE id = ? AND for_sale = 1', 1, true) then
         local p = findProperty(tonumber(params[1]))
         if p and tonumber(p.for_sale) == 1 then
@@ -850,6 +914,7 @@ function M.insert(query, params)
     params = params or {}
     do local handled, value = social('insert', query, params); if handled then return value end end
     do local handled, value = city('insert', query, params); if handled then return value end end
+    do local handled, value = heist('insert', query, params); if handled then return value end end
     if query:find('INSERT INTO som_property_owners', 1, true) then
         local propertyId, citizenid, role, grantedBy = params[1], params[2], params[3], params[4]
         local existing = findOwner(propertyId, citizenid)
@@ -1006,6 +1071,7 @@ function M.query(query, params)
     params = params or {}
     do local handled, value = social('query', query, params); if handled then return value end end
     do local handled, value = city('query', query, params); if handled then return value end end
+    do local handled, value = heist('query', query, params); if handled then return value end end
     -- jail.lua's sweep: every serving sentence, with elapsed.
     if query:find("FROM som_jail_sentences WHERE status = 'serving'", 1, true) then
         local out = {}

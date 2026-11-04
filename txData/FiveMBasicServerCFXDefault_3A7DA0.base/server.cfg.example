@@ -44,6 +44,9 @@ set som_phone_pepper "CHANGE_ME_TO_A_LONG_RANDOM_STRING"
 # som-phone: Chirp reports (optional).
 set som_phone_webhook "YOUR_DISCORD_WEBHOOK_URL"
 
+# som-heists: heist starts and endings (optional).
+set som_heist_webhook "YOUR_DISCORD_WEBHOOK_URL"
+
 # som-launder: bills minted and washed.
 set som_launder_webhook "YOUR_DISCORD_WEBHOOK_URL"
 
