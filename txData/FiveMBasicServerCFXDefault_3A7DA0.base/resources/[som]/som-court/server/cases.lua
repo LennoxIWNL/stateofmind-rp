@@ -125,6 +125,24 @@ lib.callback.register('som-court:server:docket', function(source)
     return { success = true, role = job, cases = rows or {} }
 end)
 
+--- What backs a case. Judges and the bar see any case; an officer only their own.
+lib.callback.register('som-court:server:evidence', function(source, id)
+    local player = core:getPlayer(source)
+    if not player then return fail('not loaded') end
+
+    local case = Court.Get(id)
+    if not case then return fail('no such case') end
+
+    local job = player.job.name
+    local own = job == Config.Jobs.police and case.filed_by == player.citizenid
+    if not own and job ~= Config.Jobs.judge and job ~= Config.Jobs.prosecutor and job ~= Config.Jobs.defender then
+        return fail('not permitted')
+    end
+
+    local ok, rows = pcall(function() return exports['som-evidence']:forCase(case.id) end)
+    return { success = true, evidence = ok and rows or {} }
+end)
+
 lib.callback.register('som-court:server:myCases', function(source)
     local player = core:getPlayer(source)
     if not player then return fail('not loaded') end

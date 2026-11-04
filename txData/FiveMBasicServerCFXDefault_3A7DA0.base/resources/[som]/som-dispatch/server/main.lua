@@ -258,6 +258,11 @@ RegisterNetEvent('som-dispatch:server:report', function(alertType, extra)
     local player = core:getPlayer(source)
     if not player then return end
 
+    -- A server-only event, so a client cannot raise it. som-evidence records
+    -- what a detected crime leaves behind, independent of the call's own
+    -- cooldown and chance roll below.
+    TriggerEvent('som:server:crimeReported', source, alertType)
+
     if not offCooldown(source, alertType) then return end
 
     -- The roll happens HERE. A client deciding whether its own gunshot was

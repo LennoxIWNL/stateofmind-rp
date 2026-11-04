@@ -33,8 +33,11 @@ local function resetDb()
     mysql.db.courtEvents = {}
     mysql.db.courtWarrants = {}
     mysql.db.service = {}
+    mysql.db.evidence = {}
+    mysql.db.custody = {}
+    mysql.db.profiles = {}
     mysql.db.nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
-                        courtCases = 1, courtEvents = 1, courtWarrants = 1, service = 1 }
+                        courtCases = 1, courtEvents = 1, courtWarrants = 1, service = 1, evidence = 1, custody = 1 }
     mysql.fakeNow = nil
 end
 
@@ -47,6 +50,7 @@ local function resetMocks()
     Mocks.fines = {}
     Mocks.fineFails = false
     Mocks.exported = {}
+    Mocks.weapons = {}
     Mocks.clock = 0
     Mocks.downed = {}
     Mocks.inv = {}
@@ -95,6 +99,18 @@ local function loadCourt()
         'server/rulings.lua',
     })
     return courtEnv
+end
+
+local evEnv
+
+local function loadEvidence()
+    loadCourt()
+    evEnv = loader.loadResource(REPO .. 'som-evidence', {
+        'shared/config.lua',
+        'server/evidence.lua',
+        'server/locker.lua',
+    })
+    return evEnv
 end
 
 local function loadJail()
@@ -880,6 +896,249 @@ do
         'rule: a service sentence convicts and keeps the tasks')
     local fel = dueCase('felony')
     check(rule(10, { id = fel.id, guilty = true, months = 0, fine = 0, tasks = 1 }).success == false, 'rule: a felony cannot be sentenced to service')
+end
+
+----------------------------------------------------------------------
+-- som-evidence: traces, collection, custody, lab, case links
+----------------------------------------------------------------------
+local function evScene()
+    local env = loadEvidence()
+    mysql.fakeNow = os.time()
+    env.Config.Create.casingGap = 0
+    env.Config.Scan.gap = 0
+    env.Config.Collect.gap = 0
+    Mocks.players[1] = { citizenid = 'OFFICER', job = { name = 'police', onduty = true, grade = 2 } }
+    Mocks.players[2] = { citizenid = 'SUSPECT', job = { name = 'unemployed' } }
+    Mocks.players[3] = { citizenid = 'OFFICER2', job = { name = 'police', onduty = true, grade = 2 } }
+    placePed(1, 0.0, 0.0, 0.0)
+    placePed(2, 1.0, 0.0, 0.0)
+    placePed(3, 1.0, 1.0, 0.0)
+    Mocks.inv[1] = {
+        { name = 'empty_evidence_bag', count = 1, slot = 1 },
+        { name = 'empty_evidence_bag', count = 1, slot = 2 },
+        { name = 'empty_evidence_bag', count = 1, slot = 3 },
+    }
+    Mocks.inv[3] = { { name = 'empty_evidence_bag', count = 1, slot = 1 } }
+    return env
+end
+
+local function ev(name, ...) return RegisteredCallbacks['som-evidence:server:' .. name](...) end
+local function crime(source, alert) Handlers['som:server:crimeReported'](source, alert) end
+local function shoot(serial)
+    Mocks.weapons[2] = { name = 'WEAPON_PISTOL', metadata = { serial = serial or 'S-100' } }
+    crime(2, 'shotsFired')
+end
+local function bagsFor(source, id)
+    local n = 0
+    for _, item in pairs(Mocks.inv[source] or {}) do
+        if item.name == 'filled_evidence_bag' and item.metadata and item.metadata.evidence_id == id then n = n + 1 end
+    end
+    return n
+end
+local function atLocker(env, source)
+    local at = env.Config.Stations.mrpd.locker
+    placePed(source, at.x, at.y, at.z)
+end
+local function atLab(env, source)
+    local at = env.Config.Stations.mrpd.lab
+    placePed(source, at.x, at.y, at.z)
+end
+
+do
+    local env = evScene()
+    crime(2, 'shotsFired')
+    check(#mysql.db.evidence == 0, 'traces: a shot with no weapon in hand leaves no casing')
+
+    shoot('S-100')
+    local casing = mysql.db.evidence[1]
+    check(casing and casing.kind == 'casing' and casing.weapon_serial == 'S-100' and casing.status == 'scene',
+        'traces: a shot with a weapon drops a casing carrying the serial')
+    check(casing.x == 1.0 and casing.source_cid == 'SUSPECT', 'traces: the position is the server position')
+
+    for _ = 1, 10 do shoot('S-100') end
+    check(#mysql.db.evidence == env.Config.Create.areaCap, 'traces: casings in one area are capped per shooter')
+
+    env.Config.Create.casingGap = 60
+    placePed(2, 500.0, 0.0, 0.0)
+    shoot('S-100')
+    check(#mysql.db.evidence == env.Config.Create.areaCap, 'traces: casings from one shooter are rate limited')
+    env.Config.Create.casingGap = 0
+    shoot('S-100')
+    check(#mysql.db.evidence == env.Config.Create.areaCap + 1, 'traces: a shooter elsewhere is not held to the old area cap')
+
+    local before = #mysql.db.evidence
+    Handlers['som:server:playerDowned'](2, 'SUSPECT')
+    crime(2, 'vehicleTheft')
+    check(#mysql.db.evidence == before + 2 and mysql.db.evidence[before + 1].kind == 'blood'
+        and mysql.db.evidence[before + 2].kind == 'fingerprint', 'traces: being downed leaves blood and car theft a fingerprint')
+    crime(2, 'meleeAttack')
+    check(#mysql.db.evidence == before + 2, 'traces: other crimes leave nothing')
+end
+
+do
+    local env = evScene()
+    shoot('S-100')
+    placePed(2, 300.0, 0.0, 0.0)
+    shoot('S-200')
+    check(ev('scan', 2).success == false, 'scan: a civilian cannot scan')
+    local scan = ev('scan', 1)
+    check(scan.success and #scan.evidence == 1 and scan.evidence[1].label == 'Bullet casing', 'scan: an officer sees only nearby traces')
+    env.Config.Scan.gap = 60
+    ev('scan', 1)
+    check(ev('scan', 1).success == false, 'scan: scanning is rate limited')
+end
+
+do
+    local env = evScene()
+    shoot('S-100')
+    local id = mysql.db.evidence[1].id
+    check(ev('collect', 2, id).success == false, 'collect: a civilian cannot collect')
+    Mocks.players[1].job.onduty = false
+    check(ev('collect', 1, id).success == false, 'collect: an off duty officer cannot collect')
+    Mocks.players[1].job.onduty = true
+    check(ev('collect', 1, 999).success == false and ev('collect', 1, 'x').success == false, 'collect: unknown ids are refused')
+    placePed(1, 50.0, 0.0, 0.0)
+    check(ev('collect', 1, id).success == false and mysql.db.evidence[1].status == 'scene', 'collect: out of reach is refused')
+    placePed(1, 0.0, 0.0, 0.0)
+
+    Mocks.inv[3] = {}
+    placePed(3, 1.0, 1.0, 0.0)
+    check(ev('collect', 3, id).success == false and mysql.db.evidence[1].status == 'scene',
+        'collect: no empty bag refuses and leaves the trace on the ground')
+
+    Mocks.invFull[1] = true
+    check(ev('collect', 1, id).success == false and mysql.db.evidence[1].status == 'scene', 'collect: a full pack gives the claim back')
+    local bags = 0
+    for _, item in pairs(Mocks.inv[1]) do if item.name == 'empty_evidence_bag' then bags = bags + 1 end end
+    check(bags == 3, 'collect: a full pack keeps the empty bag')
+    Mocks.invFull[1] = nil
+
+    check(ev('collect', 1, id).success == true and bagsFor(1, id) == 1, 'collect: an officer bags a trace, the bag carries only the id')
+    check(mysql.db.evidence[1].status == 'collected' and mysql.db.evidence[1].holder_cid == 'OFFICER', 'collect: the record names the holder')
+    check(#mysql.db.custody == 1 and mysql.db.custody[1].action == 'collected', 'collect: custody records it')
+    check(ev('collect', 1, id).success == false, 'collect: a second officer cannot take a collected trace')
+
+    shoot('S-100')
+    local gone = mysql.db.evidence[2]
+    gone.expires_at = mysql.fakeNow - 1
+    check(ev('collect', 1, gone.id).success == false, 'collect: a faded trace is gone')
+    env.Evidence.Sweep()
+    check(gone.status == 'destroyed', 'collect: the sweep tidies faded traces')
+end
+
+do
+    local env = evScene()
+    shoot('S-100')
+    local id = mysql.db.evidence[1].id
+    ev('collect', 1, id)
+    atLocker(env, 1)
+
+    check(ev('store', 1, 'nowhere', id).success == false, 'store: an unknown station is refused')
+    check(ev('store', 3, 'mrpd', id).success == false, 'store: someone without the bag cannot lock it up')
+    check(ev('store', 1, 'mrpd', 999).success == false, 'store: a bag for nothing is refused')
+    mysql.db.evidence[1].holder_cid = 'OFFICER2'
+    check(ev('store', 1, 'mrpd', id).success == false and mysql.db.evidence[1].status == 'collected',
+        'store: evidence held by someone else cannot be locked up by the bag alone')
+    mysql.db.evidence[1].holder_cid = 'OFFICER'
+
+    placePed(1, 90.0, 0.0, 0.0)
+    check(ev('store', 1, 'mrpd', id).success == false, 'store: away from the locker is refused')
+    atLocker(env, 1)
+
+    check(ev('store', 1, 'mrpd', id).success == true and mysql.db.evidence[1].status == 'stored', 'store: an officer locks evidence up')
+    check(bagsFor(1, id) == 0 and mysql.db.evidence[1].holder_cid == nil, 'store: the bag leaves the inventory')
+
+    check(ev('checkout', 3, 'mrpd', id).success == false, 'checkout: a civilian or far officer cannot check out')
+    check(ev('checkout', 1, 'mrpd', id).success == true and bagsFor(1, id) == 1, 'checkout: an officer gets a bag back')
+    check(ev('checkout', 1, 'mrpd', id).success == false, 'checkout: evidence that is out cannot be checked out twice')
+    local actions = {}
+    for _, row in ipairs(mysql.db.custody) do actions[#actions + 1] = row.action end
+    check(table.concat(actions, ',') == 'collected,stored,checked out', 'custody: every change leaves a row, in order')
+end
+
+do
+    local env = evScene()
+    shoot('S-777')
+    ev('collect', 1, mysql.db.evidence[1].id)
+    Handlers['som:server:playerDowned'](2, 'SUSPECT')
+    ev('collect', 1, mysql.db.evidence[2].id)
+    Mocks.players[9] = { citizenid = 'OTHER', job = { name = 'unemployed' } }
+    placePed(9, 1.0, 0.0, 0.0)
+    Handlers['som:server:playerDowned'](9, 'OTHER')
+    ev('collect', 1, mysql.db.evidence[3].id)
+    local casingId, bloodId, otherId = mysql.db.evidence[1].id, mysql.db.evidence[2].id, mysql.db.evidence[3].id
+
+    check(ev('analyse', 1, 'mrpd', casingId).success == false, 'lab: analysing away from the lab is refused')
+    atLab(env, 1)
+    check(ev('result', 1, 'mrpd', casingId).success == false, 'lab: no result before it is started')
+    check(ev('analyse', 1, 'mrpd', casingId).success == true and ev('analyse', 1, 'mrpd', casingId).success == false,
+        'lab: analysis starts once')
+    check(ev('result', 1, 'mrpd', casingId).success == false, 'lab: the result is not readable before it is due')
+    mysql.fakeNow = mysql.fakeNow + env.Config.Kinds.casing.lab * 60
+    local r = ev('result', 1, 'mrpd', casingId)
+    check(r.success and r.result.serial == 'S-777', 'lab: a casing reveals its weapon serial')
+
+    ev('analyse', 1, 'mrpd', bloodId)
+    ev('analyse', 1, 'mrpd', otherId)
+    mysql.fakeNow = mysql.fakeNow + env.Config.Kinds.blood.lab * 60
+    local unknown = ev('result', 1, 'mrpd', bloodId)
+    check(unknown.success and unknown.result.match == nil and unknown.result.profile ~= nil, 'lab: blood with no sample on file stays unidentified')
+
+    placePed(1, 0.0, 0.0, 0.0)
+    placePed(2, 1.0, 0.0, 0.0)
+    check(ev('sample', 1, 2, 'dna_sample').success == false, 'sample: an uncuffed person cannot be sampled')
+    setCuffed(2, true)
+    check(ev('sample', 1, 2, 'dna_sample').success == false, 'sample: no kit, no sample')
+    Mocks.inv[1][#Mocks.inv[1] + 1] = { name = 'dnatestkit', count = 1, slot = 20 }
+    Mocks.inv[1][#Mocks.inv[1] + 1] = { name = 'empty_evidence_bag', count = 1, slot = 21 }
+    check(ev('sample', 1, 2, 'bone_sample').success == false, 'sample: only known sample kinds')
+    check(ev('sample', 1, 2, 'dna_sample').success == true, 'sample: a cuffed person can be sampled')
+    check(env.Evidence.Profile('SUSPECT') == mysql.db.evidence[#mysql.db.evidence].profile, 'sample: it carries the person\'s own code')
+
+    atLab(env, 1)
+    local match = ev('result', 1, 'mrpd', bloodId)
+    check(match.success and match.result.match == 'SUSPECT', 'lab: blood matches the sample on file')
+    local noMatch = ev('result', 1, 'mrpd', otherId)
+    check(noMatch.success and noMatch.result.match == nil, 'lab: someone else\'s blood does not match')
+end
+
+do
+    local env = evScene()
+    shoot('S-100')
+    local id = mysql.db.evidence[1].id
+    ev('collect', 1, id)
+    atLocker(env, 1)
+    ev('store', 1, 'mrpd', id)
+    local own = addCase({ class = 'misdemeanor', status = 'accepted', filed_by = 'OFFICER', sentence_months = 0 })
+    local theirs = addCase({ class = 'misdemeanor', status = 'accepted', filed_by = 'OFFICER2', sentence_months = 0 })
+    local closed = addCase({ class = 'misdemeanor', status = 'dismissed', filed_by = 'OFFICER', sentence_months = 0 })
+
+    check(ev('link', 1, 'mrpd', id, theirs.id).success == false, 'link: another officer\'s case is refused')
+    check(ev('link', 1, 'mrpd', id, closed.id).success == false, 'link: a closed case is refused')
+    check(ev('link', 1, 'mrpd', id, 9999).success == false, 'link: a case that does not exist is refused')
+    check(ev('link', 1, 'mrpd', id, own.id).success == true and mysql.db.evidence[1].case_id == own.id, 'link: an officer links evidence to their case')
+    check(ev('link', 1, 'mrpd', id, own.id).success == false, 'link: evidence links once')
+    check(#Mocks.exported.forCase(own.id) == 1 and #Mocks.exported.forCase(theirs.id) == 0, 'link: a case lists the evidence behind it')
+
+    Mocks.players[10] = { citizenid = 'JUDGE', job = { name = 'judge', onduty = true, grade = 2 } }
+    Mocks.players[20] = { citizenid = 'CIV', job = { name = 'unemployed' } }
+    local view = RegisteredCallbacks['som-court:server:evidence']
+    check(#view(10, own.id).evidence == 1, 'court: a judge sees the evidence behind a case')
+    check(view(20, own.id).success == false, 'court: a civilian cannot')
+    check(view(1, theirs.id).success == false and view(1, own.id).success == true, 'court: an officer sees only their own case')
+end
+
+do
+    local env = evScene()
+    Mocks.inv[1][#Mocks.inv[1] + 1] = { name = 'gsrtestkit', count = 1, slot = 30 }
+    check(ev('gsr', 1, 2).success and ev('gsr', 1, 2).positive == nil, 'gsr: the kit is spent on the first test')
+    Mocks.inv[1][#Mocks.inv[1] + 1] = { name = 'gsrtestkit', count = 1, slot = 31 }
+    check(ev('gsr', 1, 2).positive == false, 'gsr: someone who has not fired tests negative')
+    Mocks.inv[1][#Mocks.inv[1] + 1] = { name = 'gsrtestkit', count = 1, slot = 32 }
+    shoot('S-100')
+    check(ev('gsr', 1, 2).positive == true, 'gsr: someone who just fired tests positive')
+    check(ev('gsr', 1, 2).success == false, 'gsr: no kit, no test')
+    check(ev('gsr', 2, 1).success == false, 'gsr: a civilian cannot test')
 end
 
 ----------------------------------------------------------------------

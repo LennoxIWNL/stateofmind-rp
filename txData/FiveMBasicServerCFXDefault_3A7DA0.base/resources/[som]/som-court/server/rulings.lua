@@ -214,6 +214,14 @@ end)
 
 ---@param caseId any
 ---@return table|nil
+exports('caseSummary', function(caseId)
+    local case = Court.Get(caseId)
+    if not case then return nil end
+    return { id = case.id, filed_by = case.filed_by, status = case.status, class = case.class }
+end)
+
+---@param caseId any
+---@return table|nil
 exports('bailTerms', function(caseId)
     local case = Court.Get(caseId)
     if not case then return nil end

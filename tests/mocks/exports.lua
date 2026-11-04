@@ -10,6 +10,7 @@ Mocks.fines = {}
 Mocks.fineFails = false
 Mocks.exported = {}        -- name -> function, filled by exports(name, fn) in loaded resources
 Mocks.downed = {}
+Mocks.weapons = {}
 Mocks.inv = {}              -- inventory id -> list of { name, count, metadata, slot }
 Mocks.invFull = {}          -- inventory id -> true when AddItem must fail
 Mocks.players = {}          -- players[source] = { citizenid = ..., job = ... }
@@ -86,10 +87,22 @@ local medical = {}
 function medical:isDowned(ref) return Mocks.downed[ref] == true end
 
 local ox = {}
+function ox:Search(inv, mode, name)
+    local slots, count = {}, 0
+    for _, item in pairs(Mocks.inv[inv] or {}) do
+        if item.name == name then
+            slots[#slots + 1] = item
+            count = count + (item.count or 1)
+        end
+    end
+    return mode == 'count' and count or slots
+end
+function ox:GetCurrentWeapon(inv) return Mocks.weapons[inv] end
 function ox:RegisterStash(id) Mocks.inv[id] = Mocks.inv[id] or {} end
 function ox:GetInventoryItems(inv) return Mocks.inv[inv] end
 function ox:AddItem(inv, name, count, metadata)
-    if Mocks.invFull[inv] then return false end
+    -- A full pack still takes back the empty bag it just gave up, which freed a slot.
+    if Mocks.invFull[inv] and name ~= 'empty_evidence_bag' then return false end
     Mocks.inv[inv] = Mocks.inv[inv] or {}
     Mocks.slot = (Mocks.slot or 0) + 1
     Mocks.inv[inv][Mocks.slot] = { name = name, count = count, metadata = metadata, slot = Mocks.slot }
@@ -105,6 +118,10 @@ end
 
 local registry = {
     ['som-medical'] = medical,
+    ['som-evidence'] = setmetatable({}, { __index = function(_, name)
+        local fn = Mocks.exported[name]
+        return fn and function(_, ...) return fn(...) end or nil
+    end }),
     ['som-court'] = setmetatable({}, { __index = function(_, name)
         local fn = Mocks.exported[name]
         return fn and function(_, ...) return fn(...) end or nil
