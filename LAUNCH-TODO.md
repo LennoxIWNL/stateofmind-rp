@@ -132,3 +132,12 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Whitelist and application flow, staff tools, anti-cheat coverage review and written rules are not built (`LAUNCH-OPS.md`). They need owner decisions.
 - [ ] Full boot out of DEV MODE has not been attempted (needs the streamed assets and a client).
 - [ ] Load test with real players has not been run. `tools/load-claims.sh` covers the heist claim query only.
+
+## Turf and the drug market (som-turf)
+
+- [ ] All three zones (`grove`, `vespucci_canals`, `davis`) are disabled with no coordinates. Set `center`, `radius`, `tag` and `enabled` per zone in `som-turf/shared/config.lua`, and rename or add zones. `som_turf` rows are seeded at boot.
+- [ ] Import section 7k of `setup.sql` (`som_drug_market`) on an existing database.
+- [ ] Prices, `dropPerUnit`, `floor`, `recoverPerHour`, `ownerBonus`, `holdMinutes`, `claimGrade` and `policeMin` are defaults, not tuned numbers. Marked bills from sales feed the launder fronts' hourly budget, so check the two together.
+- [ ] Gang members come from `/setgang`-style admin tools or the boss app; there is no application flow yet.
+- [ ] Never run in a game: sphere zones, the tag progress bar, the sell dialog, two gangs contesting. The marked bill mint needs a real ox_inventory pass.
+- [ ] Not built: passive gang payments, a phone or HUD view of turf, growing and processing, NPC buyers.
