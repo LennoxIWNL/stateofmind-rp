@@ -25,7 +25,9 @@ Fires many parallel connections at the heist site claim query (the conditional i
 
 This needs the 5 GB of streamed assets and a game client, so it cannot be done from the dev machine.
 
-## Whitelist and staff tools (plan only, not built)
+## Whitelist and staff tools (basic versions built in `som-staff`)
+
+Built: the connection gate (`som_whitelist` convar, `/whitelist`), player reports with a staff queue, goto, bring, spectate and a staff audit table. Still open: the items below.
 
 Designed in AUDIT.md section 18, Phase 6. Not built because it needs decisions only the owner can make:
 - Discord application form: the questions, who reviews, how a decision reaches the game (a bot command that inserts the identifier into an allow table, read by the connect handler). The `[discord]` bot's source is not in this repo, so the bot half cannot be edited here.

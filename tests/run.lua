@@ -47,6 +47,7 @@ local function resetDb()
     mysql.db.heist = { dongles = {}, runs = {} }
     mysql.db.turf = { zones = {}, events = {}, market = {} }
     mysql.db.whitelist = {}
+    mysql.db.staff = { reports = {}, audit = {} }
     mysql.db.vehicles = {}
     mysql.db.social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} }
     mysql.db.bills = {}
@@ -3144,6 +3145,62 @@ do
     check(said == 'Added' and mysql.db.whitelist['license:zzz'].added_by == '2', 'whitelist: an admin can add and the list records who')
     _G.TriggerClientEvent = realT
     Mocks.convars = {}
+end
+
+-- ---------------------------------------------------------------------------
+-- Staff tools
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    loader.loadResource(REPO .. 'som-staff', { 'shared/config.lua', 'server/staff.lua' })
+    Mocks.players = { [1] = { citizenid = 'P1' }, [2] = { citizenid = 'P2' }, [3] = { citizenid = 'P3' } }
+    Mocks.admins = { [3] = true }
+    FakePeds = { [1] = vec3(1, 2, 3), [2] = vec3(40, 50, 60), [3] = vec3(7, 8, 9) }
+    Mocks.clock = 1000000
+    Teleports = {}
+    local said = {}
+    local realT = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, text) if name == 'som:client:notify' then said[target] = text end end
+    local rep = RegisteredCallbacks['som-staff:server:reports']
+    local act = RegisteredCallbacks['som-staff:server:reportAction']
+
+    Mocks.commands.report(1, { message = '  my car\1 is stuck  ' })
+    check(mysql.db.staff.reports[1].message == 'my car is stuck' and said[1] == 'Report #1 sent', 'staff: a report is cleaned and stored')
+    check(said[3] == 'New report #1', 'staff: on duty staff are told')
+    Mocks.clock = Mocks.clock + 120000
+    Mocks.commands.report(1, { message = 'again' })
+    check(#mysql.db.staff.reports == 1 and said[1] == 'You already have an open report', 'staff: one open report per character')
+    Mocks.commands.report(2, { message = '   ' })
+    check(#mysql.db.staff.reports == 1, 'staff: an empty report is refused')
+    Mocks.commands.report(2, { message = string.rep('x', 500) })
+    check(#mysql.db.staff.reports[2].message == 200, 'staff: report text is capped')
+
+    check(rep(1) == nil and act(1, 1, 'claim').success == false, 'staff: players cannot read or work the queue')
+    check(#rep(3) == 2, 'staff: staff see open reports')
+    check(act(3, 'x', 'claim').error == 'bad request' and act(3, 1, 'drop').error == 'bad request', 'staff: report actions are validated')
+    check(act(3, 1, 'claim').success == true and mysql.db.staff.reports[1].claimed_by == 'P3', 'staff: a report can be claimed')
+    check(act(3, 1, 'claim').success == false, 'staff: a claimed report cannot be claimed twice')
+    check(act(3, 1, 'close').success == true and #rep(3) == 1, 'staff: a closed report leaves the queue')
+    check(mysql.db.staff.audit[1].action == 'report_claim' and mysql.db.staff.audit[2].action == 'report_close', 'staff: queue actions are audited')
+
+    Mocks.commands['goto'](1, { target = 2 })
+    check(#Teleports == 0 and said[1] == 'You do not have permission to do that', 'staff: a player cannot teleport')
+    Mocks.commands['goto'](3, { target = 2 })
+    check(Teleports[1].ped == 3 and Teleports[1].x == 40, 'staff: goto moves staff to the player')
+    Mocks.commands.bring(3, { target = 2 })
+    check(Teleports[2].ped == 2 and Teleports[2].x == 7, 'staff: bring moves the player to staff')
+    Mocks.commands['goto'](3, { target = 3 })
+    check(#Teleports == 2 and said[3] == 'No such player', 'staff: you cannot target yourself')
+    check(mysql.db.staff.audit[3].action == 'goto' and mysql.db.staff.audit[3].target == 'P2' and mysql.db.staff.audit[4].action == 'bring', 'staff: teleports are audited')
+
+    local spec
+    _G.TriggerClientEvent = function(name, target, arg) if name == 'som-staff:client:spectate' then spec = { target = target, arg = arg } end end
+    Mocks.commands.spectate(1, { target = 2 })
+    check(spec == nil, 'staff: a player cannot spectate')
+    Mocks.commands.spectate(3, { target = 2 })
+    check(spec.target == 3 and spec.arg == 2 and mysql.db.staff.audit[5].action == 'spectate', 'staff: spectate sends the target to staff only and is audited')
+    _G.TriggerClientEvent = realT
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))

@@ -148,3 +148,11 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Import section 7l of `setup.sql` (`som_whitelist`) on an existing database.
 - [ ] The Discord application form and review are not built (the bot source is not in this repo). The bot can drive the list over RCON (`whitelist add <identifier> <note>`) or insert into `som_whitelist` directly. Decide the form, the reviewers and the notification.
 - [ ] The connect gate itself has never run with a real client; only the command and SQL were exercised on the headless server.
+
+## Staff tools (som-staff)
+
+- [ ] Import the `som_reports` and `som_staff_audit` tables (section 7l of `setup.sql`) on an existing database.
+- [ ] Grant staff in `server.cfg` (`add_ace group.mod som.mod allow`, `group.admin` for `som.admin`). `/goto`, `/bring`, `/spectate` and `/reports` need `som.mod`; `/whitelist` needs `som.admin`.
+- [ ] Built: `/report` for players (one open, 200 characters, 60 s gap), a staff queue menu (`/reports`, claim and close), `/goto`, `/bring`, `/spectate`, and an audit row for each staff action. Not built: noclip, freeze, kick or ban, a staff duty toggle, an audit viewer (read `som_staff_audit` in the database for now), Discord logging of reports.
+- [ ] The spectate native, the reports menu and teleports via OneSync have never run with a client.
+- [ ] Anti-cheat coverage review of `Lennox-Anticheat` and the written rules are still undone and need the owner.

@@ -12,13 +12,20 @@ shared_scripts {
     'shared/config.lua',
 }
 
+client_scripts {
+    '@som-ui/client/context.lua',
+    'client/main.lua',
+}
+
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/whitelist.lua',
+    'server/staff.lua',
 }
 
 dependencies {
     'ox_lib',
     'oxmysql',
     'som-core',
+    'som-ui',
 }

@@ -32,6 +32,7 @@ M.db = {
     heist = { dongles = {}, runs = {} },
     turf = { zones = {}, events = {}, market = {} },
     whitelist = {},
+    staff = { reports = {}, audit = {} },
     vehicles = {},
     social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} },
     nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
@@ -417,6 +418,35 @@ local function whitelist(kind, query, params)
     return false
 end
 
+local function staff(kind, query, params)
+    local S = M.db.staff
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    if kind == 'insert' and has('INSERT INTO som_reports') then
+        for _, r in ipairs(S.reports) do
+            if r.citizenid == params[1] and r.status ~= 'closed' then return true, 0 end
+        end
+        local id = #S.reports + 1
+        S.reports[id] = { id = id, citizenid = params[1], name = params[2], message = params[3], status = 'open' }
+        return true, id
+    elseif kind == 'insert' and has('INSERT INTO som_staff_audit') then
+        S.audit[#S.audit + 1] = { staff = params[1], action = params[2], target = params[3] }
+        return true, #S.audit
+    elseif kind == 'query' and has('FROM som_reports') then
+        local out = {}
+        for _, r in ipairs(S.reports) do if r.status ~= 'closed' then out[#out + 1] = r end end
+        return true, out
+    elseif kind == 'update' and has("UPDATE som_reports SET status = 'claimed'") then
+        local r = S.reports[params[2]]
+        if r and r.status == 'open' then r.status, r.claimed_by = 'claimed', params[1]; return true, 1 end
+        return true, 0
+    elseif kind == 'update' and has("UPDATE som_reports SET status = 'closed'") then
+        local r = S.reports[params[1]]
+        if r and r.status ~= 'closed' then r.status = 'closed'; return true, 1 end
+        return true, 0
+    end
+    return false
+end
+
 local function turf(kind, query, params)
     local T = M.db.turf
     local function has(text) return query:find(text, 1, true) ~= nil end
@@ -650,6 +680,7 @@ function M.update(query, params)
     do local handled, value = heist('update', query, params); if handled then return value end end
     do local handled, value = turf('update', query, params); if handled then return value end end
     do local handled, value = whitelist('update', query, params); if handled then return value end end
+    do local handled, value = staff('update', query, params); if handled then return value end end
     if query:find('SET for_sale = 0 WHERE id = ? AND for_sale = 1', 1, true) then
         local p = findProperty(tonumber(params[1]))
         if p and tonumber(p.for_sale) == 1 then
@@ -990,6 +1021,7 @@ function M.insert(query, params)
     do local handled, value = city('insert', query, params); if handled then return value end end
     do local handled, value = heist('insert', query, params); if handled then return value end end
     do local handled, value = turf('insert', query, params); if handled then return value end end
+    do local handled, value = staff('insert', query, params); if handled then return value end end
     if query:find('INSERT INTO som_property_owners', 1, true) then
         local propertyId, citizenid, role, grantedBy = params[1], params[2], params[3], params[4]
         local existing = findOwner(propertyId, citizenid)
@@ -1147,6 +1179,7 @@ function M.query(query, params)
     do local handled, value = social('query', query, params); if handled then return value end end
     do local handled, value = city('query', query, params); if handled then return value end end
     do local handled, value = heist('query', query, params); if handled then return value end end
+    do local handled, value = staff('query', query, params); if handled then return value end end
     -- jail.lua's sweep: every serving sentence, with elapsed.
     if query:find("FROM som_jail_sentences WHERE status = 'serving'", 1, true) then
         local out = {}
