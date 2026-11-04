@@ -155,4 +155,5 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Grant staff in `server.cfg` (`add_ace group.mod som.mod allow`, `group.admin` for `som.admin`). `/goto`, `/bring`, `/spectate` and `/reports` need `som.mod`; `/whitelist` needs `som.admin`.
 - [ ] Built: `/report` for players (one open, 200 characters, 60 s gap), a staff queue menu (`/reports`, claim and close), `/goto`, `/bring`, `/spectate`, and an audit row for each staff action. Not built: noclip, freeze, kick or ban, a staff duty toggle, an audit viewer (read `som_staff_audit` in the database for now), Discord logging of reports.
 - [ ] The spectate native, the reports menu and teleports via OneSync have never run with a client.
-- [ ] Anti-cheat coverage review of `Lennox-Anticheat` and the written rules are still undone and need the owner.
+- [ ] Anti-cheat: read-only review done (`ANTICHEAT-REVIEW.md`), staff immunity fixed. Still needs a live false positive pass, the `lac_webhook_*` convars, and a decision on wiring money events.
+- [ ] Rules: a draft exists (`RULES-DRAFT.md`). The owner must approve it, set the penalty ladder, and choose where it is published.

@@ -18,6 +18,8 @@ LACConfig.Webhooks = {
 -- =========================================================================
 LACConfig.AdminAces = {
     'qbcore.god',
+    'som.admin',
+    'som.mod',
     'command',
 }
 
