@@ -70,6 +70,13 @@ Import `setup.sql` on a fresh database. A database created from an older version
 - [ ] A refusal lock follows the group id, so leaving and regrouping clears it.
 - [ ] No provider ships yet, so the Jobs app lists nothing until the courier run branch lands.
 
+## Courier run
+
+- [ ] `som-courier/shared/config.lua` `Config.routes` is empty, so the run is disabled. Add real pickup and drop coordinates.
+- [ ] Pay (`payPerDrop` 120) comes from the `postop` business. Check its balance and the number are sensible; a broke company means unpaid drops.
+- [ ] The carry animation and the blip sprite 478 are unchecked guesses.
+- [ ] Not verified live: a crew doing a full run, the zone and progress bar, pay arriving per member.
+
 ## Jobs to whitelist and assign
 
 - [ ] `judge`, `prosecutor`, `defender` (court), `dispatcher` (dispatch). All four are `whitelisted`.
