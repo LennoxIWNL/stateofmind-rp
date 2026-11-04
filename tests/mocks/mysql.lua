@@ -32,6 +32,7 @@ M.db = {
     heist = { dongles = {}, runs = {} },
     turf = { zones = {}, events = {}, market = {} },
     whitelist = {},
+    plants = {},
     gangs = { chars = {}, log = {} },
     staff = { reports = {}, audit = {} },
     vehicles = {},
@@ -419,6 +420,53 @@ local function whitelist(kind, query, params)
     return false
 end
 
+local function plants(kind, query, params)
+    local P = M.db.plants
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    local function age(p) return now() - p.planted end
+    if kind == 'update' and has("SET status = 'withered' WHERE status = 'growing' AND last_water <") then
+        for _, p in ipairs(P) do
+            if p.status == 'growing' and p.watered < now() - params[1] * 60 then p.status = 'withered' end
+        end
+        return true, 1
+    elseif kind == 'scalar' and has("SELECT COUNT(*) FROM som_plants WHERE citizenid = ?") then
+        local n = 0
+        for _, p in ipairs(P) do if p.citizenid == params[1] and p.status == 'growing' then n = n + 1 end end
+        return true, n
+    elseif kind == 'insert' and has('INSERT INTO som_plants') then
+        local id = #P + 1
+        P[id] = { id = id, citizenid = params[1], strain = params[2], x = params[3], y = params[4], z = params[5], fed = 0, status = 'growing', planted = now(), watered = now() }
+        return true, id
+    elseif kind == 'query' and has('FROM som_plants WHERE status') then
+        local out = {}
+        for _, p in ipairs(P) do
+            if p.status == 'growing' then out[#out + 1] = { id = p.id, strain = p.strain, x = p.x, y = p.y, z = p.z, fed = p.fed, age = age(p) } end
+        end
+        return true, out
+    elseif kind == 'single' and has('FROM som_plants WHERE id = ?') then
+        local p = P[params[1]]
+        if p and p.status == 'growing' then return true, { id = p.id, strain = p.strain, x = p.x, y = p.y, z = p.z, fed = p.fed, age = age(p) } end
+        return true, nil
+    elseif kind == 'update' and has('SET last_water = NOW()') then
+        local p = P[params[1]]
+        if p and p.status == 'growing' then p.watered = now(); return true, 1 end
+        return true, 0
+    elseif kind == 'update' and has('SET fed = 1') then
+        local p = P[params[1]]
+        if p and p.status == 'growing' and p.fed == 0 then p.fed = 1; return true, 1 end
+        return true, 0
+    elseif kind == 'update' and has("SET status = 'harvested' WHERE id = ? AND status = 'growing'") then
+        local p = P[params[1]]
+        if p and p.status == 'growing' then p.status = 'harvested'; return true, 1 end
+        return true, 0
+    elseif kind == 'update' and has("SET status = 'growing' WHERE id = ? AND status = 'harvested'") then
+        local p = P[params[1]]
+        if p and p.status == 'harvested' then p.status = 'growing'; return true, 1 end
+        return true, 0
+    end
+    return false
+end
+
 local function gangs(kind, query, params)
     local G = M.db.gangs
     local function has(text) return query:find(text, 1, true) ~= nil end
@@ -553,6 +601,7 @@ function M.single(query, params)
     do local handled, value = city('single', query, params); if handled then return value end end
     do local handled, value = heist('single', query, params); if handled then return value end end
     do local handled, value = turf('single', query, params); if handled then return value end end
+    do local handled, value = plants('single', query, params); if handled then return value end end
     if query:find('FROM som_properties WHERE slug = ?', 1, true) then
         for _, p in ipairs(M.db.properties) do
             if p.slug == params[1] then return copy(p) end
@@ -625,6 +674,7 @@ function M.scalar(query, params)
     do local handled, value = heist('scalar', query, params); if handled then return value end end
     do local handled, value = turf('scalar', query, params); if handled then return value end end
     do local handled, value = gangs('scalar', query, params); if handled then return value end end
+    do local handled, value = plants('scalar', query, params); if handled then return value end end
     do local handled, value = whitelist('scalar', query, params); if handled then return value end end
     if query:find('SELECT role FROM som_property_owners WHERE property_id = ? AND citizenid = ?', 1, true) then
         local o = findOwner(params[1], params[2])
@@ -728,6 +778,7 @@ function M.update(query, params)
     do local handled, value = whitelist('update', query, params); if handled then return value end end
     do local handled, value = staff('update', query, params); if handled then return value end end
     do local handled, value = gangs('update', query, params); if handled then return value end end
+    do local handled, value = plants('update', query, params); if handled then return value end end
     if query:find('SET for_sale = 0 WHERE id = ? AND for_sale = 1', 1, true) then
         local p = findProperty(tonumber(params[1]))
         if p and tonumber(p.for_sale) == 1 then
@@ -1070,6 +1121,7 @@ function M.insert(query, params)
     do local handled, value = turf('insert', query, params); if handled then return value end end
     do local handled, value = staff('insert', query, params); if handled then return value end end
     do local handled, value = gangs('insert', query, params); if handled then return value end end
+    do local handled, value = plants('insert', query, params); if handled then return value end end
     if query:find('INSERT INTO som_property_owners', 1, true) then
         local propertyId, citizenid, role, grantedBy = params[1], params[2], params[3], params[4]
         local existing = findOwner(propertyId, citizenid)
@@ -1230,6 +1282,7 @@ function M.query(query, params)
     do local handled, value = turf('query', query, params); if handled then return value end end
     do local handled, value = staff('query', query, params); if handled then return value end end
     do local handled, value = gangs('query', query, params); if handled then return value end end
+    do local handled, value = plants('query', query, params); if handled then return value end end
     -- jail.lua's sweep: every serving sentence, with elapsed.
     if query:find("FROM som_jail_sentences WHERE status = 'serving'", 1, true) then
         local out = {}

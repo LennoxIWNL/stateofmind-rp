@@ -1626,3 +1626,20 @@ CREATE TABLE IF NOT EXISTS `som_gang_log` (
   PRIMARY KEY (`id`),
   KEY `idx_gang_time` (`gang`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Weed plants (som-turf). Stage is worked out from the timestamps.
+CREATE TABLE IF NOT EXISTS `som_plants` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `strain`     VARCHAR(48) NOT NULL,
+  `x`          DOUBLE NOT NULL,
+  `y`          DOUBLE NOT NULL,
+  `z`          DOUBLE NOT NULL,
+  `fed`        TINYINT(1) NOT NULL DEFAULT 0,
+  `status`     ENUM('growing','harvested','withered') NOT NULL DEFAULT 'growing',
+  `planted_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `last_water` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_owner` (`citizenid`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -41,4 +41,34 @@ Config = {
         { name = 'vespucci_canals', label = 'Vespucci Canals', enabled = false, center = nil, radius = nil, tag = nil },
         { name = 'davis', label = 'Davis', enabled = false, center = nil, radius = nil, tag = nil },
     },
+
+    -- Growing. Plants live in the database and their stage is worked out from
+    -- timestamps. A plant can be placed inside a grow spot, or inside a zone
+    -- the planter's gang holds. Spots and bag tables ship disabled.
+    grow = {
+        maxPlants = 6,
+        growMinutes = 60,       -- from planting to ready
+        witherMinutes = 120,    -- without water for this long, a plant dies
+        yield = { min = 3, max = 6, fedBonus = 2 },
+        budsPerBag = 3,
+        waterItem = 'water_bottle',
+        feedItem = 'weed_nutrition',
+        budItem = 'weedbud',
+        bagItem = 'empty_weed_bag',
+        tendDistance = 3.0,
+        showDistance = 80.0,
+        strains = {
+            weed_whitewidow_seed = { label = 'White Widow', bag = 'weed_whitewidow' },
+            weed_skunk_seed = { label = 'Skunk', bag = 'weed_skunk' },
+            weed_purplehaze_seed = { label = 'Purple Haze', bag = 'weed_purplehaze' },
+            weed_ogkush_seed = { label = 'OG Kush', bag = 'weed_ogkush' },
+            weed_amnesia_seed = { label = 'Amnesia', bag = 'weed_amnesia' },
+        },
+        spots = {
+            { name = 'grow_1', label = 'Grow spot 1', enabled = false, center = nil, radius = nil },
+        },
+        bagTables = {
+            { name = 'bag_1', label = 'Bagging table', enabled = false, coords = nil },
+        },
+    },
 }

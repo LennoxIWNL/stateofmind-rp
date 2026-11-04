@@ -192,7 +192,10 @@ end
 function ox:RemoveItem(inv, name, count, metadata, slot)
     local list = Mocks.inv[inv] or {}
     for k, item in pairs(list) do
-        if item.name == name and (slot == nil or item.slot == slot) then list[k] = nil; return true end
+        if item.name == name and (slot == nil or item.slot == slot) then
+            if (item.count or 1) > (count or 1) then item.count = item.count - (count or 1) else list[k] = nil end
+            return true
+        end
     end
     return false
 end

@@ -16,6 +16,7 @@ client_scripts {
     '@som-ui/client/progressbar.lua',
     '@som-ui/client/dialog.lua',
     'client/main.lua',
+    'client/grow.lua',
 }
 
 server_scripts {
@@ -24,6 +25,7 @@ server_scripts {
     'server/gang.lua',
     'server/payroll.lua',
     'server/app.lua',
+    'server/grow.lua',
 }
 
 dependencies {
