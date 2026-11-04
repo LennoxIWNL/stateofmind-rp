@@ -2658,5 +2658,134 @@ do
     check(env.JobBoard.Draw('courier') == nil and j(1, 'view').view.empty ~= nil, 'board: a group that disbands loses its queue and offer')
 end
 
+
+----------------------------------------------------------------------
+-- som-courier
+----------------------------------------------------------------------
+local courierEnv
+
+local function courierScene(withRoute)
+    boardScene()
+    courierEnv = loader.loadResource(REPO .. 'som-courier', { 'shared/config.lua', 'server/main.lua' })
+    if withRoute ~= false then
+        courierEnv.Config.routes = { { label = 'Depot', pickup = vec3(0, 0, 0),
+            drops = { vec3(100, 0, 0), vec3(200, 0, 0), vec3(300, 0, 0), vec3(400, 0, 0) } } }
+    end
+    local seen = {}
+    local real = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, payload)
+        if name == 'som-courier:client:objective' then seen[#seen + 1] = { target = target, goal = payload } end
+    end
+    return courierEnv, seen, function() _G.TriggerClientEvent = real end
+end
+
+local function at(source, x) FakePeds[source] = vec3(x, 0, 0) end
+local function interact(source, kind) return RegisteredCallbacks['som-courier:server:interact'](source, kind) end
+
+local function startRun(size)
+    crew(size or 1)
+    j(1, 'queue', { provider = 'courier' })
+    boardEnv.JobBoard.Draw('courier')
+    return j(1, 'accept')
+end
+
+do
+    local env, seen, restore = courierScene(false)
+    crew(1)
+    check(j(1, 'queue', { provider = 'courier' }).error == 'no routes are open yet', 'courier: with no routes set it refuses every group')
+    check(env.Courier.Start({ id = 1, members = {} }) == false, 'courier: Start refuses without routes')
+    env.Config.routes = { { label = 'Broken', drops = {} }, { label = 'NoPickup', drops = { vec3(1, 0, 0) } } }
+    check(j(1, 'queue', { provider = 'courier' }).success == false, 'courier: a route missing a pickup or drops is not usable')
+    restore()
+end
+
+do
+    local env, seen, restore = courierScene()
+    at(1, 0); at(2, 0)
+    check(startRun(2).success == true, 'courier: an accepted offer starts a run')
+    check(#seen == 2 and seen[1].goal.kind == 'pickup', 'courier: every member is sent the pickup objective')
+    check(interact(1, 'drop').error == 'not yet', 'courier: a drop cannot be done before the pickup')
+    check(interact(1, 'nope').success == false and interact(9, 'pickup').error == 'you have no delivery', 'courier: a bad kind or an outsider is refused')
+    at(1, 500)
+    check(interact(1, 'pickup').error == 'you are too far away', 'courier: the server checks the distance')
+    FakePeds[1] = nil
+    check(interact(1, 'pickup').success == false, 'courier: a player with no ped is refused')
+    at(1, 0)
+    local before = #seen
+    check(interact(2, 'pickup').success == true and seen[#seen].goal.kind == 'drop' and #seen > before, 'courier: any member can load, and drop objectives follow')
+    check(interact(1, 'pickup').error == 'not yet', 'courier: the pickup counts once')
+
+    local paid0 = Mocks.calls.addMoney
+    at(1, 100); at(2, 100)
+    local first = seen[#seen].goal.coords.x
+    FakePeds[1] = vec3(first, 0, 0); FakePeds[2] = vec3(first, 0, 0)
+    check(interact(1, 'drop').success == true, 'courier: a drop at the right place completes')
+    check(Mocks.calls.addMoney == paid0 + 2 and Mocks.lastPaid.amount == env.Config.payPerDrop and Mocks.lastPaid.account == 'bank', 'courier: both present members are paid from the business')
+    check(Mocks.calls.businessSpend >= 2, 'courier: every payment is debited from the business first')
+
+    FakePeds[2] = vec3(first + 1000, 0, 0)
+    local goal = seen[#seen].goal.coords.x
+    FakePeds[1] = vec3(goal, 0, 0)
+    local paid1 = Mocks.calls.addMoney
+    interact(1, 'drop')
+    check(Mocks.calls.addMoney == paid1 + 1, 'courier: a member far from the drop is not paid')
+
+    goal = seen[#seen].goal.coords.x
+    FakePeds[1] = vec3(goal, 0, 0)
+    check(interact(1, 'drop').success == true, 'courier: the last drop completes')
+    check(Mocks.exported.getGroup(1).busy == nil and interact(1, 'drop').error == 'you have no delivery', 'courier: the run ends, the group is free and the objective is cleared')
+    check(seen[#seen].goal == nil, 'courier: clients are told the objective is gone')
+    restore()
+end
+
+do
+    local env, seen, restore = courierScene()
+    at(1, 0)
+    startRun(1)
+    interact(1, 'pickup')
+    Mocks.businessSpendFails = true
+    local paid = Mocks.calls.addMoney
+    FakePeds[1] = seen[#seen].goal.coords
+    interact(1, 'drop')
+    check(Mocks.calls.addMoney == paid, 'courier: if the company cannot pay, no money is created')
+    Mocks.businessSpendFails = false
+    Mocks.addMoneyFails = true
+    FakePeds[1] = seen[#seen].goal.coords
+    local transacts = Mocks.calls.businessTransact
+    interact(1, 'drop')
+    check(Mocks.calls.businessTransact == transacts + 1 and Mocks.lastTransact.amount == env.Config.payPerDrop, 'courier: a failed credit returns the money to the business')
+    Mocks.addMoneyFails = false
+    restore()
+end
+
+do
+    local env, seen, restore = courierScene()
+    at(1, 0)
+    startRun(1)
+    local real = os.time
+    os.time = function() return real() + env.Config.minutes * 60 + 5 end
+    env.Courier.Sweep()
+    os.time = real
+    check(Mocks.exported.getGroup(1).busy == nil and interact(1, 'pickup').error == 'you have no delivery', 'courier: a run that runs out of time ends')
+
+    startRun(1)
+    g(1, 'leave')
+    check(interact(1, 'pickup').error == 'you have no delivery' and seen[#seen].goal == nil, 'courier: a disbanded group loses its run')
+    startRun(1)
+    Handlers['som:server:playerUnloaded'](1, 'P1')
+    check(interact(1, 'pickup').error == 'you have no delivery', 'courier: a player who drops out is no longer on the run')
+    restore()
+end
+
+do
+    local env, seen, restore = courierScene()
+    at(1, 0); at(2, 0)
+    startRun(2)
+    g(2, 'leave')
+    check(seen[#seen].target == 2 and seen[#seen].goal == nil and interact(2, 'pickup').error == 'you have no delivery', 'courier: a member who leaves the group is dropped from the run and cleared')
+    check(interact(1, 'pickup').success == true, 'courier: the rest of the crew carries on')
+    restore()
+end
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)
