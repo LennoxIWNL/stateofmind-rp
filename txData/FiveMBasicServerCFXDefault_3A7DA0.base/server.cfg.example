@@ -38,6 +38,9 @@ set lac_webhook_events "YOUR_DISCORD_WEBHOOK_URL"
 set lac_webhook_connections "YOUR_DISCORD_WEBHOOK_URL"
 
 # ps-mdt's webhooks (mug shots, clock-in notifications).
+# som-launder: bills minted and washed.
+set som_launder_webhook "YOUR_DISCORD_WEBHOOK_URL"
+
 # som-evidence: collection, custody and lab events.
 set som_evidence_webhook "YOUR_DISCORD_WEBHOOK_URL"
 

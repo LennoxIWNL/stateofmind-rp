@@ -1287,6 +1287,40 @@ CREATE TABLE IF NOT EXISTS `som_evidence_custody` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ===========================================================================
+--  7i. MARKED BILLS AND LAUNDERING (som-launder)
+--
+--  A marked bill in an inventory is only a pointer to a row here. The worth and
+--  the status that count are the row's, never the item's metadata, so a forged
+--  or duplicated item washes at most once and a made-up uid washes never.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_marked_bills` (
+  `uid`        CHAR(16) NOT NULL,
+  `worth`      INT UNSIGNED NOT NULL,
+  `status`     ENUM('issued','washing','washed','seized','void') NOT NULL DEFAULT 'issued',
+  `order_id`   BIGINT UNSIGNED DEFAULT NULL,
+  `source_tag` VARCHAR(32) DEFAULT NULL,
+  `issued_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`uid`),
+  KEY `idx_order` (`order_id`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_launder_orders` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `front`      VARCHAR(32) NOT NULL,
+  `face`       BIGINT NOT NULL,
+  `payout`     BIGINT NOT NULL,
+  `status`     ENUM('washing','collected','cancelled') NOT NULL DEFAULT 'washing',
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `ready_at`   DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_citizen_status` (`citizenid`, `status`),
+  KEY `idx_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
 --  9. SEED DATA
 --
 --  Opening balances are PLACEHOLDER FLOAT, not a balance decision. Businesses

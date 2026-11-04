@@ -19,8 +19,10 @@ M.db = {
     evidence = {},
     custody = {},
     profiles = {},
+    bills = {},
+    orders = {},
     nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
-               courtCases = 1, courtEvents = 1, courtWarrants = 1, service = 1, evidence = 1, custody = 1 },
+               courtCases = 1, courtEvents = 1, courtWarrants = 1, service = 1, evidence = 1, custody = 1, orders = 1 },
 }
 
 -- Overridable "now" for jail/bail elapsed-time math, so a test can jump a
@@ -56,6 +58,13 @@ end
 local function findEvidence(id)
     for _, r in ipairs(M.db.evidence) do
         if r.id == tonumber(id) then return r end
+    end
+    return nil
+end
+
+local function findOrder(id)
+    for _, o in ipairs(M.db.orders) do
+        if o.id == tonumber(id) then return o end
     end
     return nil
 end
@@ -146,6 +155,12 @@ function M.single(query, params)
     if query:find('SELECT * FROM som_evidence WHERE id = ?', 1, true) then
         return copy(findEvidence(params[1]))
     end
+    if query:find('SELECT worth, status FROM som_marked_bills WHERE uid = ?', 1, true) then
+        return copy(M.db.bills[params[1]])
+    end
+    if query:find('SELECT * FROM som_launder_orders WHERE id = ?', 1, true) then
+        return copy(findOrder(params[1]))
+    end
     fail(query)
 end
 
@@ -207,6 +222,20 @@ function M.scalar(query, params)
             if r.kind == params[1] and r.profile == params[2] and r.status ~= 'destroyed' then return r.source_cid end
         end
         return nil
+    end
+    if query:find('FROM som_launder_orders WHERE citizenid = ?', 1, true) then
+        local sum = 0
+        for _, o in ipairs(M.db.orders) do
+            if o.citizenid == params[1] and o.status ~= 'cancelled' and o.created_at > now() - 86400 then sum = sum + o.face end
+        end
+        return sum
+    end
+    if query:find('FROM som_launder_orders WHERE status <> ', 1, true) then
+        local sum = 0
+        for _, o in ipairs(M.db.orders) do
+            if o.status ~= 'cancelled' and o.created_at > now() - 3600 then sum = sum + o.face end
+        end
+        return sum
     end
     fail(query)
 end
@@ -472,6 +501,49 @@ function M.update(query, params)
         end
         return n
     end
+    if query:find("UPDATE som_marked_bills SET status = 'void'", 1, true) then
+        local b = M.db.bills[params[1]]
+        if not b or b.status ~= 'issued' then return 0 end
+        b.status = 'void'
+        return 1
+    end
+    if query:find("SET status = 'washing', order_id = ? WHERE uid = ?", 1, true) then
+        local b = M.db.bills[params[2]]
+        if not b or b.status ~= 'issued' then return 0 end
+        b.status, b.order_id = 'washing', params[1]
+        return 1
+    end
+    if query:find("SET status = 'issued', order_id = NULL WHERE uid = ?", 1, true) then
+        local b = M.db.bills[params[1]]
+        if not b or b.status ~= 'washing' then return 0 end
+        b.status, b.order_id = 'issued', nil
+        return 1
+    end
+    if query:find("UPDATE som_launder_orders SET status = 'cancelled'", 1, true) then
+        local o = findOrder(params[1])
+        if not o or o.status ~= 'washing' then return 0 end
+        o.status = 'cancelled'
+        return 1
+    end
+    if query:find("UPDATE som_launder_orders SET status = 'collected'", 1, true) then
+        local o = findOrder(params[1])
+        if not o or o.citizenid ~= params[2] or o.status ~= 'washing' or o.ready_at > now() then return 0 end
+        o.status = 'collected'
+        return 1
+    end
+    if query:find("UPDATE som_launder_orders SET status = 'washing'", 1, true) then
+        local o = findOrder(params[1])
+        if not o or o.status ~= 'collected' then return 0 end
+        o.status = 'washing'
+        return 1
+    end
+    if query:find("UPDATE som_marked_bills SET status = 'washed' WHERE order_id = ?", 1, true) then
+        local n = 0
+        for _, b in pairs(M.db.bills) do
+            if b.order_id == params[1] and b.status == 'washing' then b.status = 'washed'; n = n + 1 end
+        end
+        return n
+    end
     fail(query)
 end
 
@@ -583,6 +655,19 @@ function M.insert(query, params)
         }
         return id
     end
+    if query:find('INSERT INTO som_marked_bills', 1, true) then
+        M.db.bills[params[1]] = { worth = params[2], status = 'issued', source_tag = params[3] }
+        return 1
+    end
+    if query:find('INSERT INTO som_launder_orders', 1, true) then
+        local id = M.db.nextId.orders
+        M.db.nextId.orders = id + 1
+        M.db.orders[#M.db.orders + 1] = {
+            id = id, citizenid = params[1], front = params[2], face = params[3], payout = params[4],
+            status = 'washing', created_at = now(), ready_at = now() + params[5] * 60,
+        }
+        return id
+    end
     fail(query)
 end
 
@@ -675,6 +760,17 @@ function M.query(query, params)
         local out = {}
         for _, r in ipairs(M.db.evidence) do
             if r.case_id == params[1] and r.status ~= 'destroyed' then out[#out + 1] = copy(r) end
+        end
+        return out
+    end
+    if query:find('ready_at <= NOW() AS ready FROM som_launder_orders', 1, true) then
+        local out = {}
+        for _, o in ipairs(M.db.orders) do
+            if o.citizenid == params[1] and o.front == params[2] and o.status == 'washing' then
+                local row = copy(o)
+                row.ready = o.ready_at <= now() and 1 or 0
+                out[#out + 1] = row
+            end
         end
         return out
     end

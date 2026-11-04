@@ -36,8 +36,10 @@ local function resetDb()
     mysql.db.evidence = {}
     mysql.db.custody = {}
     mysql.db.profiles = {}
+    mysql.db.bills = {}
+    mysql.db.orders = {}
     mysql.db.nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
-                        courtCases = 1, courtEvents = 1, courtWarrants = 1, service = 1, evidence = 1, custody = 1 }
+                        courtCases = 1, courtEvents = 1, courtWarrants = 1, service = 1, evidence = 1, custody = 1, orders = 1 }
     mysql.fakeNow = nil
 end
 
@@ -50,6 +52,9 @@ local function resetMocks()
     Mocks.fines = {}
     Mocks.fineFails = false
     Mocks.exported = {}
+    Mocks.paid = 0
+    Mocks.lastPaid = nil
+    Mocks.addMoneyFails = false
     Mocks.weapons = {}
     Mocks.clock = 0
     Mocks.downed = {}
@@ -111,6 +116,19 @@ local function loadDispatch()
         'server/main.lua',
     })
     return dispEnv
+end
+
+local launderEnv
+
+local function loadLaunder()
+    resetDb()
+    resetMocks()
+    launderEnv = loader.loadResource(REPO .. 'som-launder', {
+        'shared/config.lua',
+        'server/ledger.lua',
+        'server/wash.lua',
+    })
+    return launderEnv
 end
 
 local evEnv
@@ -1358,6 +1376,146 @@ do
     check(board(31).calls[1].unattended == false, 'board: a fresh call is not unattended')
     for _, call in pairs(allCalls()) do call.createdAt = os.time() - env.Config.UnattendedAfter - 1 end
     check(board(31).calls[1].unattended == true, 'board: a call nobody took for too long is flagged')
+end
+
+----------------------------------------------------------------------
+-- som-launder: the bill ledger and the front
+----------------------------------------------------------------------
+local function wScene()
+    local env = loadLaunder()
+    mysql.fakeNow = os.time()
+    env.Config.Fronts.laundromat.enabled = true
+    env.Config.Fronts.laundromat.set = true
+    Mocks.players[1] = { citizenid = 'C1', job = { name = 'unemployed' } }
+    Mocks.players[2] = { citizenid = 'C2', job = { name = 'unemployed' } }
+    placePed(1, 0.0, 0.0, 0.0)
+    placePed(2, 0.0, 0.0, 0.0)
+    Mocks.inv[1] = {}
+    Mocks.inv[2] = {}
+    return env
+end
+
+local function wl(name, ...) return RegisteredCallbacks['som-launder:server:' .. name] end
+local function countOf(source, name)
+    local n = 0
+    for _, item in pairs(Mocks.inv[source] or {}) do if item.name == name then n = n + 1 end end
+    return n
+end
+
+do
+    local env = wScene()
+    check(env.Ledger.Mint(1, {}, 't') == nil, 'mint: no bills is refused')
+    check(env.Ledger.Mint(1, { 0 }, 't') == nil and env.Ledger.Mint(1, { 5001 }, 't') == nil, 'mint: worth outside the range is refused')
+    check(env.Ledger.Mint(1, { 12.5 }, 't') == nil, 'mint: a fractional worth is refused')
+    local many = {}
+    for i = 1, 41 do many[i] = 100 end
+    check(env.Ledger.Mint(1, many, 't') == nil, 'mint: too many bills in one call is refused')
+    check(next(mysql.db.bills) == nil and countOf(1, 'markedbills') == 0, 'mint: refusals write nothing')
+
+    local uids = env.Ledger.Mint(1, { 500, 700 }, 'store')
+    check(uids and #uids == 2 and countOf(1, 'markedbills') == 2, 'mint: one item per bill')
+    check(mysql.db.bills[uids[1]].worth == 500 and mysql.db.bills[uids[1]].status == 'issued', 'mint: each bill has a ledger row')
+    local slot = env.Ledger.SlotOf(1, uids[2])
+    check(slot and Mocks.inv[1][slot].metadata.uid == uids[2], 'mint: the item carries its uid')
+
+    Mocks.invFull[1] = true
+    local before = countOf(1, 'markedbills')
+    check(env.Ledger.Mint(1, { 100, 100 }, 'store') == nil and countOf(1, 'markedbills') == before,
+        'mint: a full pack gives nothing')
+    local voided = 0
+    for _, b in pairs(mysql.db.bills) do if b.status == 'void' then voided = voided + 1 end end
+    check(voided >= 1, 'mint: a failed mint voids the rows it wrote')
+    Mocks.invFull[1] = nil
+end
+
+do
+    local env = wScene()
+    local uids = env.Ledger.Mint(1, { 500, 700 }, 'store')
+    env.Config.Fronts.laundromat.enabled = false
+    check(wl('bills')(1, 'laundromat').success == false, 'front: a disabled front is closed')
+    env.Config.Fronts.laundromat.enabled = true
+    env.Config.Fronts.laundromat.set = false
+    check(wl('bills')(1, 'laundromat').success == false, 'front: a front whose coordinates are not set is closed')
+    env.Config.Fronts.laundromat.set = true
+    check(wl('bills')(1, 'nowhere').success == false, 'front: an unknown front is refused')
+    placePed(1, 50.0, 0.0, 0.0)
+    check(wl('bills')(1, 'laundromat').success == false, 'front: away from the desk is refused')
+    placePed(1, 0.0, 0.0, 0.0)
+
+    Mocks.inv[1][#Mocks.inv[1] + 1] = { name = 'markedbills', count = 1, slot = 90, metadata = { uid = 'FFFFFFFFFFFFFFFF', worth = 99999 } }
+    local slot = env.Ledger.SlotOf(1, uids[1])
+    Mocks.inv[1][#Mocks.inv[1] + 1] = { name = 'markedbills', count = 1, slot = 91, metadata = { uid = uids[1], worth = 500 } }
+    local list = wl('bills')(1, 'laundromat')
+    check(list.success and #list.bills == 2, 'bills: forged and duplicated items are not listed')
+end
+
+do
+    local env = wScene()
+    local uids = env.Ledger.Mint(1, { 500, 700 }, 'store')
+    local deposit = wl('deposit')
+    check(deposit(1, 'laundromat', {}).success == false and deposit(1, 'laundromat', 'x').success == false, 'deposit: nothing chosen is refused')
+    check(deposit(1, 'laundromat', { 'FFFFFFFFFFFFFFFF' }).success == false, 'deposit: a uid that is not in the ledger is refused')
+    check(deposit(1, 'laundromat', { uids[1], uids[1] }).success == false, 'deposit: the same bill twice in one order is refused')
+    check(deposit(2, 'laundromat', { uids[1] }).success == false, 'deposit: someone else cannot hand over a bill they do not carry')
+    local tooMany = {}
+    for i = 1, env.Config.Wash.maxBills + 1 do tooMany[i] = uids[1] end
+    check(deposit(1, 'laundromat', tooMany).success == false, 'deposit: more bills than an order allows is refused')
+
+    local slot = env.Ledger.SlotOf(1, uids[1])
+    Mocks.inv[1][slot].metadata.worth = 99999
+    local r = deposit(1, 'laundromat', { uids[1], uids[2] })
+    check(r.success == true and r.face == 1200 and r.payout == math.floor(1200 * (1 - env.Config.Wash.cut)),
+        'deposit: the payout comes from the ledger worth, not the item metadata, minus the cut')
+    check(countOf(1, 'markedbills') == 0 and mysql.db.bills[uids[1]].status == 'washing', 'deposit: the bills are taken and claimed')
+    check(deposit(1, 'laundromat', { uids[1] }).success == false, 'deposit: a bill that was handed over cannot be handed over again')
+
+    local collect = wl('collect')
+    check(collect(1, 'laundromat', r.orderId).success == false, 'collect: not ready yet')
+    check(#wl('orders')(1, 'laundromat').orders == 1 and wl('orders')(1, 'laundromat').orders[1].ready == 0, 'orders: a pending order is listed as not ready')
+    mysql.fakeNow = mysql.fakeNow + env.Config.Wash.delayMinutes * 60
+    check(collect(2, 'laundromat', r.orderId).success == false, 'collect: someone else cannot collect it')
+    Mocks.addMoneyFails = true
+    check(collect(1, 'laundromat', r.orderId).success == false and mysql.db.orders[1].status == 'washing', 'collect: a failed payment leaves the order to retry')
+    Mocks.addMoneyFails = false
+    check(collect(1, 'laundromat', r.orderId).success == true and Mocks.paid == r.payout and Mocks.lastPaid.account == 'cash',
+        'collect: the order pays once, in clean cash')
+    check(collect(1, 'laundromat', r.orderId).success == false and Mocks.paid == r.payout, 'collect: a second collect pays nothing')
+    check(mysql.db.bills[uids[1]].status == 'washed', 'collect: the bills end washed')
+end
+
+do
+    local env = wScene()
+    env.Config.Wash.dailyCap = 1500
+    local uids = env.Ledger.Mint(1, { 1000, 600 }, 'store')
+    check(wl('deposit')(1, 'laundromat', { uids[1] }).success == true, 'cap: a wash under the daily cap goes through')
+    check(wl('deposit')(1, 'laundromat', { uids[2] }).success == false, 'cap: the daily cap stops the next one')
+    mysql.fakeNow = mysql.fakeNow + 86400 + 5
+    check(wl('deposit')(1, 'laundromat', { uids[2] }).success == true, 'cap: it resets after a day')
+end
+
+do
+    local env = wScene()
+    env.Config.Wash.hourlyBudget = 2000
+    env.Config.Wash.dailyCap = 100000
+    local a = env.Ledger.Mint(1, { 1000 }, 'store')
+    local b = env.Ledger.Mint(2, { 1000 }, 'store')
+    local c = env.Ledger.Mint(1, { 1000 }, 'store')
+    local first = wl('deposit')(1, 'laundromat', { a[1] })
+    local second = wl('deposit')(2, 'laundromat', { b[1] })
+    check(first.payout == 700, 'budget: an empty hour pays the full rate')
+    check(second.payout == 525, 'budget: a half used hour pays a lower rate for everyone')
+    check(wl('deposit')(1, 'laundromat', { c[1] }).success == false, 'budget: a used up hour takes no more')
+    mysql.fakeNow = mysql.fakeNow + 3600 + 5
+    check(wl('deposit')(1, 'laundromat', { c[1] }).payout == 700, 'budget: it recovers after an hour')
+end
+
+do
+    local env = loadLaunder()
+    local open = 0
+    for _, front in pairs(env.Config.Fronts) do
+        if front.enabled or front.set then open = open + 1 end
+    end
+    check(open == 0, 'config: every shipped front is disabled until its coordinates are set')
 end
 
 ----------------------------------------------------------------------
