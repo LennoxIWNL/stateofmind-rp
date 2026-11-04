@@ -1176,6 +1176,7 @@ CREATE TABLE IF NOT EXISTS `som_court_cases` (
   `hearing_at`      DATETIME DEFAULT NULL,
   `ruled_at`        DATETIME DEFAULT NULL,
   `sentence_months` SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  `service_tasks`   SMALLINT UNSIGNED NOT NULL DEFAULT 0,
   `fine`            BIGINT NOT NULL DEFAULT 0,
   `bail_amount`     BIGINT DEFAULT NULL,
   `notes`           VARCHAR(500) DEFAULT NULL,
@@ -1205,6 +1206,32 @@ CREATE TABLE IF NOT EXISTS `som_court_warrants` (
   `issued_by`  VARCHAR(16) NOT NULL,
   `issued_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `expires_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_citizen_status` (`citizenid`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
+--  7g. COMMUNITY SERVICE (som-jail)
+--
+--  Count based, not a timer, so a restart or a logout cannot change it. A task
+--  is counted by one conditional UPDATE that also enforces the gap since the
+--  last task, so two quick requests cannot both count. `tasks_total` only ever
+--  grows, by the escape penalty, and is capped in config.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_community_service` (
+  `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`       VARCHAR(16) NOT NULL,
+  `case_id`         BIGINT UNSIGNED DEFAULT NULL,
+  `issued_by`       VARCHAR(16) NOT NULL,
+  `tasks_total`     SMALLINT UNSIGNED NOT NULL,
+  `tasks_done`      SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  `strikes`         TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `status`          ENUM('active','completed','cancelled','absconded') NOT NULL DEFAULT 'active',
+  `issued_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `completed_at`    TIMESTAMP NULL DEFAULT NULL,
+  `last_task_at`    DATETIME DEFAULT NULL,
+  `last_penalty_at` DATETIME DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_citizen_status` (`citizenid`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

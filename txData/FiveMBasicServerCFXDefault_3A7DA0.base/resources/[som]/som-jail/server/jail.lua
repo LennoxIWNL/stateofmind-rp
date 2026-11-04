@@ -29,6 +29,8 @@ local function log(text)
         { ['Content-Type'] = 'application/json' })
 end
 
+Jail.Log = log
+
 ---True when the ped is missing (still loading) or outside the yard radius.
 ---@param source number
 ---@return boolean
@@ -102,6 +104,12 @@ lib.callback.register('som-jail:server:myStatus', function(source)
         return { serving = true, spawn = outsideYard(source) and randomSpawn() or nil }
     end
 
+    local work = Service.Active(player.citizenid)
+    if work then
+        return { serving = false, service = { remaining = work.tasks_total - work.tasks_done },
+            spawn = Service.Outside(source) and Config.Service.spawn or nil }
+    end
+
     local pending = MySQL.update.await(
         'UPDATE som_jail_sentences SET release_pending = 0 WHERE citizenid = ? AND release_pending = 1',
         { player.citizenid }) > 0
@@ -154,6 +162,19 @@ lib.callback.register('som-jail:server:book', function(source, data)
             local case = court:claimForSentence(caseId, target.citizenid, player.citizenid)
             if not case then return { success = false, error = 'that case cannot be carried out' } end
             claimed, months = true, case.sentence_months
+
+            if (case.service_tasks or 0) > 0 then
+                local started, startErr = Service.Start(targetSource, case.service_tasks, caseId, player.citizenid)
+                if not started then
+                    court:unclaimSentence(caseId)
+                    return { success = false, error = startErr }
+                end
+
+                core:setMetadata(targetSource, 'cuffed', false)
+                lastBook[player.citizenid] = os.time()
+                return { success = true, service = case.service_tasks }
+            end
+
             seconds = months * Config.Cell.secondsPerMonth
         end
     else
@@ -184,6 +205,7 @@ lib.callback.register('som-jail:server:book', function(source, data)
     end
 
     court:serveWarrants(target.citizenid)
+    Service.Cancel(target.citizenid)
 
     core:setMetadata(targetSource, 'cuffed', false)
     Jail.Confiscate(targetSource, target.citizenid)
