@@ -1578,3 +1578,15 @@ CREATE TABLE IF NOT EXISTS `som_drug_market` (
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`item`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
+--  7l. STAFF (som-staff)
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_whitelist` (
+  `identifier` VARCHAR(64) NOT NULL,
+  `note`       VARCHAR(120) NOT NULL DEFAULT '',
+  `added_by`   VARCHAR(64) NOT NULL DEFAULT 'console',
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`identifier`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

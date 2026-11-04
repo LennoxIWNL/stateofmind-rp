@@ -141,3 +141,10 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Gang members come from `/setgang`-style admin tools or the boss app; there is no application flow yet.
 - [ ] Never run in a game: sphere zones, the tag progress bar, the sell dialog, two gangs contesting. The marked bill mint needs a real ox_inventory pass.
 - [ ] Not built: passive gang payments, a phone or HUD view of turf, growing and processing, NPC buyers.
+
+## Whitelist (som-staff)
+
+- [ ] The gate is off until `set som_whitelist 1` is in the real `server.cfg`. Before turning it on, whitelist every staff licence with `/whitelist add license:<hex> <note>` from the console, or nobody can get in.
+- [ ] Import section 7l of `setup.sql` (`som_whitelist`) on an existing database.
+- [ ] The Discord application form and review are not built (the bot source is not in this repo). The bot can drive the list over RCON (`whitelist add <identifier> <note>`) or insert into `som_whitelist` directly. Decide the form, the reviewers and the notification.
+- [ ] The connect gate itself has never run with a real client; only the command and SQL were exercised on the headless server.

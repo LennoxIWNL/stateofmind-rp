@@ -46,6 +46,7 @@ local function resetDb()
     mysql.db.notes = {}
     mysql.db.heist = { dongles = {}, runs = {} }
     mysql.db.turf = { zones = {}, events = {}, market = {} }
+    mysql.db.whitelist = {}
     mysql.db.vehicles = {}
     mysql.db.social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} }
     mysql.db.bills = {}
@@ -3095,6 +3096,54 @@ do
     local back = false
     for _, it in pairs(Mocks.inv[1]) do if it.name == 'weed_ogkush' and it.slot ~= 4 then back = true end end
     check(failed.success == false and (Mocks.inv[1][4] ~= nil or back), 'turf: the drug is returned when the bills cannot be issued')
+end
+
+-- ---------------------------------------------------------------------------
+-- Whitelist
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-staff', { 'shared/config.lua', 'server/whitelist.lua' })
+    Mocks.identifiers = { [7] = { 'license:abc123', 'discord:555' } }
+    Mocks.convars = {}
+    Mocks.admins = {}
+
+    local function connect(src)
+        local out = { deferred = false }
+        local deferrals = { defer = function() out.deferred = true end, done = function(msg) out.done = true; out.msg = msg end }
+        _G.source = src
+        Handlers['playerConnecting']('x', function() end, deferrals)
+        return out
+    end
+
+    check(connect(7).deferred == false, 'whitelist: the gate is off unless the convar is set')
+    Mocks.convars.som_whitelist = '1'
+    local r = connect(7)
+    check(r.done and r.msg == env.Config.deniedMessage, 'whitelist: an unlisted player is turned away')
+
+    check(env.Whitelist.Add('License:ABC123', 'ok', 'console') == true and mysql.db.whitelist['license:abc123'] ~= nil, 'whitelist: identifiers are normalised on add')
+    r = connect(7)
+    check(r.done and r.msg == nil, 'whitelist: a listed player connects')
+    check(env.Whitelist.Add('license:abc123') == false, 'whitelist: adding twice is refused')
+    check(env.Whitelist.Add('ip:1.2.3.4') == false and env.Whitelist.Add("license:x' OR 1") == false and env.Whitelist.Add(5) == false, 'whitelist: only known identifier kinds with plain values are accepted')
+
+    Mocks.identifiers[8] = { 'discord:555' }
+    check(connect(8).msg == env.Config.deniedMessage, 'whitelist: an unlisted identifier does not match another')
+    env.Whitelist.Add('discord:555')
+    check(connect(8).msg == nil, 'whitelist: any listed identifier is enough')
+    check(env.Whitelist.Remove('discord:555') == true and connect(8).msg ~= nil, 'whitelist: removing takes effect on the next connect')
+
+    local said
+    local realT = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, text) if name == 'som:client:notify' then said = text end end
+    Mocks.commands.whitelist(2, { action = 'add', identifier = 'license:zzz' })
+    check(said == 'You do not have permission to do that' and mysql.db.whitelist['license:zzz'] == nil, 'whitelist: only an admin can change the list')
+    Mocks.admins[2] = true
+    Mocks.commands.whitelist(2, { action = 'add', identifier = 'license:zzz', note = 'n' })
+    check(said == 'Added' and mysql.db.whitelist['license:zzz'].added_by == '2', 'whitelist: an admin can add and the list records who')
+    _G.TriggerClientEvent = realT
+    Mocks.convars = {}
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))
