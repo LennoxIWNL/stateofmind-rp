@@ -38,6 +38,9 @@ set lac_webhook_events "YOUR_DISCORD_WEBHOOK_URL"
 set lac_webhook_connections "YOUR_DISCORD_WEBHOOK_URL"
 
 # ps-mdt's webhooks (mug shots, clock-in notifications).
+# som-court: case, ruling and warrant events.
+set som_court_webhook "YOUR_DISCORD_WEBHOOK_URL"
+
 # som-jail: bookings, releases and escapes.
 set som_jail_webhook "YOUR_DISCORD_WEBHOOK_URL"
 

@@ -89,6 +89,7 @@ Each of these has a webhook field in the listed file — create a channel and pa
 | #log-postal        | `[jobs]/[public]/dream-postal/server.lua`       | Postal/delivery job events |
 | #log-weed          | `[new]/BakiTelli_weed/shared/config.lua`        | Weed plant/harvest activity |
 | #log-hackermenu    | `[new]/BakiTelli_hackermenu/shared/config.lua`  | Hacker menu usage |
+| #log-court         | `set som_court_webhook` in `server.cfg`         | Cases filed, rulings, warrants |
 | #log-jail          | `set som_jail_webhook` in `server.cfg`          | Bookings, releases and escapes |
 
 ---
