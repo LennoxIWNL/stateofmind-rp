@@ -13,7 +13,7 @@ covered by the mock harness only (`lua5.4 tests/run.lua`).
 - [ ] `som.cfg` is still in DEV MODE (framework only). Leave it, boot the full resource set once, and fix what breaks.
 - [ ] GitHub branch protection on `main` and `BetaRelease` (require CI, no force push, no direct push).
 - [ ] The beta server's git webhook runs with `BRANCH=BetaRelease`; the production server stays on `main`.
-- [ ] Backups of the database and `server.cfg`/`som.cfg` exist and a restore has been tried (AUDIT section 18, Phase 6).
+- [ ] Backups: scripts exist (`tools/backup.sh`, `tools/restore-check.sh`, see `LAUNCH-OPS.md`). Still to do on the real host: install the cron job, a restricted backup DB user, an off-machine copy, and run a restore check on a real backup (include `server.cfg`).
 - [ ] `r14-evidence` stays out of `som.cfg`. Its server accepts client-supplied evidence data (AUDIT 18.1); `som-evidence` replaces it.
 
 ## Database
@@ -126,3 +126,9 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] `ox_doorlock` door names for any vault or cage door are created and put in the config.
 - [ ] Laundering fronts (where marked bills are washed) are chosen and set.
 - [ ] After the first week of play, read the economy sink/faucet report: heists and laundering are a measured faucet.
+
+## Launch ops
+
+- [ ] Whitelist and application flow, staff tools, anti-cheat coverage review and written rules are not built (`LAUNCH-OPS.md`). They need owner decisions.
+- [ ] Full boot out of DEV MODE has not been attempted (needs the streamed assets and a client).
+- [ ] Load test with real players has not been run. `tools/load-claims.sh` covers the heist claim query only.
