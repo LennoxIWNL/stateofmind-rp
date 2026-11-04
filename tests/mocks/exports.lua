@@ -100,6 +100,8 @@ function phone:notifyApp(source, app, message)
     if Mocks.exported.notifyApp then return Mocks.exported.notifyApp(source, app, message) end
 end
 
+function phone:registerApp(app) Mocks.apps[app.id] = app; return true end
+
 local dispatch = {}
 function dispatch:alert(source, alertType, extra)
     Mocks.calls.dispatchAlert = Mocks.calls.dispatchAlert + 1
