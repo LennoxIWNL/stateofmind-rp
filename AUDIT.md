@@ -2149,6 +2149,35 @@ crime visibility to police stays entirely interaction-driven through the
 existing `som-dispatch` calls/BOLOs. Recorded here explicitly so a future
 pass doesn't quietly re-propose it as a gap to fill.
 
+### 18.1 Status after the court work
+
+Phase 2 is built on `BetaRelease`, mock-tested only (nothing has run in a live
+FXServer, and `som.cfg` is still in DEV MODE):
+
+- `som-jail`: booking, time served, yard sweep, bail, relog and death handling,
+  offline release, held property, `/unjail`.
+- `som-court`: cases, hearings, rulings, warrants. Jail and bail now read a
+  case; a booking with no case is capped, an open case allows a short remand.
+- Community service, count based and server verified, including ps-mdt's
+  profile button.
+
+Deliberate differences from the roadmap text above: the 72 hour auto-warrant
+after bail is replaced by a judge declaring failure to appear (it would depend
+on court staff being online), ps-mdt's own warrant flag is left alone and
+coexists with the court's warrants, and unpaid court fines rely on the phone
+bill's auto collection instead of a conversion to warrants.
+
+**r14-evidence stays off, and why.** It is a paid product already on disk, and
+its server trusts the client where this server's rules forbid it:
+`evidence:server:AddEvidenceToInventory(evidenceId, info)` stores the client's
+`info` table as the bag's metadata without checking the evidence exists, so a
+modified client can forge a bag naming anyone, and `evidence:server:CreateEvidence`
+runs `evidence:server:Create<event>` for a client chosen event name. With the
+court citing evidence, forged bags could frame a player, and third-party logic
+cannot be edited here. Phase 3's evidence step is therefore a server
+authoritative `som-evidence` (the bag carries only an evidence id; the record,
+custody history and analysis live in the database), not a bridge.
+
 ### Phase 6, in full depth — Identity and launch ops
 
 The phase that turns "feature-complete" into "actually launchable." This
