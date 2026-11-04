@@ -118,6 +118,18 @@ local function loadDispatch()
     return dispEnv
 end
 
+local hackEnv
+
+local function loadHack()
+    resetDb()
+    resetMocks()
+    hackEnv = loader.loadResource(REPO .. 'som-hack', {
+        'shared/config.lua',
+        'server/hack.lua',
+    })
+    return hackEnv
+end
+
 local launderEnv
 
 local function loadLaunder()
@@ -1376,6 +1388,196 @@ do
     check(board(31).calls[1].unattended == false, 'board: a fresh call is not unattended')
     for _, call in pairs(allCalls()) do call.createdAt = os.time() - env.Config.UnattendedAfter - 1 end
     check(board(31).calls[1].unattended == true, 'board: a call nobody took for too long is flagged')
+end
+
+----------------------------------------------------------------------
+-- som-hack: challenges the server owns
+----------------------------------------------------------------------
+local function cellsInOrder(view)
+    local marks = {}
+    for _, m in ipairs(view.marks) do marks[#marks + 1] = m end
+    table.sort(marks, function(a, b) return a.n < b.n end)
+    local out = {}
+    for _, m in ipairs(marks) do out[#out + 1] = m.cell end
+    return out
+end
+
+-- The code a challenge will draw for a seed: two draws go on the token first.
+local function codeFor(seed, length)
+    math.randomseed(seed)
+    math.random(0, 0x7fffffff); math.random(0, 0x7fffffff)
+    local code = {}
+    for i = 1, length do code[i] = math.random(0, 9) end
+    return code
+end
+
+local function begin(env, source, kind, level, seed)
+    if seed then math.randomseed(seed) end
+    return env.Hack.Begin(source, kind, level)
+end
+
+do
+    local env = loadHack()
+    check(env.Hack.Begin(1, 'memory', 'impossible') == nil and env.Hack.Begin(1, 'nope', 'easy') == nil
+        and env.Hack.Begin(1, 'memory', nil) == nil, 'hack: an unknown kind or level is refused')
+
+    local view = begin(env, 1, 'memory', 'normal')
+    check(view and view.size == 4 and #view.marks == 6 and view.showMs == 3000 and view.nonce ~= nil,
+        'memory: the view carries the grid, the marks and a token')
+    local cells, n = {}, 0
+    for _, m in ipairs(view.marks) do
+        if not cells[m.cell] then n = n + 1 end
+        cells[m.cell] = true
+    end
+    check(n == 6, 'memory: every mark is on a different cell')
+    check(env.Hack.Begin(1, 'crack', 'easy') == nil, 'hack: a player runs one challenge at a time')
+    Mocks.clock = Mocks.clock + env.Config.ExpireMs + 1
+    check(env.Hack.Begin(1, 'crack', 'easy') ~= nil, 'hack: an expired challenge no longer blocks a new one')
+end
+
+do
+    local env = loadHack()
+    local view = begin(env, 1, 'memory', 'easy')
+    local answer = cellsInOrder(view)
+    local minMs = view.showMs + #view.marks * env.Config.Memory.minClickMs
+
+    check(env.Hack.Submit(1, 'nope', answer).solved == nil, 'memory: a wrong token is refused')
+    check(env.Hack.Submit(2, view.nonce, answer).success == false, 'memory: another player cannot answer for you')
+    Mocks.clock = Mocks.clock + minMs - 1
+    check(env.Hack.Submit(1, view.nonce, answer).solved == false, 'memory: an answer faster than a person can pick is wrong')
+    check(env.Hack.Submit(1, view.nonce, answer).success == false, 'memory: a token is spent by the first answer')
+
+    local view2 = begin(env, 1, 'memory', 'easy')
+    Mocks.clock = Mocks.clock + minMs
+    local wrong = cellsInOrder(view2)
+    wrong[1], wrong[2] = wrong[2], wrong[1]
+    check(env.Hack.Submit(1, view2.nonce, wrong).solved == false, 'memory: the right cells in the wrong order are wrong')
+
+    local view3 = begin(env, 1, 'memory', 'easy')
+    Mocks.clock = Mocks.clock + minMs
+    local short = cellsInOrder(view3)
+    short[#short] = nil
+    check(env.Hack.Submit(1, view3.nonce, short).solved == false, 'memory: too few picks are wrong')
+
+    local view4 = begin(env, 1, 'memory', 'easy')
+    Mocks.clock = Mocks.clock + minMs
+    check(env.Hack.Submit(1, view4.nonce, 'x').solved == false, 'memory: a non table answer is wrong')
+
+    local view5 = begin(env, 1, 'memory', 'easy')
+    Mocks.clock = Mocks.clock + minMs
+    check(env.Hack.Submit(1, view5.nonce, cellsInOrder(view5)).solved == true, 'memory: the right order after the floor time solves it')
+    check(env.Hack.Submit(1, view5.nonce, cellsInOrder(view5)).success == false, 'memory: a solved challenge cannot be answered again')
+
+    local view6 = begin(env, 1, 'memory', 'easy')
+    Mocks.clock = Mocks.clock + env.Config.ExpireMs + 1
+    check(env.Hack.Submit(1, view6.nonce, cellsInOrder(view6)).success == false, 'memory: an expired token is refused')
+end
+
+do
+    local env = loadHack()
+    local seed, code
+    for candidate = 1, 500 do
+        local c = codeFor(candidate, 4)
+        local seen, dup = {}, false
+        for _, d in ipairs(c) do
+            if seen[d] then dup = true end
+            seen[d] = true
+        end
+        if dup then seed, code = candidate, c; break end
+    end
+
+    local view = begin(env, 1, 'crack', 'easy', seed)
+    check(view.length == 4 and view.attempts == 8, 'crack: the view carries only the length and attempts')
+    check(view.code == nil and view.solution == nil, 'crack: the view never carries the code')
+
+    local guess = env.Hack.Guess
+    check(guess(1, view.nonce, { 1, 2 }).success == false, 'crack: a guess of the wrong length is refused')
+    check(guess(1, view.nonce, { 1, 2, 3, 12 }).success == false and guess(1, view.nonce, { 1.5, 2, 3, 4 }).success == false,
+        'crack: digits outside 0 to 9 and fractions are refused')
+    check(guess(1, 'nope', { 1, 2, 3, 4 }).success == false, 'crack: a wrong token is refused')
+
+    local dupDigit, positions = nil, {}
+    for i, d in ipairs(code) do
+        for j = i + 1, #code do
+            if code[j] == d then dupDigit = d; positions = { i, j } end
+        end
+    end
+    local other = 0
+    for d = 0, 9 do
+        local used = false
+        for _, c in ipairs(code) do if c == d then used = true end end
+        if not used then other = d; break end
+    end
+    local third
+    for i = 1, #code do if i ~= positions[1] and i ~= positions[2] then third = i; break end end
+
+    local probe = { other, other, other, other }
+    probe[positions[1]], probe[positions[2]], probe[third] = dupDigit, dupDigit, dupDigit
+    local r = guess(1, view.nonce, probe)
+    check(r.success and r.feedback[positions[1]] == 'hit' and r.feedback[positions[2]] == 'hit' and r.feedback[third] == 'miss',
+        'crack: a digit the code has twice cannot score a third time')
+    check(r.left == view.attempts - 1 and r.solved == false, 'crack: a wrong guess costs one attempt')
+    check(guess(1, view.nonce, code).error == 'slow down', 'crack: guesses faster than the gap are refused')
+
+    Mocks.clock = Mocks.clock + env.Config.Crack.guessGapMs
+    local rotated = {}
+    for i = 1, #code do rotated[i] = code[(i % #code) + 1] end
+    local nearish = guess(1, view.nonce, rotated)
+    local near = 0
+    for _, f in ipairs(nearish.feedback or {}) do if f == 'near' then near = near + 1 end end
+    check(near >= 1, 'crack: a right digit in the wrong place is near')
+
+    Mocks.clock = Mocks.clock + env.Config.Crack.guessGapMs
+    local win = guess(1, view.nonce, code)
+    check(win.solved == true and win.done == true, 'crack: the exact code solves it')
+    check(guess(1, view.nonce, code).success == false, 'crack: a finished challenge takes no more guesses')
+end
+
+do
+    local env = loadHack()
+    local settings = env.Config.Crack.easy
+    local view = begin(env, 1, 'crack', 'easy', 11)
+    local code = codeFor(11, settings.length)
+    local wrong = {}
+    for i = 1, settings.length do wrong[i] = (code[i] + 1) % 10 end
+    local last
+    for _ = 1, settings.attempts do
+        Mocks.clock = Mocks.clock + env.Config.Crack.guessGapMs
+        last = env.Hack.Guess(1, view.nonce, wrong)
+    end
+    check(last.done == true and last.solved == false, 'crack: running out of attempts ends it')
+    Mocks.clock = Mocks.clock + env.Config.Crack.guessGapMs
+    check(env.Hack.Guess(1, view.nonce, code).success == false, 'crack: the right guess after lock out is too late')
+end
+
+do
+    local env = loadHack()
+
+    env.Hack.Play = function(source, view)
+        Mocks.clock = Mocks.clock + view.showMs + #view.marks * env.Config.Memory.minClickMs
+        env.Hack.Submit(source, view.nonce, cellsInOrder(view))
+    end
+    check(env.Hack.Run(1, 'memory', 'easy') == true, 'run: a player who solves it gets true')
+
+    env.Hack.Play = function() end
+    check(env.Hack.Run(1, 'memory', 'easy') == false, 'run: a player who never answers gets false')
+
+    env.Hack.Play = function() return true, true end
+    check(env.Hack.Run(1, 'memory', 'easy') == false, 'run: what the client says it did is ignored')
+
+    env.Hack.Play = function(source, view)
+        Mocks.clock = Mocks.clock + 60000
+        env.Hack.Submit(source, 'made-up', cellsInOrder(view))
+        env.Hack.Submit(2, view.nonce, cellsInOrder(view))
+    end
+    check(env.Hack.Run(1, 'memory', 'easy') == false, 'run: answers with a forged token or from another player do not count')
+
+    env.Hack.Play = function() error('client gone') end
+    check(env.Hack.Run(1, 'crack', 'easy') == false, 'run: a failing client is a failure, not a crash')
+
+    env.Hack.Begin(1, 'memory', 'easy')
+    local ok, err = env.Hack.Run(1, 'memory', 'easy')
+    check(ok == false and err == 'busy', 'run: a second run while one is open is refused')
 end
 
 ----------------------------------------------------------------------
