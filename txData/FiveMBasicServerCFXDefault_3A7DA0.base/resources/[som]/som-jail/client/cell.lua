@@ -20,6 +20,8 @@ local function teleportTo(spawn)
     DoScreenFadeIn(600)
 end
 
+JailTeleportTo = teleportTo
+
 RegisterNetEvent('som-jail:client:booked', function(spawn)
     serving = true
     teleportTo(spawn)
@@ -34,6 +36,7 @@ end)
 RegisterNetEvent('som:client:playerLoaded', function()
     local res = lib.callback.await('som-jail:server:myStatus', false)
     serving = res and res.serving == true
+    if res and res.service then TriggerEvent('som-jail:client:serviceResume', res.service.remaining) end
     if res and res.spawn then teleportTo(res.spawn) end
     if res and res.freedom then teleportTo(res.freedom) end
 end)

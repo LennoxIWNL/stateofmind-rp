@@ -86,6 +86,53 @@ Jobs = {
         },
     },
 
+    -- The DOJ is three jobs, not three grades of one. A single ladder lets a
+    -- defender be promoted onto the bench, which is the separation of powers
+    -- this department exists to keep. som-court gates each power with one
+    -- grade threshold per job.
+    judge = {
+        label = 'Superior Court',
+        type = 'doj',
+        business = 'doj',
+        whitelisted = true,
+        defaultDuty = false,
+        offDutyPay = false,
+        grades = {
+            [0] = { name = 'Court Clerk', payment = 1400 },
+            [1] = { name = 'Magistrate', payment = 2800 },
+            [2] = { name = 'Judge', payment = 4200 },
+            [3] = { name = 'Chief Judge', payment = 5200, isboss = true },
+        },
+    },
+
+    prosecutor = {
+        label = 'District Attorney',
+        type = 'doj',
+        business = 'doj',
+        whitelisted = true,
+        defaultDuty = false,
+        offDutyPay = false,
+        grades = {
+            [0] = { name = 'Assistant Prosecutor', payment = 2400 },
+            [1] = { name = 'Prosecutor', payment = 3200 },
+            [2] = { name = 'District Attorney', payment = 4500, isboss = true },
+        },
+    },
+
+    defender = {
+        label = 'Public Defender',
+        type = 'doj',
+        business = 'doj',
+        whitelisted = true,
+        defaultDuty = false,
+        offDutyPay = false,
+        grades = {
+            [0] = { name = 'Defender', payment = 2000 },
+            [1] = { name = 'Senior Defender', payment = 3000 },
+            [2] = { name = 'Chief Defender', payment = 3800, isboss = true },
+        },
+    },
+
     -- Player-owned from here down: low base, real money from commission.
     mechanic = {
         label = 'Los Santos Customs',

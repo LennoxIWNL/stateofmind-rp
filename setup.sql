@@ -1103,17 +1103,20 @@ FROM DUAL WHERE FALSE;
 --  som_property_finance already makes, so a restart cannot lose or stall a
 --  countdown and logging out is not a way to dodge a sentence.
 --
---  No FK into `mdt_convictions`: that table is preserved third-party (see
---  8c above), not som-owned, and its own schema can be dropped and
---  recreated by its import at any time. `conviction_id` is a bare INT an
---  officer may enter for their own traceability; nothing here reads it back.
+--  `case_id` is a som_court_cases id (section 7f), a bare number with no FK so
+--  the two resources can be imported in either order. There is no link to
+--  `mdt_convictions`: that table is preserved third-party and its import can
+--  drop and recreate it at any time.
 -- ===========================================================================
 
 CREATE TABLE IF NOT EXISTS `som_jail_sentences` (
   `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `citizenid`      VARCHAR(16) NOT NULL,
   `officer_cid`    VARCHAR(16) NOT NULL,
-  `conviction_id`  INT UNSIGNED DEFAULT NULL,
+  `case_id`        BIGINT UNSIGNED DEFAULT NULL,
+  -- remand is custody before trial. It ends on its own at total_seconds, so
+  -- a court that never schedules a hearing cannot hold anyone indefinitely.
+  `kind`           ENUM('sentence','remand') NOT NULL DEFAULT 'sentence',
   `charges`        VARCHAR(255) DEFAULT NULL,
   `total_seconds`  INT UNSIGNED NOT NULL,
   -- absconded: left the yard radius while serving. Excluded from the
@@ -1149,6 +1152,91 @@ CREATE TABLE IF NOT EXISTS `som_jail_bail` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ===========================================================================
+--  7f. COURT (som-court)
+--
+--  Every status change is a conditional UPDATE (`... WHERE id = ? AND status =
+--  <expected>`) whose affected-row count decides who won, so two clerks acting
+--  on the same case cannot both succeed. No FK into any third-party table, and
+--  `incident_id` is a bare number kept for an officer's own traceability.
+--  Warrants expire by comparing `expires_at` to NOW() when read; the status
+--  column is tidied by a sweep, never counted down in memory.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_court_cases` (
+  `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `defendant_cid`   VARCHAR(16) NOT NULL,
+  `filed_by`        VARCHAR(16) NOT NULL,
+  `incident_id`     INT UNSIGNED DEFAULT NULL,
+  `charges`         VARCHAR(500) NOT NULL,
+  `class`           ENUM('infraction','misdemeanor','felony') NOT NULL,
+  `status`          ENUM('filed','accepted','scheduled','convicted','acquitted','dismissed','sentenced') NOT NULL DEFAULT 'filed',
+  `prosecutor_cid`  VARCHAR(16) DEFAULT NULL,
+  `judge_cid`       VARCHAR(16) DEFAULT NULL,
+  `defender_cid`    VARCHAR(16) DEFAULT NULL,
+  `hearing_at`      DATETIME DEFAULT NULL,
+  `ruled_at`        DATETIME DEFAULT NULL,
+  `sentence_months` SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  `service_tasks`   SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  `fine`            BIGINT NOT NULL DEFAULT 0,
+  `bail_amount`     BIGINT DEFAULT NULL,
+  `notes`           VARCHAR(500) DEFAULT NULL,
+  `created_at`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_defendant_status` (`defendant_cid`, `status`),
+  KEY `idx_status_hearing` (`status`, `hearing_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_court_events` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `case_id`    BIGINT UNSIGNED NOT NULL,
+  `actor_cid`  VARCHAR(16) NOT NULL,
+  `action`     VARCHAR(32) NOT NULL,
+  `detail`     VARCHAR(255) DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_case` (`case_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_court_warrants` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `case_id`    BIGINT UNSIGNED DEFAULT NULL,
+  `reason`     VARCHAR(255) NOT NULL,
+  `status`     ENUM('active','served','expired','recalled') NOT NULL DEFAULT 'active',
+  `issued_by`  VARCHAR(16) NOT NULL,
+  `issued_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `expires_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_citizen_status` (`citizenid`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
+--  7g. COMMUNITY SERVICE (som-jail)
+--
+--  Count based, not a timer, so a restart or a logout cannot change it. A task
+--  is counted by one conditional UPDATE that also enforces the gap since the
+--  last task, so two quick requests cannot both count. `tasks_total` only ever
+--  grows, by the escape penalty, and is capped in config.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_community_service` (
+  `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`       VARCHAR(16) NOT NULL,
+  `case_id`         BIGINT UNSIGNED DEFAULT NULL,
+  `issued_by`       VARCHAR(16) NOT NULL,
+  `tasks_total`     SMALLINT UNSIGNED NOT NULL,
+  `tasks_done`      SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  `strikes`         TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `status`          ENUM('active','completed','cancelled','absconded') NOT NULL DEFAULT 'active',
+  `issued_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `completed_at`    TIMESTAMP NULL DEFAULT NULL,
+  `last_task_at`    DATETIME DEFAULT NULL,
+  `last_penalty_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_citizen_status` (`citizenid`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
 --  9. SEED DATA
 --
 --  Opening balances are PLACEHOLDER FLOAT, not a balance decision. Businesses
@@ -1167,6 +1255,7 @@ INSERT IGNORE INTO `som_bank_accounts` (`account_no`, `label`, `type`, `balance`
   ('GOV-BCSO',  'Blaine County Sheriff Office',   'business', 0),
   ('GOV-SASP',  'San Andreas State Police',       'business', 0),
   ('GOV-EMS',   'San Andreas Medical Services',   'business', 500000),
+  ('GOV-DOJ',   'Department of Justice',          'business', 300000),
   ('BUS-LSC',   'Los Santos Customs',             'business', 150000),
   ('BUS-CAB',   'Downtown Cab Co.',               'business', 100000),
   ('BUS-POSTOP','Post OP',                        'business', 100000),
@@ -1188,6 +1277,9 @@ VALUES
   -- EMS is funded by the city, not by what it sells. Charging for medical care
   -- would make treatment a paywall.
   ('ems',         'San Andreas Medical Services', 'ambulance', (SELECT id FROM som_bank_accounts WHERE account_no='GOV-EMS'),    0.0000, 'treasury', 'emergency',  1, 0.0000),
+  -- The court. Funding is 'fines' so som-economy lets a judge issue one; the
+  -- same 70/30 department/treasury split applies and the judge receives nothing.
+  ('doj',         'Department of Justice',        NULL,        (SELECT id FROM som_bank_accounts WHERE account_no='GOV-DOJ'),    0.0000, 'fines',    'government', 1, 0.0000),
   ('lscustoms',   'Los Santos Customs',           'mechanic',  (SELECT id FROM som_bank_accounts WHERE account_no='BUS-LSC'),    0.0000, 'sales',    'private',    1, 0.0800),
   ('downtowncab', 'Downtown Cab Co.',             'taxi',      (SELECT id FROM som_bank_accounts WHERE account_no='BUS-CAB'),    0.0000, 'sales',    'private',    1, 0.0800),
   ('postop',      'Post OP',                      'delivery',  (SELECT id FROM som_bank_accounts WHERE account_no='BUS-POSTOP'), 0.0000, 'sales',    'private',    1, 0.0800),

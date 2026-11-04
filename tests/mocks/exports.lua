@@ -6,6 +6,9 @@ local Mocks = {}
 
 Mocks.calls = { payWith = 0, addMoney = 0, businessSpend = 0, dispatchAlert = 0, businessTransact = 0 }
 Mocks.admins = {}
+Mocks.fines = {}
+Mocks.fineFails = false
+Mocks.exported = {}        -- name -> function, filled by exports(name, fn) in loaded resources
 Mocks.downed = {}
 Mocks.inv = {}              -- inventory id -> list of { name, count, metadata, slot }
 Mocks.invFull = {}          -- inventory id -> true when AddItem must fail
@@ -58,6 +61,11 @@ function core:setMetadata(source, key, value)
 end
 
 local economy = {}
+function economy:issueFine(source, targetId, amount, reason)
+    if Mocks.fineFails then return false, 'fine refused' end
+    Mocks.fines[#Mocks.fines + 1] = { by = source, target = targetId, amount = amount, reason = reason }
+    return true, #Mocks.fines
+end
 function economy:businessSpend(name, amount, reason)
     Mocks.calls.businessSpend = Mocks.calls.businessSpend + 1
     return not Mocks.businessSpendFails
@@ -97,6 +105,10 @@ end
 
 local registry = {
     ['som-medical'] = medical,
+    ['som-court'] = setmetatable({}, { __index = function(_, name)
+        local fn = Mocks.exported[name]
+        return fn and function(_, ...) return fn(...) end or nil
+    end }),
     ['ox_inventory'] = ox,
     ['som-core'] = core,
     ['som-economy'] = economy,
@@ -110,7 +122,7 @@ _G.exports = setmetatable({}, {
     end,
     -- A resource exporting its own function (exports('name', fn)) — not
     -- needed by these tests, so a no-op rather than a real registry.
-    __call = function(_, name, fn) end,
+    __call = function(_, name, fn) Mocks.exported[name] = fn end,
 })
 
 _G.Mocks = Mocks

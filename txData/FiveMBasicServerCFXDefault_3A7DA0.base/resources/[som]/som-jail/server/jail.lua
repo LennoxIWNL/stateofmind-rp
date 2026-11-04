@@ -29,6 +29,8 @@ local function log(text)
         { ['Content-Type'] = 'application/json' })
 end
 
+Jail.Log = log
+
 ---True when the ped is missing (still loading) or outside the yard radius.
 ---@param source number
 ---@return boolean
@@ -102,6 +104,12 @@ lib.callback.register('som-jail:server:myStatus', function(source)
         return { serving = true, spawn = outsideYard(source) and randomSpawn() or nil }
     end
 
+    local work = Service.Active(player.citizenid)
+    if work then
+        return { serving = false, service = { remaining = work.tasks_total - work.tasks_done },
+            spawn = Service.Outside(source) and Config.Service.spawn or nil }
+    end
+
     local pending = MySQL.update.await(
         'UPDATE som_jail_sentences SET release_pending = 0 WHERE citizenid = ? AND release_pending = 1',
         { player.citizenid }) > 0
@@ -142,35 +150,88 @@ lib.callback.register('som-jail:server:book', function(source, data)
         return { success = false, error = 'slow down' }
     end
 
-    local months = math.floor(tonumber(data.months) or 0)
-    if months < 1 or months > Config.Cell.maxMonths then
-        return { success = false, error = ('between 1 and %d months'):format(Config.Cell.maxMonths) }
+    local court = exports['som-court']
+    local caseId = math.floor(tonumber(data.caseId) or 0)
+    local kind, months, seconds = 'sentence', nil, nil
+    local claimed = false
+
+    if caseId > 0 then
+        if court:openCase(caseId, target.citizenid) then
+            kind, seconds = 'remand', Config.Jail.remandHours * 3600
+        else
+            local case = court:claimForSentence(caseId, target.citizenid, player.citizenid)
+            if not case then return { success = false, error = 'that case cannot be carried out' } end
+            claimed, months = true, case.sentence_months
+
+            if (case.service_tasks or 0) > 0 then
+                local started, startErr = Service.Start(targetSource, case.service_tasks, caseId, player.citizenid)
+                if not started then
+                    court:unclaimSentence(caseId)
+                    return { success = false, error = startErr }
+                end
+
+                core:setMetadata(targetSource, 'cuffed', false)
+                lastBook[player.citizenid] = os.time()
+                return { success = true, service = case.service_tasks }
+            end
+
+            seconds = months * Config.Cell.secondsPerMonth
+        end
+    else
+        months = math.floor(tonumber(data.months) or 0)
+        if months < 1 or months > Config.Jail.directMaxMonths then
+            return { success = false,
+                error = ('without a court case, between 1 and %d months'):format(Config.Jail.directMaxMonths) }
+        end
+        seconds = months * Config.Cell.secondsPerMonth
     end
 
     local charges = type(data.charges) == 'string' and data.charges:sub(1, 255) or nil
-    local convictionId = tonumber(data.convictionId)
 
     -- Bail was spent when it was posted, so this is a record flag, not a refund.
     MySQL.update.await(
         "UPDATE som_jail_bail SET status = 'forfeited' WHERE citizenid = ? AND status = 'posted'",
         { target.citizenid })
 
-    MySQL.insert.await([[
+    local inserted = pcall(MySQL.insert.await, [[
         INSERT INTO som_jail_sentences
-            (citizenid, officer_cid, conviction_id, charges, total_seconds, status)
-        VALUES (?, ?, ?, ?, ?, 'serving')
-    ]], { target.citizenid, player.citizenid, convictionId, charges, months * Config.Cell.secondsPerMonth })
+            (citizenid, officer_cid, case_id, charges, total_seconds, kind, status)
+        VALUES (?, ?, ?, ?, ?, ?, 'serving')
+    ]], { target.citizenid, player.citizenid, caseId > 0 and caseId or nil, charges, seconds, kind })
+
+    if not inserted then
+        if claimed then court:unclaimSentence(caseId) end
+        return { success = false, error = 'could not record the booking' }
+    end
+
+    court:serveWarrants(target.citizenid)
+    Service.Cancel(target.citizenid)
 
     core:setMetadata(targetSource, 'cuffed', false)
     Jail.Confiscate(targetSource, target.citizenid)
 
     lastBook[player.citizenid] = os.time()
-    log(('%s booked %s for %d month(s): %s'):format(
-        player.citizenid, target.citizenid, months, charges or 'no charges'))
+    log(('%s booked %s (%s): %s'):format(
+        player.citizenid, target.citizenid, kind == 'remand' and 'remand' or (months .. ' mo'),
+        charges or 'no charges'))
 
     TriggerClientEvent('som-jail:client:booked', targetSource, randomSpawn())
 
-    return { success = true, months = months }
+    return { success = true, months = months, remand = kind == 'remand' }
+end)
+
+--- What an officer may book this person on: cases from the court and any warrant.
+lib.callback.register('som-jail:server:bookOptions', function(source, targetSource)
+    local _, err = officer(source)
+    if err then return { success = false, error = err } end
+
+    local target = core:getPlayer(tonumber(targetSource))
+    if not target then return { success = false, error = 'they are not here' } end
+
+    return { success = true,
+        cases = exports['som-court']:casesFor(target.citizenid),
+        warrants = #exports['som-court']:activeWarrants(target.citizenid),
+        directMax = Config.Jail.directMaxMonths }
 end)
 
 ---Atomically takes a serving sentence out of 'serving'. Whoever gets true owns
