@@ -54,6 +54,7 @@ sudo apt-get install -y lua5.4            # once
 lua5.4 tests/run.lua                      # server Lua against mocked FiveM
 node tests/nui/run.mjs                    # NUI in headless Chromium (needs playwright)
 tools/check-lua.sh                        # syntax check our Lua
+python3 tools/check-item-icons.py           # every inventory item has an icon file
 ```
 
 CI runs the same checks plus a scan for committed Discord webhook URLs.
