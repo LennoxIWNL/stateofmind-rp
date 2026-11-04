@@ -470,6 +470,57 @@ function Money.BusinessTransact(businessName, amount, reason)
     return true
 end
 
+---Signed movement on a gang's bank account, created on first use. The balance
+---is changed with one conditional UPDATE so two payments cannot both pass a
+---balance check, and the ledger row carries the gang as counterparty.
+---@param gangName string
+---@param amount number signed, negative to pay out
+---@param reason string
+---@return boolean success, string|nil err
+function Money.GangTransact(gangName, amount, reason)
+    if type(gangName) ~= 'string' or gangName == 'none' or not Gangs[gangName] then return false, 'invalid gang' end
+
+    local delta = tonumber(amount)
+    if not delta or delta % 1 ~= 0 or delta == 0 or math.abs(delta) > 1e12 then return false, 'invalid amount' end
+    if type(reason) ~= 'string' or reason == '' then return false, 'reason required' end
+
+    local row = MySQL.single.await('SELECT account_id FROM som_gangs WHERE name = ?', { gangName })
+    if not row then return false, 'gang not set up' end
+
+    local accountId = row.account_id
+    if not accountId then
+        MySQL.update.await(
+            "INSERT IGNORE INTO som_bank_accounts (account_no, label, type, owner) VALUES (?, ?, 'gang', ?)",
+            { 'GANG-' .. gangName:upper(), Gangs[gangName].label, gangName })
+        accountId = MySQL.scalar.await('SELECT id FROM som_bank_accounts WHERE account_no = ?', { 'GANG-' .. gangName:upper() })
+        if not accountId then return false, 'no account' end
+        MySQL.update.await('UPDATE som_gangs SET account_id = ? WHERE name = ? AND account_id IS NULL', { accountId, gangName })
+    end
+
+    local changed = MySQL.update.await(
+        'UPDATE som_bank_accounts SET balance = balance + ? WHERE id = ? AND frozen = 0 AND balance + ? >= 0',
+        { delta, accountId, delta })
+    if (changed or 0) < 1 then return false, 'insufficient gang funds' end
+
+    local balance = MySQL.scalar.await('SELECT balance FROM som_bank_accounts WHERE id = ?', { accountId }) or 0
+    MySQL.insert.await([[
+        INSERT INTO som_transactions
+            (citizenid, account, amount, balance, direction, flow, reason, resource, counterparty)
+        VALUES (NULL, 'bank', ?, ?, ?, 'transfer', ?, ?, ?)
+    ]], { math.abs(delta), balance, delta > 0 and 'credit' or 'debit', reason, callerResource(), gangName })
+
+    return true
+end
+
+---@param gangName string
+---@return number
+function Money.GetGangBalance(gangName)
+    if type(gangName) ~= 'string' then return 0 end
+    return MySQL.scalar.await(
+        'SELECT a.balance FROM som_gangs g JOIN som_bank_accounts a ON a.id = g.account_id WHERE g.name = ?',
+        { gangName }) or 0
+end
+
 ---Moves tax into the state treasury. Phase 4 exposes this in a UI.
 ---@param amount number positive
 ---@param reason string
@@ -538,6 +589,8 @@ exports('transferToCitizen', Money.TransferToCitizen)
 exports('payWith', Money.PayWith)
 exports('paymentOptions', Money.PaymentOptions)
 exports('businessTransact', Money.BusinessTransact)
+exports('gangTransact', Money.GangTransact)
+exports('getGangBalance', Money.GetGangBalance)
 exports('taxToTreasury', Money.TaxToTreasury)
 exports('getTreasury', Money.GetTreasury)
 exports('treasuryTransact', Money.TreasuryTransact)

@@ -1614,3 +1614,15 @@ CREATE TABLE IF NOT EXISTS `som_staff_audit` (
   PRIMARY KEY (`id`),
   KEY `idx_staff` (`staff`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_gang_log` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `gang`       VARCHAR(32) NOT NULL,
+  `actor`      VARCHAR(16) DEFAULT NULL,
+  `target`     VARCHAR(16) DEFAULT NULL,
+  `action`     VARCHAR(24) NOT NULL,
+  `detail`     VARCHAR(120) DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_gang_time` (`gang`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

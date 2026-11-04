@@ -157,3 +157,12 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] The spectate native, the reports menu and teleports via OneSync have never run with a client.
 - [ ] Anti-cheat: read-only review done (`ANTICHEAT-REVIEW.md`), staff immunity fixed. Still needs a live false positive pass, the `lac_webhook_*` convars, and a decision on wiring money events.
 - [ ] Rules: a draft exists (`RULES-DRAFT.md`). The owner must approve it, set the penalty ladder, and choose where it is published.
+
+## Gang management (som-turf, phone app `gang`)
+
+- [ ] Import the `som_gang_log` table (end of `setup.sql`) on an existing database. Gang bank accounts are created on first use (`GANG-<NAME>`).
+- [ ] Nobody is a boss until you make them one: set the first boss of each gang with the existing admin path (`/setgang`-style tool or a database update of `som_characters.gang` and `gang_grade`). From there the boss runs the roster in the phone.
+- [ ] `Config.gang` (max 30 members, 10 m invite distance, 120 s invite, 50000 deposit cap) are defaults. The deposit comes from the boss's bank, so the gang account is funded by washed money only.
+- [ ] Ranks are changed one step at a time, never above the boss's own rank, and never for someone at or above it. The last boss cannot leave.
+- [ ] The app has never been opened in a real phone UI; the view is the same host format as Groups.
+- [ ] `Money.GangTransact` (som-core) exercised on the real database only as plain SQL, not through a running player.

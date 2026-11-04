@@ -32,6 +32,7 @@ M.db = {
     heist = { dongles = {}, runs = {} },
     turf = { zones = {}, events = {}, market = {} },
     whitelist = {},
+    gangs = { chars = {}, log = {} },
     staff = { reports = {}, audit = {} },
     vehicles = {},
     social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} },
@@ -418,6 +419,34 @@ local function whitelist(kind, query, params)
     return false
 end
 
+local function gangs(kind, query, params)
+    local G = M.db.gangs
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    if kind == 'query' and has('FROM som_characters') and has('WHERE gang = ?') then
+        local out = {}
+        for cid, c in pairs(G.chars) do
+            if c.gang == params[1] then out[#out + 1] = { citizenid = cid, firstname = c.first, lastname = c.last, gang_grade = c.grade } end
+        end
+        table.sort(out, function(a, b)
+            if a.gang_grade ~= b.gang_grade then return a.gang_grade > b.gang_grade end
+            return a.citizenid < b.citizenid
+        end)
+        return true, out
+    elseif kind == 'scalar' and has('SELECT gang_grade FROM som_characters WHERE citizenid = ? AND gang = ?') then
+        local c = G.chars[params[1]]
+        if c and c.gang == params[2] then return true, c.grade end
+        return true, nil
+    elseif kind == 'update' and has('UPDATE som_characters SET gang = ?, gang_grade = ? WHERE citizenid = ? AND gang = ?') then
+        local c = G.chars[params[3]]
+        if c and c.gang == params[4] then c.gang, c.grade = params[1], params[2]; return true, 1 end
+        return true, 0
+    elseif kind == 'insert' and has('INSERT INTO som_gang_log') then
+        G.log[#G.log + 1] = { gang = params[1], actor = params[2], target = params[3], action = params[4], detail = params[5] }
+        return true, #G.log
+    end
+    return false
+end
+
 local function staff(kind, query, params)
     local S = M.db.staff
     local function has(text) return query:find(text, 1, true) ~= nil end
@@ -579,6 +608,7 @@ function M.scalar(query, params)
     do local handled, value = city('scalar', query, params); if handled then return value end end
     do local handled, value = heist('scalar', query, params); if handled then return value end end
     do local handled, value = turf('scalar', query, params); if handled then return value end end
+    do local handled, value = gangs('scalar', query, params); if handled then return value end end
     do local handled, value = whitelist('scalar', query, params); if handled then return value end end
     if query:find('SELECT role FROM som_property_owners WHERE property_id = ? AND citizenid = ?', 1, true) then
         local o = findOwner(params[1], params[2])
@@ -681,6 +711,7 @@ function M.update(query, params)
     do local handled, value = turf('update', query, params); if handled then return value end end
     do local handled, value = whitelist('update', query, params); if handled then return value end end
     do local handled, value = staff('update', query, params); if handled then return value end end
+    do local handled, value = gangs('update', query, params); if handled then return value end end
     if query:find('SET for_sale = 0 WHERE id = ? AND for_sale = 1', 1, true) then
         local p = findProperty(tonumber(params[1]))
         if p and tonumber(p.for_sale) == 1 then
@@ -1022,6 +1053,7 @@ function M.insert(query, params)
     do local handled, value = heist('insert', query, params); if handled then return value end end
     do local handled, value = turf('insert', query, params); if handled then return value end end
     do local handled, value = staff('insert', query, params); if handled then return value end end
+    do local handled, value = gangs('insert', query, params); if handled then return value end end
     if query:find('INSERT INTO som_property_owners', 1, true) then
         local propertyId, citizenid, role, grantedBy = params[1], params[2], params[3], params[4]
         local existing = findOwner(propertyId, citizenid)
@@ -1180,6 +1212,7 @@ function M.query(query, params)
     do local handled, value = city('query', query, params); if handled then return value end end
     do local handled, value = heist('query', query, params); if handled then return value end end
     do local handled, value = staff('query', query, params); if handled then return value end end
+    do local handled, value = gangs('query', query, params); if handled then return value end end
     -- jail.lua's sweep: every serving sentence, with elapsed.
     if query:find("FROM som_jail_sentences WHERE status = 'serving'", 1, true) then
         local out = {}

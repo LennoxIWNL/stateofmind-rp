@@ -7,6 +7,13 @@ Config = {
     sellCooldown = 15,     -- seconds between sales for one character
     policeMin = 0,
 
+    gang = {
+        maxMembers = 30,
+        inviteDistance = 10.0,
+        inviteSeconds = 120,
+        depositMax = 50000,
+    },
+
     -- Street prices. `base` is the price of the first unit after the market has
     -- recovered; each unit sold in the last hours lowers it by `dropPerUnit`
     -- until `floor`. Sales are paid in marked bills (som-launder), never cash.

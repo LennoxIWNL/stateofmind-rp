@@ -21,6 +21,7 @@ client_scripts {
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/main.lua',
+    'server/gang.lua',
 }
 
 dependencies {
@@ -32,4 +33,5 @@ dependencies {
     'som-ui',
     'som-launder',
     'som-dispatch',
+    'som-phone',
 }
