@@ -12,7 +12,11 @@ M.db = {
     finance = {},
     jailSentences = {},
     jailBail = {},
-    nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1 },
+    courtCases = {},
+    courtEvents = {},
+    courtWarrants = {},
+    nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
+               courtCases = 1, courtEvents = 1, courtWarrants = 1 },
 }
 
 -- Overridable "now" for jail/bail elapsed-time math, so a test can jump a
@@ -35,6 +39,25 @@ local function findSentence(id)
         if s.id == id then return s end
     end
     return nil
+end
+
+
+local function findCase(id)
+    for _, c in ipairs(M.db.courtCases) do
+        if c.id == tonumber(id) then return c end
+    end
+    return nil
+end
+
+local function liveWarrant(w)
+    return w.status == 'active' and w.expires_at > now()
+end
+
+local function inList(value, ...)
+    for _, v in ipairs({ ... }) do
+        if value == v then return true end
+    end
+    return false
 end
 
 local function findOwner(propertyId, citizenid)
@@ -89,6 +112,9 @@ function M.single(query, params)
         end
         return nil
     end
+    if query:find('FROM som_court_cases WHERE id = ?', 1, true) then
+        return copy(findCase(params[1]))
+    end
     fail(query)
 end
 
@@ -114,6 +140,19 @@ function M.scalar(query, params)
     if query:find('SELECT id FROM som_jail_bail WHERE sentence_id = ? AND status = ', 1, true) then
         for _, b in ipairs(M.db.jailBail) do
             if b.sentence_id == params[1] and b.status == 'posted' then return b.id end
+        end
+        return nil
+    end
+    if query:find("SELECT COUNT(*) FROM som_court_cases WHERE defendant_cid = ?", 1, true) then
+        local n = 0
+        for _, c in ipairs(M.db.courtCases) do
+            if c.defendant_cid == params[1] and inList(c.status, 'filed', 'accepted', 'scheduled') then n = n + 1 end
+        end
+        return n
+    end
+    if query:find("SELECT id FROM som_court_warrants WHERE case_id = ?", 1, true) then
+        for _, w in ipairs(M.db.courtWarrants) do
+            if w.case_id == params[1] and liveWarrant(w) then return w.id end
         end
         return nil
     end
@@ -198,6 +237,99 @@ function M.update(query, params)
         end
         return n
     end
+    if query:find("SET status = 'accepted', prosecutor_cid = ?", 1, true) then
+        local c = findCase(params[2])
+        if not c or c.status ~= 'filed' then return 0 end
+        c.status, c.prosecutor_cid = 'accepted', params[1]
+        return 1
+    end
+    if query:find("SET status = 'dismissed', prosecutor_cid = ?", 1, true) then
+        local c = findCase(params[2])
+        if not c or not inList(c.status, 'filed', 'accepted') then return 0 end
+        c.status, c.prosecutor_cid = 'dismissed', params[1]
+        return 1
+    end
+    if query:find("SET defender_cid = ? WHERE id = ?", 1, true) then
+        local c = findCase(params[2])
+        if not c or c.defender_cid or not inList(c.status, 'filed', 'accepted', 'scheduled') then return 0 end
+        c.defender_cid = params[1]
+        return 1
+    end
+    if query:find("SET status = 'scheduled', judge_cid = ?, hearing_at", 1, true) then
+        local c = findCase(params[3])
+        if not c or c.status ~= 'accepted' then return 0 end
+        c.status, c.judge_cid, c.hearing_at = 'scheduled', params[1], now() + params[2] * 60
+        return 1
+    end
+    if query:find("SET status = 'acquitted'", 1, true) then
+        local c = findCase(params[3])
+        if not c or c.status ~= 'scheduled' or not c.hearing_at or c.hearing_at > now() then return 0 end
+        c.status, c.judge_cid, c.notes = 'acquitted', params[1], params[2]
+        return 1
+    end
+    if query:find("SET status = ?, ruled_at = NOW(), judge_cid = ?", 1, true) then
+        local c = findCase(params[7])
+        if not c or c.status ~= 'scheduled' or not c.hearing_at or c.hearing_at > now() then return 0 end
+        c.status, c.judge_cid, c.sentence_months, c.fine, c.bail_amount, c.notes =
+            params[1], params[2], params[3], params[4], params[5], params[6]
+        return 1
+    end
+    if query:find("SET status = 'scheduled', ruled_at = NULL", 1, true) then
+        local c = findCase(params[1])
+        if not c or not inList(c.status, 'convicted', 'sentenced') then return 0 end
+        c.status = 'scheduled'
+        return 1
+    end
+    if query:find("SET status = 'dismissed', judge_cid = ?", 1, true) then
+        local c = findCase(params[2])
+        if not c or not inList(c.status, 'filed', 'accepted', 'scheduled', 'convicted') then return 0 end
+        c.status, c.judge_cid = 'dismissed', params[1]
+        return 1
+    end
+    if query:find("SET sentence_months = ?", 1, true) then
+        local c = findCase(params[2])
+        if not c or c.status ~= 'convicted' or c.sentence_months < params[3] then return 0 end
+        c.sentence_months = params[1]
+        return 1
+    end
+    if query:find("SET bail_amount = ?", 1, true) then
+        local c = findCase(params[2])
+        if not c or c.class ~= 'felony' or not inList(c.status, 'accepted', 'scheduled') then return 0 end
+        c.bail_amount = params[1]
+        return 1
+    end
+    if query:find("SET notes = 'failure to appear'", 1, true) then
+        local c = findCase(params[1])
+        if not c or c.status ~= 'scheduled' or not c.hearing_at or c.hearing_at > now() - params[2] * 60 then return 0 end
+        c.notes = 'failure to appear'
+        return 1
+    end
+    if query:find("SET status = 'sentenced' WHERE id = ? AND defendant_cid = ?", 1, true) then
+        local c = findCase(params[1])
+        if not c or c.defendant_cid ~= params[2] or c.status ~= 'convicted' or c.sentence_months < 1 then return 0 end
+        c.status = 'sentenced'
+        return 1
+    end
+    if query:find("SET status = 'convicted' WHERE id = ? AND status = 'sentenced'", 1, true) then
+        local c = findCase(params[1])
+        if not c or c.status ~= 'sentenced' then return 0 end
+        c.status = 'convicted'
+        return 1
+    end
+    if query:find("SET status = 'served' WHERE citizenid = ?", 1, true) then
+        local n = 0
+        for _, w in ipairs(M.db.courtWarrants) do
+            if w.citizenid == params[1] and liveWarrant(w) then w.status = 'served'; n = n + 1 end
+        end
+        return n
+    end
+    if query:find("SET status = 'expired' WHERE status = 'active'", 1, true) then
+        local n = 0
+        for _, w in ipairs(M.db.courtWarrants) do
+            if w.status == 'active' and w.expires_at <= now() then w.status = 'expired'; n = n + 1 end
+        end
+        return n
+    end
     fail(query)
 end
 
@@ -230,8 +362,8 @@ function M.insert(query, params)
         local id = M.db.nextId.jailSentences
         M.db.nextId.jailSentences = id + 1
         M.db.jailSentences[#M.db.jailSentences + 1] = {
-            id = id, citizenid = params[1], officer_cid = params[2], conviction_id = params[3],
-            charges = params[4], total_seconds = params[5], status = 'serving',
+            id = id, citizenid = params[1], officer_cid = params[2], case_id = params[3],
+            charges = params[4], total_seconds = params[5], kind = params[6], status = 'serving',
             booked_at = now(), released_at = nil, released_by = nil, release_pending = 0,
         }
         return id
@@ -242,6 +374,32 @@ function M.insert(query, params)
         M.db.jailBail[#M.db.jailBail + 1] = {
             id = id, sentence_id = params[1], citizenid = params[2], amount = params[3],
             status = 'posted', posted_at = now(), appeal_due_at = now() + (tonumber(params[4]) or 0) * 3600,
+        }
+        return id
+    end
+    if query:find('INSERT INTO som_court_cases', 1, true) then
+        local id = M.db.nextId.courtCases
+        M.db.nextId.courtCases = id + 1
+        M.db.courtCases[#M.db.courtCases + 1] = {
+            id = id, defendant_cid = params[1], filed_by = params[2], incident_id = params[3],
+            charges = params[4], class = params[5], status = 'filed', sentence_months = 0, fine = 0,
+        }
+        return id
+    end
+    if query:find('INSERT INTO som_court_events', 1, true) then
+        local id = M.db.nextId.courtEvents
+        M.db.nextId.courtEvents = id + 1
+        M.db.courtEvents[#M.db.courtEvents + 1] = {
+            id = id, case_id = params[1], actor_cid = params[2], action = params[3], detail = params[4],
+        }
+        return id
+    end
+    if query:find('INSERT INTO som_court_warrants', 1, true) then
+        local id = M.db.nextId.courtWarrants
+        M.db.nextId.courtWarrants = id + 1
+        M.db.courtWarrants[#M.db.courtWarrants + 1] = {
+            id = id, citizenid = params[1], case_id = params[2], reason = params[3], issued_by = params[4],
+            status = 'active', expires_at = now() + params[5] * 3600,
         }
         return id
     end
@@ -259,6 +417,46 @@ function M.query(query, params)
                 row.elapsed = now() - s.booked_at
                 out[#out + 1] = row
             end
+        end
+        return out
+    end
+    local function cases(filter)
+        local out = {}
+        for i = #M.db.courtCases, 1, -1 do
+            local c = M.db.courtCases[i]
+            if filter(c) then out[#out + 1] = copy(c) end
+        end
+        return out
+    end
+    if query:find("WHERE status IN ('accepted','scheduled','convicted') ORDER BY", 1, true) then
+        return cases(function(c) return inList(c.status, 'accepted', 'scheduled', 'convicted') end)
+    end
+    if query:find("WHERE status IN ('filed','accepted') ORDER BY", 1, true) then
+        return cases(function(c) return inList(c.status, 'filed', 'accepted') end)
+    end
+    if query:find("(defender_cid = ? OR defender_cid IS NULL)", 1, true) then
+        return cases(function(c)
+            return (c.defender_cid == params[1] or c.defender_cid == nil)
+                and inList(c.status, 'filed', 'accepted', 'scheduled')
+        end)
+    end
+    if query:find('FROM som_court_cases WHERE filed_by = ?', 1, true) then
+        return cases(function(c) return c.filed_by == params[1] end)
+    end
+    if query:find('FROM som_court_cases WHERE defendant_cid = ? ORDER BY', 1, true) then
+        return cases(function(c) return c.defendant_cid == params[1] end)
+    end
+    if query:find("OR (status = 'convicted' AND sentence_months > 0)", 1, true) then
+        return cases(function(c)
+            return c.defendant_cid == params[1]
+                and (inList(c.status, 'filed', 'accepted', 'scheduled')
+                    or (c.status == 'convicted' and c.sentence_months > 0))
+        end)
+    end
+    if query:find("FROM som_court_warrants WHERE citizenid = ? AND status = 'active'", 1, true) then
+        local out = {}
+        for _, w in ipairs(M.db.courtWarrants) do
+            if w.citizenid == params[1] and liveWarrant(w) then out[#out + 1] = copy(w) end
         end
         return out
     end

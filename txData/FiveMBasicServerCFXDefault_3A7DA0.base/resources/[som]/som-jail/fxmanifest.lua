@@ -35,6 +35,7 @@ dependencies {
     'oxmysql',
     'ox_inventory',
     'som-core',
+    'som-court',
     'som-medical',
     'som-interact',
     'som-dispatch',

@@ -24,16 +24,21 @@ local function quote(citizenid)
     local sentence, remaining = activeWithRemaining(citizenid)
     if not sentence then return false, 'not currently serving a sentence' end
 
-    if sentence.total_seconds < Config.Bail.felonyThresholdMonths * Config.Cell.secondsPerMonth then
-        return false, 'not eligible for bail'
-    end
+    -- Bail needs paperwork: a felony case the court holds on record.
+    local terms = sentence.case_id and exports['som-court']:bailTerms(sentence.case_id)
+    if not terms or terms.class ~= 'felony' then return false, 'not eligible for bail' end
+
+    if sentence.kind == 'remand' and not terms.bail_amount then return false, 'no bail has been set' end
 
     local existing = MySQL.scalar.await(
         "SELECT id FROM som_jail_bail WHERE sentence_id = ? AND status = 'posted'",
         { sentence.id })
     if existing then return false, 'bail already posted' end
 
-    return true, math.max(Config.Bail.minAmount, remaining * Config.Bail.rateMultiplier), sentence
+    local amount = sentence.kind == 'remand' and terms.bail_amount
+        or math.max(Config.Bail.minAmount, remaining * Config.Bail.rateMultiplier)
+
+    return true, amount, sentence
 end
 
 lib.callback.register('som-jail:server:bailQuote', function(source)

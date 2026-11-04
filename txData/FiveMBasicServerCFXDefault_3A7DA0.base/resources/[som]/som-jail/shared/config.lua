@@ -41,17 +41,18 @@ Config.Cell = {
 }
 
 Config.Bail = {
-    -- Bail-eligible at/above this sentence length. A stand-in for
-    -- NoPixel's documented "felony-only" rule: ps-mdt's own charge
-    -- classification (Config.PenalCode) isn't exported and isn't
-    -- something this resource reaches into (see AUDIT.md's roadmap,
-    -- Phase 2's second scope decision). Sentence length is already a
-    -- value this resource owns outright and is a reasonable proxy.
-    felonyThresholdMonths = 12,
-
-    rateMultiplier = 50, -- $ per second of time remaining
+    rateMultiplier = 50, -- $ per second of time remaining, for a convicted felon
     minAmount = 2500,
-    appealHours = 72,    -- NoPixel's own documented window
+    appealHours = 72,
+}
+
+Config.Jail = {
+    -- A booking with no court case is for minor matters only. Anything longer
+    -- needs a conviction in som-court.
+    directMaxMonths = 3,
+    -- Custody before trial. It ends on its own, so a court that never hears
+    -- the case cannot hold someone indefinitely.
+    remandHours = 2,
 }
 
 -- The dispatch alert raised when an inmate leaves the yard. A key of
