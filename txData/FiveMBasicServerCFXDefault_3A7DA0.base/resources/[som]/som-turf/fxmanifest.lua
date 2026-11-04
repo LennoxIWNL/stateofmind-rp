@@ -22,6 +22,8 @@ server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/main.lua',
     'server/gang.lua',
+    'server/payroll.lua',
+    'server/app.lua',
 }
 
 dependencies {

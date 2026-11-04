@@ -176,6 +176,9 @@ local function marketPrice(item)
     return d.base * math.max(m.floor, 1 - sold * m.dropPerUnit)
 end
 
+Turf.Price = marketPrice
+Turf.Usable = usable
+
 local function recordSale(item)
     MySQL.update.await([[
         INSERT INTO som_drug_market (item, units) VALUES (?, 1)

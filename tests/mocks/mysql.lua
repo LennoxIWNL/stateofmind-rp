@@ -484,6 +484,22 @@ local function turf(kind, query, params)
         if not z then return true, nil end
         return true, { name = params[1], owner_gang = z.owner, contested_by = z.contested_by,
                        contest_age = z.contest_started and (now() - z.contest_started) or nil }
+    elseif kind == 'query' and has('GROUP BY owner_gang') then
+        local counts, out = {}, {}
+        for _, z in pairs(T.zones) do if z.owner then counts[z.owner] = (counts[z.owner] or 0) + 1 end end
+        for gang, n in pairs(counts) do out[#out + 1] = { owner_gang = gang, zones = n } end
+        return true, out
+    elseif kind == 'query' and has('FROM som_turf_events e JOIN som_turf t') then
+        local out = {}
+        for i = #T.events, 1, -1 do
+            local e = T.events[i]
+            if e.gang == params[1] and e.action ~= 'sale' then out[#out + 1] = { label = e.zone, action = e.action } end
+        end
+        return true, out
+    elseif kind == 'single' and has('SELECT name, owner_gang, contested_by FROM som_turf WHERE name = ?') then
+        local z = T.zones[params[1]]
+        if not z then return true, nil end
+        return true, { name = params[1], owner_gang = z.owner, contested_by = z.contested_by }
     elseif kind == 'insert' and has('INSERT INTO som_turf_events') then
         T.events[#T.events + 1] = { gang = params[1], citizenid = params[2], points = params[3], action = params[4], zone = params[5] }
         return true, #T.events
@@ -1211,6 +1227,7 @@ function M.query(query, params)
     do local handled, value = social('query', query, params); if handled then return value end end
     do local handled, value = city('query', query, params); if handled then return value end end
     do local handled, value = heist('query', query, params); if handled then return value end end
+    do local handled, value = turf('query', query, params); if handled then return value end end
     do local handled, value = staff('query', query, params); if handled then return value end end
     do local handled, value = gangs('query', query, params); if handled then return value end end
     -- jail.lua's sweep: every serving sentence, with elapsed.

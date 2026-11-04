@@ -7,6 +7,11 @@ Config = {
     sellCooldown = 15,     -- seconds between sales for one character
     policeMin = 0,
 
+    -- Members of a gang that holds at least one zone are paid by the hour from
+    -- the gang account, never minted. An empty account pays nobody.
+    payrollMinutes = 60,
+    payrollCap = 5000,
+
     gang = {
         maxMembers = 30,
         inviteDistance = 10.0,
