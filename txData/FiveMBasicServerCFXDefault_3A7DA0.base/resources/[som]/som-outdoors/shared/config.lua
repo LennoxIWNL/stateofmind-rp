@@ -27,8 +27,8 @@ Config = {
         catches = {
             { item = 'codfish', weight = 50 },
             { item = 'bass', weight = 30 },
-            { item = 'fishingloot', weight = 15 },
-            { item = 'fishinglootbig', weight = 5 },
+            { item = 'fishingloot', weight = 15, rare = true },
+            { item = 'fishinglootbig', weight = 5, rare = true },
         },
         -- EVERY spot ships disabled. A spot is a water area to cast into.
         spots = {

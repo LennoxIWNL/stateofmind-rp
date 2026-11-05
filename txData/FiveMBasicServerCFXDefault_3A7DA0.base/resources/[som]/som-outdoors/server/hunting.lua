@@ -43,13 +43,16 @@ lib.callback.register('som-outdoors:server:skin', function(source, netId)
     state:set('skinned', true, true)
     last[player.citizenid] = now
 
+    -- Trophies (chance under 1) turn up 2% more often per hunting level above 1.
+    local bonus = 0.02 * (Buyer.Level(source, 'hunting') - 1)
     local got = {}
     for _, d in ipairs(def.drops) do
-        if math.random() <= d[4] then
+        if math.random() <= (d[4] < 1 and math.min(1, d[4] + bonus) or d[4]) then
             local n = math.random(d[2], d[3])
             if ox:AddItem(source, d[1], n) then got[#got + 1] = { item = d[1], count = n } end
         end
     end
+    Buyer.Xp(source, 'hunting', 25)
     return done(true, nil, { items = got })
 end)
 

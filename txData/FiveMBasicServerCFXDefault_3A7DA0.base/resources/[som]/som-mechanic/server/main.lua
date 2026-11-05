@@ -9,6 +9,10 @@ local ox = exports.ox_inventory
 
 local lastRepair = {}
 
+local function xp(src, track, n)
+    if GetResourceState('som-progress') == 'started' then exports['som-progress']:addXp(src, track, n) end
+end
+
 local function done(ok, err, extra)
     local out = extra or {}
     out.success = ok == true
@@ -85,6 +89,7 @@ lib.callback.register('som-mechanic:server:repair', function(source, netId, kind
     end
 
     TriggerClientEvent('som-mechanic:client:apply', source, id, kind, r.to)
+    xp(source, 'mechanic', 15)
     return done(true)
 end)
 

@@ -51,6 +51,7 @@ local function resetDb()
     mysql.db.plants = {}
     mysql.db.lab = {}
     mysql.db.buyer = {}
+    mysql.db.skills = {}
     mysql.db.newlife = {}
     mysql.db.chop = { log = {}, owned = {} }
     mysql.db.staff = { reports = {}, audit = {} }
@@ -3878,6 +3879,79 @@ do
     local rows = RegisteredCallbacks['som-staff:server:audit'](3)
     check(#rows > 0 and rows[1].action == 'unfreeze' and RegisteredCallbacks['som-staff:server:audit'](2) == nil, 'audit: staff read it newest first, players cannot')
     _G.TriggerClientEvent = realT
+end
+
+-- ---------------------------------------------------------------------------
+-- Skills and how they change the work
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    -- A real som-progress needs the real export, so load it against the mock core.
+    local saved = exports
+    local env = loader.loadResource(REPO .. 'som-progress', { 'shared/config.lua', 'server/main.lua' })
+    check(env.Progress.LevelFor(0) == 1 and env.Progress.LevelFor(120) == 2 and env.Progress.LevelFor(480) == 3 and env.Progress.LevelFor(10 ^ 7) == env.Config.maxLevel, 'skills: levels follow the curve and stop at the cap')
+    check(env.Progress.Needed(1) == 120 and env.Progress.Needed(env.Config.maxLevel) == nil, 'skills: the next level target is known, the last has none')
+    Mocks.players = { [1] = { citizenid = 'S1' } }
+    local add, get = Mocks.exported.addXp, Mocks.exported.getLevel
+    check(add ~= nil and get ~= nil, 'skills: addXp and getLevel are exported')
+    local gained = add(1, 'fishing', 400)
+    check(gained == 400 and mysql.db.skills['S1:fishing'].xp == 400, 'skills: experience is stored')
+    local g2 = add(1, 'fishing', 400); local g3 = add(1, 'fishing', 400); local g4 = add(1, 'fishing', 400)
+    check(mysql.db.skills['S1:fishing'].xp == env.Config.dailyCap and g4 == 300, 'skills: the daily cap stops extra experience')
+    check(add(1, 'nonsense', 10) == 0 and add(1, 'fishing', -5) == 0 and add(1, 'fishing', 100000) == 0 and add(99, 'fishing', 10) == 0, 'skills: bad tracks, amounts and players earn nothing')
+    check(get(1, 'fishing') == 4 and get(1, 'hunting') == 1, 'skills: getLevel reads the stored experience')
+    local app = Mocks.apps.skills.handler(1, 'view', {}).view
+    local fish
+    for _, r in ipairs(app.sections[1].rows) do if r.title:find('Fishing, level 4') then fish = r end end
+    check(#app.sections[1].rows == 6 and fish ~= nil, 'skills: the phone app lists every track with its level')
+    check(Mocks.apps.skills.handler(1, 'delete', {}).success == false, 'skills: the app is read only')
+end
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua', 'server/buyer.lua', 'server/fishing.lua', 'server/hunting.lua', 'server/chop.lua' })
+    Mocks.players = { [1] = { citizenid = 'W1' } }
+    Mocks.inv = { [1] = {} }
+    Mocks.xp, Mocks.levels = {}, { fishing = 10, hunting = 10, scrapping = 6 }
+    Mocks.clock = 1000000
+    FakePeds[1] = vec3(0, 0, 0)
+    local cb = RegisteredCallbacks
+    local slot = 1200
+    local function give(name, n) slot = slot + 1; Mocks.inv[1][slot] = { name = name, count = n or 1, slot = slot } end
+
+    local sp = env.Config.fishing.spots[1]
+    sp.enabled, sp.center, sp.radius = true, vec3(0, 0, 0), 20.0
+    local rare = 0
+    for i = 1, 300 do
+        give('fishingrod'); give('fishbait')
+        local c = cb['som-outdoors:server:cast'](1)
+        Mocks.clock = Mocks.clock + (c.wait + 1) * 1000
+        local r = cb['som-outdoors:server:reel'](1)
+        if r.item == 'fishingloot' or r.item == 'fishinglootbig' then rare = rare + 1 end
+        Mocks.clock = Mocks.clock + 1000
+    end
+    check(rare > 60 and Mocks.xp[1].track == 'fishing' and Mocks.xp[1].amount == 20, 'skills: a high fishing level finds more rare fish and earns experience')
+
+    Animals = { [810] = { model = 'a_c_deer', health = 0, killer = 1 } }
+    FakePeds[810] = vec3(1, 0, 0)
+    give('hunting_knife')
+    cb['som-outdoors:server:skin'](1, 810)
+    local seen = false
+    for _, x in ipairs(Mocks.xp) do if x.track == 'hunting' then seen = true end end
+    check(seen, 'skills: skinning earns hunting experience')
+
+    local D = env.Config.chop.dropoffs[1]
+    D.enabled, D.coords = true, vec3(0, 0, 0)
+    Vehicles = { [960] = { plate = 'LVL 1' } }
+    FakePeds[960] = vec3(1, 0, 0)
+    cb['som-outdoors:server:chopBegin'](1, 'chop_1', 960)
+    Mocks.clock = Mocks.clock + 30000
+    mysql.fakeNow = 5000000
+    local r = cb['som-outdoors:server:chopFinish'](1)
+    local scrap = 0
+    for _, it in pairs(Mocks.inv[1]) do if it.name == 'scrapmetal' then scrap = scrap + (it.count or 1) end end
+    check(r.success and scrap >= 4 + 2, 'skills: scrapping level 6 adds two of every part')
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))

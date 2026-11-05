@@ -246,3 +246,10 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] `/kick` (som.mod), `/ban <id> <hours> [reason]` and `/unban <identifier>` (som.admin or the server console), `/freeze` (som.mod), `/staffaudit` (a menu of the audit table, som.mod). Hours 0 is a permanent ban. A ban covers every licence, discord and steam identifier the player had; bans are checked at connect **even when the whitelist is off**, and a failed ban check refuses the connection rather than letting it through.
 - [ ] Not built: noclip (the anti-cheat treats `som.mod` as immune, so a client noclip would need its own server notice) and a staff duty toggle. Bans lift only per identifier; there is no ban search or appeal list.
 - [ ] None of it has run with a client: the connect gate, `DropPlayer`, freezing a real ped.
+
+## Skills (som-progress)
+
+- [ ] Import the `som_skills` table (end of `setup.sql`) on an existing database.
+- [ ] Six tracks (fishing, hunting, growing, chemistry, mechanic, scrapping). Level n needs 120 * (n-1)^2 experience, level 10 is the cap, and a track earns at most 1500 experience a day. Effects are small and meant to reward weeks of play: fishing and hunting find rare things more often, growing and scrapping give one extra per three levels, chemistry shaves 3% per level off a cook. Mechanic currently only earns experience. All numbers are untuned defaults.
+- [ ] A read only `Skills` phone app lists the tracks (reuses the briefcase icon). Courier, heists and gang work do not earn experience yet.
+- [ ] Never run in a game; the experience cap SQL was run on the dev database only.
