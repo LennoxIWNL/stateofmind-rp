@@ -586,6 +586,7 @@ RegisterNUICallback('createCharacter', function(data, cb)
         dob = data.dob,
         gender = data.gender,
         nationality = data.nationality,
+        backstory = data.backstory,
     })
 
     if result and result.success then

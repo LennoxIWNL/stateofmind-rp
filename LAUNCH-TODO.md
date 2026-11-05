@@ -232,3 +232,10 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Respawning at the hospital after being killed by **another player** records a 15 minute new life at the place of death and tells the player; any other death (fall, vehicle, NPC, environment) has no restriction. `Config.NewLife` has the minutes and a 200 m radius (the radius is only shown in text; nothing is enforced). A medic revive is not a new life.
 - [ ] Not built: more classes (execution, hostage), enforcement near the death place, a ban on returning. Staff read it with `/nlr <id>` (needs `som.mod`) or the `getNewLife` export. The rules text in `RULES-DRAFT.md` (new life, 15 minutes) should match whatever you set here.
 - [ ] Cause is derived on the server from the killer ped (`GetPedSourceOfDeath`, `IsPedAPlayer`); never run with real players, so check it classifies a player kill correctly.
+
+## Backstory at creation (som-core, som-multichar)
+
+- [ ] Creating a character now needs a written backstory of 100 to 1000 characters (`Config.Characters.backstoryMin/Max` in `som-core/shared/config.lua`). The server cleans and checks it; the form field and the client check are only feedback. It is stored in `som_characters.metadata.backstory`. Existing characters have none (metadata default is an empty string).
+- [ ] Staff have no screen for it yet: read it from `metadata` in the database. Showing it in the `/reports` menu is not built.
+- [ ] The creation form was edited (a textarea) and has not been seen in a client; check its layout in the multichar screen.
+- [ ] The backstory is free text and nobody reviews it automatically. The whitelist application (not built) is where review belongs.

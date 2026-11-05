@@ -5,6 +5,11 @@ Config.Debug = false
 Config.Characters = {
     -- No character may be a minor. Enforced server side in Characters.Create,
     -- and used by the client to default and bound the date picker.
+    -- A written backstory is required at creation (AUDIT 18.6), stored in the
+    -- character's metadata and shown to staff.
+    backstoryMin = 100,
+    backstoryMax = 1000,
+
     minimumAge = 18,
     maximumAge = 90,
 
@@ -94,6 +99,7 @@ Config.Needs = {
 -- Metadata keys created on every new character. Anything not listed here is
 -- rejected by SetMetadata, so a compromised client cannot invent state.
 Config.DefaultMetadata = {
+    backstory = '',
     hunger = 100,
     thirst = 100,
     stress = 0,
