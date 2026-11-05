@@ -12,7 +12,9 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const base = readdirSync(join(root, 'txData')).map((d) => join(root, 'txData', d)).find((d) => existsSync(join(d, 'resources')))
 const som = join(base, 'resources', '[som]')
 
-const resources = readdirSync(som).filter((n) => statSync(join(som, n)).isDirectory() && existsSync(join(som, n, 'fxmanifest.lua'))).sort()
+// Only resources som.cfg actually ensures count (som-traffic is deliberately off).
+const ensured = new Set(readFileSync(join(base, 'som.cfg'), 'utf8').split('\n').map((l) => /^\s*ensure\s+([\w-]+)\s*$/.exec(l)).filter(Boolean).map((m) => m[1]))
+const resources = readdirSync(som).filter((n) => statSync(join(som, n)).isDirectory() && existsSync(join(som, n, 'fxmanifest.lua')) && ensured.has(n)).sort()
 const tables = [...readFileSync(join(root, 'setup.sql'), 'utf8').matchAll(/CREATE TABLE IF NOT EXISTS `(som_[a-z0-9_]+)`/g)].map((m) => m[1]).sort()
 
 function* walk(dir) {

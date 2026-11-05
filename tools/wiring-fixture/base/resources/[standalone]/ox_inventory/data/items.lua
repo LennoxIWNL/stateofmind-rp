@@ -1,0 +1,3 @@
+return {
+	['realitem'] = { label = 'Real' },
+}

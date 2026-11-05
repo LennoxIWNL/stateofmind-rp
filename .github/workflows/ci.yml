@@ -65,6 +65,10 @@ jobs:
         run: node tools/som-mcp/selftest.mjs
       - name: Health check lists are up to date
         run: node tools/gen-health-lists.mjs --check
+      - name: Wiring check self-test
+        run: node tools/wiring-selftest.mjs
+      - name: Exports, callbacks, events, tables and items all resolve
+        run: node tools/wiring-check.mjs
       - name: Every item a system needs has a source
         run: node tools/economy-map.mjs --check
       - name: Every inventory item has an icon
