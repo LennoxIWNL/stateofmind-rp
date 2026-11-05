@@ -1,8 +1,12 @@
 {
   "mcpServers": {
+    "som-index": {
+      "command": "node",
+      "args": ["tools/som-mcp/index.mjs"]
+    },
     "chrome": {
-      "command": "chrome-devtools-mcp",
-      "args": ["--isolated"]
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest", "--headless", "--isolated"]
     }
   }
 }
