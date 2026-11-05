@@ -9,4 +9,8 @@ Config = {
     reportMax = 200,
     reportCooldown = 60,   -- seconds between reports for one character
     listMax = 30,
+
+    -- Resources whose content can be placed in game (see som-core/server/placements.lua).
+    placeable = { ['som-turf'] = true, ['som-outdoors'] = true, ['som-heists'] = true, ['som-mechanic'] = true, ['som-launder'] = true },
+    placeableList = { 'som-turf', 'som-outdoors', 'som-heists', 'som-mechanic', 'som-launder' },
 }

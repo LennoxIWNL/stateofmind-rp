@@ -95,3 +95,20 @@ _G.DeleteEntity = function(e) _G.Deleted[#_G.Deleted + 1] = e; _G.Vehicles[e] = 
 
 _G.Dropped = {}
 _G.DropPlayer = function(id, reason) _G.Dropped[#_G.Dropped + 1] = { id = id, reason = reason } end
+
+-- Not real JSON: a Lua literal round trip is enough for the flat tables the tests store.
+_G.json = _G.json or {
+    encode = function(v)
+        if type(v) ~= 'table' then return tostring(v) end
+        local parts = {}
+        for k, x in pairs(v) do parts[#parts + 1] = ('%s=%s'):format(k, tostring(x)) end
+        table.sort(parts)
+        return '{' .. table.concat(parts, ',') .. '}'
+    end,
+    decode = function(s)
+        local f = load('return ' .. tostring(s), 'json', 't', {})
+        if not f then error('bad json') end
+        return f()
+    end,
+}
+_G.GetEntityHeading = function() return 90.0 end

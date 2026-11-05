@@ -285,6 +285,13 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] The "Offers" app reuses the receipt icon. A DIY public crafting bench is not built (needs coordinates). The lscustoms business needs a real owner and bank account for sales to land in.
 - [ ] Never run in a game: the ped target, dialog, phone app and the sale itself between two players.
 
+## Placing content in game (som-staff)
+
+- [ ] Import the `som_placements` table (end of `setup.sql`) on an existing database.
+- [ ] `/place <resource> <path> [value]` (admin or console), `/unplace`, `/places`. Stand where the thing goes and run, for example, `/place som-turf zones.grove.tag`, `/place som-turf zones.grove.center`, `/place som-turf zones.grove.radius 40`, `/place som-outdoors buyers.fish.coords`, `/place som-heists sites.store_1.terminal`, `/place som-heists sites.store_1.lootPoints+` (once per loot point). A placed point also switches its entry on. Then `restart <resource>` to load it. Resources that can be placed: som-turf, som-outdoors, som-heists, som-mechanic, som-launder.
+- [ ] Not placeable this way: courier routes (a route is a list of drops, still edited in config), heist door names (config), and anything outside those five resources. A typo'd path is reported in the console when the resource starts ("no such place").
+- [ ] Verified on the headless server only through the console (a radius): placing, restart and apply. Positions need an in-game admin and have not been run with a client.
+
 ## Health check and trace
 
 - [ ] `/somhealth` (staff or console) reports resources, database, tables, items and convars. Its first run found two real defects, now fixed: the shops sold `cola` and `medikit`, which had no item definition (they were lost with the QBCore removal). `medikit` is defined but has no use effect: decide how medics use it (the treatment flow is in `som-medical`).

@@ -21,8 +21,10 @@ client_scripts {
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
+    '@som-core/server/placements.lua',
     'server/whitelist.lua',
     'server/staff.lua',
+    'server/placements.lua',
     'server/health.lua',
 }
 

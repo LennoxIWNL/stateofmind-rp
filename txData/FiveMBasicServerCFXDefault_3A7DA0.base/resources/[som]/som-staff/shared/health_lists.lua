@@ -90,6 +90,7 @@ HealthLists = {
     'som_phone_posts',
     'som_phone_reports',
     'som_phone_settings',
+    'som_placements',
     'som_plants',
     'som_police_custody',
     'som_police_impound',

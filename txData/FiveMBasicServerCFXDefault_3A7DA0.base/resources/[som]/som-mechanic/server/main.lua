@@ -107,3 +107,5 @@ end)
 AddEventHandler('onResourceStop', function(name)
     if name == GetCurrentResourceName() then lastRepair = {} end
 end)
+
+CreateThread(function() SomPlacements.Apply(Config) end)
