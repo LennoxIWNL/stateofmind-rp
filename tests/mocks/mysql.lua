@@ -489,6 +489,13 @@ local function placements(kind, query, params)
     return false
 end
 
+local function moneyRows(kind, query, params)
+    if kind == 'scalar' and query:find('SELECT 1 FROM som_character_money WHERE citizenid = ?', 1, true) then
+        return true, params[1] == 'OFFLINE1' and 1 or nil
+    end
+    return false
+end
+
 local function trade(kind, query, params)
     local T = M.db.trade
     local function has(text) return query:find(text, 1, true) ~= nil end
@@ -884,6 +891,7 @@ function M.scalar(query, params)
     do local handled, value = chop('scalar', query, params); if handled then return value end end
     do local handled, value = skills('scalar', query, params); if handled then return value end end
     do local handled, value = trade('scalar', query, params); if handled then return value end end
+    do local handled, value = moneyRows('scalar', query, params); if handled then return value end end
     do local handled, value = whitelist('scalar', query, params); if handled then return value end end
     if query:find('SELECT role FROM som_property_owners WHERE property_id = ? AND citizenid = ?', 1, true) then
         local o = findOwner(params[1], params[2])
@@ -1662,6 +1670,13 @@ _G.MySQL = {
     update = { await = function(q, p) return M.update(q, p) end },
     insert = { await = function(q, p) return M.insert(q, p) end },
     query  = { await = function(q, p) return M.query(q, p) end },
+    -- Records each transaction so a test can check what would reach the database.
+    transaction = { await = function(queries)
+        if M.failTransaction then error('simulated database failure') end
+        M.transactions[#M.transactions + 1] = queries
+        return true
+    end },
 }
+M.transactions = {}
 
 return M
