@@ -205,6 +205,42 @@ end)
 -- ox_inventory upgrade drops the hook registration along with everything else.
 -- ---------------------------------------------------------------------------
 
+-- ---------------------------------------------------------------------------
+-- Crafting rules. ox_inventory knows the recipe; this decides who may use it.
+-- A recipe with a `job` needs that job on duty, and `level` is a crafting skill
+-- level (som-progress). Crafting earns crafting experience. Repair kits and
+-- advanced lockpicks are mechanic goods by design: they are sold to other
+-- players, which is what makes the trade a roleplay interaction.
+-- ---------------------------------------------------------------------------
+
+Craft = {}
+
+local CraftRules = {
+    lockpick = { job = 'mechanic', level = 1 },
+    electronickit = { job = 'mechanic', level = 1 },
+    repairkit = { job = 'mechanic', level = 2 },
+    tirerepairkit = { job = 'mechanic', level = 2 },
+    advancedrepairkit = { job = 'mechanic', level = 5 },
+    advancedlockpick = { job = 'mechanic', level = 5 },
+}
+
+---@return boolean allowed, string|nil reason
+function Craft.Check(source, itemName)
+    local rule = CraftRules[itemName]
+    if not rule then return true end
+
+    local player = core:getPlayer(source)
+    if not player then return false, 'not available' end
+    if rule.job and (not player.job or player.job.name ~= rule.job or not player.job.onduty) then
+        return false, ('only a %s on duty can make this'):format(rule.job)
+    end
+    if rule.level and GetResourceState('som-progress') == 'started'
+        and not exports['som-progress']:hasLevel(source, 'crafting', rule.level) then
+        return false, ('you need crafting level %d'):format(rule.level)
+    end
+    return true
+end
+
 local function isDowned(source)
     if GetResourceState('som-medical') ~= 'started' then return false end
     return exports['som-medical']:isDowned(source) == true
@@ -239,4 +275,22 @@ CreateThread(function()
             return not isDowned(src)
         end)
     end
+
+    exports.ox_inventory:registerHook('craftItem', function(payload)
+        local src = payload and payload.source
+        local name = payload and payload.recipe and payload.recipe.name
+        if not src or type(name) ~= 'string' then return true end
+
+        local ok, reason = Craft.Check(src, name)
+        if not ok then
+            TriggerClientEvent('som:client:notify', src, reason, 'error')
+            return false
+        end
+        -- shortcut: experience is granted when the craft is allowed, not when it
+        -- finishes, because ox_inventory has no after-craft hook; upgrade if it grows one.
+        if CraftRules[name] and GetResourceState('som-progress') == 'started' then
+            exports['som-progress']:addXp(src, 'crafting', 15)
+        end
+        return true
+    end)
 end)

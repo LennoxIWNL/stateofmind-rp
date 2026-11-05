@@ -1,6 +1,7 @@
 return {
 	{
-        name = 'debug_crafting',
+        name = 'mechanic_workshop',
+		groups = { mechanic = 0 },
 		items = {
 			{
 				name = 'lockpick',
@@ -11,28 +12,52 @@ return {
 				duration = 5000,
 				count = 2,
 			},
-			-- Ported from qb-core's old item-combinable system (lockpick +
-			-- screwdriverset -> advancedlockpick), which ox_inventory doesn't
-			-- have a direct equivalent for; reusing this bench's existing
-			-- points/zones rather than inventing a new station location.
+			{
+				name = 'repairkit',
+				ingredients = {
+					steel = 2,
+					plastic = 2,
+					scrapmetal = 3
+				},
+				duration = 8000,
+				count = 1,
+			},
+			{
+				name = 'tirerepairkit',
+				ingredients = {
+					rubber = 2,
+					scrapmetal = 2
+				},
+				duration = 6000,
+				count = 1,
+			},
+			{
+				name = 'advancedrepairkit',
+				ingredients = {
+					repairkit = 1,
+					electronickit = 1,
+					steel = 2
+				},
+				duration = 12000,
+				count = 1,
+			},
 			{
 				name = 'advancedlockpick',
 				ingredients = {
 					lockpick = 1,
 					screwdriverset = 1
 				},
-				duration = 5000,
+				duration = 8000,
 				count = 1,
 			},
-			-- Ported from qb-core's old item-combinable system (electronickit +
-			-- gatecrack -> trojan_usb).
 			{
-				name = 'trojan_usb',
+				name = 'electronickit',
 				ingredients = {
-					electronickit = 1,
-					gatecrack = 1
+					copper = 2,
+					plastic = 2,
+					glass = 1
 				},
-				duration = 5000,
+				duration = 8000,
 				count = 1,
 			},
 		},

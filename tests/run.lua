@@ -4029,5 +4029,32 @@ do
     check(cb['som-turf:server:labStart'](1, 'lab_1', 'cook_meth').error == 'you need chemistry level 4 for this', 'unlock: cooking meth needs chemistry level 4')
 end
 
+-- ---------------------------------------------------------------------------
+-- Crafting rules
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-inventory', { 'server/main.lua' })
+    local function player(job, duty) return { citizenid = 'K1', job = { name = job, onduty = duty } } end
+    Mocks.players = { [1] = player('mechanic', true) }
+    Mocks.levels = {}
+    check(env.Craft.Check(1, 'water') == true, 'craft: an unlisted recipe is allowed for anyone')
+    Mocks.players[1] = player('unemployed', false)
+    local ok, why = env.Craft.Check(1, 'repairkit')
+    check(ok == false and why == 'only a mechanic on duty can make this', 'craft: repair kits are mechanic goods')
+    Mocks.players[1] = player('mechanic', false)
+    check(env.Craft.Check(1, 'advancedlockpick') == false, 'craft: a mechanic off duty cannot make them')
+    Mocks.players[1] = player('mechanic', true)
+    check(env.Craft.Check(99, 'repairkit') == false, 'craft: unknown players are refused')
+    Mocks.levels = { crafting = 1 }
+    local ok1, why1 = env.Craft.Check(1, 'repairkit')
+    check(ok1 == false and why1 == 'you need crafting level 2', 'craft: repair kits need crafting level 2')
+    Mocks.levels.crafting = 2
+    check(env.Craft.Check(1, 'repairkit') == true and env.Craft.Check(1, 'advancedlockpick') == false, 'craft: level 2 opens repair kits but not advanced lockpicks')
+    Mocks.levels.crafting = 5
+    check(env.Craft.Check(1, 'advancedlockpick') == true, 'craft: level 5 opens advanced lockpicks')
+end
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)

@@ -215,6 +215,7 @@ function progress:addXp(source, track, amount)
     Mocks.xp[#Mocks.xp + 1] = { source = source, track = track, amount = amount }
     return amount, 1, false
 end
+function progress:hasLevel(source, track, n) return ((Mocks.levels and Mocks.levels[track]) or 1) >= (tonumber(n) or 1) end
 function progress:getLevel(source, track) return (Mocks.levels and Mocks.levels[track]) or 1 end
 
 local registry = {
