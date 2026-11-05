@@ -6,7 +6,7 @@ description: The branch, commit, PR, CI and merge loop for this repo, including 
 # Shipping a change
 
 1. `git checkout BetaRelease && git pull --ff-only`, then `git checkout -b feature|fix|chore|docs/<kebab-case>`. Never commit to `BetaRelease` or `main`; never force-push either.
-2. Commit as `Lennox <95040675+LennoxIWNL@users.noreply.github.com>` (the session hook sets it). Subject imperative and short, body says why. No person, tool, AI or session identifiers, no `Co-Authored-By`, no "Generated with". No em dashes.
+2. Commit messages are public (Discord #changelogs): a specific, player readable subject plus a 2 to 4 line body of what players or staff get. Work for one update lives on one integration branch `feature/<update-name>` and goes to `BetaRelease` in ONE PR and one merge commit, not feature by feature. Commit as `Lennox <95040675+LennoxIWNL@users.noreply.github.com>` (the session hook sets it). Subject imperative and short, body says why. No person, tool, AI or session identifiers, no `Co-Authored-By`, no "Generated with". No em dashes.
 3. Before opening the PR: `lua5.4 tests/run.lua`, `tools/check-lua.sh`, `python3 tools/check-item-icons.py` if items changed, `node tests/nui/run.mjs` if UI changed, `fivemAudit` on new server files, new SQL on the dev database, `ensure` on the headless server and read the console.
 4. `git push -u origin <branch>` then `gh pr create --base BetaRelease` with a body of: What, Verified, Not verified, Scope cuts. Add anything unset or unverified (coordinates, prices, convars, tables to import) to `LAUNCH-TODO.md`.
 5. Wait for CI: `until s=$(gh pr checks N); ! echo "$s" | grep -qi "pending\|queued\|in_progress"; do sleep 15; done`. Run long waits with `run_in_background`; do not chain `sleep` commands.
