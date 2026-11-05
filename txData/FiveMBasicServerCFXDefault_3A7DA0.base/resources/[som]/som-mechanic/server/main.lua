@@ -90,6 +90,9 @@ lib.callback.register('som-mechanic:server:repair', function(source, netId, kind
 
     if not ox:RemoveItem(source, r.item, r.count) then return done(false, ('you need %d %s'):format(r.count, r.item)) end
     lastRepair[id] = now
+    for key, at in pairs(lastRepair) do
+        if now - at > Config.cooldownSeconds * 1000 then lastRepair[key] = nil end
+    end
 
     local customer = driver(vehicle)
     if customer and customer.citizenid ~= player.citizenid then

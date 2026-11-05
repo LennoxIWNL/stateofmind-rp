@@ -2947,6 +2947,19 @@ do
     restore()
 
     env, seen, restore = heistScene()
+    heistCrew(1)
+    j(1, 'queue', { provider = 'heist_store' }); boardEnv.JobBoard.Draw('heist_store'); j(1, 'accept')
+    FakePeds[1] = vec3(0, 0, 0); hinteract(1, 'hack')
+    local before = Mocks.treasury
+    Mocks.addMoneyThrows = true
+    FakePeds[1] = vec3(50, 0, 0); hinteract(1, 'loot')
+    Mocks.addMoneyThrows = false
+    check(Mocks.treasury == before, 'heist: a crash after the treasury debit puts the money back')
+    FakePeds[1] = vec3(100, 0, 0); hinteract(1, 'loot')
+    check(before - Mocks.treasury > 0, 'heist: the payout lock is released after a crash, so the next loot point pays')
+    restore()
+
+    env, seen, restore = heistScene()
     Mocks.treasury = 0
     heistCrew(1)
     j(1, 'queue', { provider = 'heist_store' }); boardEnv.JobBoard.Draw('heist_store'); j(1, 'accept')
@@ -3657,6 +3670,13 @@ do
     Mocks.addMoneyFails = true
     check(cb['som-outdoors:server:sell'](1, 'fish').success == false and Mocks.treasury == 1000 and count(1, 'codfish') == 3, 'buyer: a failed credit refunds the treasury and the fish')
     Mocks.addMoneyFails = false
+
+    Mocks.addMoneyThrows = true
+    local crash = cb['som-outdoors:server:sell'](1, 'fish')
+    Mocks.addMoneyThrows = false
+    check(crash.success == false and Mocks.treasury == 1000 and count(1, 'codfish') == 3, 'buyer: a crash after the treasury debit refunds the treasury and the fish')
+    local again = cb['som-outdoors:server:sell'](1, 'fish')
+    check(again.success == true, 'buyer: the lock is released after a crash, so the next sale works')
 end
 
 -- ---------------------------------------------------------------------------

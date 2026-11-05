@@ -6,8 +6,13 @@
 # Test rows are removed afterwards. Made by Lennox.
 set -u
 c=${1:-som-dev-mariadb}; n=${2:-30}; rounds=${3:-5}
-pw=$(docker exec "$c" printenv MARIADB_ROOT_PASSWORD) || exit 2
-sql() { docker exec -i "$c" mariadb -uroot -p"$pw" -N -B stateofmindrp -e "$1"; }
+# DIRECT=1 talks to a database on 127.0.0.1 (as in CI) instead of a docker container.
+if [ "${DIRECT:-0}" = 1 ]; then
+  sql() { mariadb -h127.0.0.1 -uroot -p"${DB_PASS:-root}" -N -B stateofmindrp -e "$1"; }
+else
+  pw=$(docker exec "$c" printenv MARIADB_ROOT_PASSWORD) || exit 2
+  sql() { docker exec -i "$c" mariadb -uroot -p"$pw" -N -B stateofmindrp -e "$1"; }
+fi
 
 fail=0
 # name | setup SQL | claim SQL (run N times in parallel, each must report affected rows) | check SQL (must print 1)
