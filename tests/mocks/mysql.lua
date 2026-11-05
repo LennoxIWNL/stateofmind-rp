@@ -32,6 +32,7 @@ M.db = {
     heist = { dongles = {}, runs = {} },
     turf = { zones = {}, events = {}, market = {} },
     whitelist = {},
+    buyer = {},
     lab = {},
     plants = {},
     gangs = { chars = {}, log = {} },
@@ -421,6 +422,19 @@ local function whitelist(kind, query, params)
     return false
 end
 
+local function buyer(kind, query, params)
+    local B = M.db.buyer
+    if kind == 'scalar' and query:find('FROM som_buyer_payouts WHERE buyer = ?', 1, true) then
+        local sum = 0
+        for _, r in ipairs(B) do if r.buyer == params[1] and r.ts > now() - 3600 then sum = sum + r.amount end end
+        return true, sum
+    elseif kind == 'insert' and query:find('INSERT INTO som_buyer_payouts', 1, true) then
+        B[#B + 1] = { buyer = params[1], amount = params[2], ts = now() }
+        return true, #B
+    end
+    return false
+end
+
 local function lab(kind, query, params)
     local L = M.db.lab
     local function has(text) return query:find(text, 1, true) ~= nil end
@@ -709,6 +723,7 @@ function M.scalar(query, params)
     do local handled, value = gangs('scalar', query, params); if handled then return value end end
     do local handled, value = plants('scalar', query, params); if handled then return value end end
     do local handled, value = lab('scalar', query, params); if handled then return value end end
+    do local handled, value = buyer('scalar', query, params); if handled then return value end end
     do local handled, value = whitelist('scalar', query, params); if handled then return value end end
     if query:find('SELECT role FROM som_property_owners WHERE property_id = ? AND citizenid = ?', 1, true) then
         local o = findOwner(params[1], params[2])
@@ -1158,6 +1173,7 @@ function M.insert(query, params)
     do local handled, value = gangs('insert', query, params); if handled then return value end end
     do local handled, value = plants('insert', query, params); if handled then return value end end
     do local handled, value = lab('insert', query, params); if handled then return value end end
+    do local handled, value = buyer('insert', query, params); if handled then return value end end
     if query:find('INSERT INTO som_property_owners', 1, true) then
         local propertyId, citizenid, role, grantedBy = params[1], params[2], params[3], params[4]
         local existing = findOwner(propertyId, citizenid)

@@ -1657,3 +1657,13 @@ CREATE TABLE IF NOT EXISTS `som_lab_jobs` (
   KEY `idx_lab` (`lab`, `status`),
   KEY `idx_owner` (`citizenid`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Buyer payouts (som-outdoors). The hourly cap is the sum of the last hour.
+CREATE TABLE IF NOT EXISTS `som_buyer_payouts` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `buyer`      VARCHAR(32) NOT NULL,
+  `amount`     BIGINT NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_buyer_time` (`buyer`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
