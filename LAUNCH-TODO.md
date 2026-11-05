@@ -253,3 +253,8 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Six tracks (fishing, hunting, growing, chemistry, mechanic, scrapping). Level n needs 120 * (n-1)^2 experience, level 10 is the cap, and a track earns at most 1500 experience a day. Effects are small and meant to reward weeks of play: fishing and hunting find rare things more often, growing and scrapping give one extra per three levels, chemistry shaves 3% per level off a cook. Mechanic currently only earns experience. All numbers are untuned defaults.
 - [ ] A read only `Skills` phone app lists the tracks (reuses the briefcase icon). Courier, heists and gang work do not earn experience yet.
 - [ ] Never run in a game; the experience cap SQL was run on the dev database only.
+
+## Skill unlocks
+
+- [ ] Gates (all server side, same numbers shown in the Skills app under "Coming up"): deep water fishing needs fishing 4, boar needs hunting 3, OG Kush growing 5 and Amnesia 7, refining coca leaves needs chemistry 2 and cooking meth chemistry 4, body repairs need mechanic 2. A new `crafting` track exists for the benches (next PR). Levels and numbers are untuned defaults. The unlock list in `som-progress/shared/config.lua` is display only and must be kept in step with each resource's `minLevel`.
+- [ ] A deep water fishing spot (`deep_1`) ships disabled with no coordinates.

@@ -10,6 +10,6 @@ Config = {
     -- vehicle is set to.
     repairs = {
         engine = { label = 'Repair the engine', item = 'repairkit', count = 1, price = 250, below = 900.0, to = 1000.0, seconds = 12 },
-        body = { label = 'Repair the body', item = 'steel', count = 2, price = 180, below = 900.0, to = 1000.0, seconds = 10 },
+        body = { label = 'Repair the body', minLevel = 2, item = 'steel', count = 2, price = 180, below = 900.0, to = 1000.0, seconds = 10 },
     },
 }
