@@ -70,6 +70,7 @@ return {
 			{ name = 'lockpick', price = 10 },
 			{ name = 'hunting_knife', price = 150 },
 			{ name = 'screwdriverset', price = 60 },
+			{ name = 'WEAPON_HAMMER', price = 80 },
 			{ name = 'electronickit', price = 90 },
 			{ name = 'weed_nutrition', price = 25 },
 		}, locations = {

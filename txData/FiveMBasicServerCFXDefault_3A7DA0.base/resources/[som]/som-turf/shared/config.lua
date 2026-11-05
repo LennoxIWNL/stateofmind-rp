@@ -67,6 +67,7 @@ Config = {
         spots = {
             { name = 'grow_1', label = 'Grow spot 1', enabled = false, center = nil, radius = nil },
         },
+        seedReturnChance = 0.25,  -- a harvest sometimes gives its own seed back
         bagTables = {
             { name = 'bag_1', label = 'Bagging table', enabled = false, coords = nil },
         },
@@ -97,6 +98,8 @@ Config = {
         stock = {
             coke_leaf = 40, acetone = 120, lithium = 90, ephedrine = 150,
             hydrochloric_acid = 140, sulfuric_acid = 110,
+            weed_whitewidow_seed = 60, weed_skunk_seed = 60, weed_purplehaze_seed = 80,
+            weed_ogkush_seed = 200, weed_amnesia_seed = 300,
         },
     },
 }

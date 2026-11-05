@@ -172,6 +172,7 @@ lib.callback.register('som-turf:server:harvest', function(source, id)
         MySQL.update.await("UPDATE som_plants SET status = 'growing' WHERE id = ? AND status = 'harvested'", { p.id })
         return done(false, 'you cannot carry it')
     end
+    if math.random() < G.seedReturnChance then ox:AddItem(source, p.strain, 1) end
     xp(source, 'growing', 25)
     return done(true, nil, { count = count })
 end)
