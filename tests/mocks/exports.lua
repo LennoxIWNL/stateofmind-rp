@@ -147,7 +147,11 @@ end
 function economy:getBusiness(name) return Mocks.businesses[name] end
 
 local phone = {}
-function phone:billCitizen(citizenid, business, amount, reason, opts) return 1 end
+function phone:billCitizen(citizenid, business, amount, reason, opts)
+    Mocks.bills = Mocks.bills or {}
+    Mocks.bills[#Mocks.bills + 1] = { citizenid = citizenid, business = business, amount = amount, reason = reason, opts = opts }
+    return 1
+end
 function phone:notifyApp(source, app, message)
     if Mocks.exported.notifyApp then return Mocks.exported.notifyApp(source, app, message) end
 end
