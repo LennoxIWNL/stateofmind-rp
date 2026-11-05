@@ -193,15 +193,16 @@ lib.callback.register('som-mechanic:server:fallbackBuy', function(source)
     local ped = GetPlayerPed(source)
     if ped == 0 or #(GetEntityCoords(ped) - f.coords) > f.distance then return done(false, 'you are too far away') end
 
-    local bought = MySQL.scalar.await(
-        "SELECT COUNT(*) FROM som_trade_offers WHERE buyer = ? AND seller = 'FALLBACK' AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)",
-        { player.citizenid }) or 0
-    if bought >= f.perHour then return done(false, 'you have bought one already, try again later') end
-
-    local id = MySQL.insert.await(
-        "INSERT INTO som_trade_offers (seller, buyer, item, price, status) VALUES ('FALLBACK', ?, ?, ?, 'done')",
-        { player.citizenid, f.item, f.price })
-    if not id or id < 1 then return done(false, 'try again') end
+    -- One conditional insert is both the hourly limit and the claim: two quick clicks
+    -- cannot both pass, and a failed earlier attempt (cancelled) does not count.
+    local id = MySQL.insert.await([[
+        INSERT INTO som_trade_offers (seller, buyer, item, price, status)
+        SELECT 'FALLBACK', ?, ?, ?, 'done' FROM DUAL
+        WHERE (SELECT COUNT(*) FROM som_trade_offers
+               WHERE buyer = ? AND seller = 'FALLBACK' AND status <> 'cancelled'
+                 AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)) < ?
+    ]], { player.citizenid, f.item, f.price, player.citizenid, f.perHour })
+    if not id or id < 1 then return done(false, 'you have bought one already, try again later') end
 
     local function undo() MySQL.update.await("UPDATE som_trade_offers SET status = 'cancelled' WHERE id = ?", { id }) end
 

@@ -499,7 +499,12 @@ end
 local function trade(kind, query, params)
     local T = M.db.trade
     local function has(text) return query:find(text, 1, true) ~= nil end
-    if kind == 'insert' and has('INSERT INTO som_trade_offers (seller, buyer, item, price, status)') then
+    if kind == 'insert' and has("SELECT 'FALLBACK', ?, ?, ?, 'done' FROM DUAL") then
+        local n = 0
+        for _, o in ipairs(T) do
+            if o.seller == 'FALLBACK' and o.buyer == params[4] and o.status ~= 'cancelled' and o.ts > now() - 3600 then n = n + 1 end
+        end
+        if n >= params[5] then return true, 0 end
         T[#T + 1] = { id = #T + 1, seller = 'FALLBACK', buyer = params[1], item = params[2], price = params[3], status = 'done', ts = now() }
         return true, #T
     elseif kind == 'insert' and has('INSERT INTO som_trade_offers') then
