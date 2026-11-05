@@ -39,6 +39,30 @@ local function build()
     end
 end
 
-AddEventHandler('som:client:playerLoaded', build)
-CreateThread(function() Wait(3000); build() end)
+local function supplier()
+    local sup = lib.callback.await('som-turf:server:supplierInfo', false)
+    if type(sup) ~= 'table' then return end
+    zones[#zones + 1] = exports['som-interact']:addSphereZone({
+        name = 'som_supplier',
+        coords = vec3(sup.coords.x, sup.coords.y, sup.coords.z),
+        radius = 1.5,
+        options = { { name = 'som_supplier_buy', label = sup.label, icon = 'fa-solid fa-flask-vial', distance = 2.0,
+            onSelect = function()
+                local options = {}
+                for _, r in ipairs(sup.stock) do options[#options + 1] = { value = r.item, label = ('%s ($%d)'):format(r.item:gsub('_', ' '), r.price) } end
+                local answer = lib.inputDialog(sup.label, {
+                    { type = 'select', label = 'Item', options = options, required = true },
+                    { type = 'number', label = 'Amount', min = 1, max = sup.maxQty, default = 1, required = true },
+                })
+                if answer and answer[1] and answer[2] then
+                    say(lib.callback.await('som-turf:server:supplierBuy', false, answer[1], answer[2]))
+                end
+            end } },
+    })
+end
+
+local function rebuild() build(); supplier() end
+
+AddEventHandler('som:client:playerLoaded', rebuild)
+CreateThread(function() Wait(3000); rebuild() end)
 AddEventHandler('onResourceStop', function(name) if name == GetCurrentResourceName() then clear() end end)

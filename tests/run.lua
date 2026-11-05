@@ -3443,9 +3443,13 @@ do
     check(cb['som-turf:server:labStart'](1, 'lab_1', 'cut_coke').error == 'there is no lab here', 'lab: every lab ships disabled')
     local L = env.Config.labs[1]
     L.enabled, L.coords = true, vec3(0, 0, 0)
-    check(#cb['som-turf:server:labInfo'](1).recipes == 2, 'lab: only enabled recipes are offered')
+    env.Config.recipes.cook_meth.enabled = false
+    check(#cb['som-turf:server:labInfo'](1).recipes == 3, 'lab: only enabled recipes are offered')
+    env.Config.recipes.cook_meth.enabled = true
     check(cb['som-turf:server:labStart'](3, 'lab_1', 'cut_coke').error == 'you are not in a gang', 'lab: only gang members cook')
+    env.Config.recipes.cook_meth.enabled = false
     check(cb['som-turf:server:labStart'](1, 'lab_1', 'cook_meth').error == 'you do not know that one', 'lab: a disabled recipe cannot be started')
+    env.Config.recipes.cook_meth.enabled = true
     check(cb['som-turf:server:labStart'](1, 'lab_1', 'nope').error == 'you do not know that one', 'lab: an unknown recipe is refused')
     FakePeds[1] = vec3(100, 0, 0)
     check(cb['som-turf:server:labStart'](1, 'lab_1', 'cut_coke').error == 'there is no lab here', 'lab: the server checks distance')
@@ -3464,6 +3468,63 @@ do
     Mocks.invFull[1] = false
     check(cb['som-turf:server:labCollect'](1, 'lab_1').success == true and count(1, 'cokebaggy') == 4, 'lab: a finished cook is collected')
     check(cb['som-turf:server:labCollect'](1, 'lab_1').error == 'you have nothing cooking here', 'lab: a cook is collected once')
+end
+
+-- ---------------------------------------------------------------------------
+-- Meth chain and supplier
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-turf', { 'shared/config.lua', 'server/main.lua', 'server/lab.lua' })
+    Mocks.players = { [1] = { citizenid = 'M1', gang = { name = 'ballas', grade = 1 } }, [2] = { citizenid = 'M2', gang = { name = 'none', grade = 0 } } }
+    Mocks.inv = { [1] = {}, [2] = {} }
+    Mocks.bank = { [1] = 1000, [2] = 1000 }
+    Mocks.treasury, Mocks.taxFails, Mocks.invFull = 0, false, {}
+    mysql.fakeNow = 5000000
+    FakePeds[1], FakePeds[2] = vec3(0, 0, 0), vec3(0, 0, 0)
+    local cb = RegisteredCallbacks
+    local function count(src, name) local n = 0; for _, it in pairs(Mocks.inv[src]) do if it.name == name then n = n + (it.count or 1) end end; return n end
+
+    check(cb['som-turf:server:supplierInfo'](1) == nil and cb['som-turf:server:supplierBuy'](1, 'acetone', 1).error == 'nobody is selling', 'supplier: ships disabled')
+    local S = env.Config.supplier
+    S.enabled, S.coords = true, vec3(0, 0, 0)
+    check(#cb['som-turf:server:supplierInfo'](1).stock == 6, 'supplier: the stock list is sent')
+    check(cb['som-turf:server:supplierBuy'](2, 'acetone', 1).error == 'you are not in a gang', 'supplier: only gang members buy')
+    check(cb['som-turf:server:supplierBuy'](1, 'gold', 1).error == 'they do not sell that', 'supplier: only listed items')
+    check(cb['som-turf:server:supplierBuy'](1, 'acetone', 0).success == false and cb['som-turf:server:supplierBuy'](1, 'acetone', 1.5).success == false and cb['som-turf:server:supplierBuy'](1, 'acetone', 99).success == false, 'supplier: quantities are validated')
+    FakePeds[1] = vec3(100, 0, 0)
+    check(cb['som-turf:server:supplierBuy'](1, 'acetone', 1).error == 'you are too far away', 'supplier: distance is checked')
+    FakePeds[1] = vec3(0, 0, 0)
+    check(cb['som-turf:server:supplierBuy'](1, 'acetone', 2).success == true and Mocks.bank[1] == 760 and Mocks.treasury == 240 and count(1, 'acetone') == 2, 'supplier: money goes to the treasury, not out of thin air')
+    Mocks.bank[1] = 10
+    check(cb['som-turf:server:supplierBuy'](1, 'acetone', 1).error == 'not enough in your bank', 'supplier: you cannot overspend')
+    Mocks.bank[1] = 1000
+    Mocks.invFull[1] = true
+    local paid0 = Mocks.paid or 0
+    check(cb['som-turf:server:supplierBuy'](1, 'lithium', 1).success == false and (Mocks.paid or 0) == paid0 + 90, 'supplier: a full pack is refunded')
+    Mocks.invFull[1] = false
+    Mocks.taxFails = true
+    local before = count(1, 'lithium')
+    check(cb['som-turf:server:supplierBuy'](1, 'lithium', 1).success == false and count(1, 'lithium') == before, 'supplier: a failed treasury credit undoes the sale')
+    Mocks.taxFails = false
+
+    local L = env.Config.labs[1]
+    L.enabled, L.coords = true, vec3(0, 0, 0)
+    local slot = 500
+    local function give(name, n) slot = slot + 1; Mocks.inv[1][slot] = { name = name, count = n, slot = slot } end
+    Mocks.inv[1] = {}
+    give('ephedrine', 2); give('acetone', 1); give('lithium', 1)
+    check(cb['som-turf:server:labStart'](1, 'lab_1', 'cook_meth').error == 'you are missing ingredients' and count(1, 'ephedrine') == 2, 'meth: a missing ingredient returns the others')
+    give('hydrochloric_acid', 1)
+    check(cb['som-turf:server:labStart'](1, 'lab_1', 'cook_meth').success == true and count(1, 'acetone') == 0, 'meth: the cook takes all four precursors')
+    mysql.fakeNow = mysql.fakeNow + 31 * 60
+    check(cb['som-turf:server:labCollect'](1, 'lab_1').success == true and count(1, 'meth') == 5, 'meth: five come out')
+    give('coke_leaf', 4); give('sulfuric_acid', 1)
+    check(cb['som-turf:server:labStart'](1, 'lab_1', 'refine_leaf').success == true, 'coke: leaves and acid start a refine')
+    mysql.fakeNow = mysql.fakeNow + 21 * 60
+    cb['som-turf:server:labCollect'](1, 'lab_1')
+    check(count(1, 'coke_brick') == 1, 'coke: a brick comes out')
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))

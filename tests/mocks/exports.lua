@@ -94,6 +94,11 @@ function core:gangTransact(gang, amount, reason)
     Mocks.gangLedger[#Mocks.gangLedger + 1] = { gang = gang, amount = amount, reason = reason }
     return true
 end
+function core:taxToTreasury(amount, reason)
+    if Mocks.taxFails then return false, 'refused' end
+    Mocks.treasury = Mocks.treasury + amount
+    return true
+end
 function core:removeMoney(source, account, amount, reason)
     if (Mocks.bank[source] or 0) < amount then return false, 'insufficient funds' end
     Mocks.bank[source] = Mocks.bank[source] - amount

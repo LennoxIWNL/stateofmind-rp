@@ -112,3 +112,49 @@ lib.callback.register('som-turf:server:labCollect', function(source, labName)
     end
     return done(true)
 end)
+
+-- ---------------------------------------------------------------------------
+-- Supplier
+-- ---------------------------------------------------------------------------
+
+local function supplierOpen()
+    local s = Config.supplier
+    return s.enabled and s.coords ~= nil
+end
+
+lib.callback.register('som-turf:server:supplierInfo', function()
+    if not supplierOpen() then return nil end
+    local s = Config.supplier
+    local stock = {}
+    for item, price in pairs(s.stock) do stock[#stock + 1] = { item = item, price = price } end
+    table.sort(stock, function(a, b) return a.item < b.item end)
+    return { label = s.label, coords = s.coords, stock = stock, maxQty = s.maxQty }
+end)
+
+lib.callback.register('som-turf:server:supplierBuy', function(source, item, qty)
+    local player = member(source)
+    if not player then return done(false, 'you are not in a gang') end
+    if not supplierOpen() then return done(false, 'nobody is selling') end
+
+    local s = Config.supplier
+    local ped = GetPlayerPed(source)
+    if ped == 0 or #(GetEntityCoords(ped) - s.coords) > s.distance then return done(false, 'you are too far away') end
+
+    local price = type(item) == 'string' and s.stock[item]
+    if not price then return done(false, 'they do not sell that') end
+    qty = tonumber(qty)
+    if not qty or qty % 1 ~= 0 or qty < 1 or qty > s.maxQty then return done(false, ('between 1 and %d'):format(s.maxQty)) end
+
+    local total = price * qty
+    if not core:removeMoney(source, 'bank', total, 'supplier:' .. item) then return done(false, 'not enough in your bank') end
+    if not ox:AddItem(source, item, qty) then
+        core:addMoney(source, 'bank', total, 'supplier_refund:' .. item)
+        return done(false, 'you cannot carry it')
+    end
+    if not core:taxToTreasury(total, 'supplier:' .. item) then
+        ox:RemoveItem(source, item, qty)
+        core:addMoney(source, 'bank', total, 'supplier_refund:' .. item)
+        return done(false, 'the sale fell through')
+    end
+    return done(true)
+end)
