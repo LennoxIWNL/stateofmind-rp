@@ -1,16 +1,13 @@
 # Items that had no inventory icon when tools/check-item-icons.py was added.
 # Remove a line when its icon is added.
 arms
-breathalyzer
 clothing
 drugtestkit
 ears
 emp_ammo
 forceps
-glasses
 jeans
 luxuryfinish_attachment
 surgical_staple
-syringe
 torso
 tshirt
