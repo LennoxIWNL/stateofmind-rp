@@ -7,6 +7,10 @@ return {
 			{ name = 'burger', price = 10 },
 			{ name = 'water', price = 10 },
 			{ name = 'cola', price = 10 },
+			{ name = 'water_bottle', price = 8 },
+			{ name = 'fishbait', price = 15 },
+			{ name = 'fishingrod', price = 120 },
+			{ name = 'empty_weed_bag', price = 5 },
 		}, locations = {
 			vec3(25.7, -1347.3, 29.49),
 			vec3(-3038.71, 585.9, 7.9),
@@ -63,7 +67,11 @@ return {
 		blip = {
 			id = 402, colour = 69, scale = 0.8
 		}, inventory = {
-			{ name = 'lockpick', price = 10 }
+			{ name = 'lockpick', price = 10 },
+			{ name = 'hunting_knife', price = 150 },
+			{ name = 'screwdriverset', price = 60 },
+			{ name = 'electronickit', price = 90 },
+			{ name = 'weed_nutrition', price = 25 },
 		}, locations = {
 			vec3(2748.0, 3473.0, 55.67),
 			vec3(342.99, -1298.26, 32.51)

@@ -208,13 +208,13 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Fishing spots (`Config.fishing.spots`) and the fish buyer (`Config.buyers.fish`) ship disabled with no coordinates. Place them.
 - [ ] Buyers pay from the **treasury**, capped per rolling hour (fish: 6000 for the whole server). The treasury starts at 0, so until fines and taxes fill it a buyer says "the city cannot pay right now". That is deliberate; decide whether the treasury needs a seeded balance.
 - [ ] Catch table (codfish 50, bass 30, fishingloot 15, fishinglootbig 5), prices (40, 55, 90, 180), bite wait 8 to 20 s, rod and bait items are defaults. Fish items and icons already existed.
-- [ ] Nothing hands out `fishingrod` or `fishbait` in the world yet (no shop). Decide the supplier.
+- [ ] Fishing rod (120) and bait (15) are sold at every General store; fish sell prices are 40 to 180, so a bait costs about a third of an average catch. Untuned.
 - [ ] Never run in a client: the cast progress bar, zone, sell option.
 
 ## Hunting (som-outdoors)
 
 - [ ] The game buyer (`Config.buyers.hunt`, venison 60, deer pelt 120, antlers 150, cap 6000 an hour) ships disabled with no coordinates, and pays from the treasury like the fish buyer.
-- [ ] Hunting has no zones: any deer or boar (`a_c_deer`, `a_c_boar`) killed by the player can be skinned anywhere, with a `hunting_knife`. Decide whether to restrict it to a hunting area. Nothing hands out the knife in the world yet.
+- [ ] Hunting has no zones: any deer or boar (`a_c_deer`, `a_c_boar`) killed by the player can be skinned anywhere, with a `hunting_knife`. Decide whether to restrict it to a hunting area. The knife (150) is sold at YouTool.
 - [ ] `requireLicense` is off. A `hunting_license` item exists but nothing issues it (the `som-id` licence flow is not built for it).
 - [ ] The server reads the carcass itself (model, health, killer ped, a `skinned` flag on the entity), so the client cannot invent a kill. Never run in a client: the ped target, skinning bar, and `GetPedSourceOfDeath` behaviour with real peds.
 
@@ -258,3 +258,8 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 
 - [ ] Gates (all server side, same numbers shown in the Skills app under "Coming up"): deep water fishing needs fishing 4, boar needs hunting 3, OG Kush growing 5 and Amnesia 7, refining coca leaves needs chemistry 2 and cooking meth chemistry 4, body repairs need mechanic 2. A new `crafting` track exists for the benches (next PR). Levels and numbers are untuned defaults. The unlock list in `som-progress/shared/config.lua` is display only and must be kept in step with each resource's `minLevel`.
 - [ ] A deep water fishing spot (`deep_1`) ships disabled with no coordinates.
+
+## Shop stock (ox_inventory shops)
+
+- [ ] General stores now also sell water bottles (8), fishing bait (15), fishing rods (120) and empty weed bags (5); YouTool sells the hunting knife (150), screwdriver set (60), electronic kit (90) and plant nutrition (25). Payment is charged to the buyer's bank through the existing SOM currency bridge and is a pure sink. Prices are untuned.
+- [ ] Repair kits and advanced lockpicks are deliberately not in any NPC shop: they are for player mechanics to craft and sell (later in this update), with a fallback when no mechanic is on duty. Until that lands, nobody can buy them.

@@ -165,3 +165,7 @@ No item uses these yet; they are orphan art until the meth chain and hunting bra
 ## Medical, police and access icons (2026-11-05)
 
 Four of the 18 baseline gaps filled from `aifazi/items-images`: `spikespack.png` (`police/policespikes.png`), `accesstool.png` (`general/keys/access_key.png`), `surgical_tray.png` (`general/tray.png`), `surgical_gloves.png` (`tools/cleaning/wandgloves_blue.png`). The other 14 (clothing parts, syringe, forceps, staples, breathalyzer, drug test kit, glasses, EMP ammo, luxury finish) have no match in either pack and need drawn or commissioned art.
+
+## Generated icons (realistic house style)
+
+Generated with Higgsfield (`gpt_image_2_6`), cut out and scaled to 100px with `tools/icon-process.mjs`, reviewed by the owner before adding: `syringe.png`, `breathalyzer.png`, `glasses.png`. The style audit of all 736 icons found the set mostly realistic; outliers (flat camo skins, cartoon sweets and toys, a monkey mask, icons too small or dark to read) are queued for replacement in the same style.
