@@ -1716,3 +1716,17 @@ CREATE TABLE IF NOT EXISTS `som_skills` (
   `day`       DATE NOT NULL,
   PRIMARY KEY (`citizenid`, `track`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Mechanic offers and roadside sales (som-mechanic). 'FALLBACK' as seller marks a roadside desk sale.
+CREATE TABLE IF NOT EXISTS `som_trade_offers` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `seller`     VARCHAR(16) NOT NULL,
+  `buyer`      VARCHAR(16) NOT NULL,
+  `item`       VARCHAR(48) NOT NULL,
+  `price`      BIGINT NOT NULL,
+  `status`     ENUM('pending','done','cancelled') NOT NULL DEFAULT 'pending',
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_buyer` (`buyer`, `status`),
+  KEY `idx_seller` (`seller`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
