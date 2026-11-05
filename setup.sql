@@ -1667,3 +1667,15 @@ CREATE TABLE IF NOT EXISTS `som_buyer_payouts` (
   PRIMARY KEY (`id`),
   KEY `idx_buyer_time` (`buyer`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Chopped vehicles (som-outdoors). Doubles as the drop-off and plate cooldown.
+CREATE TABLE IF NOT EXISTS `som_chop_log` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `dropoff`    VARCHAR(32) NOT NULL,
+  `plate`      VARCHAR(12) NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_dropoff` (`dropoff`, `created_at`),
+  KEY `idx_plate` (`plate`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

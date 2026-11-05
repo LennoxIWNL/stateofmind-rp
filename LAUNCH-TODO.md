@@ -217,3 +217,11 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Hunting has no zones: any deer or boar (`a_c_deer`, `a_c_boar`) killed by the player can be skinned anywhere, with a `hunting_knife`. Decide whether to restrict it to a hunting area. Nothing hands out the knife in the world yet.
 - [ ] `requireLicense` is off. A `hunting_license` item exists but nothing issues it (the `som-id` licence flow is not built for it).
 - [ ] The server reads the carcass itself (model, health, killer ped, a `skinned` flag on the entity), so the client cannot invent a kill. Never run in a client: the ped target, skinning bar, and `GetPedSourceOfDeath` behaviour with real peds.
+
+## Chop shop (som-outdoors)
+
+- [ ] Import the `som_chop_log` table (end of `setup.sql`) on an existing database.
+- [ ] `Config.chop.dropoffs` and the scrap buyer (`Config.buyers.scrap`, prices 8 to 30, cap 6000 an hour from the treasury) ship disabled with no coordinates.
+- [ ] A vehicle whose plate is in `som_vehicles` is refused, so players cannot lose an owned car; that also means a stolen player car cannot be chopped (a deliberate cut). Rental plates are NOT checked: confirm rentals use plates that never reach a chop, or add a check against `som-rentals`.
+- [ ] The VIN scrub is a progress bar with a server-enforced minimum time (25 s), not a skill check: the server cannot trust a client's skill result. 10 minute drop-off cooldown and 24 hour plate cooldown are defaults.
+- [ ] Calls dispatch `chopShop` at the shop with a 40% chance. Parts reuse existing items and icons. Never run in a client.

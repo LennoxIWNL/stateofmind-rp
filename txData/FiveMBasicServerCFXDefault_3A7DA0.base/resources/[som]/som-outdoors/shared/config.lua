@@ -8,6 +8,10 @@ Config = {
             label = 'Fish buyer', enabled = false, coords = nil, distance = 3.0, hourlyCap = 6000,
             prices = { codfish = 40, bass = 55, fishingloot = 90, fishinglootbig = 180 },
         },
+        scrap = {
+            label = 'Scrap yard', enabled = false, coords = nil, distance = 3.0, hourlyCap = 6000,
+            prices = { scrapmetal = 8, steel = 20, aluminum = 22, plastic = 10, rubber = 12, copper = 30, glass = 12 },
+        },
         hunt = {
             label = 'Game buyer', enabled = false, coords = nil, distance = 3.0, hourlyCap = 6000,
             prices = { venison = 60, deer_pelt = 120, antlers = 150 },
@@ -42,6 +46,22 @@ Config = {
         animals = {
             a_c_deer = { drops = { { 'venison', 2, 3, 1.0 }, { 'deer_pelt', 1, 1, 1.0 }, { 'antlers', 1, 1, 0.25 } } },
             a_c_boar = { drops = { { 'venison', 1, 2, 1.0 } } },
+        },
+    },
+
+    -- Chopping strips an ambient vehicle for parts. A plate that belongs to a
+    -- player (som_vehicles) is refused, so nobody loses a car they own.
+    chop = {
+        distance = 8.0,          -- vehicle to the drop-off centre
+        scrubSeconds = 25,       -- minimum time between starting and finishing
+        dropoffCooldown = 10,    -- minutes before the same drop-off can be used again
+        plateCooldown = 1440,    -- minutes before the same plate can be chopped again
+        parts = {
+            { 'scrapmetal', 4, 8 }, { 'steel', 2, 4 }, { 'aluminum', 1, 3 }, { 'plastic', 2, 4 },
+            { 'rubber', 2, 4 }, { 'copper', 1, 2 }, { 'glass', 1, 3 },
+        },
+        dropoffs = {
+            { name = 'chop_1', label = 'Chop shop', enabled = false, coords = nil },
         },
     },
 }

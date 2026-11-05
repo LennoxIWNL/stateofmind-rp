@@ -50,6 +50,7 @@ local function resetDb()
     mysql.db.plants = {}
     mysql.db.lab = {}
     mysql.db.buyer = {}
+    mysql.db.chop = { log = {}, owned = {} }
     mysql.db.staff = { reports = {}, audit = {} }
     mysql.db.gangs = { chars = {}, log = {} }
     mysql.db.vehicles = {}
@@ -3686,6 +3687,59 @@ do
     check(r.success and count(1, 'venison') >= 2 and count(1, 'deer_pelt') == 1, 'hunt: a deer gives venison and a pelt')
     Mocks.clock = Mocks.clock + 60000
     check(skin(1, 800).error == 'it has been skinned already' and count(1, 'deer_pelt') == 1, 'hunt: a carcass is skinned once')
+end
+
+-- ---------------------------------------------------------------------------
+-- Chop shop
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua', 'server/buyer.lua', 'server/chop.lua' })
+    Mocks.players = { [1] = { citizenid = 'C1' } }
+    Mocks.inv = { [1] = {} }
+    Mocks.clock = 1000000
+    mysql.fakeNow = 5000000
+    Deleted = {}
+    FakePeds[1], FakePeds[950], FakePeds[951] = vec3(0, 0, 0), vec3(1, 0, 0), vec3(1, 0, 0)
+    Vehicles = { [950] = { plate = 'ABC 123 ', engine = 1000, body = 1000 }, [951] = { plate = 'OWNED1', engine = 1000, body = 1000 } }
+    mysql.db.chop.owned['OWNED1'] = true
+    local cb = RegisteredCallbacks
+    local function count(name) local n = 0; for _, it in pairs(Mocks.inv[1]) do if it.name == name then n = n + (it.count or 1) end end; return n end
+    Mocks.calls.dispatchAlert = 0
+
+    check(cb['som-outdoors:server:chopBegin'](1, 'chop_1', 950).error == 'nobody is buying cars here', 'chop: drop-offs ship disabled')
+    local D = env.Config.chop.dropoffs[1]
+    D.enabled, D.coords = true, vec3(0, 0, 0)
+    check(cb['som-outdoors:server:chopBegin'](1, 'chop_1', 999).error == 'bring the vehicle here', 'chop: the vehicle must exist')
+    FakePeds[950] = vec3(100, 0, 0)
+    check(cb['som-outdoors:server:chopBegin'](1, 'chop_1', 950).error == 'bring the vehicle here', 'chop: the vehicle must be at the drop-off')
+    FakePeds[950] = vec3(1, 0, 0)
+    check(cb['som-outdoors:server:chopBegin'](1, 'chop_1', 951).error:find('belongs to someone'), 'chop: a player owned plate is refused')
+    check(cb['som-outdoors:server:chopFinish'](1).error == 'you have not started', 'chop: finishing needs a start')
+
+    check(cb['som-outdoors:server:chopBegin'](1, 'chop_1', 950).success, 'chop: an ambient vehicle can start')
+    check(Mocks.calls.dispatchAlert == 1 and Mocks.lastAlertType == 'chopShop', 'chop: dispatch is told at the shop')
+    Mocks.clock = Mocks.clock + 5000
+    check(cb['som-outdoors:server:chopFinish'](1).error == 'you were too quick' and #Deleted == 0, 'chop: the scrub time is enforced')
+
+    cb['som-outdoors:server:chopBegin'](1, 'chop_1', 950)
+    Mocks.clock = Mocks.clock + 30000
+    local r = cb['som-outdoors:server:chopFinish'](1)
+    check(r.success and #Deleted == 1 and count('scrapmetal') >= 4 and count('copper') >= 1, 'chop: the vehicle is deleted and parts are given')
+    check(#mysql.db.chop.log == 1 and mysql.db.chop.log[1].plate == 'ABC 123', 'chop: the plate is trimmed and logged')
+
+    Vehicles[952] = { plate = 'XYZ9' }; FakePeds[952] = vec3(1, 0, 0)
+    cb['som-outdoors:server:chopBegin'](1, 'chop_1', 952)
+    Mocks.clock = Mocks.clock + 30000
+    check(cb['som-outdoors:server:chopFinish'](1).error == 'this place is too hot, or you have done this one' and #Deleted == 1, 'chop: the drop-off has a cooldown')
+    mysql.fakeNow = mysql.fakeNow + 11 * 60
+    cb['som-outdoors:server:chopBegin'](1, 'chop_1', 952)
+    Mocks.clock = Mocks.clock + 30000
+    check(cb['som-outdoors:server:chopFinish'](1).success and #Deleted == 2, 'chop: after the cooldown the next one works')
+
+    local B = env.Config.buyers.scrap
+    check(B ~= nil and B.prices.scrapmetal == 8 and not B.enabled, 'chop: parts sell to a scrap buyer that ships disabled')
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))
