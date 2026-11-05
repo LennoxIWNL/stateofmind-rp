@@ -8,6 +8,10 @@ Config = {
             label = 'Fish buyer', enabled = false, coords = nil, distance = 3.0, hourlyCap = 6000,
             prices = { codfish = 40, bass = 55, fishingloot = 90, fishinglootbig = 180 },
         },
+        hunt = {
+            label = 'Game buyer', enabled = false, coords = nil, distance = 3.0, hourlyCap = 6000,
+            prices = { venison = 60, deer_pelt = 120, antlers = 150 },
+        },
     },
 
     fishing = {
@@ -25,6 +29,19 @@ Config = {
         -- EVERY spot ships disabled. A spot is a water area to cast into.
         spots = {
             { name = 'pier_1', label = 'Pier', enabled = false, center = nil, radius = nil },
+        },
+    },
+
+    hunting = {
+        knife = 'hunting_knife',
+        requireLicense = false,   -- needs a hunting_license item when true; nothing issues it yet
+        license = 'hunting_license',
+        distance = 3.0,
+        cooldown = 10,            -- seconds between skinnings for one character
+        -- Models are plain names hashed on the server. `drops` are { item, min, max, chance }.
+        animals = {
+            a_c_deer = { drops = { { 'venison', 2, 3, 1.0 }, { 'deer_pelt', 1, 1, 1.0 }, { 'antlers', 1, 1, 0.25 } } },
+            a_c_boar = { drops = { { 'venison', 1, 2, 1.0 } } },
         },
     },
 }

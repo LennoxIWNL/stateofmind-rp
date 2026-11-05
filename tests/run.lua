@@ -3649,5 +3649,44 @@ do
     Mocks.addMoneyFails = false
 end
 
+-- ---------------------------------------------------------------------------
+-- Hunting
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua', 'server/buyer.lua', 'server/hunting.lua' })
+    Mocks.players = { [1] = { citizenid = 'H1' }, [2] = { citizenid = 'H2' } }
+    Mocks.inv = { [1] = {}, [2] = {} }
+    Mocks.clock = 1000000
+    FakePeds[1], FakePeds[2], FakePeds[800] = vec3(0, 0, 0), vec3(0, 0, 0), vec3(1, 0, 0)
+    Animals = { [800] = { model = 'a_c_deer', health = 0, killer = 1 }, [801] = { model = 'a_c_cow', health = 0, killer = 1 } }
+    FakePeds[801] = vec3(1, 0, 0)
+    local cb = RegisteredCallbacks
+    local slot = 900
+    local function give(src, name, n) slot = slot + 1; Mocks.inv[src][slot] = { name = name, count = n or 1, slot = slot } end
+    local function count(src, name) local n = 0; for _, it in pairs(Mocks.inv[src]) do if it.name == name then n = n + (it.count or 1) end end; return n end
+    local skin = cb['som-outdoors:server:skin']
+
+    check(skin(1, 'x').error == 'bad request' and skin(1, 999).error == 'there is nothing to skin' and skin(1, 801).error == 'there is nothing to skin', 'hunt: only real listed animals can be skinned')
+    check(skin(1, 800).error == 'you need a hunting knife', 'hunt: a knife is required')
+    give(1, 'hunting_knife'); give(2, 'hunting_knife')
+    Animals[800].health = 100
+    check(skin(1, 800).error == 'it is still alive', 'hunt: a live animal is refused')
+    Animals[800].health = 0
+    check(skin(2, 800).error == 'that is not your kill', 'hunt: only the killer skins')
+    FakePeds[1] = vec3(50, 0, 0)
+    check(skin(1, 800).error == 'you are too far away', 'hunt: distance is checked')
+    FakePeds[1] = vec3(0, 0, 0)
+    env.Config.hunting.requireLicense = true
+    check(skin(1, 800).error == 'you need a hunting licence', 'hunt: the licence rule can be switched on')
+    env.Config.hunting.requireLicense = false
+
+    local r = skin(1, 800)
+    check(r.success and count(1, 'venison') >= 2 and count(1, 'deer_pelt') == 1, 'hunt: a deer gives venison and a pelt')
+    Mocks.clock = Mocks.clock + 60000
+    check(skin(1, 800).error == 'it has been skinned already' and count(1, 'deer_pelt') == 1, 'hunt: a carcass is skinned once')
+end
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)

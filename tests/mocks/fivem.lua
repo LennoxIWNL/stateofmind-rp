@@ -70,9 +70,19 @@ _G.Teleports = {}
 _G.SetEntityCoords = function(ped, x, y, z) _G.Teleports[#_G.Teleports + 1] = { ped = ped, x = x, y = y, z = z } end
 
 _G.Vehicles = {}
-_G.NetworkGetEntityFromNetworkId = function(netId) return _G.Vehicles[netId] and netId or 0 end
-_G.DoesEntityExist = function(e) return _G.Vehicles[e] ~= nil end
-_G.GetEntityType = function(e) return 2 end
+_G.Animals = {}
+_G.NetworkGetEntityFromNetworkId = function(netId) return (_G.Vehicles[netId] or _G.Animals[netId]) and netId or 0 end
+_G.DoesEntityExist = function(e) return _G.Vehicles[e] ~= nil or _G.Animals[e] ~= nil end
+_G.GetEntityType = function(e) return _G.Animals[e] and 1 or 2 end
+_G.GetEntityModel = function(e) return _G.joaat(_G.Animals[e].model) end
+_G.GetEntityHealth = function(e) return _G.Animals[e].health end
+_G.GetPedSourceOfDeath = function(e) return _G.Animals[e].killer or 0 end
+_G.Entity = function(e)
+    _G.Animals[e].bag = _G.Animals[e].bag or {}
+    local bag = _G.Animals[e].bag
+    return { state = setmetatable({ set = function(_, k, v) bag[k] = v end }, { __index = bag }) }
+end
 _G.GetVehicleEngineHealth = function(e) return _G.Vehicles[e].engine end
 _G.GetVehicleBodyHealth = function(e) return _G.Vehicles[e].body end
 _G.GetPedInVehicleSeat = function(e) return _G.Vehicles[e].driver or 0 end
+_G.joaat = function(name) local h = 5381; for i = 1, #name do h = (h * 33 + name:byte(i)) % 4294967296 end; return h end
