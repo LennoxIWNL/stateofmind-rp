@@ -85,3 +85,25 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: NUI tests
         run: node tests/nui/run.mjs
+
+  database:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: stateofmindrp
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y mariadb-client
+      - name: Import setup.sql twice (it must be safe to re-run)
+        run: |
+          for i in 1 2; do mariadb -h127.0.0.1 -uroot -proot stateofmindrp < setup.sql; done
+      - name: Every claim has exactly one winner under parallel load
+        run: DIRECT=1 DB_PASS=root tools/load-claims-all.sh x 20 3

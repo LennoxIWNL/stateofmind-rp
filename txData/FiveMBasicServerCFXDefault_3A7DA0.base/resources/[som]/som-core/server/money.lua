@@ -77,11 +77,15 @@ local function transact(player, account, delta, reason, opts)
         flow = opts.counterparty and 'transfer' or (delta > 0 and 'faucet' or 'sink')
     end
 
+    -- The balance is written as a change (`col + delta`), never as the result. Two
+    -- changes in flight can reach the database in either order; adding both always
+    -- lands on the same total, while writing "the balance I computed" would let the
+    -- older one win and bring money back.
     local ok, err = pcall(function()
         MySQL.transaction.await({
             {
-                query = ('UPDATE som_character_money SET `%s` = ? WHERE citizenid = ?'):format(account),
-                values = { balance, player.citizenid },
+                query = ('UPDATE som_character_money SET `%s` = `%s` + ? WHERE citizenid = ?'):format(account, account),
+                values = { delta, player.citizenid },
             },
             {
                 query = [[
@@ -216,33 +220,32 @@ end
 local function creditOffline(citizenid, account, value, reason, opts)
     opts = opts or {}
 
-    local current = MySQL.scalar.await(
-        ('SELECT `%s` FROM som_character_money WHERE citizenid = ?'):format(account),
-        { citizenid })
+    if not MySQL.scalar.await('SELECT 1 FROM som_character_money WHERE citizenid = ?', { citizenid }) then
+        return false, 'no such character'
+    end
 
-    if not current then return false, 'no such character' end
-
-    local balance = current + value
-
+    -- Added in the database, not read then written back: two credits to the same
+    -- offline character (or one landing as they log in) must both count.
     local ok, err = pcall(function()
-        MySQL.transaction.await({
+        local done = MySQL.transaction.await({
             {
-                query = ('UPDATE som_character_money SET `%s` = ? WHERE citizenid = ?'):format(account),
-                values = { balance, citizenid },
+                query = ('UPDATE som_character_money SET `%s` = `%s` + ? WHERE citizenid = ?'):format(account, account),
+                values = { value, citizenid },
             },
             {
-                query = [[
+                query = ([[
                     INSERT INTO som_transactions
                         (citizenid, account, amount, balance, direction, flow, reason, resource, counterparty, business_id)
-                    VALUES (?, ?, ?, ?, 'credit', ?, ?, ?, ?, ?)
-                ]],
+                    SELECT m.citizenid, ?, ?, m.`%s`, 'credit', ?, ?, ?, ?, ?
+                    FROM som_character_money m WHERE m.citizenid = ?
+                ]]):format(account),
                 values = {
-                    citizenid, account, value, balance,
-                    opts.flow or 'transfer', reason,
-                    opts.resource or callerResource(), opts.counterparty, opts.businessId,
+                    account, value, opts.flow or 'transfer', reason,
+                    opts.resource or callerResource(), opts.counterparty, opts.businessId, citizenid,
                 },
             },
         })
+        if not done then error('transaction failed') end
     end)
 
     if not ok then

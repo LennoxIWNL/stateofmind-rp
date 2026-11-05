@@ -2947,6 +2947,19 @@ do
     restore()
 
     env, seen, restore = heistScene()
+    heistCrew(1)
+    j(1, 'queue', { provider = 'heist_store' }); boardEnv.JobBoard.Draw('heist_store'); j(1, 'accept')
+    FakePeds[1] = vec3(0, 0, 0); hinteract(1, 'hack')
+    local before = Mocks.treasury
+    Mocks.addMoneyThrows = true
+    FakePeds[1] = vec3(50, 0, 0); hinteract(1, 'loot')
+    Mocks.addMoneyThrows = false
+    check(Mocks.treasury == before, 'heist: a crash after the treasury debit puts the money back')
+    FakePeds[1] = vec3(100, 0, 0); hinteract(1, 'loot')
+    check(before - Mocks.treasury > 0, 'heist: the payout lock is released after a crash, so the next loot point pays')
+    restore()
+
+    env, seen, restore = heistScene()
     Mocks.treasury = 0
     heistCrew(1)
     j(1, 'queue', { provider = 'heist_store' }); boardEnv.JobBoard.Draw('heist_store'); j(1, 'accept')
@@ -3657,6 +3670,13 @@ do
     Mocks.addMoneyFails = true
     check(cb['som-outdoors:server:sell'](1, 'fish').success == false and Mocks.treasury == 1000 and count(1, 'codfish') == 3, 'buyer: a failed credit refunds the treasury and the fish')
     Mocks.addMoneyFails = false
+
+    Mocks.addMoneyThrows = true
+    local crash = cb['som-outdoors:server:sell'](1, 'fish')
+    Mocks.addMoneyThrows = false
+    check(crash.success == false and Mocks.treasury == 1000 and count(1, 'codfish') == 3, 'buyer: a crash after the treasury debit refunds the treasury and the fish')
+    local again = cb['som-outdoors:server:sell'](1, 'fish')
+    check(again.success == true, 'buyer: the lock is released after a crash, so the next sale works')
 end
 
 -- ---------------------------------------------------------------------------
@@ -4278,6 +4298,48 @@ do
     cmd.unplace(1, { resource = 'som-turf', path = 'zones.grove.tag' })
     check(said:find('Removed') and #mysql.db.placements == 3, 'place: unplace removes a placement')
     _G.TriggerClientEvent = realT
+end
+
+-- ---------------------------------------------------------------------------
+-- Money bus: balances are written as changes, so order cannot bring money back
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    mysql.transactions = {}
+    mysql.failTransaction = false
+    local saved = { Player = _G.Player, SomFormatDate = _G.SomFormatDate }
+    _G.Player = function() return { state = { set = function() end } } end
+    _G.SomFormatDate = _G.SomFormatDate or function(d) return tostring(d) end
+    local env = loader.loadResource(REPO .. 'som-core', { 'shared/config.lua', 'shared/tiers.lua', 'shared/jobs.lua', 'shared/gangs.lua', 'server/player.lua', 'server/money.lua' })
+    local player = env.Players.Create(41, { citizenid = 'MONEY1', license = 'license:x', slot = 1, firstname = 'Mo', lastname = 'Ney', dob = '2000-01-01', gender = 0, nationality = 'LS', phone = '555-4100', job = 'unemployed', job_grade = 0, job_duty = 0, gang = 'none', gang_grade = 0 }, { cash = 0, bank = 100, crypto = 0, dirty = 0 })
+
+    check(env.Money.Add(41, 'bank', 50, 'test:add') == true and player.money.bank == 150, 'money: an add changes the balance')
+    check(env.Money.Remove(41, 'bank', 30, 'test:remove') == true and player.money.bank == 120, 'money: a remove changes the balance')
+    check(env.Money.Remove(41, 'bank', 9999, 'test:overdraw') == false and player.money.bank == 120, 'money: you cannot go below zero')
+
+    local updates = {}
+    for _, tx in ipairs(mysql.transactions) do updates[#updates + 1] = tx[1] end
+    check(#updates == 2 and updates[1].query:find('+ ? WHERE', 1, true) and not updates[1].query:find('= ? WHERE', 1, true) and updates[1].values[1] == 50 and updates[2].values[1] == -30,
+        'money: the database is told the change, not the result')
+
+    local total = 100
+    for i = #updates, 1, -1 do total = total + updates[i].values[1] end
+    check(total == player.money.bank, 'money: applying the changes in the opposite order still lands on the same total')
+
+    mysql.failTransaction = true
+    local ok = env.Money.Add(41, 'bank', 10, 'test:fail')
+    mysql.failTransaction = false
+    check(ok == false and player.money.bank == 120, 'money: a failed save rolls the in-memory balance back')
+
+    mysql.transactions = {}
+    check(env.Money.TransferToCitizen(41, 'NOBODY', 'bank', 5, 'x') == false and player.money.bank == 120, 'money: paying a character that does not exist fails')
+    mysql.transactions = {}
+    local paid = env.Money.TransferToCitizen(41, 'OFFLINE1', 'bank', 25, 'test:offline')
+    local credit = mysql.transactions[2]
+    check(paid == true and player.money.bank == 95 and credit and credit[1].query:find('+ ? WHERE', 1, true) and credit[1].values[1] == 25 and credit[2].query:find('FROM som_character_money', 1, true),
+        'money: an offline credit is added in the database and the ledger reads the balance from it')
+    _G.Player, _G.SomFormatDate = saved.Player, saved.SomFormatDate
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))

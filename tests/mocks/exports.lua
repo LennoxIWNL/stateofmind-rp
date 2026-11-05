@@ -65,6 +65,7 @@ function core:payWith(source, account, amount, reason)
 end
 function core:addMoney(source, account, amount, reason)
     Mocks.calls.addMoney = Mocks.calls.addMoney + 1
+    if Mocks.addMoneyThrows then error('simulated crash after the treasury was debited') end
     if Mocks.addMoneyFails then return false, 'refused' end
     Mocks.paid = (Mocks.paid or 0) + amount
     Mocks.lastPaid = { account = account, amount = amount, reason = reason }
