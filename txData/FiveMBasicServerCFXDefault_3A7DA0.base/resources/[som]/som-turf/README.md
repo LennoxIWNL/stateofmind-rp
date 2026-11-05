@@ -20,11 +20,10 @@ Turf and the street drug market as one system (AUDIT 17 and 18): owning a zone i
 - **Payroll**: hourly, from the gang account, for gangs holding a zone.
 - **Turf app** (`turf`): read only owners, contests, prices.
 - **Weed growing**: plants, tending, harvest, bagging (`server/grow.lua`).
-- **Labs**: timed recipe cooks (`server/lab.lua`); the coke chain works with existing items, the meth recipe is disabled.
+- **Labs**: timed recipe cooks (`server/lab.lua`); the coke chain works with existing items, precursors come from a disabled-by-default chemical supplier.
 
 ## Scope cuts
 - No NPC buyers; selling is an interaction with the zone, not a ped.
-- No meth chain: it needs precursor items and icons that do not exist yet.
 - No phone HUD or score of any kind, on purpose.
 - `control_points` on `som_turf` is unused.
 - Every zone, grow spot, bagging table and lab ships disabled with no coordinates.

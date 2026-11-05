@@ -185,6 +185,12 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Import the `som_lab_jobs` table (end of `setup.sql`) on an existing database.
 - [ ] `Config.labs` ships disabled with no coordinates. Enable and place one or more.
 - [ ] Recipes: `press_brick` (coke_brick to 3 coke_small_brick, 15 min) and `cut_coke` (coke_small_brick to 4 cokebaggy, 10 min) use existing items. Nothing in the game hands out `coke_brick` yet (not a heist payout, not a shop), so decide the source, or the chain starts only from admin-issued items.
-- [ ] `cook_meth` is disabled with empty inputs: it needs precursor items and icons, which would be new ox_inventory items.
+- [ ] `cook_meth` is now enabled (2 ephedrine, acetone, lithium, hydrochloric acid for 5 meth, 30 min) and `refine_leaf` (4 coca leaves and sulfuric acid for a brick, 20 min). The six new items are in `ox_inventory/data/items.lua` with community-pack icons. The recipes only run at a lab you place.
 - [ ] One cook per lab at a time and one per character; a cook is collected only by whoever started it. Starting raises the low-chance `drugDeal` dispatch call.
 - [ ] Never run in a client: the lab zone, dialog and progress bar.
+
+## Chemical supplier (som-turf)
+
+- [ ] `Config.supplier` ships disabled with no coordinates. It is the only source of coca leaves and precursors, so place it deliberately (it is a gang-only shop). Prices (40 to 150 each) and `maxQty` 5 are defaults. Payment is from the buyer's bank into the treasury (a sink), so nothing is minted; the treasury then funds heists and city budgets.
+- [ ] Still no source for `coke_brick` other than `refine_leaf`; the old note about it is superseded.
+- [ ] Not run in a client: the supplier dialog and zone.

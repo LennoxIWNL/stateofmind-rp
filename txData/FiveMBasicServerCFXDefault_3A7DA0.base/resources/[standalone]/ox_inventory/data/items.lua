@@ -4507,4 +4507,40 @@ return {
 		client = { anim = 'placing', usetime = 900, disable = { move = true, car = true, combat = true }, cancel = true },
 		server = { export = 'som-props.use' },
 	},
+
+	['coke_leaf'] = {
+		label = 'Coca Leaves',
+		weight = 50,
+		description = 'Fresh leaves, not much use as they are',
+	},
+
+	['acetone'] = {
+		label = 'Acetone',
+		weight = 300,
+		description = 'A strong solvent',
+	},
+
+	['lithium'] = {
+		label = 'Lithium',
+		weight = 200,
+		description = 'Cut from a battery',
+	},
+
+	['ephedrine'] = {
+		label = 'Ephedrine',
+		weight = 100,
+		description = 'A decongestant ingredient',
+	},
+
+	['hydrochloric_acid'] = {
+		label = 'Hydrochloric Acid',
+		weight = 500,
+		description = 'Corrosive. Handle with care',
+	},
+
+	['sulfuric_acid'] = {
+		label = 'Sulfuric Acid',
+		weight = 500,
+		description = 'Corrosive. Handle with care',
+	},
 }
