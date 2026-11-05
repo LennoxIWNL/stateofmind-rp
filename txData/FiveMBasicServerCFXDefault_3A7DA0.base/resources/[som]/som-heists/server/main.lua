@@ -385,3 +385,5 @@ CreateThread(function()
         pcall(Heists.Sweep)
     end
 end)
+
+CreateThread(function() SomPlacements.Apply(Config) end)

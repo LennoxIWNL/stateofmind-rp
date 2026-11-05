@@ -119,3 +119,5 @@ lib.callback.register('som-outdoors:server:sell', function(source, name)
     busy = false
     return done(true, nil, { paid = worth })
 end)
+
+CreateThread(function() SomPlacements.Apply(Config) end)

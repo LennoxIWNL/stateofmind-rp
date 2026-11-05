@@ -1730,3 +1730,17 @@ CREATE TABLE IF NOT EXISTS `som_trade_offers` (
   KEY `idx_buyer` (`buyer`, `status`),
   KEY `idx_seller` (`seller`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Staff placed positions for content that ships disabled (som-staff /place). The content
+-- resource applies a row over its Config by path when it starts.
+CREATE TABLE IF NOT EXISTS `som_placements` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `resource`   VARCHAR(32) NOT NULL,
+  `path`       VARCHAR(80) NOT NULL,
+  `kind`       ENUM('point','number','bool') NOT NULL,
+  `value`      VARCHAR(200) NOT NULL,
+  `placed_by`  VARCHAR(32) NOT NULL DEFAULT 'console',
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_resource` (`resource`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

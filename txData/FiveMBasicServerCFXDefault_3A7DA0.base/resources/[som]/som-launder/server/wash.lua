@@ -169,3 +169,5 @@ CreateThread(function()
         end
     end
 end)
+
+CreateThread(function() SomPlacements.Apply(Config) end)
