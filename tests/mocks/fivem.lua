@@ -76,7 +76,9 @@ _G.DoesEntityExist = function(e) return _G.Vehicles[e] ~= nil or _G.Animals[e] ~
 _G.GetEntityType = function(e) return _G.Animals[e] and 1 or 2 end
 _G.GetEntityModel = function(e) return _G.joaat(_G.Animals[e].model) end
 _G.GetEntityHealth = function(e) return _G.Animals[e].health end
-_G.GetPedSourceOfDeath = function(e) return _G.Animals[e].killer or 0 end
+_G.PedKillers, _G.PlayerPeds = {}, {}
+_G.GetPedSourceOfDeath = function(e) return (_G.Animals[e] and _G.Animals[e].killer) or _G.PedKillers[e] or 0 end
+_G.IsPedAPlayer = function(e) return _G.PlayerPeds[e] == true end
 _G.Entity = function(e)
     _G.Animals[e].bag = _G.Animals[e].bag or {}
     local bag = _G.Animals[e].bag

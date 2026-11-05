@@ -1679,3 +1679,17 @@ CREATE TABLE IF NOT EXISTS `som_chop_log` (
   KEY `idx_dropoff` (`dropoff`, `created_at`),
   KEY `idx_plate` (`plate`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- New life records (som-medical). until_at comes from the database clock.
+CREATE TABLE IF NOT EXISTS `som_new_life` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `class`      ENUM('violence','accident') NOT NULL,
+  `x`          DOUBLE NOT NULL,
+  `y`          DOUBLE NOT NULL,
+  `z`          DOUBLE NOT NULL,
+  `until_at`   TIMESTAMP NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_citizen` (`citizenid`, `until_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

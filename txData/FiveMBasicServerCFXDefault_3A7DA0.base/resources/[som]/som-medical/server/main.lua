@@ -201,6 +201,7 @@ lib.callback.register('som-medical:server:respawn', function(source)
     publish(source, false)
 
     TriggerEvent('som:server:playerRevived', source, cid, nil)
+    TriggerEvent('som:server:playerRespawned', source, cid)
 
     return {
         success = true,

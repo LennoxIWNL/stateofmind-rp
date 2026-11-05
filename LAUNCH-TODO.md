@@ -225,3 +225,10 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] A vehicle whose plate is in `som_vehicles` is refused, so players cannot lose an owned car; that also means a stolen player car cannot be chopped (a deliberate cut). Rental plates are NOT checked: confirm rentals use plates that never reach a chop, or add a check against `som-rentals`.
 - [ ] The VIN scrub is a progress bar with a server-enforced minimum time (25 s), not a skill check: the server cannot trust a client's skill result. 10 minute drop-off cooldown and 24 hour plate cooldown are defaults.
 - [ ] Calls dispatch `chopShop` at the shop with a 40% chance. Parts reuse existing items and icons. Never run in a client.
+
+## New life rule (som-medical)
+
+- [ ] Import the `som_new_life` table (end of `setup.sql`) on an existing database.
+- [ ] Respawning at the hospital after being killed by **another player** records a 15 minute new life at the place of death and tells the player; any other death (fall, vehicle, NPC, environment) has no restriction. `Config.NewLife` has the minutes and a 200 m radius (the radius is only shown in text; nothing is enforced). A medic revive is not a new life.
+- [ ] Not built: more classes (execution, hostage), enforcement near the death place, a ban on returning. Staff read it with `/nlr <id>` (needs `som.mod`) or the `getNewLife` export. The rules text in `RULES-DRAFT.md` (new life, 15 minutes) should match whatever you set here.
+- [ ] Cause is derived on the server from the killer ped (`GetPedSourceOfDeath`, `IsPedAPlayer`); never run with real players, so check it classifies a player kill correctly.

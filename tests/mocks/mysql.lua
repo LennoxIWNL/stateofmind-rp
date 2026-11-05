@@ -33,6 +33,7 @@ M.db = {
     turf = { zones = {}, events = {}, market = {} },
     whitelist = {},
     buyer = {},
+    newlife = {},
     chop = { log = {}, owned = {} },
     lab = {},
     plants = {},
@@ -423,6 +424,23 @@ local function whitelist(kind, query, params)
     return false
 end
 
+local function newlife(kind, query, params)
+    local N = M.db.newlife
+    if kind == 'insert' and query:find('INSERT INTO som_new_life', 1, true) then
+        N[#N + 1] = { citizenid = params[1], class = params[2], x = params[3], y = params[4], z = params[5], untilAt = now() + params[6] * 60 }
+        return true, #N
+    elseif kind == 'single' and query:find('FROM som_new_life WHERE citizenid = ?', 1, true) then
+        for i = #N, 1, -1 do
+            local r = N[i]
+            if r.citizenid == params[1] and r.untilAt > now() then
+                return true, { class = r.class, x = r.x, y = r.y, z = r.z, minutes_left = math.ceil((r.untilAt - now()) / 60) }
+            end
+        end
+        return true, nil
+    end
+    return false
+end
+
 local function chop(kind, query, params)
     local C = M.db.chop
     if kind == 'scalar' and query:find('SELECT 1 FROM som_vehicles WHERE plate = ?', 1, true) then
@@ -663,6 +681,7 @@ function M.single(query, params)
     do local handled, value = city('single', query, params); if handled then return value end end
     do local handled, value = heist('single', query, params); if handled then return value end end
     do local handled, value = turf('single', query, params); if handled then return value end end
+    do local handled, value = newlife('single', query, params); if handled then return value end end
     do local handled, value = plants('single', query, params); if handled then return value end end
     do local handled, value = lab('single', query, params); if handled then return value end end
     if query:find('FROM som_properties WHERE slug = ?', 1, true) then
@@ -1192,6 +1211,7 @@ function M.insert(query, params)
     do local handled, value = lab('insert', query, params); if handled then return value end end
     do local handled, value = buyer('insert', query, params); if handled then return value end end
     do local handled, value = chop('insert', query, params); if handled then return value end end
+    do local handled, value = newlife('insert', query, params); if handled then return value end end
     if query:find('INSERT INTO som_property_owners', 1, true) then
         local propertyId, citizenid, role, grantedBy = params[1], params[2], params[3], params[4]
         local existing = findOwner(propertyId, citizenid)
