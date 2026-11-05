@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-staff'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Launch operations: the connection whitelist and the staff action tools'
 version '0.1.0'
 

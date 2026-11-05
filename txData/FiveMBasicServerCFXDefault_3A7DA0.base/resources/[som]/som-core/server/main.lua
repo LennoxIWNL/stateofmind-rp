@@ -311,4 +311,5 @@ CreateThread(function()
     for _ in pairs(Gangs) do gangCount = gangCount + 1 end
 
     print(('[som-core] ready. %d jobs, %d gangs.'):format(jobCount, gangCount))
+    print('[som] State of Mind RP framework, made by Lennox')
 end)

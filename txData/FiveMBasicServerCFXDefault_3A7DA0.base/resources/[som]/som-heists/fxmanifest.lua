@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-heists'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Heist framework: store, small bank and vault tiers as job board providers, started by a ledger backed dongle'
 version '0.1.0'
 

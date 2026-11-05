@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-courier'
-author 'State of Mind RP'
+author 'Lennox'
 description 'A legal group delivery run, the first provider on the job board'
 version '0.1.0'
 

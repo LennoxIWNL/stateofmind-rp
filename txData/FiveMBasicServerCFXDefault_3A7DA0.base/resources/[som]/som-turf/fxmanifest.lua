@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-turf'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Gang turf and the street drug market as one system: owning a zone is what lets a gang sell in it'
 version '0.1.0'
 

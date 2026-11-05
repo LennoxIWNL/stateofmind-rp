@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-outdoors'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Fishing, hunting and scrapping: server-checked work sold to buyers paid from a capped treasury pool'
 version '0.1.0'
 

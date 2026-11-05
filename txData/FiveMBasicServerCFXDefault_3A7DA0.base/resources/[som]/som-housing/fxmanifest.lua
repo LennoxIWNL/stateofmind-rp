@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-housing'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Property: houses, apartments and warehouses in shell interiors, with keys, storage, mortgages and police raids'
 version '0.1.0'
 

@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-ui'
-author 'State of Mind RP'
+author 'Lennox'
 description 'SOM notifications and progress, the single implementation behind som:client:notify'
 version '0.2.0'
 

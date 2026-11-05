@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-compat'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Legacy qb-core export surface backed by som-core, so preserved resources run untouched'
 version '0.1.0'
 

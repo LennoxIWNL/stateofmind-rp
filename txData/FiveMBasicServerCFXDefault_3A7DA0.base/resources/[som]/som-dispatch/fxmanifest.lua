@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-dispatch'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Crime alerts and the call store, answering to the ps-dispatch surface ps-mdt expects'
 version '0.1.0'
 

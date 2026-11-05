@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-economy'
-author 'State of Mind RP'
+author 'Lennox'
 description 'SOM economy: market saturation, business register, departments, fines'
 version '0.1.0'
 

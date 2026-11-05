@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-props'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Placeable scene props: cones, barriers and worklights, placed and picked up under server authority'
 version '0.1.0'
 

@@ -2,7 +2,7 @@ fx_version 'cerulean'
 game 'gta5'
 
 name 'som-traffic'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Puts the lore-friendly civilian cars into ambient NPC traffic'
 version '0.1.0'
 

@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-hud'
-author 'State of Mind RP'
+author 'Lennox'
 description 'The HUD: condition, speedometers, compass, location and the layout editor'
 version '0.2.0'
 

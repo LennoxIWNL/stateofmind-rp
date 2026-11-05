@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-loading'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Loading screen'
 version '1.0.0'
 

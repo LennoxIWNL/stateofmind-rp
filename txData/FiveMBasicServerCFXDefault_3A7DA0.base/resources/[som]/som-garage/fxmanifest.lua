@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-garage'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Vehicle ownership and garages: personal, business fleets and the police pool, with a live preview'
 version '0.1.0'
 
