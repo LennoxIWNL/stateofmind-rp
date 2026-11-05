@@ -3495,7 +3495,7 @@ do
     check(cb['som-turf:server:supplierInfo'](1) == nil and cb['som-turf:server:supplierBuy'](1, 'acetone', 1).error == 'nobody is selling', 'supplier: ships disabled')
     local S = env.Config.supplier
     S.enabled, S.coords = true, vec3(0, 0, 0)
-    check(#cb['som-turf:server:supplierInfo'](1).stock == 6, 'supplier: the stock list is sent')
+    check(#cb['som-turf:server:supplierInfo'](1).stock == 11, 'supplier: the stock list is sent')
     check(cb['som-turf:server:supplierBuy'](2, 'acetone', 1).error == 'you are not in a gang', 'supplier: only gang members buy')
     check(cb['som-turf:server:supplierBuy'](1, 'gold', 1).error == 'they do not sell that', 'supplier: only listed items')
     check(cb['som-turf:server:supplierBuy'](1, 'acetone', 0).success == false and cb['som-turf:server:supplierBuy'](1, 'acetone', 1.5).success == false and cb['som-turf:server:supplierBuy'](1, 'acetone', 99).success == false, 'supplier: quantities are validated')
