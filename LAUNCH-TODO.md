@@ -201,3 +201,12 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Mechanics have no way to get `repairkit` or `steel` in the world yet (no shop, no recycle link). Decide the supplier (an ox_inventory shop at the garage, or `jim-recycle`).
 - [ ] Not built: tyres, tuning/mod shop (that is `som-garage`'s modshop), mechanic commission (`jobs.lua` has `commission = 0.12`, unused), tow integration with `som-towtruck`. `jim-mechanic` (paid) stays off.
 - [ ] Health is read on the server but applied by the mechanic's client (setting vehicle health is a client native), so the effect is cosmetic-trust only; the parts and the bill are decided server side. Never run in a client.
+
+## Fishing and buyers (som-outdoors)
+
+- [ ] Import the `som_buyer_payouts` table (end of `setup.sql`) on an existing database.
+- [ ] Fishing spots (`Config.fishing.spots`) and the fish buyer (`Config.buyers.fish`) ship disabled with no coordinates. Place them.
+- [ ] Buyers pay from the **treasury**, capped per rolling hour (fish: 6000 for the whole server). The treasury starts at 0, so until fines and taxes fill it a buyer says "the city cannot pay right now". That is deliberate; decide whether the treasury needs a seeded balance.
+- [ ] Catch table (codfish 50, bass 30, fishingloot 15, fishinglootbig 5), prices (40, 55, 90, 180), bite wait 8 to 20 s, rod and bait items are defaults. Fish items and icons already existed.
+- [ ] Nothing hands out `fishingrod` or `fishbait` in the world yet (no shop). Decide the supplier.
+- [ ] Never run in a client: the cast progress bar, zone, sell option.

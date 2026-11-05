@@ -49,6 +49,7 @@ local function resetDb()
     mysql.db.whitelist = {}
     mysql.db.plants = {}
     mysql.db.lab = {}
+    mysql.db.buyer = {}
     mysql.db.staff = { reports = {}, audit = {} }
     mysql.db.gangs = { chars = {}, log = {} }
     mysql.db.vehicles = {}
@@ -3574,6 +3575,78 @@ do
     local bills0 = #Mocks.bills
     check(cb['som-mechanic:server:repair'](1, 900, 'body').success == true and #Mocks.bills == bills0, 'mechanic: no bill when the mechanic is the driver')
     _G.TriggerClientEvent = realT
+end
+
+-- ---------------------------------------------------------------------------
+-- Fishing and the buyer
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua', 'server/buyer.lua', 'server/fishing.lua' })
+    Mocks.players = { [1] = { citizenid = 'F1' }, [2] = { citizenid = 'F2' } }
+    Mocks.inv = { [1] = {}, [2] = {} }
+    Mocks.clock = 1000000
+    mysql.fakeNow = 5000000
+    FakePeds[1], FakePeds[2] = vec3(0, 0, 0), vec3(0, 0, 0)
+    local cb = RegisteredCallbacks
+    local slot = 700
+    local function give(src, name, n) slot = slot + 1; Mocks.inv[src][slot] = { name = name, count = n or 1, slot = slot } end
+    local function count(src, name) local n = 0; for _, it in pairs(Mocks.inv[src]) do if it.name == name then n = n + (it.count or 1) end end; return n end
+
+    check(cb['som-outdoors:server:cast'](1).error == 'there is nothing to catch here', 'fishing: spots ship disabled')
+    local sp = env.Config.fishing.spots[1]
+    sp.enabled, sp.center, sp.radius = true, vec3(0, 0, 0), 20.0
+    check(cb['som-outdoors:server:cast'](1).error == 'you need a fishing rod', 'fishing: a rod is required')
+    give(1, 'fishingrod')
+    check(cb['som-outdoors:server:cast'](1).error == 'you need bait', 'fishing: bait is required')
+    give(1, 'fishbait', 2)
+    check(cb['som-outdoors:server:reel'](1).error == 'you have not cast', 'fishing: you cannot reel without casting')
+    local c = cb['som-outdoors:server:cast'](1)
+    check(c.success and c.wait >= 8 and c.wait <= 20, 'fishing: the server picks the bite time')
+    check(cb['som-outdoors:server:reel'](1).error == 'nothing is biting yet' and count(1, 'fishbait') == 2, 'fishing: reeling early catches nothing and keeps the bait')
+    cb['som-outdoors:server:cast'](1)
+    Mocks.clock = Mocks.clock + 100 * 1000
+    check(cb['som-outdoors:server:reel'](1).error == 'the fish got away', 'fishing: a late reel loses the fish')
+    local c2 = cb['som-outdoors:server:cast'](1)
+    Mocks.clock = Mocks.clock + (c2.wait + 1) * 1000
+    FakePeds[1] = vec3(500, 0, 0)
+    check(cb['som-outdoors:server:reel'](1).error == 'you moved away', 'fishing: you must still be at the spot')
+    FakePeds[1] = vec3(0, 0, 0)
+    local c3 = cb['som-outdoors:server:cast'](1)
+    Mocks.clock = Mocks.clock + (c3.wait + 1) * 1000
+    local r = cb['som-outdoors:server:reel'](1)
+    check(r.success and (r.item == 'codfish' or r.item == 'bass' or r.item == 'fishingloot' or r.item == 'fishinglootbig') and count(1, r.item) == 1 and count(1, 'fishbait') == 1, 'fishing: a bite catches a listed fish and uses a bait')
+
+    check(cb['som-outdoors:server:sell'](1, 'fish').error == 'nobody is buying', 'buyer: ships disabled')
+    local B = env.Config.buyers.fish
+    B.enabled, B.coords = true, vec3(0, 0, 0)
+    Mocks.treasury = 100000
+    Mocks.inv[1] = {}
+    check(cb['som-outdoors:server:sell'](1, 'fish').error == 'you have nothing they want', 'buyer: nothing to sell')
+    give(1, 'codfish', 3)
+    FakePeds[1] = vec3(100, 0, 0)
+    check(cb['som-outdoors:server:sell'](1, 'fish').error == 'you are too far away', 'buyer: distance is checked')
+    FakePeds[1] = vec3(0, 0, 0)
+    local paid0 = Mocks.paid or 0
+    local s = cb['som-outdoors:server:sell'](1, 'fish')
+    check(s.success and s.paid == 120 and (Mocks.paid or 0) == paid0 + 120 and Mocks.treasury == 100000 - 120 and count(1, 'codfish') == 0, 'buyer: a sale is paid from the treasury, exactly')
+
+    B.hourlyCap = 100
+    give(1, 'codfish', 5)
+    mysql.db.buyer = {}
+    local s3 = cb['som-outdoors:server:sell'](1, 'fish')
+    check(s3.success and s3.paid == 80 and count(1, 'codfish') == 3, 'buyer: the hourly cap limits the sale to what it pays for')
+    check(cb['som-outdoors:server:sell'](1, 'fish').error == 'they cannot pay any more right now', 'buyer: the cap holds for the next sale')
+
+    mysql.db.buyer = {}
+    B.hourlyCap = 6000
+    Mocks.treasury = 0
+    check(cb['som-outdoors:server:sell'](1, 'fish').error == 'the city cannot pay right now' and count(1, 'codfish') == 3, 'buyer: an empty treasury returns the fish')
+    Mocks.treasury = 1000
+    Mocks.addMoneyFails = true
+    check(cb['som-outdoors:server:sell'](1, 'fish').success == false and Mocks.treasury == 1000 and count(1, 'codfish') == 3, 'buyer: a failed credit refunds the treasury and the fish')
+    Mocks.addMoneyFails = false
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))
