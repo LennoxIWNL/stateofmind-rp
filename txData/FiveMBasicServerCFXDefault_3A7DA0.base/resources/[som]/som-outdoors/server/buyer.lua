@@ -8,6 +8,15 @@ local ox = exports.ox_inventory
 
 Buyer = {}
 
+function Buyer.Xp(src, track, n)
+    if GetResourceState('som-progress') == 'started' then exports['som-progress']:addXp(src, track, n) end
+end
+
+function Buyer.Level(src, track)
+    if GetResourceState('som-progress') == 'started' then return exports['som-progress']:getLevel(src, track) or 1 end
+    return 1
+end
+
 local busy = false
 
 local function done(ok, err, extra)

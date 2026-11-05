@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-phone'
-author 'State of Mind RP'
+author 'Lennox'
 description 'SOM phone: the action pipeline, the app host, banking over the transaction ledger, settings'
 version '0.1.0'
 

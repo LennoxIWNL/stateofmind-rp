@@ -1,6 +1,5 @@
 # Items that had no inventory icon when tools/check-item-icons.py was added.
 # Remove a line when its icon is added.
-accesstool
 arms
 breathalyzer
 clothing
@@ -11,10 +10,7 @@ forceps
 glasses
 jeans
 luxuryfinish_attachment
-spikespack
-surgical_gloves
 surgical_staple
-surgical_tray
 syringe
 torso
 tshirt

@@ -7,6 +7,15 @@ local core = exports['som-core']
 local ox = exports.ox_inventory
 local G = Config.grow
 
+local function xp(src, track, n)
+    if GetResourceState('som-progress') == 'started' then exports['som-progress']:addXp(src, track, n) end
+end
+
+local function level(src, track)
+    if GetResourceState('som-progress') == 'started' then return exports['som-progress']:getLevel(src, track) or 1 end
+    return 1
+end
+
 local function done(ok, err, extra)
     local out = extra or {}
     out.success = ok == true
@@ -153,11 +162,13 @@ lib.callback.register('som-turf:server:harvest', function(source, id)
     local n = MySQL.update.await("UPDATE som_plants SET status = 'harvested' WHERE id = ? AND status = 'growing'", { p.id })
     if (n or 0) < 1 then return done(false, 'someone got there first') end
 
-    local count = math.random(G.yield.min, G.yield.max) + (p.fed == 1 and G.yield.fedBonus or 0)
+    -- One extra bud for every three growing levels.
+    local count = math.random(G.yield.min, G.yield.max) + (p.fed == 1 and G.yield.fedBonus or 0) + math.floor(level(source, 'growing') / 3)
     if not ox:AddItem(source, G.budItem, count, { strain = p.strain }) then
         MySQL.update.await("UPDATE som_plants SET status = 'growing' WHERE id = ? AND status = 'harvested'", { p.id })
         return done(false, 'you cannot carry it')
     end
+    xp(source, 'growing', 25)
     return done(true, nil, { count = count })
 end)
 

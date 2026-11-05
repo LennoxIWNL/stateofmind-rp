@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-id'
-author 'State of Mind RP'
+author 'Lennox'
 description 'SOM identity documents: ID card, licences, shown to players nearby'
 version '0.1.0'
 

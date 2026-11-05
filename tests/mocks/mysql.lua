@@ -34,6 +34,7 @@ M.db = {
     whitelist = {},
     bans = {},
     buyer = {},
+    skills = {},
     newlife = {},
     chop = { log = {}, owned = {} },
     lab = {},
@@ -463,6 +464,31 @@ local function newlife(kind, query, params)
     return false
 end
 
+local function skills(kind, query, params)
+    local K = M.db.skills
+    if kind == 'scalar' and query:find('SELECT xp FROM som_skills WHERE citizenid = ? AND track = ?', 1, true) then
+        local r = K[params[1] .. ':' .. params[2]]
+        return true, r and r.xp or nil
+    elseif kind == 'query' and query:find('SELECT track, xp FROM som_skills WHERE citizenid = ?', 1, true) then
+        local out = {}
+        for key, r in pairs(K) do if key:find(params[1] .. ':', 1, true) == 1 then out[#out + 1] = { track = r.track, xp = r.xp } end end
+        return true, out
+    elseif kind == 'update' and query:find('INSERT INTO som_skills', 1, true) then
+        local cid, track, amount, cap = params[1], params[2], params[3], params[4]
+        local key = cid .. ':' .. track
+        local r = K[key]
+        if not r then
+            local g = math.min(amount, cap)
+            K[key] = { track = track, xp = g, day_xp = g }
+        else
+            local g = math.min(amount, math.max(0, cap - r.day_xp))
+            r.xp, r.day_xp = r.xp + g, r.day_xp + g
+        end
+        return true, 1
+    end
+    return false
+end
+
 local function chop(kind, query, params)
     local C = M.db.chop
     if kind == 'scalar' and query:find('SELECT 1 FROM som_vehicles WHERE plate = ?', 1, true) then
@@ -787,6 +813,7 @@ function M.scalar(query, params)
     do local handled, value = lab('scalar', query, params); if handled then return value end end
     do local handled, value = buyer('scalar', query, params); if handled then return value end end
     do local handled, value = chop('scalar', query, params); if handled then return value end end
+    do local handled, value = skills('scalar', query, params); if handled then return value end end
     do local handled, value = whitelist('scalar', query, params); if handled then return value end end
     if query:find('SELECT role FROM som_property_owners WHERE property_id = ? AND citizenid = ?', 1, true) then
         local o = findOwner(params[1], params[2])
@@ -890,6 +917,7 @@ function M.update(query, params)
     do local handled, value = whitelist('update', query, params); if handled then return value end end
     do local handled, value = bans('update', query, params); if handled then return value end end
     do local handled, value = staff('update', query, params); if handled then return value end end
+    do local handled, value = skills('update', query, params); if handled then return value end end
     do local handled, value = gangs('update', query, params); if handled then return value end end
     do local handled, value = plants('update', query, params); if handled then return value end end
     do local handled, value = lab('update', query, params); if handled then return value end end
@@ -1400,6 +1428,7 @@ function M.query(query, params)
     do local handled, value = heist('query', query, params); if handled then return value end end
     do local handled, value = turf('query', query, params); if handled then return value end end
     do local handled, value = staff('query', query, params); if handled then return value end end
+    do local handled, value = skills('query', query, params); if handled then return value end end
     do local handled, value = gangs('query', query, params); if handled then return value end end
     do local handled, value = plants('query', query, params); if handled then return value end end
     -- jail.lua's sweep: every serving sentence, with elapsed.

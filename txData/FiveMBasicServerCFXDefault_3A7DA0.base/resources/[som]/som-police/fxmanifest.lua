@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-police'
-author 'State of Mind RP'
+author 'Lennox'
 description 'LSPD: duty, armoury, custody, fines, impounds and certifications'
 version '0.1.0'
 

@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-appearance'
-author 'State of Mind RP'
+author 'Lennox'
 description 'SOM appearance: character creator, barber and clothing, over the standard ped appearance shape'
 version '0.1.0'
 

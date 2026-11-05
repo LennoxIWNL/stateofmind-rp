@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-multichar'
-author 'State of Mind RP'
+author 'Lennox'
 description 'SOM character selection, creation and spawn'
 version '0.1.0'
 

@@ -7,6 +7,15 @@
 local core = exports['som-core']
 local ox = exports.ox_inventory
 
+local function xp(src, track, n)
+    if GetResourceState('som-progress') == 'started' then exports['som-progress']:addXp(src, track, n) end
+end
+
+local function level(src, track)
+    if GetResourceState('som-progress') == 'started' then return exports['som-progress']:getLevel(src, track) or 1 end
+    return 1
+end
+
 local function done(ok, err, extra)
     local out = extra or {}
     out.success = ok == true
@@ -70,11 +79,14 @@ lib.callback.register('som-turf:server:labStart', function(source, labName, reci
         taken[#taken + 1] = { item = item, count = count }
     end
 
+    -- Each chemistry level above 1 shaves 3% off the cook, never below a minute.
+    local minutes = math.max(1, math.floor(recipe.minutes * (1 - 0.03 * (level(source, 'chemistry') - 1))))
+
     local id = MySQL.insert.await([[
         INSERT INTO som_lab_jobs (citizenid, lab, recipe, ready_at)
         SELECT ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE) FROM DUAL
         WHERE NOT EXISTS (SELECT 1 FROM som_lab_jobs WHERE lab = ? AND status = 'cooking')
-    ]], { player.citizenid, lab.name, recipeId, recipe.minutes, lab.name })
+    ]], { player.citizenid, lab.name, recipeId, minutes, lab.name })
     if not id or id < 1 then
         giveBack(source, taken)
         return done(false, 'the lab is busy')
@@ -110,6 +122,7 @@ lib.callback.register('som-turf:server:labCollect', function(source, labName)
         end
         given[#given + 1] = { item = item, count = count }
     end
+    xp(source, 'chemistry', 25)
     return done(true)
 end)
 

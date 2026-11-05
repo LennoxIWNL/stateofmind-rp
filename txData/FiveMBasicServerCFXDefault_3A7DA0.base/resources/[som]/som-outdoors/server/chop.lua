@@ -87,11 +87,14 @@ lib.callback.register('som-outdoors:server:chopFinish', function(source)
 
     DeleteEntity(vehicle)
 
+    -- One extra of each part for every three scrapping levels.
+    local extra = math.floor(Buyer.Level(source, 'scrapping') / 3)
     local got = {}
     for _, part in ipairs(C.parts) do
-        local n = math.random(part[2], part[3])
+        local n = math.random(part[2], part[3]) + extra
         if ox:AddItem(source, part[1], n) then got[#got + 1] = { item = part[1], count = n } end
     end
+    Buyer.Xp(source, 'scrapping', 30)
     return done(true, nil, { parts = got })
 end)
 

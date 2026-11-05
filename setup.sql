@@ -1706,3 +1706,13 @@ CREATE TABLE IF NOT EXISTS `som_bans` (
   PRIMARY KEY (`id`),
   KEY `idx_identifier` (`identifier`, `revoked`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Skill experience (som-progress). Levels are computed from xp, never stored.
+CREATE TABLE IF NOT EXISTS `som_skills` (
+  `citizenid` VARCHAR(16) NOT NULL,
+  `track`     VARCHAR(24) NOT NULL,
+  `xp`        BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  `day_xp`    INT UNSIGNED NOT NULL DEFAULT 0,
+  `day`       DATE NOT NULL,
+  PRIMARY KEY (`citizenid`, `track`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-mechanic'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Mechanic work: engine and body repair that consumes parts and bills the driver through the phone'
 version '0.1.0'
 

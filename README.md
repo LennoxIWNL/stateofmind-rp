@@ -1,5 +1,7 @@
 # State of Mind RP
 
+*Every `som-*` resource is made by Lennox.*
+
 A FiveM roleplay server running **SOM**, a custom framework written for this
 server. Interaction-driven, phone-centric, low-command.
 

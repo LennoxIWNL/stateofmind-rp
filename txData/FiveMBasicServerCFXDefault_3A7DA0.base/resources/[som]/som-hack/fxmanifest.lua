@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-hack'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Hacking challenges whose answer the server holds and checks'
 version '0.1.0'
 

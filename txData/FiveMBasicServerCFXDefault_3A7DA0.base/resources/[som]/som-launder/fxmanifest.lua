@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-launder'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Marked bills: the ledger that mints them, and the front that washes them'
 version '0.1.0'
 

@@ -58,7 +58,7 @@ position, at its own cooldown.
 
 `CEventGunShot` is subscribed by name, matching how r14-evidence does it on this
 same server, so it is known to work in this build rather than assumed. **Only
-the local player's own shots report** — every nearby client receives that event,
+the local player's own shots report**, every nearby client receives that event,
 so without the check one gunshot files one call per witness.
 
 Melee and vehicle theft are polled, because neither has a game event worth

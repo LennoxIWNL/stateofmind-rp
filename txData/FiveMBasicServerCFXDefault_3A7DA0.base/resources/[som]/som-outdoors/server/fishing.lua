@@ -39,14 +39,20 @@ lib.callback.register('som-outdoors:server:cast', function(source)
     return done(true, nil, { wait = wait })
 end)
 
-local function roll()
+-- Rare catches weigh 10% more per fishing level above 1.
+local function weight(c, lvl)
+    return c.rare and c.weight * (1 + 0.1 * (lvl - 1)) or c.weight
+end
+
+local function roll(lvl)
     local total = 0
-    for _, c in ipairs(F.catches) do total = total + c.weight end
-    local r = math.random(total)
+    for _, c in ipairs(F.catches) do total = total + weight(c, lvl) end
+    local r = math.random() * total
     for _, c in ipairs(F.catches) do
-        r = r - c.weight
+        r = r - weight(c, lvl)
         if r <= 0 then return c.item end
     end
+    return F.catches[1].item
 end
 
 lib.callback.register('som-outdoors:server:reel', function(source)
@@ -64,11 +70,12 @@ lib.callback.register('som-outdoors:server:reel', function(source)
 
     if not ox:RemoveItem(source, F.bait, 1) then return done(false, 'you need bait') end
 
-    local item = roll()
+    local item = roll(Buyer.Level(source, 'fishing'))
     if not ox:AddItem(source, item, 1) then
         ox:AddItem(source, F.bait, 1)
         return done(false, 'you cannot carry it')
     end
+    Buyer.Xp(source, 'fishing', 20)
     return done(true, nil, { item = item })
 end)
 

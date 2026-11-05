@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-evidence'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Evidence: scene traces, collection, custody, the lab and case links'
 version '0.1.0'
 

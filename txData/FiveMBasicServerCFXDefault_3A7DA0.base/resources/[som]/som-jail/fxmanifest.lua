@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-jail'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Jail and bail: booking, time served, the yard, and bail'
 version '0.1.0'
 

@@ -161,3 +161,7 @@ Eleven icons copied from `aifazi/items-images` (the community pack this repo alr
 | `hunting_license.png` | `license/hunting_license.png` |
 
 No item uses these yet; they are orphan art until the meth chain and hunting branches add the items. Fishing, mechanic and chop shop items reuse art already in the folder (`fishingrod`, `fishbait`, `codfish`, `repairkit`, `scrapmetal`, `steel`, `aluminum`, `plastic`, `rubber`, `copper`, `glass` and others).
+
+## Medical, police and access icons (2026-11-05)
+
+Four of the 18 baseline gaps filled from `aifazi/items-images`: `spikespack.png` (`police/policespikes.png`), `accesstool.png` (`general/keys/access_key.png`), `surgical_tray.png` (`general/tray.png`), `surgical_gloves.png` (`tools/cleaning/wandgloves_blue.png`). The other 14 (clothing parts, syringe, forceps, staples, breathalyzer, drug test kit, glasses, EMP ammo, luxury finish) have no match in either pack and need drawn or commissioned art.

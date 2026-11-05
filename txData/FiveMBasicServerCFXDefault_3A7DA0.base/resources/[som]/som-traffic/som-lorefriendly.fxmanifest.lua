@@ -2,7 +2,7 @@ fx_version 'cerulean'
 game 'gta5'
 
 name 'som-lorefriendly'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Twenty lore-friendly civilian vehicles, streamed for NPC traffic'
 version '0.1.0'
 

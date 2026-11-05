@@ -209,7 +209,16 @@ function ox:RemoveItem(inv, name, count, metadata, slot)
     return false
 end
 
+local progress = {}
+function progress:addXp(source, track, amount)
+    Mocks.xp = Mocks.xp or {}
+    Mocks.xp[#Mocks.xp + 1] = { source = source, track = track, amount = amount }
+    return amount, 1, false
+end
+function progress:getLevel(source, track) return (Mocks.levels and Mocks.levels[track]) or 1 end
+
 local registry = {
+    ['som-progress'] = progress,
     ['pma-voice'] = { setPlayerCall = function(_, source, channel) Mocks.voice[source] = channel end },
     ['som-medical'] = medical,
     ['som-evidence'] = setmetatable({}, { __index = function(_, name)
@@ -251,7 +260,7 @@ _G.exports = setmetatable({}, {
     __index = function(_, name)
         return registry[name] or error('export not mocked: ' .. tostring(name), 2)
     end,
-    -- A resource exporting its own function (exports('name', fn)) — not
+    -- A resource exporting its own function (exports('name', fn)), not
     -- needed by these tests, so a no-op rather than a real registry.
     __call = function(_, name, fn) Mocks.exported[name] = fn end,
 })

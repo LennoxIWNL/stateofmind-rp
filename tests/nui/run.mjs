@@ -88,7 +88,7 @@ async function main() {
     check(classes !== null && classes.includes('error'),
         'notify: a BOLO hit should render with the error style, not an unstyled default');
 
-    // No leftover stock-toast chrome from whatever this was adapted from —
+    // No leftover stock-toast chrome from whatever this was adapted from,
     // QBCore's own notify system uses the class "qb-notification".
     const stockLeftover = await page.locator('.qb-notification').count();
     check(stockLeftover === 0, 'notify: no leftover QBCore stock-notification markup should be present');
