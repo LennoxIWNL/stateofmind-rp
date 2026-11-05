@@ -63,6 +63,10 @@ jobs:
         run: lua5.4 tests/run.lua
       - name: Repo index server self-test
         run: node tools/som-mcp/selftest.mjs
+      - name: Wiring check self-test
+        run: node tools/wiring-selftest.mjs
+      - name: Exports, callbacks, events, tables and items all resolve
+        run: node tools/wiring-check.mjs
       - name: Every item a system needs has a source
         run: node tools/economy-map.mjs --check
       - name: Every inventory item has an icon
