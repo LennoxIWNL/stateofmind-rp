@@ -9,6 +9,7 @@ version '0.1.0'
 
 shared_scripts {
     '@ox_lib/init.lua',
+    'shared/trace.lua',
     'shared/config.lua',
     'shared/tiers.lua',
     'shared/jobs.lua',
