@@ -270,3 +270,11 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] A rule hook in `som-inventory` requires the mechanic job on duty and a crafting level (repair and tire kits 2, advanced kit and advanced lockpick 5) and grants crafting experience. Experience is granted when the craft is allowed, not when it finishes, because ox_inventory has no after-craft hook.
 - [ ] Not built yet: the public DIY bench (needs coordinates) and the no-mechanic fallback desk, both in the mechanic shop PR.
 - [ ] Never run in a game: the bench UI, group gating through the SOM bridge, and the hook payload (`recipe.name`) were read from ox_inventory source only.
+
+## Mechanic sales and the roadside fallback (som-mechanic)
+
+- [ ] Import the `som_trade_offers` table (end of `setup.sql`) on an existing database.
+- [ ] A mechanic on duty gets an "Offer a kit" option on nearby players: repair kit ($120 to $450), tire kit ($80 to $300), advanced repair kit ($400 to $1200), advanced lockpick ($250 to $900); the price is theirs inside the limits. The customer accepts in the phone's "Offers" app within 2 minutes. The money goes to the shop's business account (`lscustoms`), the mechanic keeps the job's 12% commission, and every step rolls back on failure. Limits are untuned defaults.
+- [ ] The roadside desk (`Config.fallback`, a repair kit for $700 once an hour, paid to the treasury) ships disabled with no coordinates. It only sells while NO mechanic is on duty, so it never undercuts the trade. Decide where it goes and whether $700 is right (the price should stay well above the top of the mechanic range).
+- [ ] The "Offers" app reuses the receipt icon. A DIY public crafting bench is not built (needs coordinates). The lscustoms business needs a real owner and bank account for sales to land in.
+- [ ] Never run in a game: the ped target, dialog, phone app and the sale itself between two players.

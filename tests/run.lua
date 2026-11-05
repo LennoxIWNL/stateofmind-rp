@@ -51,6 +51,7 @@ local function resetDb()
     mysql.db.plants = {}
     mysql.db.lab = {}
     mysql.db.buyer = {}
+    mysql.db.trade = {}
     mysql.db.skills = {}
     mysql.db.newlife = {}
     mysql.db.chop = { log = {}, owned = {} }
@@ -4054,6 +4055,81 @@ do
     check(env.Craft.Check(1, 'repairkit') == true and env.Craft.Check(1, 'advancedlockpick') == false, 'craft: level 2 opens repair kits but not advanced lockpicks')
     Mocks.levels.crafting = 5
     check(env.Craft.Check(1, 'advancedlockpick') == true, 'craft: level 5 opens advanced lockpicks')
+end
+
+-- ---------------------------------------------------------------------------
+-- Mechanic trade and the roadside fallback
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-mechanic', { 'shared/config.lua', 'server/main.lua', 'server/trade.lua' })
+    local function mech(duty) return { citizenid = 'M1', job = { name = 'mechanic', onduty = duty ~= false }, charinfo = { firstname = 'Mo', lastname = 'Chanic' } } end
+    Mocks.players = { [1] = mech(), [2] = { citizenid = 'C2', job = { name = 'unemployed' }, charinfo = { firstname = 'Cu', lastname = 'Stomer' } } }
+    Mocks.inv = { [1] = {}, [2] = {} }
+    Mocks.bank = { [1] = 0, [2] = 1000 }
+    Mocks.jobs = { mechanic = { commission = 0.12 } }
+    Mocks.treasury, Mocks.clock = 0, 1000000
+    mysql.fakeNow = 5000000
+    FakePeds[1], FakePeds[2] = vec3(0, 0, 0), vec3(1, 0, 0)
+    mysql.db.characters = {}
+    local cb = RegisteredCallbacks
+    local app = Mocks.apps.trade
+    local slot = 2100
+    local function give(src, name) slot = slot + 1; Mocks.inv[src][slot] = { name = name, count = 1, slot = slot } end
+    local function count(src, name) local n = 0; for _, it in pairs(Mocks.inv[src]) do if it.name == name then n = n + 1 end end; return n end
+    local offer = cb['som-mechanic:server:offer']
+    give(1, 'repairkit')
+
+    check(offer(2, 1, 'repairkit', 200).error == 'you are not on duty as a mechanic', 'trade: only an on duty mechanic can offer')
+    check(offer(1, 2, 'steel', 200).error == 'that is not something you can sell here', 'trade: only listed goods')
+    check(offer(1, 2, 'repairkit', 50).error:find('between') and offer(1, 2, 'repairkit', 99999).error:find('between') and offer(1, 2, 'repairkit', 150.5).error:find('between'), 'trade: the price must sit inside the limits')
+    check(offer(1, 1, 'repairkit', 200).error == 'there is nobody to sell to' and offer(1, 99, 'repairkit', 200).error == 'there is nobody to sell to', 'trade: no self sales or ghosts')
+    FakePeds[2] = vec3(50, 0, 0)
+    check(offer(1, 2, 'repairkit', 200).error == 'they need to be next to you', 'trade: the customer must be close')
+    FakePeds[2] = vec3(1, 0, 0)
+    Mocks.inv[1] = {}
+    check(offer(1, 2, 'repairkit', 200).error == 'you do not have one', 'trade: you must carry it')
+    give(1, 'repairkit')
+    check(offer(1, 2, 'repairkit', 200).success == true and #mysql.db.trade == 1, 'trade: a valid offer is stored')
+    check(app.handler(2, 'view', {}).view.sections[1].rows[1].action == 'accept', 'trade: the customer sees the offer')
+    check(app.handler(1, 'accept', { offer = 1 }).error == 'that offer is gone', 'trade: only the customer can accept')
+
+    Mocks.bank[2] = 50
+    local r = app.handler(2, 'accept', { offer = 1 })
+    check(r.error == 'not enough in your bank' and count(1, 'repairkit') == 1 and mysql.db.trade[1].status == 'cancelled', 'trade: a customer who cannot pay gets nothing and the mechanic keeps the kit')
+    Mocks.bank[2] = 1000
+    offer(1, 2, 'repairkit', 200)
+    local ok = app.handler(2, 'accept', { offer = 2 })
+    check(ok.success and count(1, 'repairkit') == 0 and count(2, 'repairkit') == 1 and Mocks.bank[2] == 800, 'trade: accepting moves the kit and the money')
+    check(Mocks.lastTransact and (Mocks.paid or 0) >= 24, 'trade: the mechanic is paid the 12% commission')
+    check(app.handler(2, 'accept', { offer = 2 }).error == 'that offer is gone', 'trade: an offer is accepted once')
+
+    give(1, 'repairkit')
+    offer(1, 2, 'repairkit', 200)
+    mysql.fakeNow = mysql.fakeNow + 500
+    check(app.handler(2, 'accept', { offer = 3 }).error == 'that offer is gone', 'trade: offers expire')
+
+    -- fallback
+    local F = env.Config.fallback
+    check(cb['som-mechanic:server:fallbackBuy'](2).error == 'nobody is selling', 'fallback: ships disabled')
+    F.enabled, F.coords = true, vec3(0, 0, 0)
+    check(cb['som-mechanic:server:fallbackBuy'](2).error == 'a mechanic is on duty, go and see them', 'fallback: closed while a mechanic is on duty')
+    Mocks.players[1] = mech(false)
+    FakePeds[2] = vec3(50, 0, 0)
+    check(cb['som-mechanic:server:fallbackBuy'](2).error == 'you are too far away', 'fallback: distance is checked')
+    FakePeds[2] = vec3(1, 0, 0)
+    Mocks.bank[2] = 100
+    check(cb['som-mechanic:server:fallbackBuy'](2).error == 'not enough in your bank', 'fallback: you cannot overspend')
+    Mocks.bank[2] = 1000
+    local b = cb['som-mechanic:server:fallbackBuy'](2)
+    check(b.success and Mocks.bank[2] == 300 and Mocks.treasury == 700 and count(2, 'repairkit') == 2, 'fallback: with no mechanic on duty the desk sells at the worse price into the treasury')
+    check(cb['som-mechanic:server:fallbackBuy'](2).error == 'you have bought one already, try again later', 'fallback: one per hour')
+    Mocks.invFull[2] = true
+    Mocks.bank[2] = 1000
+    mysql.fakeNow = mysql.fakeNow + 4000
+    local paid0 = Mocks.paid or 0
+    check(cb['som-mechanic:server:fallbackBuy'](2).success == false and (Mocks.paid or 0) == paid0 + 700, 'fallback: a full pack is refunded')
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))
