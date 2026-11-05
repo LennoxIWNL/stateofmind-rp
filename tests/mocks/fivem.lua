@@ -92,3 +92,6 @@ _G.joaat = function(name) local h = 5381; for i = 1, #name do h = (h * 33 + name
 _G.GetVehicleNumberPlateText = function(e) return (_G.Vehicles[e] or {}).plate end
 _G.Deleted = {}
 _G.DeleteEntity = function(e) _G.Deleted[#_G.Deleted + 1] = e; _G.Vehicles[e] = nil end
+
+_G.Dropped = {}
+_G.DropPlayer = function(id, reason) _G.Dropped[#_G.Dropped + 1] = { id = id, reason = reason } end

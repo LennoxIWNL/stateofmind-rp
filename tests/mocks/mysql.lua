@@ -32,6 +32,7 @@ M.db = {
     heist = { dongles = {}, runs = {} },
     turf = { zones = {}, events = {}, market = {} },
     whitelist = {},
+    bans = {},
     buyer = {},
     newlife = {},
     chop = { log = {}, owned = {} },
@@ -408,6 +409,27 @@ local function heist(kind, query, params)
     return false
 end
 
+local function bans(kind, query, params)
+    local B = M.db.bans
+    if kind == 'insert' and query:find('INSERT INTO som_bans', 1, true) then
+        B[#B + 1] = { identifier = params[1], reason = params[2], by = params[3], revoked = 0, expires = params[4] ~= 0 and (now() + params[5] * 3600) or nil }
+        return true, #B
+    elseif kind == 'single' and query:find('FROM som_bans WHERE identifier = ?', 1, true) then
+        for i = #B, 1, -1 do
+            local r = B[i]
+            if r.identifier == params[1] and r.revoked == 0 and (r.expires == nil or r.expires > now()) then
+                return true, { reason = r.reason, permanent = r.expires == nil and 1 or 0 }
+            end
+        end
+        return true, nil
+    elseif kind == 'update' and query:find('UPDATE som_bans SET revoked = 1', 1, true) then
+        local n = 0
+        for _, r in ipairs(B) do if r.identifier == params[1] and r.revoked == 0 then r.revoked = 1; n = n + 1 end end
+        return true, n
+    end
+    return false
+end
+
 local function whitelist(kind, query, params)
     local W = M.db.whitelist
     if kind == 'update' and query:find('INSERT IGNORE INTO som_whitelist', 1, true) then
@@ -588,6 +610,10 @@ local function staff(kind, query, params)
     elseif kind == 'insert' and has('INSERT INTO som_staff_audit') then
         S.audit[#S.audit + 1] = { staff = params[1], action = params[2], target = params[3] }
         return true, #S.audit
+    elseif kind == 'query' and has('FROM som_staff_audit ORDER BY id DESC') then
+        local out = {}
+        for i = #S.audit, 1, -1 do out[#out + 1] = S.audit[i] end
+        return true, out
     elseif kind == 'query' and has('FROM som_reports') then
         local out = {}
         for _, r in ipairs(S.reports) do if r.status ~= 'closed' then out[#out + 1] = r end end
@@ -681,6 +707,7 @@ function M.single(query, params)
     do local handled, value = city('single', query, params); if handled then return value end end
     do local handled, value = heist('single', query, params); if handled then return value end end
     do local handled, value = turf('single', query, params); if handled then return value end end
+    do local handled, value = bans('single', query, params); if handled then return value end end
     do local handled, value = newlife('single', query, params); if handled then return value end end
     do local handled, value = plants('single', query, params); if handled then return value end end
     do local handled, value = lab('single', query, params); if handled then return value end end
@@ -861,6 +888,7 @@ function M.update(query, params)
     do local handled, value = heist('update', query, params); if handled then return value end end
     do local handled, value = turf('update', query, params); if handled then return value end end
     do local handled, value = whitelist('update', query, params); if handled then return value end end
+    do local handled, value = bans('update', query, params); if handled then return value end end
     do local handled, value = staff('update', query, params); if handled then return value end end
     do local handled, value = gangs('update', query, params); if handled then return value end end
     do local handled, value = plants('update', query, params); if handled then return value end end
@@ -1205,6 +1233,7 @@ function M.insert(query, params)
     do local handled, value = city('insert', query, params); if handled then return value end end
     do local handled, value = heist('insert', query, params); if handled then return value end end
     do local handled, value = turf('insert', query, params); if handled then return value end end
+    do local handled, value = bans('insert', query, params); if handled then return value end end
     do local handled, value = staff('insert', query, params); if handled then return value end end
     do local handled, value = gangs('insert', query, params); if handled then return value end end
     do local handled, value = plants('insert', query, params); if handled then return value end end

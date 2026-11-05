@@ -1693,3 +1693,16 @@ CREATE TABLE IF NOT EXISTS `som_new_life` (
   PRIMARY KEY (`id`),
   KEY `idx_citizen` (`citizenid`, `until_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Bans (som-staff). One row per identifier; expires_at NULL is permanent.
+CREATE TABLE IF NOT EXISTS `som_bans` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `identifier` VARCHAR(64) NOT NULL,
+  `reason`     VARCHAR(120) NOT NULL,
+  `banned_by`  VARCHAR(32) NOT NULL,
+  `revoked`    TINYINT(1) NOT NULL DEFAULT 0,
+  `expires_at` TIMESTAMP NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_identifier` (`identifier`, `revoked`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -46,9 +46,22 @@ function Whitelist.Allows(identifiers)
     return false
 end
 
-AddEventHandler('playerConnecting', function(_, _, deferrals)
-    if not enabled() then return end
+---Whether any identifier has an active ban. Returns the message to show.
+---@param identifiers string[]
+---@return string|nil message
+function Whitelist.Banned(identifiers)
+    for _, raw in ipairs(identifiers) do
+        local id = Whitelist.Normalise(raw)
+        local ban = id and MySQL.single.await(
+            'SELECT reason, expires_at IS NULL AS permanent FROM som_bans WHERE identifier = ? AND revoked = 0 AND (expires_at IS NULL OR expires_at > NOW()) ORDER BY id DESC LIMIT 1',
+            { id })
+        if ban then
+            return ('You are banned: %s%s'):format(ban.reason, ban.permanent == 1 and ' (permanent)' or '')
+        end
+    end
+end
 
+AddEventHandler('playerConnecting', function(_, _, deferrals)
     local src = source
     deferrals.defer()
     Wait(0)
@@ -56,8 +69,14 @@ AddEventHandler('playerConnecting', function(_, _, deferrals)
     local ids = {}
     for i = 0, GetNumPlayerIdentifiers(src) - 1 do ids[#ids + 1] = GetPlayerIdentifier(src, i) end
 
-    local ok, allowed = pcall(Whitelist.Allows, ids)
-    if ok and allowed then return deferrals.done() end
+    local ok, banned = pcall(Whitelist.Banned, ids)
+    if not ok then return deferrals.done('The server could not check your ban status. Try again.') end
+    if banned then return deferrals.done(banned) end
+
+    if not enabled() then return deferrals.done() end
+
+    local good, allowed = pcall(Whitelist.Allows, ids)
+    if good and allowed then return deferrals.done() end
     deferrals.done(Config.deniedMessage)
 end)
 
