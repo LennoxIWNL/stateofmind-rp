@@ -34,6 +34,13 @@ jobs:
             echo "commit messages must not contain co-author, tool or session attribution"; exit 1
           fi
 
+      - name: No em dashes in our code and docs
+        run: |
+          if grep -rIl '—' --include='*.lua' --include='*.md' --include='*.sh' --include='*.py' --include='*.mjs' --include='*.sql' \
+              txData/*/resources/\[som\] tests tools CLAUDE.md LAUNCH-TODO.md LAUNCH-OPS.md .claude/skills 2>/dev/null; then
+            echo "em dash found; CLAUDE.md forbids them"; exit 1
+          fi
+
       - name: No committed Discord webhook URLs
         run: |
           if grep -rEn 'discord(app)?\.com/api/webhooks/[0-9]' --include='*.lua' --include='*.js' --include='*.mjs' --include='*.json' --include='*.md' . --exclude-dir=node_modules --exclude-dir=.git; then
@@ -47,6 +54,8 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y lua5.4
       - name: Syntax check our Lua
         run: tools/check-lua.sh
+      - name: No accidental globals
+        run: python3 tools/lint-globals.py
       - name: Server tests
         run: lua5.4 tests/run.lua
       - name: Every inventory item has an icon

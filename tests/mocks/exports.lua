@@ -251,7 +251,7 @@ _G.exports = setmetatable({}, {
     __index = function(_, name)
         return registry[name] or error('export not mocked: ' .. tostring(name), 2)
     end,
-    -- A resource exporting its own function (exports('name', fn)) — not
+    -- A resource exporting its own function (exports('name', fn)), not
     -- needed by these tests, so a no-op rather than a real registry.
     __call = function(_, name, fn) Mocks.exported[name] = fn end,
 })

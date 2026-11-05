@@ -253,7 +253,7 @@ do
 end
 
 ----------------------------------------------------------------------
--- som-housing:server:buy — race: second buyer refused before paying
+-- som-housing:server:buy, race: second buyer refused before paying
 ----------------------------------------------------------------------
 do
     local env = loadHousing()
@@ -275,7 +275,7 @@ do
 end
 
 ----------------------------------------------------------------------
--- som-housing:server:buy — payment failure releases the claim
+-- som-housing:server:buy, payment failure releases the claim
 ----------------------------------------------------------------------
 do
     local env = loadHousing()
@@ -292,7 +292,7 @@ do
 end
 
 ----------------------------------------------------------------------
--- som-housing:server:mortgage — race: second signing refused before paying
+-- som-housing:server:mortgage, race: second signing refused before paying
 ----------------------------------------------------------------------
 do
     local env = loadHousing()
