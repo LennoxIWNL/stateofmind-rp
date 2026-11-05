@@ -16,4 +16,4 @@ description: The branch, commit, PR, CI and merge loop for this repo, including 
 Promotion `BetaRelease` into `main` is the owner's job.
 
 ## Two sessions in one checkout
-Another Claude session may be working in the same directory. Run `git branch --show-current` and `git status` before every commit; if the branch is not yours, do not `git add -A` there. Use a separate worktree (`git worktree add ../som-<name> -b <branch> origin/BetaRelease`) for your own branch, and never reset or delete a branch you did not create.
+Another Claude session may be working in the same directory. Run `git branch --show-current` and `git status` before every commit; if the branch is not yours, do not `git add -A` there. Worktrees are full copies of the repo (about 100 MB each), so use at most ONE extra worktree at a time, and remove it with `git worktree remove` as soon as its branch is merged. Never reset or delete a branch you did not create.
