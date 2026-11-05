@@ -121,6 +121,20 @@ function Characters.List(source)
     return rows
 end
 
+---Collapses whitespace and strips control characters, then checks the length.
+---@param text any
+---@return string|nil clean, string|nil err
+function Characters.ValidateBackstory(text)
+    if type(text) ~= 'string' then return nil, 'a backstory is required' end
+
+    local clean = text:gsub('[%z\1-\31\127]', ' '):gsub('%s+', ' '):match('^%s*(.-)%s*$')
+    if #clean < Config.Characters.backstoryMin then
+        return nil, ('your backstory needs at least %d characters'):format(Config.Characters.backstoryMin)
+    end
+
+    return clean:sub(1, Config.Characters.backstoryMax)
+end
+
 ---@param source number
 ---@param data table client supplied character fields
 ---@return boolean success, string|nil err
@@ -159,6 +173,13 @@ function Characters.Create(source, data)
 
     local nationality = type(data.nationality) == 'string' and data.nationality:sub(1, 32) or 'Unknown'
 
+    local backstory, storyErr = Characters.ValidateBackstory(data.backstory)
+    if not backstory then return false, storyErr end
+
+    local metadata = {}
+    for k, v in pairs(Config.DefaultMetadata) do metadata[k] = v end
+    metadata.backstory = backstory
+
     local citizenid = generateCitizenId()
     local phone = ('%03d-%04d'):format(math.random(100, 999), math.random(1000, 9999))
 
@@ -173,7 +194,7 @@ function Characters.Create(source, data)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ]], {
         citizenid, license, slot, firstname, lastname, dob, gender, nationality, phone,
-        json.encode(Config.DefaultMetadata),
+        json.encode(metadata),
     })
 
     -- Starting funds are a faucet and are ledgered like any other, so the very

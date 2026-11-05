@@ -3793,5 +3793,24 @@ do
     _G.TriggerClientEvent = realT
 end
 
+-- ---------------------------------------------------------------------------
+-- Backstory at character creation
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-core', { 'shared/config.lua', 'server/characters.lua' })
+    local v = env.Characters.ValidateBackstory
+    local long = string.rep('a', 120)
+    check(v(nil) == nil and v(42) == nil and v({}) == nil, 'backstory: only a string is accepted')
+    local _, err = v('too short')
+    check(err and err:find('at least 100'), 'backstory: a short one is refused with the minimum')
+    check(v(string.rep(' ', 300)) == nil, 'backstory: whitespace does not count')
+    check(v(long) == long, 'backstory: a long enough one is accepted')
+    check(v('  ' .. long .. '\1\2  ') == long, 'backstory: control characters and edges are cleaned')
+    check(#v(string.rep('b', 5000)) == 1000, 'backstory: it is capped at the maximum')
+    check(v('x\n\n\ty ' .. long) == 'x y ' .. long, 'backstory: whitespace is collapsed to single spaces')
+end
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)
