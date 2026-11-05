@@ -4543,4 +4543,34 @@ return {
 		weight = 500,
 		description = 'Corrosive. Handle with care',
 	},
+
+	['venison'] = {
+		label = 'Venison',
+		weight = 600,
+		description = 'Fresh deer meat',
+	},
+
+	['deer_pelt'] = {
+		label = 'Deer Pelt',
+		weight = 800,
+		description = 'A skinned deer pelt',
+	},
+
+	['antlers'] = {
+		label = 'Antlers',
+		weight = 900,
+		description = 'A set of deer antlers',
+	},
+
+	['hunting_knife'] = {
+		label = 'Hunting Knife',
+		weight = 400,
+		description = 'A blade for skinning',
+	},
+
+	['hunting_license'] = {
+		label = 'Hunting License',
+		weight = 0,
+		description = 'Permission to hunt',
+	},
 }

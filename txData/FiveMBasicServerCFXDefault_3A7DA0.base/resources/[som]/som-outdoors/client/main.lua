@@ -55,6 +55,27 @@ local function build()
     end
 end
 
+local animalModels = {}
+for _, name in ipairs({ 'a_c_deer', 'a_c_boar' }) do animalModels[joaat(name)] = true end
+
+local function skin(entity)
+    if not lib.progressBar({ duration = 8000, label = 'Skinning', canCancel = true, disable = { move = true, combat = true } }) then return end
+    local result = lib.callback.await('som-outdoors:server:skin', false, NetworkGetNetworkIdFromEntity(entity))
+    if result and result.success then
+        TriggerEvent('som:client:notify', 'You skinned it', 'success')
+    else
+        say(result)
+    end
+end
+
+exports['som-interact']:addGlobalPed({
+    {
+        name = 'som_hunt_skin', label = 'Skin', icon = 'fa-solid fa-knife', distance = 2.5,
+        canInteract = function(entity) return IsEntityDead(entity) and animalModels[GetEntityModel(entity)] == true end,
+        onSelect = function(data) skin(data.entity) end,
+    },
+})
+
 AddEventHandler('som:client:playerLoaded', build)
 CreateThread(function() Wait(3000); build() end)
 AddEventHandler('onResourceStop', function(name) if name == GetCurrentResourceName() then clear() end end)

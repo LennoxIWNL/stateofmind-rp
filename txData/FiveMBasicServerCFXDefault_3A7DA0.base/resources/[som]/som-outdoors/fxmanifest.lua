@@ -22,6 +22,7 @@ server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/buyer.lua',
     'server/fishing.lua',
+    'server/hunting.lua',
 }
 
 dependencies {

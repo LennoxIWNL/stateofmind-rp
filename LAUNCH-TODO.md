@@ -210,3 +210,10 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Catch table (codfish 50, bass 30, fishingloot 15, fishinglootbig 5), prices (40, 55, 90, 180), bite wait 8 to 20 s, rod and bait items are defaults. Fish items and icons already existed.
 - [ ] Nothing hands out `fishingrod` or `fishbait` in the world yet (no shop). Decide the supplier.
 - [ ] Never run in a client: the cast progress bar, zone, sell option.
+
+## Hunting (som-outdoors)
+
+- [ ] The game buyer (`Config.buyers.hunt`, venison 60, deer pelt 120, antlers 150, cap 6000 an hour) ships disabled with no coordinates, and pays from the treasury like the fish buyer.
+- [ ] Hunting has no zones: any deer or boar (`a_c_deer`, `a_c_boar`) killed by the player can be skinned anywhere, with a `hunting_knife`. Decide whether to restrict it to a hunting area. Nothing hands out the knife in the world yet.
+- [ ] `requireLicense` is off. A `hunting_license` item exists but nothing issues it (the `som-id` licence flow is not built for it).
+- [ ] The server reads the carcass itself (model, health, killer ped, a `skinned` flag on the entity), so the client cannot invent a kill. Never run in a client: the ped target, skinning bar, and `GetPedSourceOfDeath` behaviour with real peds.
