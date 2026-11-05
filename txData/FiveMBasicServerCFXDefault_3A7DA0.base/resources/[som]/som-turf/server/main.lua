@@ -230,4 +230,7 @@ AddEventHandler('som:server:playerUnloaded', function(source)
     end
 end)
 
-CreateThread(function() Turf.Seed() end)
+CreateThread(function()
+    SomPlacements.Apply(Config)
+    Turf.Seed()
+end)

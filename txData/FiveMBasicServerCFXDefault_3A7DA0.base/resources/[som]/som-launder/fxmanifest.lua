@@ -20,6 +20,7 @@ client_scripts {
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
+    '@som-core/server/placements.lua',
     -- ledger.lua defines Ledger, which wash.lua reads through.
     'server/ledger.lua',
     'server/wash.lua',

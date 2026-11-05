@@ -89,7 +89,7 @@ lib.addCommand('whitelist', {
     params = {
         { name = 'action', type = 'string' },
         { name = 'identifier', type = 'string' },
-        { name = 'note', type = 'string', optional = true },
+        { name = 'note', type = 'longString', optional = true },
     },
 }, function(source, args)
     if source ~= 0 and not core:hasPermission(source, 'som.admin') then

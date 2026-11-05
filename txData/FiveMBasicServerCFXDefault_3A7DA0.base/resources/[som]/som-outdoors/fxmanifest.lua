@@ -20,6 +20,7 @@ client_scripts {
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
+    '@som-core/server/placements.lua',
     'server/buyer.lua',
     'server/fishing.lua',
     'server/hunting.lua',
