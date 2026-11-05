@@ -153,7 +153,7 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 
 - [ ] Import the `som_reports` and `som_staff_audit` tables (section 7l of `setup.sql`) on an existing database.
 - [ ] Grant staff in `server.cfg` (`add_ace group.mod som.mod allow`, `group.admin` for `som.admin`). `/goto`, `/bring`, `/spectate` and `/reports` need `som.mod`; `/whitelist` needs `som.admin`.
-- [ ] Built: `/report` for players (one open, 200 characters, 60 s gap), a staff queue menu (`/reports`, claim and close), `/goto`, `/bring`, `/spectate`, and an audit row for each staff action. Not built: noclip, freeze, kick or ban, a staff duty toggle, an audit viewer (read `som_staff_audit` in the database for now), Discord logging of reports.
+- [ ] Built: `/report` for players (one open, 200 characters, 60 s gap), a staff queue menu (`/reports`, claim and close), `/goto`, `/bring`, `/spectate`, and an audit row for each staff action. Staff v2 (below) added kick, ban, freeze and an audit viewer. Not built: noclip, a staff duty toggle, Discord logging of reports.
 - [ ] The spectate native, the reports menu and teleports via OneSync have never run with a client.
 - [ ] Anti-cheat: read-only review done (`ANTICHEAT-REVIEW.md`), staff immunity fixed. Still needs a live false positive pass, the `lac_webhook_*` convars, and a decision on wiring money events.
 - [ ] Rules: a draft exists (`RULES-DRAFT.md`). The owner must approve it, set the penalty ladder, and choose where it is published.
@@ -239,3 +239,10 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Staff have no screen for it yet: read it from `metadata` in the database. Showing it in the `/reports` menu is not built.
 - [ ] The creation form was edited (a textarea) and has not been seen in a client; check its layout in the multichar screen.
 - [ ] The backstory is free text and nobody reviews it automatically. The whitelist application (not built) is where review belongs.
+
+## Staff tools v2 (som-staff)
+
+- [ ] Import the `som_bans` table (end of `setup.sql`) on an existing database.
+- [ ] `/kick` (som.mod), `/ban <id> <hours> [reason]` and `/unban <identifier>` (som.admin or the server console), `/freeze` (som.mod), `/staffaudit` (a menu of the audit table, som.mod). Hours 0 is a permanent ban. A ban covers every licence, discord and steam identifier the player had; bans are checked at connect **even when the whitelist is off**, and a failed ban check refuses the connection rather than letting it through.
+- [ ] Not built: noclip (the anti-cheat treats `som.mod` as immune, so a client noclip would need its own server notice) and a staff duty toggle. Bans lift only per identifier; there is no ban search or appeal list.
+- [ ] None of it has run with a client: the connect gate, `DropPlayer`, freezing a real ped.

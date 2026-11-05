@@ -131,3 +131,104 @@ lib.addCommand('spectate', { help = 'Watch a player, again to stop', params = { 
     TriggerClientEvent('som-staff:client:spectate', source, target)
     audit(source, 'spectate', actor(target))
 end)
+
+-- ---------------------------------------------------------------------------
+-- Kick, ban, freeze, audit
+-- ---------------------------------------------------------------------------
+
+local frozen = {}
+
+local function admin(source)
+    if source ~= 0 and not core:hasPermission(source, 'som.admin') then
+        notify(source, 'You do not have permission to do that', 'error')
+        return false
+    end
+    return true
+end
+
+local function playerIdentifiers(target)
+    local ids = {}
+    for i = 0, GetNumPlayerIdentifiers(target) - 1 do
+        local id = Whitelist.Normalise(GetPlayerIdentifier(target, i))
+        if id then ids[#ids + 1] = id end
+    end
+    return ids
+end
+
+local function cleanReason(text)
+    return clean(text, 120) or 'No reason given'
+end
+
+lib.addCommand('kick', {
+    help = 'Remove a player from the server',
+    params = { { name = 'target', type = 'playerId' }, { name = 'reason', type = 'longString', optional = true } },
+}, function(source, args)
+    local target = targetOf(source, args)
+    if not target then return end
+
+    local reason = cleanReason(args.reason)
+    audit(source, 'kick', actor(target), reason)
+    DropPlayer(target, 'Kicked: ' .. reason)
+end)
+
+lib.addCommand('ban', {
+    help = 'Ban a player. Hours 0 is permanent',
+    params = {
+        { name = 'target', type = 'playerId' },
+        { name = 'hours', type = 'number' },
+        { name = 'reason', type = 'longString', optional = true },
+    },
+}, function(source, args)
+    if not admin(source) then return end
+    if source ~= 0 and (args.target == source or GetPlayerPed(args.target) == 0) then return notify(source, 'No such player', 'error') end
+
+    local hours = math.floor(tonumber(args.hours) or -1)
+    if hours < 0 or hours > 24 * 365 then return notify(source, 'Hours must be 0 (permanent) to 8760', 'error') end
+
+    local reason = cleanReason(args.reason)
+    local ids = playerIdentifiers(args.target)
+    if #ids == 0 then return notify(source, 'That player has no identifiers to ban', 'error') end
+
+    local who = source == 0 and 'console' or actor(source)
+    for _, id in ipairs(ids) do
+        MySQL.insert.await(
+            'INSERT INTO som_bans (identifier, reason, banned_by, expires_at) VALUES (?, ?, ?, IF(? = 0, NULL, DATE_ADD(NOW(), INTERVAL ? HOUR)))',
+            { id, reason, who, hours, hours })
+    end
+
+    if source ~= 0 then audit(source, 'ban', ids[1], ('%dh %s'):format(hours, reason)) end
+    DropPlayer(args.target, 'Banned: ' .. reason)
+end)
+
+lib.addCommand('unban', {
+    help = 'Lift every active ban on an identifier',
+    params = { { name = 'identifier', type = 'string' } },
+}, function(source, args)
+    if not admin(source) then return end
+
+    local id = Whitelist.Normalise(args.identifier)
+    if not id then return notify(source, 'Not a valid identifier', 'error') end
+
+    local n = MySQL.update.await('UPDATE som_bans SET revoked = 1 WHERE identifier = ? AND revoked = 0', { id })
+    if source ~= 0 then audit(source, 'unban', id) end
+    local text = (n or 0) > 0 and 'Ban lifted' or 'No active ban for that identifier'
+    if source == 0 then print('[som-staff] ' .. text) else notify(source, text) end
+end)
+
+lib.addCommand('freeze', { help = 'Freeze or release a player', params = { { name = 'target', type = 'playerId' } } }, function(source, args)
+    local target = targetOf(source, args)
+    if not target then return end
+
+    frozen[target] = not frozen[target] or nil
+    TriggerClientEvent('som-staff:client:freeze', target, frozen[target] == true)
+    audit(source, frozen[target] and 'freeze' or 'unfreeze', actor(target))
+end)
+
+AddEventHandler('playerDropped', function()
+    frozen[source] = nil
+end)
+
+lib.callback.register('som-staff:server:audit', function(source)
+    if not isStaff(source) then return nil end
+    return MySQL.query.await('SELECT staff, action, target, detail FROM som_staff_audit ORDER BY id DESC LIMIT ?', { Config.listMax }) or {}
+end)

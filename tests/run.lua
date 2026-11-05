@@ -47,6 +47,7 @@ local function resetDb()
     mysql.db.heist = { dongles = {}, runs = {} }
     mysql.db.turf = { zones = {}, events = {}, market = {} }
     mysql.db.whitelist = {}
+    mysql.db.bans = {}
     mysql.db.plants = {}
     mysql.db.lab = {}
     mysql.db.buyer = {}
@@ -3124,7 +3125,7 @@ do
         return out
     end
 
-    check(connect(7).deferred == false, 'whitelist: the gate is off unless the convar is set')
+    check(connect(7).msg == nil and connect(7).done == true, 'whitelist: the gate is off unless the convar is set')
     Mocks.convars.som_whitelist = '1'
     local r = connect(7)
     check(r.done and r.msg == env.Config.deniedMessage, 'whitelist: an unlisted player is turned away')
@@ -3810,6 +3811,73 @@ do
     check(v('  ' .. long .. '\1\2  ') == long, 'backstory: control characters and edges are cleaned')
     check(#v(string.rep('b', 5000)) == 1000, 'backstory: it is capped at the maximum')
     check(v('x\n\n\ty ' .. long) == 'x y ' .. long, 'backstory: whitespace is collapsed to single spaces')
+end
+
+-- ---------------------------------------------------------------------------
+-- Bans, kick and freeze
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-staff', { 'shared/config.lua', 'server/whitelist.lua', 'server/staff.lua' })
+    Mocks.players = { [1] = { citizenid = 'B1' }, [2] = { citizenid = 'B2' }, [3] = { citizenid = 'B3' } }
+    Mocks.admins = { [3] = true }
+    Mocks.identifiers = { [2] = { 'license:abc', 'discord:99', 'ip:1.2.3.4' }, [3] = { 'license:adm' }, [1] = { 'license:mod' } }
+    mysql.fakeNow = 5000000
+    FakePeds = { [1] = vec3(0, 0, 0), [2] = vec3(0, 0, 0), [3] = vec3(0, 0, 0) }
+    Dropped = {}
+    local said = {}
+    local realT = _G.TriggerClientEvent
+    local froze
+    _G.TriggerClientEvent = function(name, target, a) if name == 'som:client:notify' then said[target] = a elseif name == 'som-staff:client:freeze' then froze = { target = target, state = a } end end
+    local function connect(src)
+        local out = {}
+        _G.source = src
+        Handlers['playerConnecting']('x', function() end, { defer = function() end, done = function(m) out.done = true; out.msg = m end })
+        return out
+    end
+
+    Mocks.admins[1] = nil
+    Mocks.commands.ban(1, { target = 2, hours = 1, reason = 'x' })
+    check(#mysql.db.bans == 0 and said[1] == 'You do not have permission to do that', 'ban: only an admin can ban')
+    Mocks.commands.ban(3, { target = 2, hours = -5, reason = 'x' })
+    check(#mysql.db.bans == 0, 'ban: hours are validated')
+    Mocks.commands.ban(3, { target = 3, hours = 1 })
+    check(#mysql.db.bans == 0 and said[3] == 'No such player', 'ban: you cannot ban yourself')
+    Mocks.commands.ban(3, { target = 2, hours = 2, reason = '  cheating\n ' })
+    check(#mysql.db.bans == 2 and mysql.db.bans[1].identifier == 'license:abc' and mysql.db.bans[2].identifier == 'discord:99', 'ban: every known identifier is banned, junk ones are not')
+    check(#Dropped == 1 and Dropped[1].id == 2 and Dropped[1].reason == 'Banned: cheating', 'ban: the player is removed with the reason')
+    check(mysql.db.staff.audit[#mysql.db.staff.audit].action == 'ban', 'ban: it is audited')
+
+    local r = connect(2)
+    check(r.done and r.msg and r.msg:find('You are banned: cheating') and not r.msg:find('permanent'), 'ban: a banned player cannot connect')
+    mysql.fakeNow = mysql.fakeNow + 3 * 3600
+    check(connect(2).msg == nil, 'ban: it expires by timestamp')
+
+    Mocks.commands.ban(3, { target = 2, hours = 0, reason = 'forever' })
+    check(connect(2).msg:find('(permanent)', 1, true), 'ban: hours 0 is permanent')
+    Mocks.commands.unban(1, { identifier = 'license:abc' })
+    check(connect(2).msg ~= nil, 'ban: a player cannot lift one')
+    Mocks.commands.unban(3, { identifier = 'license:abc' })
+    Mocks.commands.unban(3, { identifier = 'discord:99' })
+    check(connect(2).msg == nil, 'ban: an admin can lift it')
+
+    Mocks.admins[1] = true
+    Dropped = {}
+    Mocks.commands.kick(1, { target = 2, reason = 'afk' })
+    check(#Dropped == 1 and Dropped[1].reason == 'Kicked: afk', 'kick: a mod can kick')
+    Mocks.admins[1] = nil
+    Mocks.commands.kick(2, { target = 1 })
+    check(#Dropped == 1, 'kick: a player cannot')
+
+    Mocks.commands.freeze(3, { target = 2 })
+    check(froze.target == 2 and froze.state == true, 'freeze: staff can freeze')
+    Mocks.commands.freeze(3, { target = 2 })
+    check(froze.state == false, 'freeze: again releases')
+
+    local rows = RegisteredCallbacks['som-staff:server:audit'](3)
+    check(#rows > 0 and rows[1].action == 'unfreeze' and RegisteredCallbacks['som-staff:server:audit'](2) == nil, 'audit: staff read it newest first, players cannot')
+    _G.TriggerClientEvent = realT
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))

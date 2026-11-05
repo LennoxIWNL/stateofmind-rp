@@ -16,6 +16,23 @@ RegisterNetEvent('som-staff:client:spectate', function(target)
     spectating = true
 end)
 
+RegisterNetEvent('som-staff:client:freeze', function(state)
+    FreezeEntityPosition(PlayerPedId(), state == true)
+end)
+
+RegisterCommand('staffaudit', function()
+    local rows = lib.callback.await('som-staff:server:audit', false)
+    if type(rows) ~= 'table' then return end
+
+    local options = {}
+    for _, r in ipairs(rows) do
+        options[#options + 1] = { title = ('%s %s'):format(r.action, r.target or ''), description = ('%s %s'):format(r.staff, r.detail or '') }
+    end
+    if #options == 0 then options[1] = { title = 'Nothing logged' } end
+    lib.registerContext({ id = 'som_staff_audit', title = 'Staff audit', options = options })
+    lib.showContext('som_staff_audit')
+end, false)
+
 RegisterCommand('reports', function()
     local rows = lib.callback.await('som-staff:server:reports', false)
     if type(rows) ~= 'table' then return end
