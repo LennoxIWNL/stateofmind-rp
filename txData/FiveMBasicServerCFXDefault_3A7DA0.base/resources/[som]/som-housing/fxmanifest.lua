@@ -9,6 +9,7 @@ version '0.1.0'
 
 shared_scripts {
     '@ox_lib/init.lua',
+    '@som-core/shared/trace.lua',
     -- shells.lua first: config.lua validates its own property list against the
     -- offsets in it at load, so a property pointing at a shell nobody has
     -- measured is caught at boot rather than when somebody tries to walk in.

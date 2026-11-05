@@ -284,3 +284,9 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] The roadside desk (`Config.fallback`, a repair kit for $700 once an hour, paid to the treasury) ships disabled with no coordinates. It only sells while NO mechanic is on duty, so it never undercuts the trade. Decide where it goes and whether $700 is right (the price should stay well above the top of the mechanic range).
 - [ ] The "Offers" app reuses the receipt icon. A DIY public crafting bench is not built (needs coordinates). The lscustoms business needs a real owner and bank account for sales to land in.
 - [ ] Never run in a game: the ped target, dialog, phone app and the sale itself between two players.
+
+## Health check and trace
+
+- [ ] `/somhealth` (staff or console) reports resources, database, tables, items and convars. Its first run found two real defects, now fixed: the shops sold `cola` and `medikit`, which had no item definition (they were lost with the QBCore removal). `medikit` is defined but has no use effect: decide how medics use it (the treatment flow is in `som-medical`).
+- [ ] Set `som_phone_pepper` in the real `server.cfg` (the check fails without it) and the webhook convars you want. `set som_debug 1` turns on a one line trace of every server callback while testing; leave it off in production.
+- [ ] `health_lists.lua` is generated (`node tools/gen-health-lists.mjs`); CI fails if it is stale.

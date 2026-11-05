@@ -63,6 +63,8 @@ jobs:
         run: lua5.4 tests/run.lua
       - name: Repo index server self-test
         run: node tools/som-mcp/selftest.mjs
+      - name: Health check lists are up to date
+        run: node tools/gen-health-lists.mjs --check
       - name: Every item a system needs has a source
         run: node tools/economy-map.mjs --check
       - name: Every inventory item has an icon
