@@ -263,3 +263,10 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 
 - [ ] General stores now also sell water bottles (8), fishing bait (15), fishing rods (120) and empty weed bags (5); YouTool sells the hunting knife (150), screwdriver set (60), electronic kit (90) and plant nutrition (25). Payment is charged to the buyer's bank through the existing SOM currency bridge and is a pure sink. Prices are untuned.
 - [ ] Repair kits and advanced lockpicks are deliberately not in any NPC shop: they are for player mechanics to craft and sell (later in this update), with a fallback when no mechanic is on duty. Until that lands, nobody can buy them.
+
+## Crafting benches
+
+- [ ] The old `debug_crafting` bench is now the `mechanic_workshop` bench (same two real locations, restricted to the mechanic job). Recipes: lockpick, repair kit, tire repair kit, advanced repair kit, advanced lockpick and electronic kit, all from chop shop parts and shop goods. The ledger-less `trojan_usb` recipe was removed, so dongles only come from the launder ledger.
+- [ ] A rule hook in `som-inventory` requires the mechanic job on duty and a crafting level (repair and tire kits 2, advanced kit and advanced lockpick 5) and grants crafting experience. Experience is granted when the craft is allowed, not when it finishes, because ox_inventory has no after-craft hook.
+- [ ] Not built yet: the public DIY bench (needs coordinates) and the no-mechanic fallback desk, both in the mechanic shop PR.
+- [ ] Never run in a game: the bench UI, group gating through the SOM bridge, and the hook payload (`recipe.name`) were read from ox_inventory source only.
