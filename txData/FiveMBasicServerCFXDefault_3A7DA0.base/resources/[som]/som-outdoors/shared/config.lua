@@ -33,6 +33,7 @@ Config = {
         -- EVERY spot ships disabled. A spot is a water area to cast into.
         spots = {
             { name = 'pier_1', label = 'Pier', enabled = false, center = nil, radius = nil },
+            { name = 'deep_1', label = 'Deep water', enabled = false, center = nil, radius = nil, minLevel = 4 },
         },
     },
 
@@ -45,7 +46,7 @@ Config = {
         -- Models are plain names hashed on the server. `drops` are { item, min, max, chance }.
         animals = {
             a_c_deer = { drops = { { 'venison', 2, 3, 1.0 }, { 'deer_pelt', 1, 1, 1.0 }, { 'antlers', 1, 1, 0.25 } } },
-            a_c_boar = { drops = { { 'venison', 1, 2, 1.0 } } },
+            a_c_boar = { minLevel = 3, drops = { { 'venison', 1, 2, 1.0 } } },
         },
     },
 

@@ -3486,6 +3486,7 @@ do
     Mocks.inv = { [1] = {}, [2] = {} }
     Mocks.bank = { [1] = 1000, [2] = 1000 }
     Mocks.treasury, Mocks.taxFails, Mocks.invFull = 0, false, {}
+    Mocks.levels = { chemistry = 10 }
     mysql.fakeNow = 5000000
     FakePeds[1], FakePeds[2] = vec3(0, 0, 0), vec3(0, 0, 0)
     local cb = RegisteredCallbacks
@@ -3546,6 +3547,7 @@ do
     Mocks.clock = 1000000
     FakePeds[1], FakePeds[2], FakePeds[900] = vec3(0, 0, 0), vec3(1, 0, 0), vec3(2, 0, 0)
     Vehicles = { [900] = { engine = 300.0, body = 950.0, driver = 2 } }
+    Mocks.levels = { mechanic = 1 }
     local cb = RegisteredCallbacks
     local sent
     local realT = _G.TriggerClientEvent
@@ -3575,6 +3577,8 @@ do
     check(cb['som-mechanic:server:repair'](1, 900, 'engine').error == 'nothing to fix', 'mechanic: an undamaged vehicle is refused')
     Vehicles[900].body = 400.0
     give('steel', 2)
+    check(cb['som-mechanic:server:repair'](1, 900, 'body').error == 'you need mechanic level 2 for this', 'unlock: body repairs need mechanic level 2')
+    Mocks.levels.mechanic = 2
     Vehicles[900].driver = 1
     local bills0 = #Mocks.bills
     check(cb['som-mechanic:server:repair'](1, 900, 'body').success == true and #Mocks.bills == bills0, 'mechanic: no bill when the mechanic is the driver')
@@ -3904,7 +3908,7 @@ do
     local app = Mocks.apps.skills.handler(1, 'view', {}).view
     local fish
     for _, r in ipairs(app.sections[1].rows) do if r.title:find('Fishing, level 4') then fish = r end end
-    check(#app.sections[1].rows == 6 and fish ~= nil, 'skills: the phone app lists every track with its level')
+    check(#app.sections[1].rows == 7 and fish ~= nil, 'skills: the phone app lists every track with its level')
     check(Mocks.apps.skills.handler(1, 'delete', {}).success == false, 'skills: the app is read only')
 end
 
@@ -3952,6 +3956,77 @@ do
     local scrap = 0
     for _, it in pairs(Mocks.inv[1]) do if it.name == 'scrapmetal' then scrap = scrap + (it.count or 1) end end
     check(r.success and scrap >= 4 + 2, 'skills: scrapping level 6 adds two of every part')
+end
+
+-- ---------------------------------------------------------------------------
+-- Skill unlock gates
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-progress', { 'shared/config.lua', 'server/main.lua' })
+    Mocks.players = { [1] = { citizenid = 'U1' } }
+    mysql.db.skills['U1:fishing'] = { track = 'fishing', xp = 1080, day_xp = 0 }
+    check(Mocks.exported.hasLevel(1, 'fishing', 4) == true and Mocks.exported.hasLevel(1, 'fishing', 5) == false, 'unlock: hasLevel compares against the stored level')
+    check(Mocks.exported.hasLevel(99, 'fishing', 1) == false and Mocks.exported.hasLevel(1, 'nonsense', 1) == false, 'unlock: unknown players and tracks have no level')
+    local view = Mocks.apps.skills.handler(1, 'view', {}).view
+    check(view.sections[2] and view.sections[2].title == 'Coming up' and #view.sections[2].rows <= 5, 'unlock: the skills app shows what comes next')
+    local list = view.sections[2].rows[1].title
+    check(not list:find('Fishing 4'), 'unlock: reached unlocks are not listed again')
+end
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua', 'server/buyer.lua', 'server/fishing.lua', 'server/hunting.lua' })
+    Mocks.players = { [1] = { citizenid = 'V1' } }
+    Mocks.inv = { [1] = {} }
+    Mocks.clock = 1000000
+    Mocks.levels = { fishing = 1, hunting = 1 }
+    FakePeds[1] = vec3(0, 0, 0)
+    local cb = RegisteredCallbacks
+    local slot = 1500
+    local function give(name, n) slot = slot + 1; Mocks.inv[1][slot] = { name = name, count = n or 1, slot = slot } end
+    local deep = env.Config.fishing.spots[2]
+    deep.enabled, deep.center, deep.radius = true, vec3(0, 0, 0), 20.0
+    give('fishingrod'); give('fishbait')
+    check(cb['som-outdoors:server:cast'](1).error == 'you need fishing level 4 to fish here', 'unlock: deep water needs fishing level 4')
+    Mocks.levels.fishing = 4
+    check(cb['som-outdoors:server:cast'](1).success == true, 'unlock: level 4 may fish deep water')
+
+    Animals = { [820] = { model = 'a_c_boar', health = 0, killer = 1 } }
+    FakePeds[820] = vec3(1, 0, 0)
+    give('hunting_knife')
+    check(cb['som-outdoors:server:skin'](1, 820).error == 'you need hunting level 3 to skin this', 'unlock: boar needs hunting level 3')
+    Mocks.levels.hunting = 3
+    check(cb['som-outdoors:server:skin'](1, 820).success == true, 'unlock: level 3 may skin boar')
+end
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-turf', { 'shared/config.lua', 'server/main.lua', 'server/grow.lua', 'server/lab.lua' })
+    Mocks.players = { [1] = { citizenid = 'Y1', gang = { name = 'ballas', grade = 1 } } }
+    Mocks.inv = { [1] = {} }
+    mysql.fakeNow = 5000000
+    FakePeds[1] = vec3(0, 0, 0)
+    local cb = RegisteredCallbacks
+    local slot = 1700
+    local function give(name, n) slot = slot + 1; Mocks.inv[1][slot] = { name = name, count = n or 1, slot = slot } end
+    env.Config.grow.spots[1].enabled, env.Config.grow.spots[1].center, env.Config.grow.spots[1].radius = true, vec3(0, 0, 0), 20.0
+    Mocks.levels = { growing = 1, chemistry = 1 }
+    give('weed_ogkush_seed')
+    check(cb['som-turf:server:plant'](1, 'weed_ogkush_seed').error == 'you need growing level 5 for OG Kush', 'unlock: OG Kush needs growing level 5')
+    Mocks.levels.growing = 5
+    check(cb['som-turf:server:plant'](1, 'weed_ogkush_seed').success == true, 'unlock: level 5 may plant OG Kush')
+    local L = env.Config.labs[1]
+    L.enabled, L.coords = true, vec3(0, 0, 0)
+    give('coke_leaf', 4); give('sulfuric_acid', 1)
+    check(cb['som-turf:server:labStart'](1, 'lab_1', 'refine_leaf').error == 'you need chemistry level 2 for this', 'unlock: refining needs chemistry level 2')
+    Mocks.levels.chemistry = 2
+    check(cb['som-turf:server:labStart'](1, 'lab_1', 'refine_leaf').success == true, 'unlock: level 2 may refine')
+    give('ephedrine', 2); give('acetone', 1); give('lithium', 1); give('hydrochloric_acid', 1)
+    Mocks.levels.chemistry = 3
+    mysql.db.lab = {}
+    check(cb['som-turf:server:labStart'](1, 'lab_1', 'cook_meth').error == 'you need chemistry level 4 for this', 'unlock: cooking meth needs chemistry level 4')
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))

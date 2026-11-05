@@ -49,6 +49,12 @@ end
 
 exports('addXp', addXp)
 
+exports('hasLevel', function(source, track, n)
+    local player = core:getPlayer(source)
+    if not player or not Config.tracks[track] then return false end
+    return levelFor(xpOf(player.citizenid, track)) >= (tonumber(n) or 1)
+end)
+
 exports('getLevel', function(source, track)
     local player = core:getPlayer(source)
     if not player or not Config.tracks[track] then return 1 end
@@ -74,7 +80,21 @@ local function view(player)
     end
     table.sort(rows, function(a, b) return a.id < b.id end)
     for _, r in ipairs(rows) do r.id = nil end
-    return { sections = { { title = 'Your skills', rows = rows } } }
+    local soon = {}
+    for _, u in ipairs(Config.unlocks) do
+        local t = Config.tracks[u.track]
+        local have = levelFor(owned[u.track] or 0)
+        if t and have < u.level then
+            soon[#soon + 1] = { title = ('%s %d: %s'):format(t.label, u.level, u.text), sub = ('You are level %d'):format(have), order = u.level - have }
+        end
+    end
+    table.sort(soon, function(a, b) return a.order < b.order end)
+    for i = #soon, 6, -1 do soon[i] = nil end
+    for _, r in ipairs(soon) do r.order = nil end
+
+    local sections = { { title = 'Your skills', rows = rows } }
+    if #soon > 0 then sections[2] = { title = 'Coming up', rows = soon } end
+    return { sections = sections }
 end
 
 exports['som-phone']:registerApp({

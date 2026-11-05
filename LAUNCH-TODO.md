@@ -254,6 +254,11 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] A read only `Skills` phone app lists the tracks (reuses the briefcase icon). Courier, heists and gang work do not earn experience yet.
 - [ ] Never run in a game; the experience cap SQL was run on the dev database only.
 
+## Skill unlocks
+
+- [ ] Gates (all server side, same numbers shown in the Skills app under "Coming up"): deep water fishing needs fishing 4, boar needs hunting 3, OG Kush growing 5 and Amnesia 7, refining coca leaves needs chemistry 2 and cooking meth chemistry 4, body repairs need mechanic 2. A new `crafting` track exists for the benches (next PR). Levels and numbers are untuned defaults. The unlock list in `som-progress/shared/config.lua` is display only and must be kept in step with each resource's `minLevel`.
+- [ ] A deep water fishing spot (`deep_1`) ships disabled with no coordinates.
+
 ## Shop stock (ox_inventory shops)
 
 - [ ] General stores now also sell water bottles (8), fishing bait (15), fishing rods (120) and empty weed bags (5); YouTool sells the hunting knife (150), screwdriver set (60), electronic kit (90) and plant nutrition (25). Payment is charged to the buyer's bank through the existing SOM currency bridge and is a pure sink. Prices are untuned.

@@ -27,6 +27,10 @@ lib.callback.register('som-outdoors:server:skin', function(source, netId)
     local def = models[GetEntityModel(animal)]
     if not def then return done(false, 'there is nothing to skin') end
 
+    if def.minLevel and Buyer.Level(source, 'hunting') < def.minLevel then
+        return done(false, ('you need hunting level %d to skin this'):format(def.minLevel))
+    end
+
     local ped = GetPlayerPed(source)
     if ped == 0 or #(GetEntityCoords(ped) - GetEntityCoords(animal)) > H.distance then return done(false, 'you are too far away') end
     if GetEntityHealth(animal) > 0 then return done(false, 'it is still alive') end

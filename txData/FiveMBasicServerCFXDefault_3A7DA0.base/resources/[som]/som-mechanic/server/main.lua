@@ -13,6 +13,11 @@ local function xp(src, track, n)
     if GetResourceState('som-progress') == 'started' then exports['som-progress']:addXp(src, track, n) end
 end
 
+local function level(src, track)
+    if GetResourceState('som-progress') == 'started' then return exports['som-progress']:getLevel(src, track) or 1 end
+    return 1
+end
+
 local function done(ok, err, extra)
     local out = extra or {}
     out.success = ok == true
@@ -69,6 +74,10 @@ lib.callback.register('som-mechanic:server:repair', function(source, netId, kind
 
     local r = type(kind) == 'string' and Config.repairs[kind]
     if not r then return done(false, 'bad request') end
+
+    if r.minLevel and level(source, 'mechanic') < r.minLevel then
+        return done(false, ('you need mechanic level %d for this'):format(r.minLevel))
+    end
 
     local vehicle, id = vehicleNear(source, netId)
     if not vehicle then return done(false, 'no vehicle here') end

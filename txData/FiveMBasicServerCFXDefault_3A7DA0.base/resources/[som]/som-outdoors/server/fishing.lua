@@ -30,7 +30,11 @@ end)
 lib.callback.register('som-outdoors:server:cast', function(source)
     local player = core:getPlayer(source)
     if not player then return done(false, 'not available') end
-    if not spotAt(source) then return done(false, 'there is nothing to catch here') end
+    local spot = spotAt(source)
+    if not spot then return done(false, 'there is nothing to catch here') end
+    if spot.minLevel and Buyer.Level(source, 'fishing') < spot.minLevel then
+        return done(false, ('you need fishing level %d to fish here'):format(spot.minLevel))
+    end
     if (ox:Search(source, 'count', F.rod) or 0) < 1 then return done(false, 'you need a fishing rod') end
     if (ox:Search(source, 'count', F.bait) or 0) < 1 then return done(false, 'you need bait') end
 
