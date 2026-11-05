@@ -68,3 +68,11 @@ _G.GetPlayers = function() local out = {}; for id in pairs(_G.FakePeds) do out[#
 _G.GetPlayerName = function(source) return 'Player' .. tostring(source) end
 _G.Teleports = {}
 _G.SetEntityCoords = function(ped, x, y, z) _G.Teleports[#_G.Teleports + 1] = { ped = ped, x = x, y = y, z = z } end
+
+_G.Vehicles = {}
+_G.NetworkGetEntityFromNetworkId = function(netId) return _G.Vehicles[netId] and netId or 0 end
+_G.DoesEntityExist = function(e) return _G.Vehicles[e] ~= nil end
+_G.GetEntityType = function(e) return 2 end
+_G.GetVehicleEngineHealth = function(e) return _G.Vehicles[e].engine end
+_G.GetVehicleBodyHealth = function(e) return _G.Vehicles[e].body end
+_G.GetPedInVehicleSeat = function(e) return _G.Vehicles[e].driver or 0 end

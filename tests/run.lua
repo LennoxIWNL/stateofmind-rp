@@ -3527,5 +3527,54 @@ do
     check(count(1, 'coke_brick') == 1, 'coke: a brick comes out')
 end
 
+-- ---------------------------------------------------------------------------
+-- Mechanic
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-mechanic', { 'shared/config.lua', 'server/main.lua' })
+    local function mech(duty) return { citizenid = 'X1', job = { name = 'mechanic', onduty = duty ~= false }, charinfo = { firstname = 'Mo', lastname = 'Chanic' } } end
+    Mocks.players = { [1] = mech(), [2] = { citizenid = 'X2', job = { name = 'unemployed' }, charinfo = { firstname = 'Cus', lastname = 'Tomer' } } }
+    Mocks.inv = { [1] = {}, [2] = {} }
+    Mocks.bills = {}
+    Mocks.clock = 1000000
+    FakePeds[1], FakePeds[2], FakePeds[900] = vec3(0, 0, 0), vec3(1, 0, 0), vec3(2, 0, 0)
+    Vehicles = { [900] = { engine = 300.0, body = 950.0, driver = 2 } }
+    local cb = RegisteredCallbacks
+    local sent
+    local realT = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, ...) if name == 'som-mechanic:client:apply' then sent = { target = target, args = { ... } } end end
+    local function give(name, n) Mocks.inv[1][#Mocks.inv[1] + 1 + 300] = { name = name, count = n, slot = #Mocks.inv[1] + 301 } end
+
+    check(cb['som-mechanic:server:inspect'](2, 900).error == 'you are not on duty as a mechanic', 'mechanic: only an on duty mechanic can inspect')
+    Mocks.players[1] = mech(false)
+    check(cb['som-mechanic:server:repair'](1, 900, 'engine').error == 'you are not on duty as a mechanic', 'mechanic: off duty cannot repair')
+    Mocks.players[1] = mech()
+    check(cb['som-mechanic:server:repair'](1, 900, 'rocket').error == 'bad request' and cb['som-mechanic:server:repair'](1, 'x', 'engine').error == 'no vehicle here' and cb['som-mechanic:server:repair'](1, 123, 'engine').error == 'no vehicle here', 'mechanic: kind and vehicle are validated')
+    local info = cb['som-mechanic:server:inspect'](1, 900)
+    check(info.success and info.repairs[1].kind == 'body' and info.repairs[1].damaged == false and info.repairs[2].damaged == true, 'mechanic: inspect reads damage on the server')
+    FakePeds[1] = vec3(100, 0, 0)
+    check(cb['som-mechanic:server:repair'](1, 900, 'engine').error == 'no vehicle here', 'mechanic: distance is checked')
+    FakePeds[1] = vec3(0, 0, 0)
+    check(cb['som-mechanic:server:repair'](1, 900, 'engine').error:find('you need'), 'mechanic: parts are required')
+
+    give('repairkit', 1)
+    check(cb['som-mechanic:server:repair'](1, 900, 'engine').success == true and sent.target == 1 and sent.args[2] == 'engine' and sent.args[3] == 1000.0, 'mechanic: a repair consumes the part and tells the mechanic to apply it')
+    check(#Mocks.bills == 1 and Mocks.bills[1].citizenid == 'X2' and Mocks.bills[1].business == 'lscustoms' and Mocks.bills[1].amount == 250 and Mocks.bills[1].opts.issuerCitizenid == 'X1', 'mechanic: the driver is billed for the shop')
+    give('repairkit', 1)
+    check(cb['som-mechanic:server:repair'](1, 900, 'engine').error == 'give it a moment', 'mechanic: one vehicle cannot be farmed')
+
+    Vehicles[900].engine = 1000.0
+    Mocks.clock = Mocks.clock + 60000
+    check(cb['som-mechanic:server:repair'](1, 900, 'engine').error == 'nothing to fix', 'mechanic: an undamaged vehicle is refused')
+    Vehicles[900].body = 400.0
+    give('steel', 2)
+    Vehicles[900].driver = 1
+    local bills0 = #Mocks.bills
+    check(cb['som-mechanic:server:repair'](1, 900, 'body').success == true and #Mocks.bills == bills0, 'mechanic: no bill when the mechanic is the driver')
+    _G.TriggerClientEvent = realT
+end
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)

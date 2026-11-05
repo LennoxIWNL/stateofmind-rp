@@ -194,3 +194,10 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] `Config.supplier` ships disabled with no coordinates. It is the only source of coca leaves and precursors, so place it deliberately (it is a gang-only shop). Prices (40 to 150 each) and `maxQty` 5 are defaults. Payment is from the buyer's bank into the treasury (a sink), so nothing is minted; the treasury then funds heists and city budgets.
 - [ ] Still no source for `coke_brick` other than `refine_leaf`; the old note about it is superseded.
 - [ ] Not run in a client: the supplier dialog and zone.
+
+## Mechanic job (som-mechanic)
+
+- [ ] The `mechanic` job (Los Santos Customs, whitelisted) already existed; `som-mechanic` adds the work. A mechanic on duty gets a "Repair" option on any vehicle: engine (1 `repairkit`, $250) and body (2 `steel`, $180). Prices, parts and the 30 s per-vehicle cooldown are defaults in `Config`. The driver, if a player, is billed to `lscustoms` through the phone (so the shop earns, not the mechanic); an unbilled repair only costs the mechanic parts.
+- [ ] Mechanics have no way to get `repairkit` or `steel` in the world yet (no shop, no recycle link). Decide the supplier (an ox_inventory shop at the garage, or `jim-recycle`).
+- [ ] Not built: tyres, tuning/mod shop (that is `som-garage`'s modshop), mechanic commission (`jobs.lua` has `commission = 0.12`, unused), tow integration with `som-towtruck`. `jim-mechanic` (paid) stays off.
+- [ ] Health is read on the server but applied by the mechanic's client (setting vehicle health is a client native), so the effect is cosmetic-trust only; the parts and the bill are decided server side. Never run in a client.
