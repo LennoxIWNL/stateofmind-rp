@@ -134,3 +134,18 @@ Config.RespawnHealth = 150
 -- keypress while a medic is on the way.
 Config.RespawnKey = 38          -- E
 Config.RespawnHoldMs = 1200
+
+-- ---------------------------------------------------------------------------
+-- New life
+--
+-- Respawning at the hospital is a new life: the character forgets how they
+-- died. How long they must keep away from where it happened depends on how they
+-- died, derived on the server (never from the client's label). A medic revive
+-- is not a new life. Nothing is enforced in code beyond telling the player and
+-- recording it for staff.
+-- ---------------------------------------------------------------------------
+Config.NewLife = {
+    violence = 15,   -- minutes, killed by another player
+    accident = 0,    -- fall, vehicle, fire, environment, an NPC: remember it
+    radius = 200.0,
+}

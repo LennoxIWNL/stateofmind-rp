@@ -50,6 +50,7 @@ local function resetDb()
     mysql.db.plants = {}
     mysql.db.lab = {}
     mysql.db.buyer = {}
+    mysql.db.newlife = {}
     mysql.db.chop = { log = {}, owned = {} }
     mysql.db.staff = { reports = {}, audit = {} }
     mysql.db.gangs = { chars = {}, log = {} }
@@ -3740,6 +3741,56 @@ do
 
     local B = env.Config.buyers.scrap
     check(B ~= nil and B.prices.scrapmetal == 8 and not B.enabled, 'chop: parts sell to a scrap buyer that ships disabled')
+end
+
+-- ---------------------------------------------------------------------------
+-- New life rule
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-medical', { 'shared/config.lua', 'server/newlife.lua' })
+    Mocks.players = { [1] = { citizenid = 'N1' }, [2] = { citizenid = 'N2' }, [3] = { citizenid = 'N3' } }
+    mysql.fakeNow = 5000000
+    FakePeds[1], FakePeds[2], FakePeds[3] = vec3(10, 20, 30), vec3(0, 0, 0), vec3(0, 0, 0)
+    PlayerPeds = { [2] = true }
+    PedKillers = { [1] = 2 }
+    local said
+    local realT = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, text) if name == 'som:client:notify' then said = text end end
+
+    check(Handlers['som:server:playerRespawned'](1, 'N1') == nil and #mysql.db.newlife == 0, 'newlife: a respawn with no recorded death does nothing')
+    Handlers['som:server:playerDowned'](1, 'N1', 'whatever the client said')
+    Handlers['som:server:playerRespawned'](1, 'N1')
+    check(#mysql.db.newlife == 1 and mysql.db.newlife[1].class == 'violence' and mysql.db.newlife[1].x == 10, 'newlife: a killing by another player is recorded where it happened')
+    check(said:find('15 minutes'), 'newlife: the player is told how long')
+
+    PedKillers = { [1] = 0 }
+    Handlers['som:server:playerDowned'](1, 'N1')
+    Handlers['som:server:playerRespawned'](1, 'N1')
+    check(#mysql.db.newlife == 1, 'newlife: an accident has no restriction and writes nothing')
+
+    PedKillers = { [1] = 3 }
+    Handlers['som:server:playerDowned'](1, 'N1')
+    Handlers['som:server:playerRespawned'](1, 'N1')
+    check(#mysql.db.newlife == 1, 'newlife: a non-player killer counts as an accident')
+
+    PedKillers = { [1] = 2 }
+    Handlers['som:server:playerDowned'](1, 'N1')
+    Handlers['som:server:playerUnloaded'](1, 'N1')
+    Handlers['som:server:playerRespawned'](1, 'N1')
+    check(#mysql.db.newlife == 1, 'newlife: leaving clears a pending death')
+
+    Mocks.admins = {}
+    Mocks.commands.nlr(3, { target = 1 })
+    check(said == 'You do not have permission to do that', 'newlife: only staff can look it up')
+    Mocks.admins[3] = true
+    Mocks.commands.nlr(3, { target = 1 })
+    check(said:find('violence') and said:find('15 min left'), 'newlife: staff see class, time left and place')
+    mysql.fakeNow = mysql.fakeNow + 16 * 60
+    Mocks.commands.nlr(3, { target = 1 })
+    check(said == 'No active new life', 'newlife: it expires by timestamp')
+    _G.TriggerClientEvent = realT
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))
