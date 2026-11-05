@@ -17,6 +17,7 @@ provide 'ps-dispatch'
 
 shared_scripts {
     '@ox_lib/init.lua',
+    '@som-core/shared/trace.lua',
     'shared/config.lua',
 }
 

@@ -4134,6 +4134,79 @@ do
 end
 
 -- ---------------------------------------------------------------------------
+-- Callback trace (som_debug)
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local origRegister = lib.callback.register
+    local lines, realPrint = {}, print
+    _G.print = function(text) lines[#lines + 1] = text end
+    _G.IsDuplicityVersion = function() return true end
+    local hadName = _G.GetCurrentResourceName
+    _G.GetCurrentResourceName = _G.GetCurrentResourceName or function() return 'trace-test' end
+
+    Mocks.convars = {}
+    loader.loadResource(REPO .. 'som-core', { 'shared/trace.lua' })
+    check(lib.callback.register == origRegister, 'trace: nothing is wrapped while som_debug is off')
+
+    Mocks.convars = { som_debug = '1' }
+    loader.loadResource(REPO .. 'som-core', { 'shared/trace.lua' })
+    check(lib.callback.register ~= origRegister, 'trace: som_debug wraps callback registration')
+    lib.callback.register('trace:demo', function(source, a) if a == 'boom' then error('exploded') end return { success = false, error = 'nope' } end)
+    local result = RegisteredCallbacks['trace:demo'](7, 'x')
+    check(result.error == 'nope' and lines[1]:find('trace:demo') and lines[1]:find('src=7') and lines[1]:find('refused: nope'), 'trace: a call logs its name, source and result and still returns it')
+    local ok, err = pcall(RegisteredCallbacks['trace:demo'], 7, 'boom')
+    check(ok == false and tostring(err):find('exploded') and lines[2]:find('ERROR'), 'trace: a failing handler is logged and the error still propagates')
+
+    lib.callback.register = origRegister
+    _G.IsDuplicityVersion = nil
+    _G.GetCurrentResourceName = hadName
+    _G.print = realPrint
+    Mocks.convars = {}
+end
+
+-- ---------------------------------------------------------------------------
+-- /somhealth
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-staff', { 'shared/config.lua', 'shared/health_lists.lua', 'server/health.lua' })
+    local lists = { resources = { 'a', 'b' }, tables = { 'som_one', 'som_two' }, items = { 'water', 'ghost' } }
+    local function snap(over)
+        local s = { states = { a = 'started', b = 'started' }, dbOk = true, tables = { som_one = true, som_two = true }, items = { water = true, ghost = true },
+            convars = { som_phone_pepper = 'x', som_whitelist = '1', som_phone_webhook = 'u', som_heist_webhook = 'u', som_launder_webhook = 'u', lac_webhook_bans = 'u' }, lists = lists }
+        for k, v in pairs(over or {}) do s[k] = v end
+        return s
+    end
+    local function levels(rows) local o = {}; for _, r in ipairs(rows) do o[#o + 1] = r.level end; return table.concat(o, ',') end
+
+    check(levels(env.Health.Evaluate(snap())) == 'PASS,PASS,PASS,PASS,PASS', 'health: a healthy server passes every check')
+    local rows = env.Health.Evaluate(snap({ states = { a = 'started', b = 'stopped' } }))
+    check(rows[1].level == 'FAIL' and rows[1].text:find('b %(stopped%)'), 'health: a stopped resource is named')
+    rows = env.Health.Evaluate(snap({ tables = { som_one = true } }))
+    check(rows[3].level == 'FAIL' and rows[3].text:find('som_two'), 'health: a missing table is named')
+    rows = env.Health.Evaluate(snap({ dbOk = false }))
+    check(rows[2].level == 'FAIL' and #rows == 4, 'health: a dead database fails and skips the table check')
+    rows = env.Health.Evaluate(snap({ items = { water = true } }))
+    check(rows[4].level == 'FAIL' and rows[4].text:find('ghost'), 'health: a missing item is named')
+    local c = snap(); c.convars.som_phone_pepper = ''; c.convars.som_whitelist = 'false'
+    rows = env.Health.Evaluate(c)
+    local fail, warn = 0, 0
+    for _, r in ipairs(rows) do if r.level == 'FAIL' then fail = fail + 1 elseif r.level == 'WARN' then warn = warn + 1 end end
+    check(fail == 1 and warn == 1, 'health: a missing pepper fails and an open whitelist warns')
+
+    local said
+    local realT = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, text) if name == 'som:client:notify' then said = text end end
+    Mocks.admins = {}
+    Mocks.commands.somhealth(3, {})
+    check(said == 'You do not have permission to do that', 'health: only admins can run it')
+    _G.TriggerClientEvent = realT
+end
+
+-- ---------------------------------------------------------------------------
 -- Placements
 -- ---------------------------------------------------------------------------
 

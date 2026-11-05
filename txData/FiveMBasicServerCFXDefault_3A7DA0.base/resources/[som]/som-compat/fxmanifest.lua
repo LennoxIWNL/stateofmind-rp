@@ -13,6 +13,7 @@ provide 'qb-core'
 
 shared_scripts {
     '@ox_lib/init.lua',
+    '@som-core/shared/trace.lua',
     -- NOT loaded into som-compat itself, only EXPOSED so ps-hud's manifest can
     -- @-reference it. Listed in files{} below rather than here, because loading
     -- it into every script that includes som-compat would define a global

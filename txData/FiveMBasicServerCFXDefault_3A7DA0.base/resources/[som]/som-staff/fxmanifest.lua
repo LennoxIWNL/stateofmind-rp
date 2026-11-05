@@ -9,7 +9,9 @@ version '0.1.0'
 
 shared_scripts {
     '@ox_lib/init.lua',
+    '@som-core/shared/trace.lua',
     'shared/config.lua',
+    'shared/health_lists.lua',
 }
 
 client_scripts {
@@ -23,6 +25,7 @@ server_scripts {
     'server/whitelist.lua',
     'server/staff.lua',
     'server/placements.lua',
+    'server/health.lua',
 }
 
 dependencies {

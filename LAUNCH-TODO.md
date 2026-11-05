@@ -291,3 +291,9 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] `/place <resource> <path> [value]` (admin or console), `/unplace`, `/places`. Stand where the thing goes and run, for example, `/place som-turf zones.grove.tag`, `/place som-turf zones.grove.center`, `/place som-turf zones.grove.radius 40`, `/place som-outdoors buyers.fish.coords`, `/place som-heists sites.store_1.terminal`, `/place som-heists sites.store_1.lootPoints+` (once per loot point). A placed point also switches its entry on. Then `restart <resource>` to load it. Resources that can be placed: som-turf, som-outdoors, som-heists, som-mechanic, som-launder.
 - [ ] Not placeable this way: courier routes (a route is a list of drops, still edited in config), heist door names (config), and anything outside those five resources. A typo'd path is reported in the console when the resource starts ("no such place").
 - [ ] Verified on the headless server only through the console (a radius): placing, restart and apply. Positions need an in-game admin and have not been run with a client.
+
+## Health check and trace
+
+- [ ] `/somhealth` (staff or console) reports resources, database, tables, items and convars. Its first run found two real defects, now fixed: the shops sold `cola` and `medikit`, which had no item definition (they were lost with the QBCore removal). `medikit` is defined but has no use effect: decide how medics use it (the treatment flow is in `som-medical`).
+- [ ] Set `som_phone_pepper` in the real `server.cfg` (the check fails without it) and the webhook convars you want. `set som_debug 1` turns on a one line trace of every server callback while testing; leave it off in production.
+- [ ] `health_lists.lua` is generated (`node tools/gen-health-lists.mjs`); CI fails if it is stale.

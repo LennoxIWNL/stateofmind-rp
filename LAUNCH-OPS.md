@@ -15,7 +15,9 @@ replaces one manual pass on the beta server.
 
 Fires many parallel connections at the heist site claim query (the conditional insert) on a real MariaDB and checks exactly one wins per site. Result on the dev container: 15 rounds of 40 parallel claimers, one winner each. This covers the claim query only. The property buy, mortgage and vehicle purchase claims are plain conditional UPDATEs (`Properties.Claim` pattern) and have not been put under this kind of load.
 
-## Full boot out of DEV MODE (not done)
+## Full boot out of DEV MODE (not done; the step by step checklist and the 42 test flows are in `TEST-SCRIPT.md`)
+
+Run `somhealth` first after every boot; `set som_debug 1` logs every server callback for bug reports.
 
 `som.cfg` still boots the framework only. To leave it:
 1. On the beta server, comment out the DEV MODE block and enable FULL BOOT.
