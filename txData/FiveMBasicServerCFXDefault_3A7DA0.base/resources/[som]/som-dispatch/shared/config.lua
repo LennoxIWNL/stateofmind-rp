@@ -144,6 +144,18 @@ Config.Alerts = {
         blip = { sprite = 51, colour = 1, scale = 0.9, duration = 240 },
     },
 
+    -- Raised by som-outdoors when a vehicle is brought to a chop shop, at the
+    -- shop's own coordinates. NOT `reportable`.
+    chopShop = {
+        label = 'Suspicious Vehicle Activity',
+        code = '10-66',
+        priority = 2,
+        chance = 0.4,
+        cooldown = 120,
+        jobs = { 'police' },
+        blip = { sprite = 225, colour = 1, scale = 0.9, duration = 300 },
+    },
+
     -- Raised by som-heists when a terminal is touched. NOT `reportable`: the
     -- server raises it with the site's own coordinates.
     heistInProgress = {

@@ -29,6 +29,21 @@ local function fish()
     end
 end
 
+local function chop(drop)
+    local vehicle = GetVehiclePedIsIn(cache.ped, true)
+    if vehicle == 0 then return say({ error = 'Bring a vehicle' }) end
+    local begun = lib.callback.await('som-outdoors:server:chopBegin', false, drop.name, NetworkGetNetworkIdFromEntity(vehicle))
+    if not begun or not begun.success then return say(begun) end
+
+    if not lib.progressBar({ duration = begun.seconds * 1000, label = 'Scrubbing the VIN', canCancel = true, disable = { move = true, combat = true } }) then return end
+    local result = lib.callback.await('som-outdoors:server:chopFinish', false)
+    if result and result.success then
+        TriggerEvent('som:client:notify', 'Stripped for parts', 'success')
+    else
+        say(result)
+    end
+end
+
 local function clear()
     for _, id in ipairs(zones) do exports['som-interact']:removeZone(id) end
     zones = {}
@@ -42,6 +57,14 @@ local function build()
             coords = vec3(s.center.x, s.center.y, s.center.z),
             radius = s.radius,
             options = { { name = 'som_fish_cast', label = 'Fish here', icon = 'fa-solid fa-fish', distance = s.radius, onSelect = fish } },
+        })
+    end
+    for _, d in ipairs(lib.callback.await('som-outdoors:server:chopSpots', false) or {}) do
+        zones[#zones + 1] = exports['som-interact']:addSphereZone({
+            name = 'som_chop_' .. d.name,
+            coords = vec3(d.coords.x, d.coords.y, d.coords.z),
+            radius = d.distance,
+            options = { { name = 'som_chop_start', label = 'Chop the vehicle', icon = 'fa-solid fa-car-burst', distance = d.distance, onSelect = function() chop(d) end } },
         })
     end
     for _, b in ipairs(lib.callback.await('som-outdoors:server:buyers', false) or {}) do

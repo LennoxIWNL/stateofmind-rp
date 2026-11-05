@@ -4,7 +4,7 @@ lua54 'yes'
 
 name 'som-outdoors'
 author 'State of Mind RP'
-description 'Fishing and hunting: server-rolled catches sold to buyers paid from a capped treasury pool'
+description 'Fishing, hunting and scrapping: server-checked work sold to buyers paid from a capped treasury pool'
 version '0.1.0'
 
 shared_scripts {
@@ -23,6 +23,7 @@ server_scripts {
     'server/buyer.lua',
     'server/fishing.lua',
     'server/hunting.lua',
+    'server/chop.lua',
 }
 
 dependencies {

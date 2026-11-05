@@ -86,3 +86,7 @@ _G.GetVehicleEngineHealth = function(e) return _G.Vehicles[e].engine end
 _G.GetVehicleBodyHealth = function(e) return _G.Vehicles[e].body end
 _G.GetPedInVehicleSeat = function(e) return _G.Vehicles[e].driver or 0 end
 _G.joaat = function(name) local h = 5381; for i = 1, #name do h = (h * 33 + name:byte(i)) % 4294967296 end; return h end
+
+_G.GetVehicleNumberPlateText = function(e) return (_G.Vehicles[e] or {}).plate end
+_G.Deleted = {}
+_G.DeleteEntity = function(e) _G.Deleted[#_G.Deleted + 1] = e; _G.Vehicles[e] = nil end
