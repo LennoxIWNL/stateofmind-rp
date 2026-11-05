@@ -95,9 +95,8 @@ txData/default/config.json
 **/node_modules/
 
 # -------------------------------------------------------------
-#  Claude Code skills (local reference docs, not needed on server)
+#  Claude Code skills: the project skills in .claude/skills are tracked
 # -------------------------------------------------------------
-skills/
 
 # -------------------------------------------------------------
 #  Test harness output (tests/ itself IS tracked; only generated
