@@ -276,3 +276,11 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Seeds had no source in the world. The gang-only supplier (disabled, no coordinates) now sells all five strains (60, 60, 80, 200, 300), and a harvest returns its own seed 25% of the time. The level gates (OG Kush 5, Amnesia 7) still apply when planting. If seeds should come from somewhere less gang-flavoured, move them.
 - [ ] A hammer (80) is now sold at YouTool because the lockpick recipe wears one.
 - [ ] `ECONOMY-MAP.md` is generated (`node tools/economy-map.mjs`); CI fails if it is stale or if an item a recipe, lab, plant, fishing, hunting, repair or buyer needs has no source. Intentional gaps go in `tools/economy-known.json`. The generator reads configs with patterns, so a new recipe shape may need a line in the script.
+
+## Mechanic sales and the roadside fallback (som-mechanic)
+
+- [ ] Import the `som_trade_offers` table (end of `setup.sql`) on an existing database.
+- [ ] A mechanic on duty gets an "Offer a kit" option on nearby players: repair kit ($120 to $450), tire kit ($80 to $300), advanced repair kit ($400 to $1200), advanced lockpick ($250 to $900); the price is theirs inside the limits. The customer accepts in the phone's "Offers" app within 2 minutes. The money goes to the shop's business account (`lscustoms`), the mechanic keeps the job's 12% commission, and every step rolls back on failure. Limits are untuned defaults.
+- [ ] The roadside desk (`Config.fallback`, a repair kit for $700 once an hour, paid to the treasury) ships disabled with no coordinates. It only sells while NO mechanic is on duty, so it never undercuts the trade. Decide where it goes and whether $700 is right (the price should stay well above the top of the mechanic range).
+- [ ] The "Offers" app reuses the receipt icon. A DIY public crafting bench is not built (needs coordinates). The lscustoms business needs a real owner and bank account for sales to land in.
+- [ ] Never run in a game: the ped target, dialog, phone app and the sale itself between two players.

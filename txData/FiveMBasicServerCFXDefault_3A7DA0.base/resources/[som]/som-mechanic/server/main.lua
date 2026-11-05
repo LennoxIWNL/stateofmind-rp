@@ -31,6 +31,8 @@ local function mechanic(source)
     return player
 end
 
+Mechanic = { OnDuty = mechanic }
+
 local function vehicleNear(source, netId)
     netId = tonumber(netId)
     if not netId or netId % 1 ~= 0 then return nil end
