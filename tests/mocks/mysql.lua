@@ -34,6 +34,7 @@ M.db = {
     whitelist = {},
     bans = {},
     buyer = {},
+    trade = {},
     skills = {},
     newlife = {},
     chop = { log = {}, owned = {} },
@@ -464,6 +465,49 @@ local function newlife(kind, query, params)
     return false
 end
 
+local function trade(kind, query, params)
+    local T = M.db.trade
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    if kind == 'insert' and has('INSERT INTO som_trade_offers (seller, buyer, item, price, status)') then
+        T[#T + 1] = { id = #T + 1, seller = 'FALLBACK', buyer = params[1], item = params[2], price = params[3], status = 'done', ts = now() }
+        return true, #T
+    elseif kind == 'insert' and has('INSERT INTO som_trade_offers') then
+        T[#T + 1] = { id = #T + 1, seller = params[1], buyer = params[2], item = params[3], price = params[4], status = 'pending', ts = now() }
+        return true, #T
+    elseif kind == 'scalar' and has("seller = ? AND status = 'pending'") then
+        local n = 0
+        for _, o in ipairs(T) do if o.seller == params[1] and o.status == 'pending' and o.ts > now() - params[2] then n = n + 1 end end
+        return true, n
+    elseif kind == 'scalar' and has("seller = 'FALLBACK'") then
+        local n = 0
+        for _, o in ipairs(T) do if o.seller == 'FALLBACK' and o.buyer == params[1] and o.status ~= 'cancelled' and o.ts > now() - 3600 then n = n + 1 end end
+        return true, n
+    elseif kind == 'update' and has("SET status = 'done' WHERE id = ?") then
+        local o = T[params[1]]
+        if o and o.buyer == params[2] and o.status == 'pending' and o.ts > now() - params[3] then o.status = 'done'; return true, 1 end
+        return true, 0
+    elseif kind == 'update' and has("SET status = 'cancelled' WHERE id = ? AND buyer = ?") then
+        local o = T[params[1]]
+        if o and o.buyer == params[2] and o.status == 'pending' then o.status = 'cancelled'; return true, 1 end
+        return true, 0
+    elseif kind == 'update' and has("SET status = 'cancelled' WHERE id = ?") then
+        local o = T[params[1]]
+        if o then o.status = 'cancelled' end
+        return true, 1
+    elseif kind == 'single' and has('SELECT seller, item, price FROM som_trade_offers WHERE id = ?') then
+        local o = T[params[1]]
+        return true, o and { seller = o.seller, item = o.item, price = o.price } or nil
+    elseif kind == 'query' and has('FROM som_trade_offers o JOIN som_characters c') then
+        local out = {}
+        for i = #T, 1, -1 do
+            local o = T[i]
+            if o.buyer == params[1] and o.status == 'pending' and o.ts > now() - params[2] then out[#out + 1] = { id = o.id, item = o.item, price = o.price, firstname = 'Mo', lastname = 'Chanic' } end
+        end
+        return true, out
+    end
+    return false
+end
+
 local function skills(kind, query, params)
     local K = M.db.skills
     if kind == 'scalar' and query:find('SELECT xp FROM som_skills WHERE citizenid = ? AND track = ?', 1, true) then
@@ -733,6 +777,7 @@ function M.single(query, params)
     do local handled, value = city('single', query, params); if handled then return value end end
     do local handled, value = heist('single', query, params); if handled then return value end end
     do local handled, value = turf('single', query, params); if handled then return value end end
+    do local handled, value = trade('single', query, params); if handled then return value end end
     do local handled, value = bans('single', query, params); if handled then return value end end
     do local handled, value = newlife('single', query, params); if handled then return value end end
     do local handled, value = plants('single', query, params); if handled then return value end end
@@ -814,6 +859,7 @@ function M.scalar(query, params)
     do local handled, value = buyer('scalar', query, params); if handled then return value end end
     do local handled, value = chop('scalar', query, params); if handled then return value end end
     do local handled, value = skills('scalar', query, params); if handled then return value end end
+    do local handled, value = trade('scalar', query, params); if handled then return value end end
     do local handled, value = whitelist('scalar', query, params); if handled then return value end end
     if query:find('SELECT role FROM som_property_owners WHERE property_id = ? AND citizenid = ?', 1, true) then
         local o = findOwner(params[1], params[2])
@@ -918,6 +964,7 @@ function M.update(query, params)
     do local handled, value = bans('update', query, params); if handled then return value end end
     do local handled, value = staff('update', query, params); if handled then return value end end
     do local handled, value = skills('update', query, params); if handled then return value end end
+    do local handled, value = trade('update', query, params); if handled then return value end end
     do local handled, value = gangs('update', query, params); if handled then return value end end
     do local handled, value = plants('update', query, params); if handled then return value end end
     do local handled, value = lab('update', query, params); if handled then return value end end
@@ -1268,6 +1315,7 @@ function M.insert(query, params)
     do local handled, value = lab('insert', query, params); if handled then return value end end
     do local handled, value = buyer('insert', query, params); if handled then return value end end
     do local handled, value = chop('insert', query, params); if handled then return value end end
+    do local handled, value = trade('insert', query, params); if handled then return value end end
     do local handled, value = newlife('insert', query, params); if handled then return value end end
     if query:find('INSERT INTO som_property_owners', 1, true) then
         local propertyId, citizenid, role, grantedBy = params[1], params[2], params[3], params[4]
@@ -1429,6 +1477,7 @@ function M.query(query, params)
     do local handled, value = turf('query', query, params); if handled then return value end end
     do local handled, value = staff('query', query, params); if handled then return value end end
     do local handled, value = skills('query', query, params); if handled then return value end end
+    do local handled, value = trade('query', query, params); if handled then return value end end
     do local handled, value = gangs('query', query, params); if handled then return value end end
     do local handled, value = plants('query', query, params); if handled then return value end end
     -- jail.lua's sweep: every serving sentence, with elapsed.

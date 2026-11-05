@@ -208,13 +208,13 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Fishing spots (`Config.fishing.spots`) and the fish buyer (`Config.buyers.fish`) ship disabled with no coordinates. Place them.
 - [ ] Buyers pay from the **treasury**, capped per rolling hour (fish: 6000 for the whole server). The treasury starts at 0, so until fines and taxes fill it a buyer says "the city cannot pay right now". That is deliberate; decide whether the treasury needs a seeded balance.
 - [ ] Catch table (codfish 50, bass 30, fishingloot 15, fishinglootbig 5), prices (40, 55, 90, 180), bite wait 8 to 20 s, rod and bait items are defaults. Fish items and icons already existed.
-- [ ] Nothing hands out `fishingrod` or `fishbait` in the world yet (no shop). Decide the supplier.
+- [ ] Fishing rod (120) and bait (15) are sold at every General store; fish sell prices are 40 to 180, so a bait costs about a third of an average catch. Untuned.
 - [ ] Never run in a client: the cast progress bar, zone, sell option.
 
 ## Hunting (som-outdoors)
 
 - [ ] The game buyer (`Config.buyers.hunt`, venison 60, deer pelt 120, antlers 150, cap 6000 an hour) ships disabled with no coordinates, and pays from the treasury like the fish buyer.
-- [ ] Hunting has no zones: any deer or boar (`a_c_deer`, `a_c_boar`) killed by the player can be skinned anywhere, with a `hunting_knife`. Decide whether to restrict it to a hunting area. Nothing hands out the knife in the world yet.
+- [ ] Hunting has no zones: any deer or boar (`a_c_deer`, `a_c_boar`) killed by the player can be skinned anywhere, with a `hunting_knife`. Decide whether to restrict it to a hunting area. The knife (150) is sold at YouTool.
 - [ ] `requireLicense` is off. A `hunting_license` item exists but nothing issues it (the `som-id` licence flow is not built for it).
 - [ ] The server reads the carcass itself (model, health, killer ped, a `skinned` flag on the entity), so the client cannot invent a kill. Never run in a client: the ped target, skinning bar, and `GetPedSourceOfDeath` behaviour with real peds.
 
@@ -253,3 +253,34 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Six tracks (fishing, hunting, growing, chemistry, mechanic, scrapping). Level n needs 120 * (n-1)^2 experience, level 10 is the cap, and a track earns at most 1500 experience a day. Effects are small and meant to reward weeks of play: fishing and hunting find rare things more often, growing and scrapping give one extra per three levels, chemistry shaves 3% per level off a cook. Mechanic currently only earns experience. All numbers are untuned defaults.
 - [ ] A read only `Skills` phone app lists the tracks (reuses the briefcase icon). Courier, heists and gang work do not earn experience yet.
 - [ ] Never run in a game; the experience cap SQL was run on the dev database only.
+
+## Skill unlocks
+
+- [ ] Gates (all server side, same numbers shown in the Skills app under "Coming up"): deep water fishing needs fishing 4, boar needs hunting 3, OG Kush growing 5 and Amnesia 7, refining coca leaves needs chemistry 2 and cooking meth chemistry 4, body repairs need mechanic 2. A new `crafting` track exists for the benches (next PR). Levels and numbers are untuned defaults. The unlock list in `som-progress/shared/config.lua` is display only and must be kept in step with each resource's `minLevel`.
+- [ ] A deep water fishing spot (`deep_1`) ships disabled with no coordinates.
+
+## Shop stock (ox_inventory shops)
+
+- [ ] General stores now also sell water bottles (8), fishing bait (15), fishing rods (120) and empty weed bags (5); YouTool sells the hunting knife (150), screwdriver set (60), electronic kit (90) and plant nutrition (25). Payment is charged to the buyer's bank through the existing SOM currency bridge and is a pure sink. Prices are untuned.
+- [ ] Repair kits and advanced lockpicks are deliberately not in any NPC shop: they are for player mechanics to craft and sell (later in this update), with a fallback when no mechanic is on duty. Until that lands, nobody can buy them.
+
+## Crafting benches
+
+- [ ] The old `debug_crafting` bench is now the `mechanic_workshop` bench (same two real locations, restricted to the mechanic job). Recipes: lockpick, repair kit, tire repair kit, advanced repair kit, advanced lockpick and electronic kit, all from chop shop parts and shop goods. The ledger-less `trojan_usb` recipe was removed, so dongles only come from the launder ledger.
+- [ ] A rule hook in `som-inventory` requires the mechanic job on duty and a crafting level (repair and tire kits 2, advanced kit and advanced lockpick 5) and grants crafting experience. Experience is granted when the craft is allowed, not when it finishes, because ox_inventory has no after-craft hook.
+- [ ] Not built yet: the public DIY bench (needs coordinates) and the no-mechanic fallback desk, both in the mechanic shop PR.
+- [ ] Never run in a game: the bench UI, group gating through the SOM bridge, and the hook payload (`recipe.name`) were read from ox_inventory source only.
+
+## Seeds and the economy map
+
+- [ ] Seeds had no source in the world. The gang-only supplier (disabled, no coordinates) now sells all five strains (60, 60, 80, 200, 300), and a harvest returns its own seed 25% of the time. The level gates (OG Kush 5, Amnesia 7) still apply when planting. If seeds should come from somewhere less gang-flavoured, move them.
+- [ ] A hammer (80) is now sold at YouTool because the lockpick recipe wears one.
+- [ ] `ECONOMY-MAP.md` is generated (`node tools/economy-map.mjs`); CI fails if it is stale or if an item a recipe, lab, plant, fishing, hunting, repair or buyer needs has no source. Intentional gaps go in `tools/economy-known.json`. The generator reads configs with patterns, so a new recipe shape may need a line in the script.
+
+## Mechanic sales and the roadside fallback (som-mechanic)
+
+- [ ] Import the `som_trade_offers` table (end of `setup.sql`) on an existing database.
+- [ ] A mechanic on duty gets an "Offer a kit" option on nearby players: repair kit ($120 to $450), tire kit ($80 to $300), advanced repair kit ($400 to $1200), advanced lockpick ($250 to $900); the price is theirs inside the limits. The customer accepts in the phone's "Offers" app within 2 minutes. The money goes to the shop's business account (`lscustoms`), the mechanic keeps the job's 12% commission, and every step rolls back on failure. Limits are untuned defaults.
+- [ ] The roadside desk (`Config.fallback`, a repair kit for $700 once an hour, paid to the treasury) ships disabled with no coordinates. It only sells while NO mechanic is on duty, so it never undercuts the trade. Decide where it goes and whether $700 is right (the price should stay well above the top of the mechanic range).
+- [ ] The "Offers" app reuses the receipt icon. A DIY public crafting bench is not built (needs coordinates). The lscustoms business needs a real owner and bank account for sales to land in.
+- [ ] Never run in a game: the ped target, dialog, phone app and the sale itself between two players.

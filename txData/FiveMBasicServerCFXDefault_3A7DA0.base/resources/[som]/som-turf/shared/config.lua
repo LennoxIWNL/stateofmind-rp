@@ -61,12 +61,13 @@ Config = {
             weed_whitewidow_seed = { label = 'White Widow', bag = 'weed_whitewidow' },
             weed_skunk_seed = { label = 'Skunk', bag = 'weed_skunk' },
             weed_purplehaze_seed = { label = 'Purple Haze', bag = 'weed_purplehaze' },
-            weed_ogkush_seed = { label = 'OG Kush', bag = 'weed_ogkush' },
-            weed_amnesia_seed = { label = 'Amnesia', bag = 'weed_amnesia' },
+            weed_ogkush_seed = { label = 'OG Kush', bag = 'weed_ogkush', minLevel = 5 },
+            weed_amnesia_seed = { label = 'Amnesia', bag = 'weed_amnesia', minLevel = 7 },
         },
         spots = {
             { name = 'grow_1', label = 'Grow spot 1', enabled = false, center = nil, radius = nil },
         },
+        seedReturnChance = 0.25,  -- a harvest sometimes gives its own seed back
         bagTables = {
             { name = 'bag_1', label = 'Bagging table', enabled = false, coords = nil },
         },
@@ -83,9 +84,9 @@ Config = {
             inputs = { coke_small_brick = 1 }, outputs = { cokebaggy = 4 } },
         press_brick = { label = 'Break down a brick', enabled = true, minutes = 15,
             inputs = { coke_brick = 1 }, outputs = { coke_small_brick = 3 } },
-        refine_leaf = { label = 'Refine coca leaves', enabled = true, minutes = 20,
+        refine_leaf = { label = 'Refine coca leaves', enabled = true, minutes = 20, minLevel = 2,
             inputs = { coke_leaf = 4, sulfuric_acid = 1 }, outputs = { coke_brick = 1 } },
-        cook_meth = { label = 'Cook meth', enabled = true, minutes = 30,
+        cook_meth = { label = 'Cook meth', enabled = true, minutes = 30, minLevel = 4,
             inputs = { ephedrine = 2, acetone = 1, lithium = 1, hydrochloric_acid = 1 }, outputs = { meth = 5 } },
     },
     lab = { distance = 3.0, maxActive = 1 },
@@ -97,6 +98,8 @@ Config = {
         stock = {
             coke_leaf = 40, acetone = 120, lithium = 90, ephedrine = 150,
             hydrochloric_acid = 140, sulfuric_acid = 110,
+            weed_whitewidow_seed = 60, weed_skunk_seed = 60, weed_purplehaze_seed = 80,
+            weed_ogkush_seed = 200, weed_amnesia_seed = 300,
         },
     },
 }

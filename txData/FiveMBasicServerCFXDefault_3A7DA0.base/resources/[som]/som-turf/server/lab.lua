@@ -66,6 +66,9 @@ lib.callback.register('som-turf:server:labStart', function(source, labName, reci
 
     local recipe = type(recipeId) == 'string' and Config.recipes[recipeId]
     if not recipe or not recipe.enabled then return done(false, 'you do not know that one') end
+    if recipe.minLevel and level(source, 'chemistry') < recipe.minLevel then
+        return done(false, ('you need chemistry level %d for this'):format(recipe.minLevel))
+    end
 
     local mine = MySQL.scalar.await("SELECT COUNT(*) FROM som_lab_jobs WHERE citizenid = ? AND status = 'cooking'", { player.citizenid }) or 0
     if mine >= Config.lab.maxActive then return done(false, 'you already have something cooking') end

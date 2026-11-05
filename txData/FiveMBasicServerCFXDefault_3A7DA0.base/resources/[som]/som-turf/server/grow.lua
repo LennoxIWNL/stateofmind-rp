@@ -96,6 +96,10 @@ lib.callback.register('som-turf:server:plant', function(source, seed)
     local strain = type(seed) == 'string' and G.strains[seed]
     if not strain then return done(false, 'that is not a seed') end
 
+    if strain.minLevel and level(source, 'growing') < strain.minLevel then
+        return done(false, ('you need growing level %d for %s'):format(strain.minLevel, strain.label))
+    end
+
     local pos = pedPos(source)
     if not pos or not allowed(player, pos) then return done(false, 'nothing will grow here') end
 
@@ -168,6 +172,7 @@ lib.callback.register('som-turf:server:harvest', function(source, id)
         MySQL.update.await("UPDATE som_plants SET status = 'growing' WHERE id = ? AND status = 'harvested'", { p.id })
         return done(false, 'you cannot carry it')
     end
+    if math.random() < G.seedReturnChance then ox:AddItem(source, p.strain, 1) end
     xp(source, 'growing', 25)
     return done(true, nil, { count = count })
 end)

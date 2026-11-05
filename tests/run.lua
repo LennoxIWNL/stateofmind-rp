@@ -51,6 +51,7 @@ local function resetDb()
     mysql.db.plants = {}
     mysql.db.lab = {}
     mysql.db.buyer = {}
+    mysql.db.trade = {}
     mysql.db.skills = {}
     mysql.db.newlife = {}
     mysql.db.chop = { log = {}, owned = {} }
@@ -3486,6 +3487,7 @@ do
     Mocks.inv = { [1] = {}, [2] = {} }
     Mocks.bank = { [1] = 1000, [2] = 1000 }
     Mocks.treasury, Mocks.taxFails, Mocks.invFull = 0, false, {}
+    Mocks.levels = { chemistry = 10 }
     mysql.fakeNow = 5000000
     FakePeds[1], FakePeds[2] = vec3(0, 0, 0), vec3(0, 0, 0)
     local cb = RegisteredCallbacks
@@ -3494,7 +3496,7 @@ do
     check(cb['som-turf:server:supplierInfo'](1) == nil and cb['som-turf:server:supplierBuy'](1, 'acetone', 1).error == 'nobody is selling', 'supplier: ships disabled')
     local S = env.Config.supplier
     S.enabled, S.coords = true, vec3(0, 0, 0)
-    check(#cb['som-turf:server:supplierInfo'](1).stock == 6, 'supplier: the stock list is sent')
+    check(#cb['som-turf:server:supplierInfo'](1).stock == 11, 'supplier: the stock list is sent')
     check(cb['som-turf:server:supplierBuy'](2, 'acetone', 1).error == 'you are not in a gang', 'supplier: only gang members buy')
     check(cb['som-turf:server:supplierBuy'](1, 'gold', 1).error == 'they do not sell that', 'supplier: only listed items')
     check(cb['som-turf:server:supplierBuy'](1, 'acetone', 0).success == false and cb['som-turf:server:supplierBuy'](1, 'acetone', 1.5).success == false and cb['som-turf:server:supplierBuy'](1, 'acetone', 99).success == false, 'supplier: quantities are validated')
@@ -3546,6 +3548,7 @@ do
     Mocks.clock = 1000000
     FakePeds[1], FakePeds[2], FakePeds[900] = vec3(0, 0, 0), vec3(1, 0, 0), vec3(2, 0, 0)
     Vehicles = { [900] = { engine = 300.0, body = 950.0, driver = 2 } }
+    Mocks.levels = { mechanic = 1 }
     local cb = RegisteredCallbacks
     local sent
     local realT = _G.TriggerClientEvent
@@ -3575,6 +3578,8 @@ do
     check(cb['som-mechanic:server:repair'](1, 900, 'engine').error == 'nothing to fix', 'mechanic: an undamaged vehicle is refused')
     Vehicles[900].body = 400.0
     give('steel', 2)
+    check(cb['som-mechanic:server:repair'](1, 900, 'body').error == 'you need mechanic level 2 for this', 'unlock: body repairs need mechanic level 2')
+    Mocks.levels.mechanic = 2
     Vehicles[900].driver = 1
     local bills0 = #Mocks.bills
     check(cb['som-mechanic:server:repair'](1, 900, 'body').success == true and #Mocks.bills == bills0, 'mechanic: no bill when the mechanic is the driver')
@@ -3904,7 +3909,7 @@ do
     local app = Mocks.apps.skills.handler(1, 'view', {}).view
     local fish
     for _, r in ipairs(app.sections[1].rows) do if r.title:find('Fishing, level 4') then fish = r end end
-    check(#app.sections[1].rows == 6 and fish ~= nil, 'skills: the phone app lists every track with its level')
+    check(#app.sections[1].rows == 7 and fish ~= nil, 'skills: the phone app lists every track with its level')
     check(Mocks.apps.skills.handler(1, 'delete', {}).success == false, 'skills: the app is read only')
 end
 
@@ -3952,6 +3957,179 @@ do
     local scrap = 0
     for _, it in pairs(Mocks.inv[1]) do if it.name == 'scrapmetal' then scrap = scrap + (it.count or 1) end end
     check(r.success and scrap >= 4 + 2, 'skills: scrapping level 6 adds two of every part')
+end
+
+-- ---------------------------------------------------------------------------
+-- Skill unlock gates
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-progress', { 'shared/config.lua', 'server/main.lua' })
+    Mocks.players = { [1] = { citizenid = 'U1' } }
+    mysql.db.skills['U1:fishing'] = { track = 'fishing', xp = 1080, day_xp = 0 }
+    check(Mocks.exported.hasLevel(1, 'fishing', 4) == true and Mocks.exported.hasLevel(1, 'fishing', 5) == false, 'unlock: hasLevel compares against the stored level')
+    check(Mocks.exported.hasLevel(99, 'fishing', 1) == false and Mocks.exported.hasLevel(1, 'nonsense', 1) == false, 'unlock: unknown players and tracks have no level')
+    local view = Mocks.apps.skills.handler(1, 'view', {}).view
+    check(view.sections[2] and view.sections[2].title == 'Coming up' and #view.sections[2].rows <= 5, 'unlock: the skills app shows what comes next')
+    local list = view.sections[2].rows[1].title
+    check(not list:find('Fishing 4'), 'unlock: reached unlocks are not listed again')
+end
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua', 'server/buyer.lua', 'server/fishing.lua', 'server/hunting.lua' })
+    Mocks.players = { [1] = { citizenid = 'V1' } }
+    Mocks.inv = { [1] = {} }
+    Mocks.clock = 1000000
+    Mocks.levels = { fishing = 1, hunting = 1 }
+    FakePeds[1] = vec3(0, 0, 0)
+    local cb = RegisteredCallbacks
+    local slot = 1500
+    local function give(name, n) slot = slot + 1; Mocks.inv[1][slot] = { name = name, count = n or 1, slot = slot } end
+    local deep = env.Config.fishing.spots[2]
+    deep.enabled, deep.center, deep.radius = true, vec3(0, 0, 0), 20.0
+    give('fishingrod'); give('fishbait')
+    check(cb['som-outdoors:server:cast'](1).error == 'you need fishing level 4 to fish here', 'unlock: deep water needs fishing level 4')
+    Mocks.levels.fishing = 4
+    check(cb['som-outdoors:server:cast'](1).success == true, 'unlock: level 4 may fish deep water')
+
+    Animals = { [820] = { model = 'a_c_boar', health = 0, killer = 1 } }
+    FakePeds[820] = vec3(1, 0, 0)
+    give('hunting_knife')
+    check(cb['som-outdoors:server:skin'](1, 820).error == 'you need hunting level 3 to skin this', 'unlock: boar needs hunting level 3')
+    Mocks.levels.hunting = 3
+    check(cb['som-outdoors:server:skin'](1, 820).success == true, 'unlock: level 3 may skin boar')
+end
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-turf', { 'shared/config.lua', 'server/main.lua', 'server/grow.lua', 'server/lab.lua' })
+    Mocks.players = { [1] = { citizenid = 'Y1', gang = { name = 'ballas', grade = 1 } } }
+    Mocks.inv = { [1] = {} }
+    mysql.fakeNow = 5000000
+    FakePeds[1] = vec3(0, 0, 0)
+    local cb = RegisteredCallbacks
+    local slot = 1700
+    local function give(name, n) slot = slot + 1; Mocks.inv[1][slot] = { name = name, count = n or 1, slot = slot } end
+    env.Config.grow.spots[1].enabled, env.Config.grow.spots[1].center, env.Config.grow.spots[1].radius = true, vec3(0, 0, 0), 20.0
+    Mocks.levels = { growing = 1, chemistry = 1 }
+    give('weed_ogkush_seed')
+    check(cb['som-turf:server:plant'](1, 'weed_ogkush_seed').error == 'you need growing level 5 for OG Kush', 'unlock: OG Kush needs growing level 5')
+    Mocks.levels.growing = 5
+    check(cb['som-turf:server:plant'](1, 'weed_ogkush_seed').success == true, 'unlock: level 5 may plant OG Kush')
+    local L = env.Config.labs[1]
+    L.enabled, L.coords = true, vec3(0, 0, 0)
+    give('coke_leaf', 4); give('sulfuric_acid', 1)
+    check(cb['som-turf:server:labStart'](1, 'lab_1', 'refine_leaf').error == 'you need chemistry level 2 for this', 'unlock: refining needs chemistry level 2')
+    Mocks.levels.chemistry = 2
+    check(cb['som-turf:server:labStart'](1, 'lab_1', 'refine_leaf').success == true, 'unlock: level 2 may refine')
+    give('ephedrine', 2); give('acetone', 1); give('lithium', 1); give('hydrochloric_acid', 1)
+    Mocks.levels.chemistry = 3
+    mysql.db.lab = {}
+    check(cb['som-turf:server:labStart'](1, 'lab_1', 'cook_meth').error == 'you need chemistry level 4 for this', 'unlock: cooking meth needs chemistry level 4')
+end
+
+-- ---------------------------------------------------------------------------
+-- Crafting rules
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-inventory', { 'server/main.lua' })
+    local function player(job, duty) return { citizenid = 'K1', job = { name = job, onduty = duty } } end
+    Mocks.players = { [1] = player('mechanic', true) }
+    Mocks.levels = {}
+    check(env.Craft.Check(1, 'water') == true, 'craft: an unlisted recipe is allowed for anyone')
+    Mocks.players[1] = player('unemployed', false)
+    local ok, why = env.Craft.Check(1, 'repairkit')
+    check(ok == false and why == 'only a mechanic on duty can make this', 'craft: repair kits are mechanic goods')
+    Mocks.players[1] = player('mechanic', false)
+    check(env.Craft.Check(1, 'advancedlockpick') == false, 'craft: a mechanic off duty cannot make them')
+    Mocks.players[1] = player('mechanic', true)
+    check(env.Craft.Check(99, 'repairkit') == false, 'craft: unknown players are refused')
+    Mocks.levels = { crafting = 1 }
+    local ok1, why1 = env.Craft.Check(1, 'repairkit')
+    check(ok1 == false and why1 == 'you need crafting level 2', 'craft: repair kits need crafting level 2')
+    Mocks.levels.crafting = 2
+    check(env.Craft.Check(1, 'repairkit') == true and env.Craft.Check(1, 'advancedlockpick') == false, 'craft: level 2 opens repair kits but not advanced lockpicks')
+    Mocks.levels.crafting = 5
+    check(env.Craft.Check(1, 'advancedlockpick') == true, 'craft: level 5 opens advanced lockpicks')
+end
+
+-- ---------------------------------------------------------------------------
+-- Mechanic trade and the roadside fallback
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-mechanic', { 'shared/config.lua', 'server/main.lua', 'server/trade.lua' })
+    local function mech(duty) return { citizenid = 'M1', job = { name = 'mechanic', onduty = duty ~= false }, charinfo = { firstname = 'Mo', lastname = 'Chanic' } } end
+    Mocks.players = { [1] = mech(), [2] = { citizenid = 'C2', job = { name = 'unemployed' }, charinfo = { firstname = 'Cu', lastname = 'Stomer' } } }
+    Mocks.inv = { [1] = {}, [2] = {} }
+    Mocks.bank = { [1] = 0, [2] = 1000 }
+    Mocks.jobs = { mechanic = { commission = 0.12 } }
+    Mocks.treasury, Mocks.clock = 0, 1000000
+    mysql.fakeNow = 5000000
+    FakePeds[1], FakePeds[2] = vec3(0, 0, 0), vec3(1, 0, 0)
+    mysql.db.characters = {}
+    local cb = RegisteredCallbacks
+    local app = Mocks.apps.trade
+    local slot = 2100
+    local function give(src, name) slot = slot + 1; Mocks.inv[src][slot] = { name = name, count = 1, slot = slot } end
+    local function count(src, name) local n = 0; for _, it in pairs(Mocks.inv[src]) do if it.name == name then n = n + 1 end end; return n end
+    local offer = cb['som-mechanic:server:offer']
+    give(1, 'repairkit')
+
+    check(offer(2, 1, 'repairkit', 200).error == 'you are not on duty as a mechanic', 'trade: only an on duty mechanic can offer')
+    check(offer(1, 2, 'steel', 200).error == 'that is not something you can sell here', 'trade: only listed goods')
+    check(offer(1, 2, 'repairkit', 50).error:find('between') and offer(1, 2, 'repairkit', 99999).error:find('between') and offer(1, 2, 'repairkit', 150.5).error:find('between'), 'trade: the price must sit inside the limits')
+    check(offer(1, 1, 'repairkit', 200).error == 'there is nobody to sell to' and offer(1, 99, 'repairkit', 200).error == 'there is nobody to sell to', 'trade: no self sales or ghosts')
+    FakePeds[2] = vec3(50, 0, 0)
+    check(offer(1, 2, 'repairkit', 200).error == 'they need to be next to you', 'trade: the customer must be close')
+    FakePeds[2] = vec3(1, 0, 0)
+    Mocks.inv[1] = {}
+    check(offer(1, 2, 'repairkit', 200).error == 'you do not have one', 'trade: you must carry it')
+    give(1, 'repairkit')
+    check(offer(1, 2, 'repairkit', 200).success == true and #mysql.db.trade == 1, 'trade: a valid offer is stored')
+    check(app.handler(2, 'view', {}).view.sections[1].rows[1].action == 'accept', 'trade: the customer sees the offer')
+    check(app.handler(1, 'accept', { offer = 1 }).error == 'that offer is gone', 'trade: only the customer can accept')
+
+    Mocks.bank[2] = 50
+    local r = app.handler(2, 'accept', { offer = 1 })
+    check(r.error == 'not enough in your bank' and count(1, 'repairkit') == 1 and mysql.db.trade[1].status == 'cancelled', 'trade: a customer who cannot pay gets nothing and the mechanic keeps the kit')
+    Mocks.bank[2] = 1000
+    offer(1, 2, 'repairkit', 200)
+    local ok = app.handler(2, 'accept', { offer = 2 })
+    check(ok.success and count(1, 'repairkit') == 0 and count(2, 'repairkit') == 1 and Mocks.bank[2] == 800, 'trade: accepting moves the kit and the money')
+    check(Mocks.lastTransact and (Mocks.paid or 0) >= 24, 'trade: the mechanic is paid the 12% commission')
+    check(app.handler(2, 'accept', { offer = 2 }).error == 'that offer is gone', 'trade: an offer is accepted once')
+
+    give(1, 'repairkit')
+    offer(1, 2, 'repairkit', 200)
+    mysql.fakeNow = mysql.fakeNow + 500
+    check(app.handler(2, 'accept', { offer = 3 }).error == 'that offer is gone', 'trade: offers expire')
+
+    -- fallback
+    local F = env.Config.fallback
+    check(cb['som-mechanic:server:fallbackBuy'](2).error == 'nobody is selling', 'fallback: ships disabled')
+    F.enabled, F.coords = true, vec3(0, 0, 0)
+    check(cb['som-mechanic:server:fallbackBuy'](2).error == 'a mechanic is on duty, go and see them', 'fallback: closed while a mechanic is on duty')
+    Mocks.players[1] = mech(false)
+    FakePeds[2] = vec3(50, 0, 0)
+    check(cb['som-mechanic:server:fallbackBuy'](2).error == 'you are too far away', 'fallback: distance is checked')
+    FakePeds[2] = vec3(1, 0, 0)
+    Mocks.bank[2] = 100
+    check(cb['som-mechanic:server:fallbackBuy'](2).error == 'not enough in your bank', 'fallback: you cannot overspend')
+    Mocks.bank[2] = 1000
+    local b = cb['som-mechanic:server:fallbackBuy'](2)
+    check(b.success and Mocks.bank[2] == 300 and Mocks.treasury == 700 and count(2, 'repairkit') == 2, 'fallback: with no mechanic on duty the desk sells at the worse price into the treasury')
+    check(cb['som-mechanic:server:fallbackBuy'](2).error == 'you have bought one already, try again later', 'fallback: one per hour')
+    Mocks.invFull[2] = true
+    Mocks.bank[2] = 1000
+    mysql.fakeNow = mysql.fakeNow + 4000
+    local paid0 = Mocks.paid or 0
+    check(cb['som-mechanic:server:fallbackBuy'](2).success == false and (Mocks.paid or 0) == paid0 + 700, 'fallback: a full pack is refunded')
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))
