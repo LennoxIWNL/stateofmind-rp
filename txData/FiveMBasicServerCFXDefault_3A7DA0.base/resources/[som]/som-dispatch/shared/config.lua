@@ -144,6 +144,18 @@ Config.Alerts = {
         blip = { sprite = 51, colour = 1, scale = 0.9, duration = 240 },
     },
 
+    -- Raised by som-anpr when a police plate reader scans a stolen, BOLO'd or
+    -- police flagged plate, at the scanned vehicle's position. NOT `reportable`.
+    flaggedVehicle = {
+        label = 'Flagged Vehicle',
+        code = '10-29',
+        priority = 2,
+        chance = 1.0,
+        cooldown = 60,
+        jobs = { 'police' },
+        blip = { sprite = 225, colour = 47, scale = 0.9, duration = 240 },
+    },
+
     -- Raised by som-outdoors when a vehicle is brought to a chop shop, at the
     -- shop's own coordinates. NOT `reportable`.
     chopShop = {
