@@ -30,7 +30,7 @@ run() {
 }
 
 cleanup() {
-  sql "DELETE FROM som_plants WHERE citizenid = 'LOADTEST'; DELETE FROM som_trade_offers WHERE seller = 'LOADTEST'; DELETE FROM som_lab_jobs WHERE citizenid LIKE 'LOADTEST%'; DELETE FROM som_chop_log WHERE citizenid LIKE 'LOADTEST%'; DELETE FROM som_turf WHERE name = 'loadtest_zone'; DELETE FROM som_trade_offers WHERE buyer = 'LOADTEST'; DELETE FROM som_shops WHERE shop_id LIKE 'loadshop%'; DELETE FROM som_property_leases WHERE property_id IN (99998, 99999);" >/dev/null
+  sql "DELETE FROM som_plants WHERE citizenid = 'LOADTEST'; DELETE FROM som_trade_offers WHERE seller = 'LOADTEST'; DELETE FROM som_lab_jobs WHERE citizenid LIKE 'LOADTEST%'; DELETE FROM som_chop_log WHERE citizenid LIKE 'LOADTEST%'; DELETE FROM som_turf WHERE name = 'loadtest_zone'; DELETE FROM som_trade_offers WHERE buyer = 'LOADTEST'; DELETE FROM som_shops WHERE shop_id LIKE 'loadshop%'; DELETE FROM som_property_leases WHERE property_id IN (99998, 99999); DELETE FROM som_loans WHERE citizenid LIKE 'LOADTEST%';" >/dev/null
 }
 trap cleanup EXIT
 
@@ -65,6 +65,14 @@ run "lease start (one lease per property, two would-be tenants)" \
 run "lease rent week (one charge per due week)" \
   "DELETE FROM som_property_leases WHERE property_id = 99998; INSERT INTO som_property_leases (id, property_id, landlord, tenant, rent, next_due) VALUES (900001, 99998, 'LOADTEST', 'LOADT0', 500, '2026-01-01 00:00:00')" \
   "UPDATE som_property_leases SET next_due = DATE_ADD(next_due, INTERVAL 7 DAY), missed_cycles = missed_cycles + 0 WHERE id = 900001 AND status = 'active' AND UNIX_TIMESTAMP(next_due) = UNIX_TIMESTAMP('2026-01-01 00:00:00')"
+
+run "loan start (one open loan per person, total owed capped)" \
+  "DELETE FROM som_loans WHERE citizenid LIKE 'LOADTEST%'" \
+  "INSERT INTO som_loans (citizenid, principal, fee, instalment, remaining, next_due) SELECT 'LOADTEST', 1000, 100, 275, 1100, DATE_ADD(NOW(), INTERVAL 7 DAY) FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM som_loans WHERE citizenid = 'LOADTEST' AND status IN ('active', 'defaulted')) AND (SELECT COALESCE(SUM(remaining), 0) FROM som_loans WHERE status IN ('active', 'defaulted') AND citizenid LIKE 'LOADTEST%') + 1100 <= 100000"
+
+run "loan instalment (one claim per due week)" \
+  "DELETE FROM som_loans WHERE citizenid LIKE 'LOADTEST%'; INSERT INTO som_loans (id, citizenid, principal, fee, instalment, remaining, next_due) VALUES (900002, 'LOADTEST2', 1000, 100, 275, 1100, '2026-01-01 00:00:00')" \
+  "UPDATE som_loans SET next_due = DATE_ADD(next_due, INTERVAL 7 DAY), status = IF(remaining = 275, 'paid', status), remaining = remaining - 275 WHERE id = 900002 AND status = 'active' AND UNIX_TIMESTAMP(next_due) = UNIX_TIMESTAMP('2026-01-01 00:00:00') AND remaining >= 275"
 
 # Same statement as the insert in som-mechanic/server/trade.lua fallbackBuy; change both together.
 run "roadside kit (one per hour)" \

@@ -30,6 +30,7 @@ local function resetDb()
     mysql.db.jailSentences = {}
     mysql.db.jailBail = {}
     mysql.db.courtCases = {}
+    mysql.db.courtService = {}
     mysql.db.courtEvents = {}
     mysql.db.courtWarrants = {}
     mysql.db.service = {}
@@ -61,13 +62,14 @@ local function resetDb()
     mysql.db.licences = { rows = {}, attempts = {} }
     mysql.db.staff = { reports = {}, audit = {} }
     mysql.db.taxi = { earned = {} }
+    mysql.db.carsales = { vehicles = {}, flagged = {}, stolen = {}, sales = {} }
     mysql.db.gangs = { chars = {}, log = {} }
     mysql.db.vehicles = {}
     mysql.db.social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} }
     mysql.db.bills = {}
     mysql.db.orders = {}
     mysql.db.nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
-                        courtCases = 1, courtEvents = 1, courtWarrants = 1, service = 1, evidence = 1, custody = 1, orders = 1 }
+                        courtCases = 1, courtEvents = 1, courtWarrants = 1, courtService = 1, service = 1, evidence = 1, custody = 1, orders = 1 }
     mysql.fakeNow = nil
 end
 
@@ -4844,6 +4846,167 @@ do
 end
 
 -- ---------------------------------------------------------------------------
+-- Phone loans
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    resetMocks()
+    mysql.fakeNow = 1000000
+    mysql.db.loans = {}
+    local env = loader.loadResource(REPO .. 'som-loans', { 'shared/config.lua', 'server/loans.lua' })
+    local core = exports['som-core']
+    local C = env.Config
+    local app = Mocks.apps.loans
+    local DAY = 86400
+
+    local function person(src, cid) return { citizenid = cid, source = src, charinfo = { firstname = 'P' .. src, lastname = 'Q' .. src } } end
+    Mocks.players = { [1] = person(1, 'BOR1'), [2] = person(2, 'BOR2'), [3] = person(3, 'STAFF3') }
+    Mocks.bank = { [1] = 0, [2] = 0, [3] = 0 }
+    Mocks.treasury = 200000
+    Mocks.addMoneyFails, Mocks.admins = false, { [3] = true }
+    local saved = { addMoney = core.addMoney }
+    function core:addMoney(source, _, amount)
+        if Mocks.addMoneyFails then return false, 'refused' end
+        Mocks.bank[source] = (Mocks.bank[source] or 0) + amount
+        return true
+    end
+    function core:getMoney(source) return Mocks.bank[source] or 0 end
+    local notes = {}
+    local realT = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, ...) notes[#notes + 1] = { name = name, target = target, args = { ... } } end
+
+    local function loanOf(cid) for i = #mysql.db.loans, 1, -1 do if mysql.db.loans[i].citizenid == cid then return mysql.db.loans[i] end end end
+    local function borrow(src, amount, weeks)
+        local picked = app.handler(src, 'pick', { amount = amount })
+        if not picked.success then return picked end
+        return app.handler(src, 'borrow', { weeks = weeks })
+    end
+    local function week() mysql.fakeNow = mysql.fakeNow + 8 * DAY end
+
+    -- Asking
+    check(#app.handler(1, 'view', {}).view.sections[1].rows == #C.amounts, 'loans: the phone offers the listed amounts')
+    check(app.handler(1, 'pick', { amount = 750 }).error == 'bad request' and app.handler(1, 'pick', { amount = '500' }).error == 'bad request' and app.handler(1, 'pick', {}).error == 'bad request', 'loans: only listed amounts can be chosen')
+    check(app.handler(1, 'borrow', { weeks = 4 }).error == 'bad request', 'loans: nothing is lent without a chosen amount')
+    app.handler(1, 'pick', { amount = 1000 })
+    check(app.handler(1, 'borrow', { weeks = 5 }).error == 'bad request' and app.handler(1, 'borrow', { weeks = '4' }).error == 'bad request', 'loans: only listed terms can be chosen')
+    check(#app.handler(1, 'view', {}).view.sections == 2, 'loans: the phone shows the terms once an amount is chosen')
+
+    -- Lending
+    local made = app.handler(1, 'borrow', { weeks = 4, amount = 99999, fee = 0, instalment = 1 })
+    local loan = loanOf('BOR1')
+    check(made.success and loan.principal == 1000 and loan.fee == 100 and loan.instalment == 275 and loan.remaining == 1100, 'loans: the fee and instalment are worked out on the server')
+    check(Mocks.bank[1] == 1000 and Mocks.treasury == 199000, 'loans: the money comes from the treasury')
+    check(borrow(1, 500, 4).error == 'you already have a loan open', 'loans: one open loan per person')
+
+    Mocks.treasury = 50500
+    check(borrow(2, 1000, 4).error == 'the bank cannot lend right now' and loanOf('BOR2') == nil and Mocks.treasury == 50500, 'loans: the treasury floor holds')
+    Mocks.treasury = 199000
+    C.globalCap = 1500
+    check(borrow(2, 500, 4).error == 'the bank is not lending more right now' and loanOf('BOR2') == nil and Mocks.treasury == 199000, 'loans: the total owed is capped')
+    C.globalCap = 100000
+    Mocks.addMoneyFails = true
+    check(borrow(2, 500, 4).success == false and Mocks.treasury == 199000 and loanOf('BOR2').status == 'cancelled', 'loans: a failed credit refunds the treasury and cancels the loan')
+    Mocks.addMoneyFails = false
+    check(borrow(2, 500, 4).success and loanOf('BOR2').status == 'active', 'loans: a cancelled loan does not block a new one')
+    -- Take that loan out again so the weeks below are about one borrower at a time.
+    table.remove(mysql.db.loans)
+    Mocks.treasury, Mocks.bank[2] = 199000, 0
+
+    -- Weeks
+    Mocks.bank[1] = 1000
+    week()
+    env.Loans.Sweep()
+    check(loan.remaining == 825 and Mocks.bank[1] == 725 and Mocks.treasury == 199275 and loan.missed == 0, 'loans: an instalment is taken from the bank and goes to the treasury')
+    env.Loans.Sweep()
+    check(loan.remaining == 825, 'loans: the same week is never taken twice')
+    local row = { id = loan.id, citizenid = 'BOR1', instalment = 275, remaining = loan.remaining, due = loan.due }
+    week()
+    local bankBefore, treasuryBefore = Mocks.bank[1], Mocks.treasury
+    env.Loans.Collect(row); env.Loans.Collect(row)
+    check(loan.remaining == 550 and Mocks.bank[1] == bankBefore - 275 and Mocks.treasury == treasuryBefore + 275, 'loans: two ticks on the same week take it once, in money as well as in the balance')
+
+    Mocks.bank[1] = 0
+    week()
+    env.Loans.Sweep()
+    check(loan.remaining == 550 and loan.missed == 1 and loan.status == 'active', 'loans: a week that cannot be paid is counted as missed')
+    env.Loans.Sweep()
+    check(loan.missed == 1, 'loans: a missed week is not counted again on the next tick')
+
+    Mocks.bank[1] = 100
+    Mocks.treasury = 199275
+    Mocks.transferBlocked = nil
+    env.Loans.Settle('BOR1')
+    check(loan.missed == 1 and loan.remaining == 550 and Mocks.bank[1] == 100, 'loans: a settle the borrower cannot afford puts the missed week back')
+    Mocks.bank[1] = 1000
+    env.Loans.Settle('BOR1')
+    check(loan.missed == 0 and loan.remaining == 275 and Mocks.bank[1] == 725, 'loans: a returning borrower pays what they missed')
+    env.Loans.Settle('BOR1')
+    check(loan.remaining == 275, 'loans: missed weeks are paid once')
+
+    -- Last instalment, offline weeks and default
+    loan.remaining = 200
+    week()
+    env.Loans.Sweep()
+    check(loan.status == 'paid' and loan.remaining == 0 and Mocks.bank[1] == 525, 'loans: the last instalment is only what is left and closes the loan')
+
+    check(borrow(2, 500, 4).success, 'loans: a second borrower takes a loan')
+    local second = loanOf('BOR2')
+    Mocks.players[2] = nil
+    week(); env.Loans.Sweep()
+    check(second.missed == 1 and second.remaining == 550 and second.status == 'active', 'loans: an offline borrower is not charged, the week is counted')
+    week(); env.Loans.Sweep()
+    week(); env.Loans.Sweep()
+    check(second.status == 'defaulted' and second.missed == 3, 'loans: three missed weeks put the loan in default')
+    Mocks.players[2] = person(2, 'BOR2')
+
+    -- Collection and the block on new loans
+    Mocks.bank[2] = 0
+    env.Loans.Sweep()
+    check(second.remaining == 550 and Mocks.bank[2] == 0, 'loans: collection takes nothing from an empty bank')
+    Mocks.bank[2] = 200
+    local before = Mocks.treasury
+    env.Loans.Sweep()
+    check(second.remaining == 350 and Mocks.bank[2] == 0 and Mocks.treasury == before + 200, 'loans: collection takes what is in the bank and no more')
+    check(borrow(2, 500, 4).error == 'you already have a loan open', 'loans: a loan in default blocks a new one')
+    check(app.handler(2, 'payoff', {}).error == 'not enough in your bank' and second.remaining == 350 and second.status == 'defaulted', 'loans: a payoff the borrower cannot afford changes nothing')
+    Mocks.bank[2] = 1000
+    check(app.handler(2, 'payoff', {}).success and second.remaining == 0 and second.status == 'paid' and Mocks.bank[2] == 650 and Mocks.treasury == before + 550, 'loans: an early payoff pays only what is left')
+    check(app.handler(2, 'payoff', {}).error == 'you have no loan', 'loans: there is nothing to pay off once it is paid')
+    check(borrow(2, 500, 4).success, 'loans: a cleared debt lets the borrower borrow again')
+
+    -- Money is conserved
+    local t0 = Mocks.treasury
+    Mocks.bank[1] = 5000
+    local full = borrow(1, 1000, 4)
+    local fl = loanOf('BOR1')
+    Mocks.players[2] = nil
+    for _ = 1, 4 do week(); env.Loans.Sweep() end
+    Mocks.players[2] = person(2, 'BOR2')
+    check(full.success and fl.status == 'paid' and Mocks.treasury == t0 - 1000 + 1100, 'loans: over a full loan the treasury gets back the amount plus the flat fee')
+
+    -- Staff
+    local forgive = Mocks.commands.forgiveloan
+    local third = loanOf('BOR2')
+    check(pcall(forgive, 2, { id = third.id }) and third.status == 'defaulted', 'loans: a player cannot forgive a loan')
+    forgive(3, { id = 9999 })
+    check(third.status == 'defaulted', 'loans: forgiving an unknown loan does nothing')
+    mysql.ledgerFails = true
+    forgive(3, { id = third.id })
+    mysql.ledgerFails = false
+    check(third.status == 'defaulted' and third.remaining == 550, 'loans: if the ledger row cannot be written nothing is forgiven')
+    local owed = third.remaining
+    forgive(3, { id = third.id })
+    check(third.status == 'forgiven' and third.remaining == 0 and mysql.loanLedger[1].amount == owed and mysql.loanLedger[1].citizenid == 'BOR2', 'loans: forgiving writes off the debt and ledgers it')
+    forgive(3, { id = third.id })
+    check(#mysql.loanLedger == 1, 'loans: a debt is only forgiven once')
+
+    core.addMoney = saved.addMoney
+    _G.TriggerClientEvent = realT
+    mysql.fakeNow = nil
+end
+
+-- ---------------------------------------------------------------------------
 -- Player leases
 -- ---------------------------------------------------------------------------
 
@@ -6616,6 +6779,369 @@ do
         check(bad == 0, 'boot: no ";" inside a comment in ' .. name)
     end
 end
+
+-- som-serving
+----------------------------------------------------------------------
+do
+    local env, notes
+    local DAY = 24 * 3600
+
+    local function scene(overrides)
+        resetDb()
+        mysql.fakeNow = nil
+        Mocks.players = {
+            [3] = { citizenid = 'SERVER', job = { name = 'unemployed' }, charinfo = { firstname = 'Sam', lastname = 'Server' } },
+            [4] = { citizenid = 'OTHER', job = { name = 'unemployed' }, charinfo = { firstname = 'Otto', lastname = 'Other' } },
+            [5] = { citizenid = 'DEF1', job = { name = 'unemployed' }, charinfo = { firstname = 'Dee', lastname = 'One' } },
+            [6] = { citizenid = 'DEF2', job = { name = 'unemployed' }, charinfo = { firstname = 'Dex', lastname = 'Two' } },
+        }
+        FakePeds = { [3] = vec3(0, 0, 0), [4] = vec3(0, 0, 0), [5] = vec3(1, 0, 0), [6] = vec3(1, 0, 0) }
+        Mocks.businesses.doj = { label = 'DOJ' }
+        Mocks.bizBalance = { doj = 5000 }
+        Mocks.addMoneyFails, Mocks.addMoneyThrows, Mocks.businessSpendFails = false, false, false
+        env = loader.loadResource(REPO .. 'som-serving', { 'shared/config.lua', 'server/main.lua' })
+        for k, v in pairs(overrides or {}) do env.Config[k] = v end
+        notes = {}
+        local real = _G.TriggerClientEvent
+        _G.TriggerClientEvent = function(name, target, payload) notes[#notes + 1] = { name = name, target = target, payload = payload } end
+        return function() _G.TriggerClientEvent = real end
+    end
+
+    local function paper(id, defendant, overrides)
+        local c = { id = id, status = 'scheduled', defendant_cid = defendant, filed_by = 'OFFICER', judge_cid = 'JUDGE',
+            hearing_at = os.time() + 7200, class = 'misdemeanor', charges = 'x' }
+        for k, v in pairs(overrides or {}) do c[k] = v end
+        mysql.db.courtCases[id] = c
+        return c
+    end
+
+    local function app(source, action, payload) return Mocks.apps.papers.handler(source, action, payload or {}) end
+    local function begin(source, target)
+        Mocks.clock = (Mocks.clock or 0) + 3000
+        return RegisteredCallbacks['som-serving:server:begin'](source, target)
+    end
+    local function finish(source, target, wait)
+        Mocks.clock = (Mocks.clock or 0) + (wait or 7000)
+        return RegisteredCallbacks['som-serving:server:finish'](source, target)
+    end
+    local function serve(source, target)
+        local b = begin(source, target)
+        if not b.success then return b end
+        return finish(source, target)
+    end
+    local function later(seconds, fn)
+        local real = os.time
+        os.time = function() return real() + seconds end
+        local ok, err = pcall(fn)
+        os.time = real
+        if not ok then error(err, 0) end
+    end
+    local function titles(source)
+        local out = {}
+        for _, sec in ipairs(app(source, 'view').view.sections or {}) do
+            for _, r in ipairs(sec.rows) do out[#out + 1] = r.title end
+        end
+        return out
+    end
+
+    do
+        local restore = scene()
+        paper(1, 'DEF1'); paper(2, 'DEF2')
+        check(#titles(3) == 2 and titles(3)[1] == 'Dee One', 'serving: the list shows the defendant name and nothing about the charges')
+        local sub = app(3, 'view').view.sections[1].rows[1]
+        check(sub.sub:find('$250', 1, true) and not sub.sub:find('x', 1, true) and sub.payload.case == 1, 'serving: a row shows the hearing time and the fee only')
+        paper(3, 'DEF1', { hearing_at = os.time() + 300 })
+        paper(4, 'DEF1', { status = 'convicted' })
+        check(#titles(3) == 2, 'serving: a hearing too close or a case not scheduled is not listed')
+        paper(5, 'OTHER'); paper(6, 'DEF2', { filed_by = 'SERVER' }); paper(7, 'DEF2', { judge_cid = 'SERVER' })
+        paper(8, 'DEF2', { prosecutor_cid = 'SERVER' }); paper(9, 'DEF2', { defender_cid = 'SERVER' })
+        check(#titles(3) == 3, 'serving: the filer, judge, prosecutor, defender and the defendant never see their own case')
+        check(#titles(4) > #titles(3), 'serving: other people do see those cases')
+        Mocks.bizBalance.doj = 100
+        check(app(3, 'view').view.empty == 'The courts cannot pay for service right now', 'serving: the list is refused up front when the courts cannot pay')
+        check(app(3, 'take', { case = 1 }).error == 'the courts cannot pay for service right now', 'serving: a paper cannot be taken either')
+        restore()
+    end
+
+    do
+        local restore = scene()
+        paper(1, 'DEF1'); paper(2, 'DEF2')
+        check(app(3, 'take', { case = 'x' }).error == 'bad request' and app(3, 'take', { case = 99 }).error == 'that paper is gone', 'serving: a bad or missing case is refused')
+        check(app(3, 'take', { case = 1 }).success == true, 'serving: a paper can be taken')
+        check(app(3, 'take', { case = 2 }).error == 'you are already holding a paper', 'serving: one paper at a time')
+        check(app(4, 'take', { case = 1 }).error == 'someone else has that paper' and #titles(4) == 1, 'serving: a held paper is hidden from others')
+        check(app(3, 'drop').success == true and app(4, 'take', { case = 1 }).success == true, 'serving: handing a paper back frees it')
+        app(4, 'drop')
+        app(3, 'take', { case = 1 })
+        later(31 * 60, function()
+            check(#titles(4) == 2 and app(4, 'take', { case = 1 }).success == true, 'serving: a hold that ran out frees the paper')
+        end)
+        restore()
+    end
+
+    do
+        local restore = scene()
+        paper(1, 'DEF1'); paper(2, 'DEF2')
+        check(begin(3, 5).error == 'you are not holding a paper', 'serving: serving needs a held paper')
+        app(3, 'take', { case = 1 })
+        check(begin(3, 6).error == 'that is not the person on the paper', 'serving: the wrong person cannot be served')
+        check(begin(3, 3).error == 'that is not the person on the paper' and begin(3, 'x').error == 'that is not the person on the paper', 'serving: yourself or a bad id is refused')
+        FakePeds[5] = vec3(40, 0, 0)
+        check(begin(3, 5).error == 'you are too far away', 'serving: the distance is checked by the server')
+        FakePeds[5] = vec3(1, 0, 0)
+        check(finish(3, 5).error == 'the papers were not handed over', 'serving: finishing without beginning pays nothing')
+        check(begin(3, 5).success == true, 'serving: serving begins next to the defendant')
+        local paid = Mocks.calls.addMoney
+        check(finish(3, 5, 1000).error == 'the papers were not handed over' and Mocks.calls.addMoney == paid, 'serving: the progress time is enforced on the server')
+        begin(3, 5)
+        check(finish(3, 6).error == 'the papers were not handed over', 'serving: finishing on someone else is refused')
+        begin(3, 5)
+        FakePeds[5] = vec3(40, 0, 0)
+        check(finish(3, 5).error == 'you are too far away' and #mysql.db.courtService == 0, 'serving: moving away before the end cancels it')
+        FakePeds[5] = vec3(1, 0, 0)
+        Mocks.players[5] = nil
+        begin(3, 5)
+        check(#mysql.db.courtService == 0, 'serving: a defendant who is not loaded cannot be served')
+        restore()
+    end
+
+    do
+        local restore = scene()
+        paper(1, 'DEF1')
+        app(3, 'take', { case = 1 })
+        local before, bank = Mocks.calls.addMoney, Mocks.bizBalance.doj
+        check(serve(3, 5).success == true, 'serving: a paper is served')
+        check(#mysql.db.courtService == 1 and mysql.db.courtService[1].server_cid == 'SERVER' and mysql.db.courtService[1].defendant_cid == 'DEF1' and mysql.db.courtService[1].fee == 250, 'serving: the service is recorded in the table')
+        check(Mocks.calls.addMoney == before + 1 and Mocks.lastPaid.amount == 250 and Mocks.bizBalance.doj == bank - 250, 'serving: the fee comes out of the DOJ account')
+        local told
+        for _, n in ipairs(notes) do if n.name == 'som:client:notify' and n.target == 5 and tostring(n.payload):find('served court papers for hearing #1', 1, true) then told = true end end
+        check(told, 'serving: the defendant is told they were served')
+        check(#titles(3) == 0 and begin(3, 5).error == 'you are not holding a paper', 'serving: the paper is gone and the hold cleared')
+        check(app(4, 'take', { case = 1 }).error == 'that paper is gone', 'serving: a served case cannot be served or paid again')
+        restore()
+    end
+
+    do
+        local restore = scene()
+        paper(1, 'DEF1'); paper(2, 'DEF1', { hearing_at = os.time() + 3 * DAY }); paper(3, 'DEF2')
+        app(3, 'take', { case = 1 }); serve(3, 5)
+        check(app(3, 'take', { case = 2 }).error == 'they were served recently', 'serving: the same defendant cannot be served again for a fee within a day')
+        check(app(3, 'take', { case = 3 }).success == true, 'serving: a different defendant is still open')
+        app(3, 'drop')
+        later(DAY + 60, function()
+            check(app(3, 'take', { case = 2 }).success == true, 'serving: the per-defendant cooldown ends')
+        end)
+        restore()
+
+        restore = scene({ hourlyCap = 250 })
+        paper(1, 'DEF1'); paper(2, 'DEF2')
+        app(3, 'take', { case = 1 }); serve(3, 5)
+        check(app(3, 'take', { case = 2 }).error == 'you have served enough for this hour', 'serving: the hourly cap is checked up front')
+        later(3700, function() check(app(3, 'take', { case = 2 }).success == true, 'serving: the cap frees after an hour') end)
+        restore()
+
+        restore = scene({ hourlyCap = 500 })
+        paper(1, 'DEF1'); paper(2, 'DEF2')
+        app(3, 'take', { case = 1 }); app(4, 'take', { case = 2 })
+        serve(3, 5)
+        mysql.db.courtService[#mysql.db.courtService + 1] = { id = 99, case_id = 77, defendant_cid = 'ZZ', server_cid = 'OTHER', fee = 250, at = os.time() }
+        check(serve(4, 6).success == true, 'serving: a different server has their own cap')
+        restore()
+    end
+
+    do
+        local restore = scene()
+        paper(1, 'DEF1')
+        app(3, 'take', { case = 1 })
+        Mocks.bizBalance.doj = 100
+        local paid = Mocks.calls.addMoney
+        check(serve(3, 5).success == false and #mysql.db.courtService == 0 and Mocks.calls.addMoney == paid, 'serving: a broke DOJ pays nothing and the claim is undone')
+        Mocks.bizBalance.doj = 5000
+        Mocks.addMoneyFails = true
+        local t = Mocks.calls.businessTransact
+        check(serve(3, 5).success == false and #mysql.db.courtService == 0 and Mocks.calls.businessTransact == t + 1 and Mocks.bizBalance.doj == 5000, 'serving: a failed credit returns the money and undoes the claim')
+        Mocks.addMoneyFails = false
+        Mocks.addMoneyThrows = true
+        check(serve(3, 5).success == false and #mysql.db.courtService == 0, 'serving: a payout that throws undoes the claim')
+        Mocks.addMoneyThrows = false
+        check(serve(3, 5).success == true and #mysql.db.courtService == 1, 'serving: the same paper can be served once the courts can pay')
+        restore()
+    end
+
+    do
+        local restore = scene()
+        paper(1, 'DEF1')
+        app(3, 'take', { case = 1 })
+        mysql.db.courtService[1] = { id = 50, case_id = 1, defendant_cid = 'DEF1', server_cid = 'OTHER', fee = 250, at = os.time() }
+        begin(3, 5)
+        local paid = Mocks.calls.addMoney
+        check(finish(3, 5).error == 'that paper is gone' and Mocks.calls.addMoney == paid, 'serving: a paper served by someone else in the meantime pays nothing')
+        restore()
+    end
+
+    do
+        local restore = scene()
+        courtScene()
+        local filed = cb('file')(1, { target = 2, class = 'misdemeanor', charges = 'Assault' })
+        cb('accept')(11, filed.id)
+        cb('schedule')(10, filed.id, 1)
+        local second = cb('file')(1, { target = 2, class = 'misdemeanor', charges = 'Theft' })
+        cb('accept')(11, second.id)
+        mysql.db.courtService[1] = { id = 1, case_id = filed.id, defendant_cid = 'INMATE', server_cid = 'SERVER', fee = 250, at = os.time() }
+        local docket = cb('docket')(10)
+        local flags = {}
+        for _, c in ipairs(docket.cases) do flags[c.id] = c.served end
+        check(flags[filed.id] == true and flags[second.id] == false, 'serving: the judge docket shows which cases were served, read from the table')
+        restore()
+    end
+end
+
+
+do
+    resetDb()
+    local realTrigger = _G.TriggerClientEvent
+    local sent = {}
+    _G.TriggerClientEvent = function(name, src, ...) sent[#sent + 1] = { name = name, src = src, args = { ... } } end
+    local env = loader.loadResource(REPO .. 'som-carsales', { 'shared/config.lua', 'server/main.lua' })
+    local cb, C = RegisteredCallbacks, env.Config
+    local core = exports['som-core']
+    local DB = mysql.db.carsales
+
+    _G.NetworkGetEntityFromNetworkId = function(id) return id end
+    _G.GetEntityType = function() return 2 end
+    _G.Vehicles[900] = { plate = 'ABC123' }
+    FakePeds[900] = vec3(0, 0, 0)
+
+    local function person(src, cid, bank)
+        Mocks.players[src] = { source = src, citizenid = cid, job = { name = 'unemployed' }, charinfo = { firstname = cid, lastname = 'T' } }
+        FakePeds[src] = vec3(1, 0, 0)
+        Mocks.bank[src] = bank
+    end
+    local function car(extra)
+        local row = { id = 7, citizenid = 'S1', plate = 'ABC123', model = 'sultan', state = 'out', owner_group = nil, group_restricted = 0, assigned_to = nil, purchase_price = 5000 }
+        for k, v in pairs(extra or {}) do row[k] = v end
+        DB.vehicles['ABC123'] = row
+        return row
+    end
+    local rawOffer, answer = cb['som-carsales:server:offer'], cb['som-carsales:server:answer']
+    local function offer(...) Mocks.clock = Mocks.clock + (C.offerCooldownSeconds + 1) * 1000; return rawOffer(...) end
+
+    Mocks.clock = 1000
+    person(1, 'S1', 0); person(2, 'B2', 100000)
+    car()
+    Mocks.treasury = 0
+
+    check(offer(1, 'x', 2, 5000).error == 'bad request' and offer(1, 900, 2, 50.5).error == 'bad request', 'carsales: the request must be whole numbers')
+    check(offer(1, 900, 2, C.minPrice - 1).error:find('the price must be') and offer(1, 900, 2, C.maxPrice + 1).error:find('the price must be'), 'carsales: the price must be in range')
+    check(offer(1, 900, 1, 5000).error == 'pick somebody to sell to', 'carsales: nobody sells to themselves')
+    FakePeds[2] = vec3(100, 0, 0)
+    check(offer(1, 900, 2, 5000).error == 'they need to be standing with you', 'carsales: the buyer has to be close')
+    FakePeds[2] = vec3(1, 0, 0)
+    FakePeds[1], FakePeds[2] = vec3(50, 0, 0), vec3(51, 0, 0)
+    check(offer(1, 900, 2, 5000).error == 'you are not at that vehicle', 'carsales: the seller has to be at the car')
+    FakePeds[1], FakePeds[2] = vec3(1, 0, 0), vec3(1, 0, 0)
+
+    car({ citizenid = 'OTHER' })
+    check(offer(1, 900, 2, 5000).error == 'that is not your vehicle', 'carsales: only the owner can sell')
+    car({ state = 'garaged' })
+    check(offer(1, 900, 2, 5000).error == 'take it out of the garage first', 'carsales: a garaged car is taken out first')
+    car({ state = 'impounded' })
+    check(offer(1, 900, 2, 5000).error == 'take it out of the garage first', 'carsales: an impounded car cannot be sold')
+    car({ owner_group = 'lspd' })
+    check(offer(1, 900, 2, 5000).error:find('cannot be sold'), 'carsales: a business or pool car cannot be sold')
+    car({ group_restricted = 1 })
+    check(offer(1, 900, 2, 5000).error:find('cannot be sold'), 'carsales: a group restricted car cannot be sold')
+    car({ assigned_to = 'O1' })
+    check(offer(1, 900, 2, 5000).error:find('cannot be sold'), 'carsales: a car signed out to somebody cannot be sold')
+    car()
+    DB.flagged['ABC123'] = true
+    check(offer(1, 900, 2, 5000).error == 'the police have a hold on that vehicle', 'carsales: a police flagged plate cannot be sold')
+    DB.flagged['ABC123'] = nil
+    DB.stolen['ABC123'] = true
+    check(offer(1, 900, 2, 5000).error == 'the police have a hold on that vehicle', 'carsales: a car marked stolen cannot be sold')
+    DB.stolen['ABC123'] = nil
+
+    check(answer(2, true).error == 'no offer', 'carsales: nothing to accept with no offer')
+    Mocks.clock = Mocks.clock + 6000
+    check(rawOffer(1, 900, 2, 5000).success and rawOffer(1, 900, 2, 5000).error == 'one moment', 'carsales: offers from one seller are spaced out')
+    check(offer(1, 900, 2, 5000).success, 'carsales: the owner can make an offer')
+    check(answer(3, true).error == 'no offer', 'carsales: somebody else cannot accept it')
+    check(answer(2, false).error == 'declined' and DB.vehicles['ABC123'].citizenid == 'S1' and Mocks.bank[2] == 100000, 'carsales: declining changes nothing')
+
+    offer(1, 900, 2, 5000)
+    Mocks.clock = Mocks.clock + (C.offerSeconds + 1) * 1000
+    check(answer(2, true).error == 'the offer ran out' and DB.vehicles['ABC123'].citizenid == 'S1', 'carsales: an old offer cannot be accepted')
+
+    -- A good sale at a price where the tax needs rounding up: 101 * 5 percent = 5.05 -> 6.
+    offer(1, 900, 2, 101)
+    local ok = answer(2, true)
+    local row = DB.vehicles['ABC123']
+    check(ok.success and row.citizenid == 'B2' and row.purchase_price == 101, 'carsales: the car changes hands and keeps the price')
+    check(Mocks.bank[2] == 100000 - 101 and Mocks.treasury == 6 and Mocks.lastPaid.amount == 95 and Mocks.lastPaid.reason == 'carsale:sell',
+        'carsales: the buyer pays the price, the city gets the rounded up tax and the seller the rest')
+    check(#DB.sales == 1 and DB.sales[1].seller == 'S1' and DB.sales[1].buyer == 'B2' and DB.sales[1].tax == 6, 'carsales: the sale is recorded')
+    check(answer(2, true).error == 'no offer', 'carsales: an offer is used once')
+    check(offer(1, 900, 2, 500).error == 'that is not your vehicle', 'carsales: the old owner cannot sell it again')
+
+    -- Minimum price still pays the seller something.
+    car(); Mocks.treasury = 0
+    offer(1, 900, 2, C.minPrice)
+    answer(2, true)
+    check(Mocks.treasury == 5 and Mocks.lastPaid.amount == C.minPrice - 5, 'carsales: the smallest price still pays the seller')
+
+    -- Buyer cannot pay: nothing moves.
+    car(); Mocks.bank[2] = 5; Mocks.treasury = 0
+    offer(1, 900, 2, 5000)
+    check(answer(2, true).error:find('you need') and DB.vehicles['ABC123'].citizenid == 'S1' and Mocks.treasury == 0, 'carsales: a buyer without the money does not get the car')
+    Mocks.bank[2] = 100000
+
+    -- The tax cannot be taken: buyer refunded, car goes back.
+    car(); Mocks.treasury = 0
+    offer(1, 900, 2, 5000)
+    Mocks.taxFails = true
+    local r = answer(2, true)
+    Mocks.taxFails = nil
+    check(not r.success and DB.vehicles['ABC123'].citizenid == 'S1' and Mocks.lastPaid.reason == 'carsale:refund' and Mocks.lastPaid.amount == 5000,
+        'carsales: a failed tax step refunds the buyer and returns the car')
+
+    -- The seller cannot be paid: tax taken back, buyer refunded, car goes back.
+    car(); Mocks.treasury = 0
+    offer(1, 900, 2, 5000)
+    local realAdd = core.addMoney
+    core.addMoney = function(self, src, account, amount, reason, opts) if reason == 'carsale:sell' then return false end return realAdd(self, src, account, amount, reason, opts) end
+    r = answer(2, true)
+    core.addMoney = realAdd
+    check(not r.success and DB.vehicles['ABC123'].citizenid == 'S1' and Mocks.treasury == 0 and Mocks.lastPaid.reason == 'carsale:refund',
+        'carsales: a seller who cannot be paid cancels the sale, with the tax and the price returned')
+
+    -- Things that change between the offer and the answer.
+    car(); offer(1, 900, 2, 5000); FakePeds[1] = vec3(200, 0, 0)
+    check(answer(2, true).error == 'you have to be standing with the seller' and DB.vehicles['ABC123'].citizenid == 'S1', 'carsales: the seller walking away voids the offer')
+    FakePeds[1] = vec3(1, 0, 0)
+    car(); offer(1, 900, 2, 5000); Mocks.players[1] = nil
+    check(answer(2, true).error == 'the seller is no longer here', 'carsales: a seller who left voids the offer')
+    person(1, 'S1', 0)
+    car(); offer(1, 900, 2, 5000); DB.flagged['ABC123'] = true
+    check(answer(2, true).error == 'the police have a hold on that vehicle' and DB.vehicles['ABC123'].citizenid == 'S1', 'carsales: a flag set after the offer stops the sale')
+    DB.flagged['ABC123'] = nil
+    car(); offer(1, 900, 2, 5000); DB.vehicles['ABC123'].state = 'garaged'
+    check(answer(2, true).error == 'take it out of the garage first', 'carsales: a car stored after the offer cannot be sold')
+    car(); offer(1, 900, 2, 5000); _G.Vehicles[900].plate = 'ZZZ999'
+    check(answer(2, true).error == 'that is not the same vehicle', 'carsales: the offer is for that car and no other')
+    _G.Vehicles[900].plate = 'ABC123'
+
+    -- Two buyers: only one claim wins, and the loser pays nothing.
+    car(); Mocks.bank[2] = 100000
+    offer(1, 900, 2, 5000)
+    DB.claimRaces = true
+    local bank = Mocks.bank[2]
+    r = answer(2, true)
+    DB.claimRaces = nil
+    check(r.error == 'the vehicle is no longer for sale' and Mocks.bank[2] == bank, 'carsales: losing the claim race takes no money')
+
+    _G.TriggerClientEvent = realTrigger
+end
+
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)

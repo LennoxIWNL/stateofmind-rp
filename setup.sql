@@ -1812,6 +1812,27 @@ CREATE TABLE IF NOT EXISTS `som_shop_staff` (
   KEY `idx_shop` (`shop_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 -- ===========================================================================
+--  7n. COURT SERVICE (som-serving)
+--
+--  One row per case, and `case_id` is UNIQUE: the insert that creates it is the
+--  claim, so two servers cannot both be paid for the same papers. The hourly
+--  cap and the per-defendant cooldown are read from this table, not memory.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_court_service` (
+  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `case_id`       BIGINT UNSIGNED NOT NULL,
+  `defendant_cid` VARCHAR(16) NOT NULL,
+  `server_cid`    VARCHAR(16) NOT NULL,
+  `fee`           BIGINT NOT NULL,
+  `served_at`     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_case` (`case_id`),
+  KEY `idx_defendant_time` (`defendant_cid`, `served_at`),
+  KEY `idx_server_time` (`server_cid`, `served_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
 --  7m. LICENCES AND DRIVING SCHOOL (som-licences)
 --
 --  Licences themselves stay in som_licenses (suspended_until above). This only
@@ -1841,6 +1862,28 @@ CREATE TABLE IF NOT EXISTS `som_licence_attempts` (
 --   SELECT citizenid, 'driver', 'legacy' FROM som_characters
 --   WHERE JSON_VALUE(metadata, '$.licenses.driver') = 'true';
 
+-- ===========================================================================
+--  7n. PLAYER VEHICLE SALES (som-carsales)
+--
+--  An audit trail only; the owner of a car is som_vehicles.citizenid. No foreign
+--  keys, so the record outlives either character.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_vehicle_sales` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `vehicle_id` INT UNSIGNED NOT NULL,
+  `plate`      VARCHAR(12) NOT NULL,
+  `seller`     VARCHAR(16) NOT NULL,
+  `buyer`      VARCHAR(16) NOT NULL,
+  `price`      BIGINT NOT NULL,
+  `tax`        BIGINT NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_plate` (`plate`),
+  KEY `idx_seller` (`seller`),
+  KEY `idx_buyer` (`buyer`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Player leases (som-housing). The owner of a property lets it to one tenant for a weekly rent. The
 -- tenant holds a 'tenant' key in som_property_owners while the lease is active. next_due and
 -- missed_cycles are changed only by conditional UPDATEs, so a sweep tick and a login settle cannot
@@ -1860,5 +1903,25 @@ CREATE TABLE IF NOT EXISTS `som_property_leases` (
   KEY `idx_property` (`property_id`, `status`),
   KEY `idx_tenant` (`tenant`, `status`),
   KEY `idx_landlord` (`landlord`, `status`),
+  KEY `idx_due` (`status`, `next_due`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Phone loans (som-loans). One open loan per character (active or defaulted), lent from the city
+-- treasury and repaid to it. remaining is what is still owed including the flat fee; it is changed
+-- only by conditional UPDATEs, so two ticks, a login settle and an early payoff cannot take the same
+-- money twice.
+CREATE TABLE IF NOT EXISTS `som_loans` (
+  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`     VARCHAR(16) NOT NULL,
+  `principal`     BIGINT NOT NULL,
+  `fee`           BIGINT NOT NULL,
+  `instalment`    BIGINT NOT NULL,
+  `remaining`     BIGINT NOT NULL,
+  `next_due`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `missed_cycles` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `status`        ENUM('active','paid','defaulted','cancelled','forgiven') NOT NULL DEFAULT 'active',
+  `started_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_citizen` (`citizenid`, `status`),
   KEY `idx_due` (`status`, `next_due`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

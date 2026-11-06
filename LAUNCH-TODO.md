@@ -388,6 +388,22 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Not verified live: `SetVehicleFuelLevel` moving the ps-hud gauge (ps-hud reads it through `som-compat`'s `GetFuel`) and cutting the engine at zero, the pump model names, the `WEAPON_PETROLCAN` metadata (`durability` and `ammo` as 0 to 100, written by the server only), the state bag `fuel` handler on the other clients, drain balance. Known limit: the drain runs on the driver's client, so a cheater can avoid draining, but no fuel can be minted: every increase is a server approved sale or can pour.
 - [ ] Cut on purpose: player owned stations, electric charging, fuel types, siphoning. cdn-fuel stays unensured.
 
+## Player vehicle sales (som-carsales)
+
+- [ ] Existing databases: import the new `som_vehicle_sales` table (`setup.sql` section 7n). Nothing else changes.
+- [ ] A seller stands at their own car (it must be out in the world, not in a garage), uses "Sell this vehicle", types a price and the person beside them gets an on-screen offer for 60 seconds. Price $100 to $2000000, tax 5 percent rounded up taken from what the seller receives, and the buyer pays the whole price from the bank. All untuned.
+- [ ] Refused on purpose: garaged or impounded cars, business, gang and pool cars, cars signed out to someone, police flagged plates and cars marked stolen in the MDT.
+- [ ] The glovebox and boot belong to the car (they are keyed on the vehicle id), so their contents go to the buyer. The seller is told to empty them.
+- [ ] There is no vehicle key mechanism and no vehicle finance or insurance in this codebase, so nothing like that moves in a sale. If keys are added later they must move in `som-carsales`.
+- [ ] Never run in a game: the "Sell this vehicle" option on a car, picking the closest player, the buyer dialog, and the plate the server reads from a real vehicle (padding and case). The plate is trimmed and compared exactly with `som_vehicles.plate`; if real plates differ from the stored text the sale says "that is not your vehicle".
+## Process serving (som-serving)
+
+- [ ] Import the new `som_court_service` table on an existing database (section 7n of `setup.sql`, `CREATE TABLE IF NOT EXISTS`). Run on the dev database already; not on production.
+- [ ] Fees are paid by the `doj` business (funding `fines`, so only the fines share fills it, see `setup.sql` seed rows). Until fines have been issued its balance may be too low and the Papers app says "The courts cannot pay for service right now". Check the balance against the fee (250) and the hourly cap (1000 per citizen); staff decide who tops DOJ up.
+- [ ] Anti-farm numbers are untuned: one paper held at a time for 30 minutes, a hearing must be 15 or more minutes away, the same defendant earns a fee at most once per 24 hours across all cases, 6 second serving bar within 3 metres. The server, filer, judge, prosecutor and defender on a case never see it.
+- [ ] Service is shown in the court docket as "served" or "not served". It is not enforced: a judge can still declare a failure to appear on an unserved case.
+- [ ] The `Papers` phone app uses the `note` icon, and the `mp_common` / `givetake1_a` animation is an unchecked guess.
+- [ ] Not verified live: the player target option, the progress bar and cancelling by moving, the phone app list, a real defendant being notified. Only the mock suite and the dev MariaDB (claim insert, cap and cooldown on a rolled back transaction) have run.
 ## Player leases (som-housing)
 
 - [ ] Import `setup.sql` on an existing database: it adds one table, `som_property_leases` (`CREATE TABLE IF NOT EXISTS`, safe to re-run). Until it is imported the lease sweep prints "som_property_leases is missing" and does nothing.
@@ -406,3 +422,12 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Each loan weapon gets a server made serial `LSPD-<line id>` written on the item, so a casing from it already carries that serial (`som-evidence` reads `metadata.serial`, no change was needed). Weapons bought at the armoury still get the old non unique `POL<last 5 of citizenid>` serial, unchanged on purpose.
 - [ ] A weapon flagged missing keeps blocking a new sign out of that type for that officer until it is returned. There is no write off button; staff clear it with `UPDATE som_police_armoury SET status = 'void' WHERE id = <id>;`. The audit list shows the 50 oldest open lines.
 - [ ] Not verified live: the context menu on the armoury zone, ox_inventory slot metadata for weapons (`metadata.serial` surviving into the slot the return looks for), and the serial reaching evidence casings.
+## Phone loans (som-loans)
+
+- [ ] Import `setup.sql` on an existing database: it adds one table, `som_loans` (`CREATE TABLE IF NOT EXISTS`, safe to re-run). Until it is imported the sweep prints "som_loans is missing" and does nothing, and borrowing fails.
+- [ ] The treasury starts at 0 and the floor is $50,000, so nobody can borrow until fines and taxes have filled it. Decide `Config.treasuryFloor`, `Config.globalCap` (total still owed across everyone), the amounts and terms lists, the flat fee (10 percent) and the weeks before default (3) in `som-loans/shared/config.lua`. They are first guesses.
+- [ ] Loans are the treasury's money: the principal leaves the treasury and every repayment, including the fee, goes back. A default leaves the treasury short, bounded by the cap. The only thing that creates money is staff forgiveness (`/forgiveloan <id>`, needs `som.admin`, ledgered as `loan:forgiven`); use it deliberately.
+- [ ] A borrower must be online to pay: a week offline or short of money is counted as missed and paid back on their next login. Three missed weeks is a default, and from then every sweep (30 minutes) takes what is in their bank until it is paid. That is harsh on purpose; decide if it should be gentler.
+- [ ] The treasury floor is checked under the loan lock, but other treasury spending (department budgets, heist and buyer payouts) can still lower it at the same moment; the floor is a guard, not a reservation.
+- [ ] Not verified in a live server: the Bank loans phone app, a real week passing, collection from a defaulted borrower in game.
+- [ ] Left out on purpose: business loans and loans to shops, interest that changes over time, credit scores, co-signers, seizing property on default, an early payoff rebate, a bank branch.
