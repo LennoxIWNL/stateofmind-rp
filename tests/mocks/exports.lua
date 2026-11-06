@@ -320,6 +320,7 @@ local registry = {
     ['som-economy'] = economy,
     ['som-phone'] = phone,
     ['som-dispatch'] = dispatch,
+    ['som-dmv'] = { registration = function(_, plate) return Mocks.registrationOf and Mocks.registrationOf[plate] end },
 }
 
 _G.exports = setmetatable({}, {

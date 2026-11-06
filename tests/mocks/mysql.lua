@@ -1421,12 +1421,93 @@ local function courtService(kind, query, params)
     return false
 end
 
+local function dmv(kind, query, params)
+    local D = M.db.dmv
+    local function norm(p) return (tostring(p):upper():gsub('%s+', '')) end
+    if kind == 'scalar' and query:find("SELECT id FROM som_vehicles WHERE REPLACE(UPPER(plate)", 1, true) then
+        for _, v in pairs(D.vehicles) do if norm(v.plate) == params[1] then return true, v.id end end
+        return true, nil
+    elseif kind == 'update' and query:find('INSERT IGNORE INTO som_vehicle_registration', 1, true) then
+        if D.registration[params[1]] then return true, 0 end
+        D.registration[params[1]] = { expires = now() + params[2] * 86400 }
+        return true, 1
+    elseif kind == 'scalar' and query:find('SELECT UNIX_TIMESTAMP(expires_at) FROM som_vehicle_registration', 1, true) then
+        local r = D.registration[params[1]]
+        return true, r and r.expires or nil
+    elseif kind == 'scalar' and query:find('SELECT UNIX_TIMESTAMP(NOW())', 1, true) then
+        return true, now()
+    elseif kind == 'query' and query:find('ORDER BY id LIMIT 30', 1, true) then
+        local out = {}
+        for _, v in pairs(D.vehicles) do
+            if v.citizenid == params[1] and v.state ~= 'impounded' and not v.owner_group and v.group_restricted == 0 then
+                out[#out + 1] = { id = v.id, plate = v.plate, model = v.model, state = v.state }
+            end
+        end
+        table.sort(out, function(a, b) return a.id < b.id end)
+        return true, out
+    elseif kind == 'scalar' and query:find("SELECT id FROM som_vehicles WHERE id = ? AND citizenid = ? AND state <> 'impounded'", 1, true) then
+        for _, v in pairs(D.vehicles) do
+            if v.id == params[1] and v.citizenid == params[2] and v.state ~= 'impounded' and not v.owner_group and v.group_restricted == 0 then return true, v.id end
+        end
+        return true, nil
+    elseif kind == 'update' and query:find('SET expires_at = DATE_ADD(GREATEST(expires_at, NOW())', 1, true) then
+        local r = D.registration[params[3]]
+        if r and r.expires < now() + params[4] * 86400 then
+            r.expires = math.max(r.expires, now()) + params[1] * 86400
+            r.renewed_by = params[2]
+            return true, 1
+        end
+        return true, 0
+    elseif kind == 'update' and query:find('SET expires_at = FROM_UNIXTIME(?)', 1, true) then
+        local r = D.registration[params[2]]
+        if r and r.renewed_by == params[3] then r.expires = params[1]; return true, 1 end
+        return true, 0
+    elseif kind == 'scalar' and query:find('FROM som_dmv_plate_log WHERE citizenid', 1, true) then
+        local n = 0
+        for _, l in ipairs(D.log) do if l.citizenid == params[1] and l.ts > now() - params[2] * 60 then n = n + 1 end end
+        return true, n
+    elseif kind == 'single' and query:find('SELECT id, plate, state FROM som_vehicles', 1, true) then
+        for _, v in pairs(D.vehicles) do
+            if v.id == params[1] and v.citizenid == params[2] and not v.owner_group and v.group_restricted == 0 and not v.assigned_to then
+                return true, { id = v.id, plate = v.plate, state = v.state }
+            end
+        end
+        return true, nil
+    elseif kind == 'single' and query:find('AS wanted', 1, true) then
+        local key = params[1]
+        return true, { flagged = D.flagged[key] and 1 or 0, bolo = D.bolo[key] and 1 or 0, wanted = D.wanted[key] and 1 or 0 }
+    elseif kind == 'update' and query:find('UPDATE som_vehicles SET plate = ?', 1, true) and query:find("state = 'garaged'", 1, true) then
+        for _, v in pairs(D.vehicles) do
+            if v.id == params[2] and v.citizenid == params[3] and v.plate == params[4] and v.state == 'garaged' then
+                for _, other in pairs(D.vehicles) do if other.plate == params[1] then error('Duplicate entry for key uniq_plate') end end
+                v.plate = params[1]
+                return true, 1
+            end
+        end
+        return true, 0
+    elseif kind == 'update' and query:find('UPDATE som_vehicles SET plate = ? WHERE id = ? AND plate = ?', 1, true) then
+        for _, v in pairs(D.vehicles) do if v.id == params[2] and v.plate == params[3] then v.plate = params[1]; return true, 1 end end
+        return true, 0
+    elseif kind == 'update' and query:find('UPDATE mdt_vehicleinfo SET plate = ? WHERE plate = ?', 1, true) then
+        if D.mdtFails and params[1] == D.mdtFails then error('simulated mdt failure') end
+        local n = 0
+        for _, r in ipairs(D.mdt) do if r.plate == params[2] then r.plate = params[1]; n = n + 1 end end
+        return true, n
+    elseif kind == 'insert' and query:find('INSERT INTO som_dmv_plate_log', 1, true) then
+        D.log[#D.log + 1] = { vehicle_id = params[1], citizenid = params[2], old = params[3], new = params[4], ts = now() }
+        return true, #D.log
+    end
+    return false
+end
+
+
 function M.single(query, params)
     params = params or {}
     do local handled, value = loansDb('single', query, params); if handled then return value end end
     do local handled, value = courtService('single', query, params); if handled then return value end end
     do local handled, value = leases('single', query, params); if handled then return value end end
     do local handled, value = shopsDb('single', query, params); if handled then return value end end
+    do local handled, value = dmv('single', query, params); if handled then return value end end
     do local handled, value = carsales('single', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('single', query, params); if handled then return value end end
     do local handled, value = social('single', query, params); if handled then return value end end
@@ -1514,6 +1595,7 @@ function M.scalar(query, params)
         return _G.Mocks.budgetDrawn or 0
     end
     do local handled, value = shopsDb('scalar', query, params); if handled then return value end end
+    do local handled, value = dmv('scalar', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('scalar', query, params); if handled then return value end end
     do local handled, value = social('scalar', query, params); if handled then return value end end
     do local handled, value = city('scalar', query, params); if handled then return value end end
@@ -1629,6 +1711,7 @@ function M.update(query, params)
     do local handled, value = courtService('update', query, params); if handled then return value end end
     do local handled, value = leases('update', query, params); if handled then return value end end
     do local handled, value = shopsDb('update', query, params); if handled then return value end end
+    do local handled, value = dmv('update', query, params); if handled then return value end end
     do local handled, value = carsales('update', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('update', query, params); if handled then return value end end
     do local handled, value = licences('update', query, params); if handled then return value end end
@@ -1987,6 +2070,7 @@ function M.insert(query, params)
     do local handled, value = courtService('insert', query, params); if handled then return value end end
     do local handled, value = leases('insert', query, params); if handled then return value end end
     do local handled, value = shopsDb('insert', query, params); if handled then return value end end
+    do local handled, value = dmv('insert', query, params); if handled then return value end end
     do local handled, value = carsales('insert', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('insert', query, params); if handled then return value end end
     do local handled, value = social('insert', query, params); if handled then return value end end
@@ -2165,6 +2249,7 @@ function M.query(query, params)
     do local handled, value = leases('query', query, params); if handled then return value end end
     do local handled, value = armoury('query', query, params); if handled then return value end end
     do local handled, value = shopsDb('query', query, params); if handled then return value end end
+    do local handled, value = dmv('query', query, params); if handled then return value end end
     do local handled, value = social('query', query, params); if handled then return value end end
     do local handled, value = licences('query', query, params); if handled then return value end end
     do local handled, value = city('query', query, params); if handled then return value end end
