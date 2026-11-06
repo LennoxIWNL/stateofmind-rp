@@ -398,3 +398,13 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Every door now has a "Let this property" option; the server only lets the owner use it. Decide whether to hide it for non-owners (needs a client-side ownership cache).
 - [ ] Not verified in a live server: the offer and answer dialogs, the Leases phone app, a real week passing, eviction while the tenant is inside the property (they are told, not moved, and lose stash access immediately).
 - [ ] Left out on purpose: city motel rooms, deposits, rent tax, subletting, mid-lease rent changes, items in the stash on eviction (they stay with the property).
+
+## Phone loans (som-loans)
+
+- [ ] Import `setup.sql` on an existing database: it adds one table, `som_loans` (`CREATE TABLE IF NOT EXISTS`, safe to re-run). Until it is imported the sweep prints "som_loans is missing" and does nothing, and borrowing fails.
+- [ ] The treasury starts at 0 and the floor is $50,000, so nobody can borrow until fines and taxes have filled it. Decide `Config.treasuryFloor`, `Config.globalCap` (total still owed across everyone), the amounts and terms lists, the flat fee (10 percent) and the weeks before default (3) in `som-loans/shared/config.lua`. They are first guesses.
+- [ ] Loans are the treasury's money: the principal leaves the treasury and every repayment, including the fee, goes back. A default leaves the treasury short, bounded by the cap. The only thing that creates money is staff forgiveness (`/forgiveloan <id>`, needs `som.admin`, ledgered as `loan:forgiven`); use it deliberately.
+- [ ] A borrower must be online to pay: a week offline or short of money is counted as missed and paid back on their next login. Three missed weeks is a default, and from then every sweep (30 minutes) takes what is in their bank until it is paid. That is harsh on purpose; decide if it should be gentler.
+- [ ] The treasury floor is checked under the loan lock, but other treasury spending (department budgets, heist and buyer payouts) can still lower it at the same moment; the floor is a guard, not a reservation.
+- [ ] Not verified in a live server: the Bank loans phone app, a real week passing, collection from a defaulted borrower in game.
+- [ ] Left out on purpose: business loans and loans to shops, interest that changes over time, credit scores, co-signers, seizing property on default, an early payoff rebate, a bank branch.

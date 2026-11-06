@@ -1841,3 +1841,23 @@ CREATE TABLE IF NOT EXISTS `som_property_leases` (
   KEY `idx_landlord` (`landlord`, `status`),
   KEY `idx_due` (`status`, `next_due`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Phone loans (som-loans). One open loan per character (active or defaulted), lent from the city
+-- treasury and repaid to it. remaining is what is still owed including the flat fee; it is changed
+-- only by conditional UPDATEs, so two ticks, a login settle and an early payoff cannot take the same
+-- money twice.
+CREATE TABLE IF NOT EXISTS `som_loans` (
+  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`     VARCHAR(16) NOT NULL,
+  `principal`     BIGINT NOT NULL,
+  `fee`           BIGINT NOT NULL,
+  `instalment`    BIGINT NOT NULL,
+  `remaining`     BIGINT NOT NULL,
+  `next_due`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `missed_cycles` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `status`        ENUM('active','paid','defaulted','cancelled','forgiven') NOT NULL DEFAULT 'active',
+  `started_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_citizen` (`citizenid`, `status`),
+  KEY `idx_due` (`status`, `next_due`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
