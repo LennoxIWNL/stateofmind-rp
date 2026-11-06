@@ -317,3 +317,19 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Not verified in a live server: the counter menu and the owner management menu (som-ui context and dialog shims), the hire offer dialog, the phone app, hourly payroll over a real restart, and concurrent sales. Only the mock suite and a scratch MariaDB ran the queries.
 - [ ] Shop ownership never expires: a shop whose owner stops playing stays owned, and there is no way for staff to take it back except in the database. Decide an inactivity rule later.
 - [ ] Left out on purpose: supplier ordering, several shops per owner, handing a shop to another player, staff grades or commission, shop robbery.
+## Licences and driving school (som-licences)
+
+- [ ] Existing databases: `ALTER TABLE som_licenses ADD COLUMN suspended_until TIMESTAMP NULL DEFAULT NULL;` and import the new `som_licence_attempts` table (`setup.sql` section 7m).
+- [ ] The school ships closed. In `som-licences/shared/config.lua` set `school.coords` (the counter), `school.spawn` (a vec4 for the test car) and `practical.route` (a list of vec3 checkpoints on public roads), then `school.enabled = true`. Fee, pass mark, retry wait, speed limit and fault count are untuned defaults.
+- [ ] **Run the legacy backfill before this ships to a database with players** (commented SQL at the end of `setup.sql`, section 7m). Weapon licences bought from the old shop exist only as character metadata, and login now rebuilds metadata from `som_licenses`, so without the two `INSERT IGNORE` statements existing holders lose the licence.
+- [ ] `ox_inventory/data/licenses.lua` is now empty: the $5000 weapon licence shop is gone. A weapon licence comes from an officer of grade `Config.approveGrade` (3) with the buyer agreeing on screen within `Config.weapon.offerSeconds` (the officer's duty, rank and distance are checked again when they agree), fee `Config.weapon.fee` to the `lspd` account.
+- [ ] Review the 15 theory questions in `som-licences/server/questions.lua` (road rules are written for a generic left/right-agnostic setting; question 12 assumes driving on the right).
+- [ ] The school car is locked with the server-side `SetVehicleDoorsLocked(entity, 2)` and the test taker is seated by the client; not run live, so confirm others cannot get in and the taker can.
+- [ ] Never run in a game: the theory menus, the school car appearing and the player being put in it, the checkpoint blip, officer options on a player (check, suspend, revoke, issue), and the ps-mdt licence revoke button turning into a revoke in `som_licenses` (it is assumed to write `metadata.licences.<type> = false` through som-compat).
+- [ ] A suspension that ends while the player stays online leaves `metadata.licenses` false until their next login; the table is correct at once, so a police check and the licence card are right and only the ox_inventory weapon gate lags.
+- [ ] Not built, on purpose: other licence classes, licence points, an automatic fine for driving unlicensed (officers use the existing "Driving without a licence" fine), a background check before a weapon licence, and a record of which officer suspended or revoked.
+## Money write follow-ups
+
+- [ ] Gang, business and treasury ledger writes undo the balance change if the ledger row cannot be written (two separate statements, not one transaction). Needs a live database check that a single `MySQL.transaction` with a `ROW_COUNT()` guard behaves the same before replacing it.
+- [ ] Heist clean cash payouts now wait for the previous payout instead of paying nothing; the wait loop is only provable in a live server with two crews looting together.
+- [ ] Buyer sales and heist clean payouts now record the payout before paying, so a database failure refuses the sale instead of paying without counting it against the hourly cap.
