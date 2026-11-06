@@ -396,6 +396,14 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] The glovebox and boot belong to the car (they are keyed on the vehicle id), so their contents go to the buyer. The seller is told to empty them.
 - [ ] There is no vehicle key mechanism and no vehicle finance or insurance in this codebase, so nothing like that moves in a sale. If keys are added later they must move in `som-carsales`.
 - [ ] Never run in a game: the "Sell this vehicle" option on a car, picking the closest player, the buyer dialog, and the plate the server reads from a real vehicle (padding and case). The plate is trimmed and compared exactly with `som_vehicles.plate`; if real plates differ from the stored text the sale says "that is not your vehicle".
+## Process serving (som-serving)
+
+- [ ] Import the new `som_court_service` table on an existing database (section 7n of `setup.sql`, `CREATE TABLE IF NOT EXISTS`). Run on the dev database already; not on production.
+- [ ] Fees are paid by the `doj` business (funding `fines`, so only the fines share fills it, see `setup.sql` seed rows). Until fines have been issued its balance may be too low and the Papers app says "The courts cannot pay for service right now". Check the balance against the fee (250) and the hourly cap (1000 per citizen); staff decide who tops DOJ up.
+- [ ] Anti-farm numbers are untuned: one paper held at a time for 30 minutes, a hearing must be 15 or more minutes away, the same defendant earns a fee at most once per 24 hours across all cases, 6 second serving bar within 3 metres. The server, filer, judge, prosecutor and defender on a case never see it.
+- [ ] Service is shown in the court docket as "served" or "not served". It is not enforced: a judge can still declare a failure to appear on an unserved case.
+- [ ] The `Papers` phone app uses the `note` icon, and the `mp_common` / `givetake1_a` animation is an unchecked guess.
+- [ ] Not verified live: the player target option, the progress bar and cancelling by moving, the phone app list, a real defendant being notified. Only the mock suite and the dev MariaDB (claim insert, cap and cooldown on a rolled back transaction) have run.
 ## Player leases (som-housing)
 
 - [ ] Import `setup.sql` on an existing database: it adds one table, `som_property_leases` (`CREATE TABLE IF NOT EXISTS`, safe to re-run). Until it is imported the lease sweep prints "som_property_leases is missing" and does nothing.
