@@ -86,9 +86,15 @@ RegisterNetEvent('wk:onPlateScanned', function(cam, plate)
     prune(told, Config.officerCooldown * 1000, now)
 
     local reasons = reasonsFor(key)
+
+    -- An expired registration is for the officer only; it never raises a dispatch call.
+    local hard = #reasons
+    local ok, registration = pcall(function() return exports['som-dmv']:registration(key) end)
+    if ok and registration == 'expired' then reasons[#reasons + 1] = 'registration expired' end
     if #reasons == 0 then return end
 
     TriggerClientEvent('som-anpr:client:hit', source, cam, key, reasons)
+    if hard == 0 then return end
 
     if called[key] and now - called[key] < Config.plateCooldown * 1000 then return end
     prune(window, 60000, now)

@@ -415,6 +415,16 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Not verified in a live server: the offer and answer dialogs, the Leases phone app, a real week passing, eviction while the tenant is inside the property (they are told, not moved, and lose stash access immediately).
 - [ ] Left out on purpose: city motel rooms, deposits, rent tax, subletting, mid-lease rent changes, items in the stash on eviction (they stay with the property).
 
+## DMV: registration and vanity plates (som-dmv)
+
+- [ ] Existing databases: import the two new tables `som_vehicle_registration` and `som_dmv_plate_log` (`setup.sql` section 7o).
+- [ ] The counter ships closed. Stand at the DMV and run `/place som-dmv desk.coords`, then `restart som-dmv`. Until then nobody can renew or change a plate, and nothing is ever charged automatically.
+- [ ] Rules (untuned): registration lasts 14 days and costs $150 to the city treasury, a car the server has never seen is given 14 days from the first time anything asks (police plate run, ANPR or the counter), a plate change costs $2500 and each character can change one plate an hour. The blocked plate words are `Config.vanity.blocked` in `som-dmv/shared/config.lua` (Lua patterns on the upper case plate, spaces ignored); staff should read and extend that list. Short words like `COP` or `EMS` also block plates that merely contain them.
+- [ ] Police see REGISTRATION EXPIRED on a plate run, and an ANPR reader tells the officer "registration expired" but never calls dispatch for it alone. Whether to fine it is the officer's call (the "Driving without a licence"-style presets); no fine is automatic.
+- [ ] A plate can only be changed while the car is in a garage (nothing in the world has to be renamed), is the owner's, is not a business, gang or pool car, and has no police flag, BOLO, stolen or code 5 mark. Those records are checked rather than moved, so there is nothing stale left to move except the MDT vehicle record, which is. History tables (`som_police_impound`, `som_police_plates` rows already cleared, the chop log and `som_vehicle_sales` once merged) keep the plate as it was at the time.
+- [ ] Registration belongs to the vehicle id, so a car sold to another player keeps whatever time it had left, and a plate change keeps it too. Nothing was added to the dealership or `som-carsales` flows.
+- [ ] A plate change is refused while the old glovebox or boot is loaded and holds items. Those inventories are keyed on the plate while open, and saved by vehicle id, so this stops contents disappearing for the session.
+- [ ] Never run in a game: the counter menu, a plate change reaching the spawned car (it spawns with the new plate from the database), the police menu line and the ANPR note. The SQL has only run against the mock, not MariaDB (`GREATEST`, `FROM_UNIXTIME`, `INSERT IGNORE`, and the unique key on `som_vehicles.plate` raising the "taken" error that is caught).
 ## Phone loans (som-loans)
 
 - [ ] Import `setup.sql` on an existing database: it adds one table, `som_loans` (`CREATE TABLE IF NOT EXISTS`, safe to re-run). Until it is imported the sweep prints "som_loans is missing" and does nothing, and borrowing fails.
