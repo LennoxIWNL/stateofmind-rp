@@ -387,3 +387,12 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Numbers are untuned defaults: 100 unit tank, drain 0.012 per second plus 0.0016 per m/s, jerry can 120 for 25 units, 5 units per pour.
 - [ ] Not verified live: `SetVehicleFuelLevel` moving the ps-hud gauge (ps-hud reads it through `som-compat`'s `GetFuel`) and cutting the engine at zero, the pump model names, the `WEAPON_PETROLCAN` metadata (`durability` and `ammo` as 0 to 100, written by the server only), the state bag `fuel` handler on the other clients, drain balance. Known limit: the drain runs on the driver's client, so a cheater can avoid draining, but no fuel can be minted: every increase is a server approved sale or can pour.
 - [ ] Cut on purpose: player owned stations, electric charging, fuel types, siphoning. cdn-fuel stays unensured.
+
+## Process serving (som-serving)
+
+- [ ] Import the new `som_court_service` table on an existing database (section 7n of `setup.sql`, `CREATE TABLE IF NOT EXISTS`). Run on the dev database already; not on production.
+- [ ] Fees are paid by the `doj` business (funding `fines`, so only the fines share fills it, see `setup.sql` seed rows). Until fines have been issued its balance may be too low and the Papers app says "The courts cannot pay for service right now". Check the balance against the fee (250) and the hourly cap (1000 per citizen); staff decide who tops DOJ up.
+- [ ] Anti-farm numbers are untuned: one paper held at a time for 30 minutes, a hearing must be 15 or more minutes away, the same defendant earns a fee at most once per 24 hours across all cases, 6 second serving bar within 3 metres. The server, filer, judge, prosecutor and defender on a case never see it.
+- [ ] Service is shown in the court docket as "served" or "not served". It is not enforced: a judge can still declare a failure to appear on an unserved case.
+- [ ] The `Papers` phone app uses the `note` icon, and the `mp_common` / `givetake1_a` animation is an unchecked guess.
+- [ ] Not verified live: the player target option, the progress bar and cancelling by moving, the phone app list, a real defendant being notified. Only the mock suite and the dev MariaDB (claim insert, cap and cooldown on a rolled back transaction) have run.
