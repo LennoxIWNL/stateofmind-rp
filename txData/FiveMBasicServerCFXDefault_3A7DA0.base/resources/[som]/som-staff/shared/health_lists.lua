@@ -51,6 +51,7 @@ HealthLists = {
     'som-trucking',
     'som-turf',
     'som-ui',
+    'som-welcome',
     },
     tables = {
     'som_appearance_log',
@@ -134,6 +135,8 @@ HealthLists = {
     'som_vehicle_registration',
     'som_vehicle_sales',
     'som_vehicles',
+    'som_welcome_claims',
+    'som_welcome_jobs',
     'som_whitelist',
     },
     items = {

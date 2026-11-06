@@ -434,3 +434,12 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] The treasury floor is checked under the loan lock, but other treasury spending (department budgets, heist and buyer payouts) can still lower it at the same moment; the floor is a guard, not a reservation.
 - [ ] Not verified in a live server: the Bank loans phone app, a real week passing, collection from a defaulted borrower in game.
 - [ ] Left out on purpose: business loans and loans to shops, interest that changes over time, credit scores, co-signers, seizing property on default, an early payoff rebate, a bank branch.
+
+## New player onboarding (som-welcome)
+
+- [ ] Existing databases: import `som_welcome_claims` and `som_welcome_jobs` (`setup.sql` section 7p). Import run twice on a scratch MariaDB database without error; the claim insert with its cap subquery and the duplicate claim error (1062) were run there too.
+- [ ] The job centre ships closed. Stand at the counter and run `/place som-welcome desk.coords`, then `restart som-welcome`. Without it there is still no way for an ordinary player to get a job. It hands out only the jobs in `Config.jobs` (`taxi` and `delivery`) at grade 0; whitelisted jobs stay admin only, and a character on a whitelisted job cannot leave it here.
+- [ ] The "Getting Started" phone app text is generic. Add where the DMV, driving school, job centre and estate agent really are to `Config.guide` in `som-welcome/shared/config.lua`.
+- [ ] Settling-in payment: $1000 once per character, only after a valid driver licence, a job held for 30 minutes and a home (an owned property or a tenancy), from the treasury, at most $20000 in any 30 days across all characters. All untuned. New characters already start with $500 cash and $5000 in the bank, so check the total feels right.
+- [ ] The job step reads `som_welcome_jobs`, which is filled when a character logs in or changes job. Characters who already hold a job when this ships start their 30 minutes at their first login after.
+- [ ] Never run in a game: the app on a real phone, the claim button, the desk and its menu, and the job change reaching HUD and radial. Going on duty still goes through the clock in/out entry; the desk does not change duty (a new job starts with the job's default duty).
