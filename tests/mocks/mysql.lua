@@ -397,6 +397,10 @@ local function heist(kind, query, params)
             if r and r.status == 'active' then r.status = params[1]; return true, 1 end
             return true, 0
         end
+        if has('UPDATE som_heist_runs SET clean_paid = clean_paid - ? WHERE id = ?') then
+            H.runs[params[2]].clean_paid = H.runs[params[2]].clean_paid - params[1]
+            return true, 1
+        end
         if has('UPDATE som_heist_runs SET clean_paid = clean_paid + ? WHERE id = ?') then
             H.runs[params[2]].clean_paid = H.runs[params[2]].clean_paid + params[1]
             return true, 1
@@ -493,6 +497,9 @@ end
 local function sharedAccounts(kind, query, params)
     local S = M.db.shared
     local function has(text) return query:find(text, 1, true) ~= nil end
+    if kind == 'single' and has('SELECT account_id FROM som_gangs WHERE name = ?') then
+        return true, params[1] == 'ballas' and { account_id = 9 } or nil
+    end
     if kind == 'single' and has('SELECT b.id, b.account_id FROM som_businesses b WHERE b.name = ?') then
         return true, params[1] == 'acme' and { id = 1, account_id = 7 } or nil
     elseif kind == 'update' and has('UPDATE som_bank_accounts SET balance = balance + ? WHERE id = ? AND frozen = 0 AND balance + ? >= 0') and S.accounts[params[2]] then
@@ -515,7 +522,7 @@ local function sharedAccounts(kind, query, params)
         return true, 1
     elseif kind == 'scalar' and has('SELECT balance FROM som_bank_accounts WHERE id = ?') then
         return true, S.accounts[params[1]]
-    elseif kind == 'insert' and has('INSERT INTO som_transactions') and (has('business_id)') or has('FROM som_treasury WHERE id = 1')) then
+    elseif kind == 'insert' and has('INSERT INTO som_transactions') and (has('business_id)') or has('FROM som_treasury WHERE id = 1') or has('counterparty)')) then
         if S.ledgerFails then error('simulated ledger failure') end
         S.ledger[#S.ledger + 1] = { sql = query, params = params }
         return true, #S.ledger
@@ -626,8 +633,12 @@ local function buyer(kind, query, params)
         return true, sum
     elseif kind == 'insert' and query:find('INSERT INTO som_buyer_payouts', 1, true) then
         if M.payoutThrows then error('simulated payout record failure') end
-        B[#B + 1] = { buyer = params[1], amount = params[2], ts = now() }
-        return true, #B
+        B.nextId = (B.nextId or 0) + 1
+        B[#B + 1] = { id = B.nextId, buyer = params[1], amount = params[2], ts = now() }
+        return true, B.nextId
+    elseif kind == 'update' and query:find('DELETE FROM som_buyer_payouts WHERE id = ?', 1, true) then
+        for i, r in ipairs(B) do if r.id == params[1] then table.remove(B, i); return true, 1 end end
+        return true, 0
     end
     return false
 end
@@ -1034,6 +1045,7 @@ function M.update(query, params)
     do local handled, value = social('update', query, params); if handled then return value end end
     do local handled, value = city('update', query, params); if handled then return value end end
     do local handled, value = heist('update', query, params); if handled then return value end end
+    do local handled, value = buyer('update', query, params); if handled then return value end end
     do local handled, value = turf('update', query, params); if handled then return value end end
     do local handled, value = whitelist('update', query, params); if handled then return value end end
     do local handled, value = bans('update', query, params); if handled then return value end end
