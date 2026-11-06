@@ -45,6 +45,7 @@ M.db = {
     chop = { log = {}, owned = {} },
     licences = { rows = {}, attempts = {} },
     taxi = { earned = {} },
+    carsales = { vehicles = {}, flagged = {}, stolen = {}, sales = {} },
     lab = {},
     plants = {},
     gangs = { chars = {}, log = {} },
@@ -857,6 +858,38 @@ local function skills(kind, query, params)
     return false
 end
 
+local function carsales(kind, query, params)
+    local C = M.db.carsales
+    if kind == 'single' and query:find('SELECT id, citizenid, plate, model, state, owner_group', 1, true) then
+        local r = C.vehicles[params[1]]
+        if not r then return true, nil end
+        local copy = {}
+        for k, v in pairs(r) do copy[k] = v end
+        return true, copy
+    elseif kind == 'single' and query:find('AS flagged', 1, true) and not query:find('mdt_bolos', 1, true) then
+        return true, { flagged = C.flagged[params[1]] and 1 or 0, stolen = C.stolen[params[1]] and 1 or 0 }
+    elseif kind == 'update' and query:find("AND state = 'out' AND owner_group IS NULL", 1, true) then
+        for _, r in pairs(C.vehicles) do
+            if r.id == params[3] and r.citizenid == params[4] and r.state == 'out' and not r.owner_group
+                and r.group_restricted == 0 and not r.assigned_to then
+                if C.claimRaces then r.citizenid = 'RACER'; return true, 0 end
+                r.citizenid, r.purchase_price = params[1], params[2]
+                return true, 1
+            end
+        end
+        return true, 0
+    elseif kind == 'update' and query:find('SET citizenid = ?, purchase_price = ? WHERE id = ? AND citizenid = ?', 1, true) then
+        for _, r in pairs(C.vehicles) do
+            if r.id == params[3] and r.citizenid == params[4] then r.citizenid, r.purchase_price = params[1], params[2]; return true, 1 end
+        end
+        return true, 0
+    elseif kind == 'insert' and query:find('INSERT INTO som_vehicle_sales', 1, true) then
+        C.sales[#C.sales + 1] = { vehicle_id = params[1], plate = params[2], seller = params[3], buyer = params[4], price = params[5], tax = params[6] }
+        return true, #C.sales
+    end
+    return false
+end
+
 local function taxi(kind, query, params)
     if kind == 'scalar' and query:find("reason = 'taxi:commission'", 1, true) then
         return true, M.db.taxi.earned[params[1]] or 0
@@ -1230,6 +1263,7 @@ function M.single(query, params)
     do local handled, value = courtService('single', query, params); if handled then return value end end
     do local handled, value = leases('single', query, params); if handled then return value end end
     do local handled, value = shopsDb('single', query, params); if handled then return value end end
+    do local handled, value = carsales('single', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('single', query, params); if handled then return value end end
     do local handled, value = social('single', query, params); if handled then return value end end
     do local handled, value = city('single', query, params); if handled then return value end end
@@ -1428,6 +1462,7 @@ function M.update(query, params)
     do local handled, value = courtService('update', query, params); if handled then return value end end
     do local handled, value = leases('update', query, params); if handled then return value end end
     do local handled, value = shopsDb('update', query, params); if handled then return value end end
+    do local handled, value = carsales('update', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('update', query, params); if handled then return value end end
     do local handled, value = licences('update', query, params); if handled then return value end end
     do local handled, value = social('update', query, params); if handled then return value end end
@@ -1783,6 +1818,7 @@ function M.insert(query, params)
     do local handled, value = courtService('insert', query, params); if handled then return value end end
     do local handled, value = leases('insert', query, params); if handled then return value end end
     do local handled, value = shopsDb('insert', query, params); if handled then return value end end
+    do local handled, value = carsales('insert', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('insert', query, params); if handled then return value end end
     do local handled, value = social('insert', query, params); if handled then return value end end
     do local handled, value = city('insert', query, params); if handled then return value end end
