@@ -1840,6 +1840,8 @@ CREATE TABLE IF NOT EXISTS `som_vehicle_sales` (
   KEY `idx_plate` (`plate`),
   KEY `idx_seller` (`seller`),
   KEY `idx_buyer` (`buyer`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Player leases (som-housing). The owner of a property lets it to one tenant for a weekly rent. The
 -- tenant holds a 'tenant' key in som_property_owners while the lease is active. next_due and
 -- missed_cycles are changed only by conditional UPDATEs, so a sweep tick and a login settle cannot
