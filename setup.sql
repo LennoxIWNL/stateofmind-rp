@@ -382,6 +382,7 @@ CREATE TABLE IF NOT EXISTS `som_licenses` (
   `issued_by`  VARCHAR(16) DEFAULT NULL,
   `issued_at`  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `revoked`    TINYINT(1)  NOT NULL DEFAULT 0,
+  `suspended_until` TIMESTAMP NULL DEFAULT NULL,
   PRIMARY KEY (`citizenid`, `type`),
   CONSTRAINT `fk_lic_char` FOREIGN KEY (`citizenid`) REFERENCES `som_characters` (`citizenid`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -1744,3 +1745,33 @@ CREATE TABLE IF NOT EXISTS `som_placements` (
   PRIMARY KEY (`id`),
   KEY `idx_resource` (`resource`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
+--  7m. LICENCES AND DRIVING SCHOOL (som-licences)
+--
+--  Licences themselves stay in som_licenses (suspended_until above). This only
+--  records test attempts, so a failed theory test can carry a retry cooldown
+--  that survives a restart.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_licence_attempts` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `kind`       ENUM('theory','practical') NOT NULL,
+  `passed`     TINYINT(1)  NOT NULL DEFAULT 0,
+  `score`      SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_citizen_kind` (`citizenid`, `kind`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- One-time backfill for databases that already have licence holders. Before
+-- som-licences the weapon licence existed only as metadata, and logging in now
+-- rebuilds that metadata from som_licenses, so without these rows existing
+-- holders lose the licence. Run once; INSERT IGNORE makes a repeat harmless.
+-- INSERT IGNORE INTO som_licenses (citizenid, type, issued_by)
+--   SELECT citizenid, 'weapon', 'legacy' FROM som_characters
+--   WHERE JSON_VALUE(metadata, '$.licenses.weapon') = 'true';
+-- INSERT IGNORE INTO som_licenses (citizenid, type, issued_by)
+--   SELECT citizenid, 'driver', 'legacy' FROM som_characters
+--   WHERE JSON_VALUE(metadata, '$.licenses.driver') = 'true';
