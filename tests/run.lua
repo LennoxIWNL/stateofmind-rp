@@ -3552,6 +3552,195 @@ do
 end
 
 -- ---------------------------------------------------------------------------
+-- EMS hospital transport
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-ems', { 'shared/config.lua', 'server/main.lua', 'server/hospital.lua' })
+    local H = env.Config.hospital
+    local cb = RegisteredCallbacks
+    local function medic() return { citizenid = 'H1', job = { name = 'ambulance', onduty = true }, charinfo = { firstname = 'Me', lastname = 'Dic' } } end
+    local function reset()
+        if Mocks.players[1] then cb['som-ems:server:unload'](1) end
+        env.Ems.Cooldown = {}
+        Mocks.players = { [1] = medic(), [2] = { citizenid = 'H2', job = { name = 'unemployed' }, charinfo = { firstname = 'Pa', lastname = 'Tient' } } }
+        Mocks.downed, Mocks.downSince, Mocks.reviveFails, Mocks.revived = { [2] = true }, {}, false, nil
+        Mocks.bank = { [1] = 0, [2] = 1000 }
+        Mocks.business = { ems = 500 }
+        Mocks.businessFails, Mocks.addMoneyFails, Mocks.credits, Mocks.deathClass = false, false, {}, 'violence'
+        Mocks.clock = 5000000
+        FakePeds[1], FakePeds[2], FakePeds[800] = vec3(0, 0, 0), vec3(1, 0, 0), vec3(2, 0, 0)
+        Vehicles = { [800] = { model = 'ambulance', seats = {} } }
+        PedVehicle = {}
+    end
+    reset()
+    local carried = {}
+    local realT = _G.TriggerClientEvent
+    local sent
+    _G.TriggerClientEvent = function(name, target, ...)
+        if name == 'som-medical:client:carried' then carried[#carried + 1] = { target = target, args = { ... } } end
+        if name == 'som-ems:client:admitted' then sent = { target = target, args = { ... } } end
+    end
+    H.enabled, H.desk, H.bed = true, vec3(100, 0, 0), vec4(110, 0, 10, 90.0)
+
+    local info = cb['som-ems:server:inspect'](1, 2)
+    check(info.success and info.seconds >= 100 and info.cause == 'violence', 'ems hospital: a medic can check how long and why a patient is down')
+    check(cb['som-ems:server:inspect'](2, 1).error == 'you are not on duty as a paramedic', 'ems hospital: only an on duty medic can check a patient')
+
+    check(cb['som-ems:server:load'](1, 2, 999).error == 'no ambulance here' and cb['som-ems:server:load'](1, 2, 'x').error == 'no ambulance here', 'ems hospital: the vehicle must exist')
+    Vehicles[801] = { model = 'sultan', seats = {} }; FakePeds[801] = vec3(2, 0, 0)
+    check(cb['som-ems:server:load'](1, 2, 801).error == 'no ambulance here', 'ems hospital: only an ambulance model can carry a patient')
+    FakePeds[800] = vec3(60, 0, 0)
+    check(cb['som-ems:server:load'](1, 2, 800).error == 'no ambulance here', 'ems hospital: the ambulance must be near the medic')
+    FakePeds[800] = vec3(2, 0, 0)
+    Vehicles[800].seats = { [1] = 77, [2] = 78 }
+    check(cb['som-ems:server:load'](1, 2, 800).error == 'the ambulance is full', 'ems hospital: a full ambulance refuses')
+    Vehicles[800].seats = {}
+    check(cb['som-ems:server:admit'](1).error == 'nobody is loaded', 'ems hospital: admit needs a loaded patient')
+    check(cb['som-ems:server:load'](1, 2, 800).success == true and Seated.vehicle == 800 and carried[#carried].args[1] == true, 'ems hospital: loading seats the patient and tells their client')
+    check(cb['som-ems:server:load'](1, 2, 800).error == 'you already have a patient loaded', 'ems hospital: one patient per medic')
+
+    -- admission checks
+    FakePeds[1] = vec3(100, 0, 0); FakePeds[800] = vec3(100, 0, 0)
+    Mocks.downSince[2] = os.time() - 5
+    PedVehicle[2] = 0
+    check(cb['som-ems:server:admit'](1).error == 'the patient is no longer in the ambulance', 'ems hospital: a patient who left the ambulance cannot be admitted')
+    check(cb['som-ems:server:load'](1, 2, 800).error == 'nobody here needs help', 'ems hospital: the load record was dropped with the failed admission')
+    FakePeds[1] = vec3(1, 0, 0); FakePeds[800] = vec3(1, 0, 0); FakePeds[2] = vec3(1, 0, 0)
+    check(cb['som-ems:server:load'](1, 2, 800).success == true, 'ems hospital: loaded again')
+    FakePeds[1] = vec3(0, 0, 0)
+    check(cb['som-ems:server:admit'](1).error == 'bring the ambulance to the front desk', 'ems hospital: the medic and the ambulance must be at the desk')
+    FakePeds[1], FakePeds[800] = vec3(100, 0, 0), vec3(100, 0, 0)
+    check(cb['som-ems:server:admit'](1).error == 'they only just went down, treat them first', 'ems hospital: a patient just downed pays nothing')
+    Mocks.downSince[2] = os.time() - 100
+
+    -- the patient pays first, then the medic is paid from the ems account
+    local r = cb['som-ems:server:admit'](1)
+    check(r.success and r.paid == 150 and Mocks.bank[2] == 750 and Mocks.business.ems == 500 + 250 - 150, 'ems hospital: patient pays 250 into ems, the medic is paid 150 from ems')
+    check(#Mocks.credits == 1 and Mocks.credits[1].source == 1 and Mocks.credits[1].amount == 150 and Mocks.revived.ref == 2 and sent.target == 2 and sent.args[1].x == 110, 'ems hospital: the medic is credited, the patient is revived and sent to the bed')
+    check(r.paid <= math.floor(H.fee * 0.6), 'ems hospital: pay stays under 60 percent of the fee')
+
+    -- cooldown farming
+    reset(); Mocks.clock = 5000000
+    FakePeds[1], FakePeds[2], FakePeds[800] = vec3(100, 0, 0), vec3(100, 0, 0), vec3(100, 0, 0)
+    Mocks.downSince[2] = os.time() - 100
+    cb['som-ems:server:load'](1, 2, 800)
+    cb['som-ems:server:admit'](1)
+    Mocks.downed[2] = true
+    cb['som-ems:server:load'](1, 2, 800)
+    check(cb['som-ems:server:admit'](1).error == 'give them a moment', 'ems hospital: a patient cannot be admitted twice inside the cooldown')
+
+    -- a patient who cannot pay is admitted, the medic gets nothing
+    reset(); Mocks.clock = 5000000 + 600000
+    Mocks.bank[2] = 10
+    FakePeds[1], FakePeds[2], FakePeds[800] = vec3(100, 0, 0), vec3(100, 0, 0), vec3(100, 0, 0)
+    Mocks.downSince[2] = os.time() - 100
+    cb['som-ems:server:load'](1, 2, 800)
+    r = cb['som-ems:server:admit'](1)
+    check(r.success and r.paid == 0 and Mocks.bank[2] == 10 and #Mocks.credits == 0 and Mocks.business.ems == 500, 'ems hospital: a broke patient is admitted and nobody is paid')
+
+    -- the ems credit fails: the patient is refunded and the medic gets nothing
+    reset(); Mocks.clock = 5000000 + 1200000
+    FakePeds[1], FakePeds[2], FakePeds[800] = vec3(100, 0, 0), vec3(100, 0, 0), vec3(100, 0, 0)
+    Mocks.downSince[2] = os.time() - 100
+    cb['som-ems:server:load'](1, 2, 800)
+    Mocks.businessFails = true
+    r = cb['som-ems:server:admit'](1)
+    check(r.success and r.paid == 0 and #Mocks.credits == 1 and Mocks.credits[1].reason == 'hospital-admission:refund' and Mocks.credits[1].source == 2 and Mocks.credits[1].amount == 250, 'ems hospital: a failed credit to ems refunds the patient and pays no one')
+
+    -- the medic credit fails: the ems debit is put back
+    reset(); Mocks.clock = 5000000 + 1800000
+    FakePeds[1], FakePeds[2], FakePeds[800] = vec3(100, 0, 0), vec3(100, 0, 0), vec3(100, 0, 0)
+    Mocks.downSince[2] = os.time() - 100
+    cb['som-ems:server:load'](1, 2, 800)
+    Mocks.addMoneyFails = true
+    r = cb['som-ems:server:admit'](1)
+    check(r.success and r.paid == 0 and Mocks.business.ems == 750, 'ems hospital: a failed medic credit puts the ems debit back')
+    Mocks.addMoneyFails = false
+
+    -- unload, and states clear on revive
+    reset(); Mocks.clock = 5000000 + 2400000
+    cb['som-ems:server:load'](1, 2, 800)
+    carried = {}
+    check(cb['som-ems:server:unload'](1).success == true and carried[1].args[1] == false and cb['som-ems:server:unload'](1).error == 'nobody is loaded', 'ems hospital: unload frees the patient once')
+    cb['som-ems:server:load'](1, 2, 800)
+    Handlers['som:server:playerRevived'](2, 'H2')
+    check(cb['som-ems:server:admit'](1).error == 'nobody is loaded', 'ems hospital: a revive clears the loaded state')
+    cb['som-ems:server:load'](1, 2, 800)
+    _G.source = 1
+    Handlers['playerDropped']()
+    check(cb['som-ems:server:admit'](1).error == 'nobody is loaded', 'ems hospital: the medic leaving clears the loaded state')
+
+    -- a deleted ambulance never drops the patient at the map origin
+    reset(); Mocks.clock = 5000000 + 3000000
+    cb['som-ems:server:load'](1, 2, 800)
+    carried = {}
+    Vehicles[800] = nil; FakePeds[800] = nil
+    FakePeds[2] = vec3(7, 8, 9)
+    _G.source = 1
+    Handlers['playerDropped']()
+    check(carried[1] and carried[1].args[1] == false and carried[1].args[2].x == 7 and carried[1].args[2].z == 9, 'ems hospital: a deleted ambulance frees the patient where they are, not at the map origin')
+
+    -- losing the job or going off duty cannot strand the patient
+    reset(); Mocks.clock = 5000000 + 3600000
+    cb['som-ems:server:load'](1, 2, 800)
+    Mocks.players[1].job = { name = 'ambulance', onduty = false }
+    check(cb['som-ems:server:unload'](1).success == true, 'ems hospital: an off duty medic can still unload')
+    cb['som-ems:server:load'](1, 2, 800)
+    Mocks.players[1].job = { name = 'ambulance', onduty = true }
+    cb['som-ems:server:load'](1, 2, 800)
+    Handlers['som:server:jobChanged'](1, 'H1', { name = 'unemployed' })
+    check(cb['som-ems:server:unload'](1).error == 'nobody is loaded', 'ems hospital: leaving the ambulance job frees the patient')
+
+    reset(); Mocks.clock = 5000000 + 4200000
+    cb['som-ems:server:load'](1, 2, 800)
+    FakePeds[1], FakePeds[2], FakePeds[800] = vec3(100, 0, 0), vec3(100, 0, 0), vec3(100, 0, 0)
+    Mocks.downSince[2] = os.time() - 100
+    Mocks.calls.businessTransact = 0
+    Mocks.businessThrowAt = 2
+    r = cb['som-ems:server:admit'](1)
+    Mocks.businessThrowAt = nil
+    check(r.success and r.paid == 0 and Mocks.business.ems == 750 and #Mocks.credits == 0, 'ems hospital: a crash paying the medic cannot undo the admission')
+    H.enabled = false
+    check(cb['som-ems:server:load'](1, 2, 800).error == 'the hospital is closed' and cb['som-ems:server:deskInfo'](1) == nil, 'ems hospital: ships closed')
+    _G.TriggerClientEvent = realT
+end
+
+-- ---------------------------------------------------------------------------
+-- Hospital respawn fee goes to the ems account
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-medical', { 'shared/config.lua', 'server/main.lua' })
+    local cb = RegisteredCallbacks
+    Mocks.players = { [1] = { citizenid = 'R1', job = { name = 'unemployed' } } }
+    Mocks.bank = { [1] = 1000 }
+    Mocks.business = { ems = 0 }
+    Mocks.credits, Mocks.businessFails = {}, false
+    FakePeds[1] = vec3(0, 0, 0)
+    Player = Player or function() return { state = { set = function() end } } end
+
+    env.Medical.Down(1, 'x')
+    check(env.Medical.IsDowned(1) == true, 'respawn: the test player is down')
+    check(Mocks.exported.getDownInfo(1).since <= os.time(), 'respawn: getDownInfo reports when a player went down')
+    check(Mocks.exported.getDownInfo(9) == nil, 'respawn: getDownInfo is nil for someone not down')
+
+    check(cb['som-medical:server:respawn'](1).error:find('wait'), 'respawn: the wait is still enforced')
+    env.Config.RespawnOfferedAfter = 0
+    local r = cb['som-medical:server:respawn'](1)
+    check(r.success and r.charged == 350 and Mocks.bank[1] == 650 and Mocks.business.ems == 350, 'respawn: the fee is paid into the ems account, not lost')
+
+    env.Medical.Down(1, 'x')
+    Mocks.businessFails = true
+    Mocks.credits = {}
+    r = cb['som-medical:server:respawn'](1)
+    check(r.success and r.charged == 0 and Mocks.credits[1].amount == 350 and Mocks.credits[1].reason == 'hospital-treatment:refund', 'respawn: a failed credit to ems refunds the player and still treats them')
+    Mocks.businessFails = false
+end
+
+-- ---------------------------------------------------------------------------
 -- Mechanic
 -- ---------------------------------------------------------------------------
 

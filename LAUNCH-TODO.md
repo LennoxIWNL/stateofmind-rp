@@ -309,6 +309,12 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 
 - [ ] Business and city treasury balances are now changed with one conditional add, and a failed player money save is noticed and rolled back. Only the mock suite and the dev MariaDB have run them. In game: a shop sale, a seizure and a heist payout at the same moment, then check `som_transactions` against the balances. Whether oxmysql returns `false` (not an error) for a failed transaction is assumed from how it is documented, not run.
 
+## EMS hospital transport
+
+- [ ] Sink and faucet change for staff: the hospital respawn fee (350, `Config.RespawnFee` in `som-medical`) is now paid into the `ems` business account instead of vanishing. If the credit fails the player is refunded and treated free.
+- [ ] Place the hospital in `som-ems` (`Config.hospital`, ships closed): front `desk` point and a `bed` point (vec4). Admission charges the patient 250 into `ems` first, then pays the medic 60 percent (150) from `ems`, only after the charge went through. A patient who cannot pay is still admitted and the medic gets nothing. Needs at least 30 s down and a 60 s per-patient cooldown. All numbers untuned.
+- [ ] Not verified live: server side `SetPedIntoVehicle` on a downed player (seats 1 and 2 of an `ambulance`), the medic's "Load into ambulance", "Unload patient", "Check patient" and desk "admit patient" options, the bed animation (`missarmenian2` / `drunk_loop`) and fade, and that a loaded patient is not pulled back by the down anchor. Cause on "Check patient" is only "hurt by another person" or "an accident" (the server's own death classification).
+- [ ] Cut on purpose: bleeding and injury states (nothing tracks them), a second hospital, a stretcher prop, medic XP.
 ## Licences and driving school (som-licences)
 
 - [ ] Existing databases: `ALTER TABLE som_licenses ADD COLUMN suspended_until TIMESTAMP NULL DEFAULT NULL;` and import the new `som_licence_attempts` table (`setup.sql` section 7m).
