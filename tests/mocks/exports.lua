@@ -210,6 +210,7 @@ function ox:AddItem(inv, name, count, metadata)
     Mocks.inv[inv][Mocks.slot] = { name = name, count = count, metadata = metadata, slot = Mocks.slot }
     return true
 end
+function ox:CanCarryItem(inv, name, count) return not Mocks.invFull[inv] end
 function ox:RemoveItem(inv, name, count, metadata, slot)
     local list = Mocks.inv[inv] or {}
     for k, item in pairs(list) do
