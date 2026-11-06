@@ -110,6 +110,7 @@ HealthLists = {
     'som_phone_settings',
     'som_placements',
     'som_plants',
+    'som_police_armoury',
     'som_police_custody',
     'som_police_impound',
     'som_police_plates',

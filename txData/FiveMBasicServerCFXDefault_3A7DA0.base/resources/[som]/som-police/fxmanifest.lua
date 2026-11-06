@@ -26,6 +26,7 @@ client_scripts {
     -- duty first: stations, custody and keybinds all read Duty.IsOnDuty().
     'client/duty.lua',
     'client/armoury.lua',
+    'client/armoury_ledger.lua',
     'client/stations.lua',
     'client/custody.lua',
     'client/vehicles.lua',
@@ -43,6 +44,7 @@ server_scripts {
     'server/fines.lua',
     'server/impound.lua',
     'server/incidents.lua',
+    'server/armoury.lua',
 }
 
 -- Built from ui/apps/som-police. Do not edit html/ by hand, it is generated.

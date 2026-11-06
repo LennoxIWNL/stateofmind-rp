@@ -33,6 +33,7 @@ M.db = {
     turf = { zones = {}, events = {}, market = {} },
     whitelist = {},
     bans = {},
+    armoury = {},
     anpr = { bolos = {}, vehicleinfo = {}, flagged = {} },
     buyer = {},
     placements = {},
@@ -451,6 +452,59 @@ local function anpr(kind, query, params)
         local A = M.db.anpr
         A.lookups = (A.lookups or 0) + 1
         return true, { bolo = A.bolos[params[1]] and 1 or 0, stolen = A.vehicleinfo[params[2]] and 1 or 0, flagged = A.flagged[params[3]] and 1 or 0 }
+    end
+    return false
+end
+
+local function armoury(kind, query, params)
+    local A = M.db.armoury
+    local function open(r) return r.status == 'out' or r.status == 'missing' end
+    local function byId(id) for _, r in ipairs(A) do if r.id == id then return r end end end
+    if not query:find('som_police_armoury', 1, true) then return false end
+    if kind == 'insert' then
+        for _, r in ipairs(A) do
+            if r.citizenid == params[4] and r.item == params[5] and open(r) then return true, 0 end
+        end
+        local row = { id = #A + 1, citizenid = params[1], officer_name = params[2], item = params[3], status = 'out', hours = 0 }
+        A[#A + 1] = row
+        return true, row.id
+    elseif kind == 'update' then
+        if query:find('SET serial = ?', 1, true) then
+            local r = byId(params[2]); if M.armouryFailSerial or not r then return true, 0 end
+            r.serial = params[1]; return true, 1
+        elseif query:find("SET status = 'void'", 1, true) then
+            local r = byId(params[1]); if r and r.status == 'out' then r.status = 'void'; return true, 1 end
+            return true, 0
+        elseif query:find("SET status = 'returned', returned_at = NOW()", 1, true) then
+            local r = byId(params[1])
+            if r and r.citizenid == params[2] and open(r) then r.status = 'returned'; return true, 1 end
+            return true, 0
+        elseif query:find('returned_at = NULL', 1, true) then
+            local r = byId(params[2]); if r and r.status == 'returned' then r.status = params[1]; return true, 1 end
+            return true, 0
+        elseif query:find("SET status = 'missing'", 1, true) then
+            local r = byId(params[2])
+            if r and r.status == 'out' then r.status = 'missing'; r.flagged_by = params[1]; return true, 1 end
+            return true, 0
+        end
+    elseif kind == 'single' then
+        if query:find('SELECT id, serial, status', 1, true) then
+            for i = #A, 1, -1 do
+                local r = A[i]
+                if r.citizenid == params[1] and r.item == params[2] and open(r) then return true, { id = r.id, serial = r.serial, status = r.status } end
+            end
+            return true, nil
+        elseif query:find('SELECT officer_name, item, serial', 1, true) then
+            local r = byId(params[1]); return true, r and { officer_name = r.officer_name, item = r.item, serial = r.serial } or nil
+        end
+    elseif kind == 'query' then
+        local out = {}
+        if query:find('WHERE citizenid = ?', 1, true) then
+            for _, r in ipairs(A) do if r.citizenid == params[1] and open(r) then out[#out + 1] = { id = r.id, item = r.item, serial = r.serial, status = r.status } end end
+        else
+            for _, r in ipairs(A) do if open(r) then out[#out + 1] = { id = r.id, officer_name = r.officer_name, item = r.item, serial = r.serial, status = r.status, hours = r.hours } end end
+        end
+        return true, out
     end
     return false
 end
@@ -1505,6 +1559,7 @@ function M.single(query, params)
     do local handled, value = turf('single', query, params); if handled then return value end end
     do local handled, value = trade('single', query, params); if handled then return value end end
     do local handled, value = bans('single', query, params); if handled then return value end end
+    do local handled, value = armoury('single', query, params); if handled then return value end end
     do local handled, value = anpr('single', query, params); if handled then return value end end
     do local handled, value = newlife('single', query, params); if handled then return value end end
     do local handled, value = plants('single', query, params); if handled then return value end end
@@ -1712,6 +1767,7 @@ function M.update(query, params)
     do local handled, value = turf('update', query, params); if handled then return value end end
     do local handled, value = whitelist('update', query, params); if handled then return value end end
     do local handled, value = bans('update', query, params); if handled then return value end end
+    do local handled, value = armoury('update', query, params); if handled then return value end end
     do local handled, value = staff('update', query, params); if handled then return value end end
     do local handled, value = skills('update', query, params); if handled then return value end end
     do local handled, value = trade('update', query, params); if handled then return value end end
@@ -2067,6 +2123,7 @@ function M.insert(query, params)
     do local handled, value = heist('insert', query, params); if handled then return value end end
     do local handled, value = turf('insert', query, params); if handled then return value end end
     do local handled, value = bans('insert', query, params); if handled then return value end end
+    do local handled, value = armoury('insert', query, params); if handled then return value end end
     do local handled, value = staff('insert', query, params); if handled then return value end end
     do local handled, value = gangs('insert', query, params); if handled then return value end end
     do local handled, value = plants('insert', query, params); if handled then return value end end
@@ -2235,6 +2292,7 @@ function M.query(query, params)
     params = params or {}
     do local handled, value = loansDb('query', query, params); if handled then return value end end
     do local handled, value = leases('query', query, params); if handled then return value end end
+    do local handled, value = armoury('query', query, params); if handled then return value end end
     do local handled, value = shopsDb('query', query, params); if handled then return value end end
     do local handled, value = dmv('query', query, params); if handled then return value end end
     do local handled, value = social('query', query, params); if handled then return value end end
