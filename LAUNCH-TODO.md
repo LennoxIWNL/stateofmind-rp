@@ -297,3 +297,7 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] `/somhealth` (staff or console) reports resources, database, tables, items and convars. Its first run found two real defects, now fixed: the shops sold `cola` and `medikit`, which had no item definition (they were lost with the QBCore removal). `medikit` is defined but has no use effect: decide how medics use it (the treatment flow is in `som-medical`).
 - [ ] Set `som_phone_pepper` in the real `server.cfg` (the check fails without it) and the webhook convars you want. `set som_debug 1` turns on a one line trace of every server callback while testing; leave it off in production.
 - [ ] `health_lists.lua` is generated (`node tools/gen-health-lists.mjs`); CI fails if it is stale.
+
+## Money writes
+
+- [ ] Business and city treasury balances are now changed with one conditional add, and a failed player money save is noticed and rolled back. Only the mock suite and the dev MariaDB have run them. In game: a shop sale, a seizure and a heist payout at the same moment, then check `som_transactions` against the balances. Whether oxmysql returns `false` (not an error) for a failed transaction is assumed from how it is documented, not run.

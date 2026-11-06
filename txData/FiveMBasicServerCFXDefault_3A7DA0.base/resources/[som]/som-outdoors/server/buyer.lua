@@ -108,7 +108,8 @@ lib.callback.register('som-outdoors:server:sell', function(source, name)
 
     if not ok then
         print(('[som-outdoors] sale to %s failed: %s'):format(name, tostring(result)))
-        result = done(false, 'the sale fell through')
+        -- Already paid (only the payout record failed): the player must not be told it failed.
+        result = state.paid and done(true, nil, { paid = state.worth }) or done(false, 'the sale fell through')
     end
 
     -- Anything taken or debited without a completed payment goes back.

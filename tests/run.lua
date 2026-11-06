@@ -53,6 +53,7 @@ local function resetDb()
     mysql.db.buyer = {}
     mysql.db.placements = {}
     mysql.db.trade = {}
+    mysql.db.shared = { accounts = { [7] = 100 }, treasury = 500, updates = {}, ledger = {} }
     mysql.db.skills = {}
     mysql.db.newlife = {}
     mysql.db.chop = { log = {}, owned = {} }
@@ -4339,6 +4340,21 @@ do
     local credit = mysql.transactions[2]
     check(paid == true and player.money.bank == 95 and credit and credit[1].query:find('+ ? WHERE', 1, true) and credit[1].values[1] == 25 and credit[2].query:find('FROM som_character_money', 1, true),
         'money: an offline credit is added in the database and the ledger reads the balance from it')
+
+    mysql.failTransaction = 'throw'
+    local thrown = env.Money.Add(41, 'bank', 10, 'test:throw')
+    mysql.failTransaction = false
+    check(thrown == false and player.money.bank == 95, 'money: a save that throws also rolls the balance back')
+
+    local S = mysql.db.shared
+    check(env.Money.BusinessTransact('acme', -30, 'test:spend') == true and S.accounts[7] == 70 and #S.ledger == 1, 'business: a spend lowers the account and is ledgered')
+    check(env.Money.BusinessTransact('acme', -500, 'test:overdraw') == false and S.accounts[7] == 70 and #S.ledger == 1, 'business: it cannot be overdrawn and nothing is ledgered')
+    check(S.updates[1]:find('balance = balance + ?', 1, true) and not S.updates[1]:find('SET balance = ? ', 1, true), 'business: the database is told the change, not the total')
+    check(env.Money.BusinessTransact('nobody', 5, 'test:none') == false, 'business: an unknown business is refused')
+
+    check(env.Money.TreasuryTransact(-200, 'test:city') == true and S.treasury == 300 and #S.ledger == 2, 'treasury: a spend lowers it and is ledgered')
+    check(env.Money.TreasuryTransact(-9999, 'test:over') == false and S.treasury == 300 and #S.ledger == 2, 'treasury: it cannot go below zero and nothing is ledgered')
+    check(S.updates[#S.updates]:find('balance = balance + ?', 1, true), 'treasury: the database is told the change, not the total')
     _G.Player, _G.SomFormatDate = saved.Player, saved.SomFormatDate
 end
 

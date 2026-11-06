@@ -15,9 +15,9 @@ else
 fi
 
 fail=0
-# name | setup SQL | claim SQL (run N times in parallel, each must report affected rows) | check SQL (must print 1)
+# name | setup SQL | claim SQL (run N times in parallel, each must report affected rows)
 run() {
-  local name=$1 setup=$2 claim=$3 check=$4
+  local name=$1 setup=$2 claim=$3
   for r in $(seq 1 "$rounds"); do
     sql "$setup" >/dev/null
     for i in $(seq 1 "$n"); do ( sql "$claim; SELECT ROW_COUNT();" 2>/dev/null | tail -1 >> /tmp/claimcount.$$ ) & done
@@ -29,29 +29,33 @@ run() {
 }
 
 cleanup() {
-  sql "DELETE FROM som_plants WHERE citizenid = 'LOADTEST'; DELETE FROM som_trade_offers WHERE seller = 'LOADTEST'; DELETE FROM som_lab_jobs WHERE citizenid LIKE 'LOADTEST%'; DELETE FROM som_chop_log WHERE citizenid LIKE 'LOADTEST%'; DELETE FROM som_turf WHERE name = 'loadtest_zone';" >/dev/null
+  sql "DELETE FROM som_plants WHERE citizenid = 'LOADTEST'; DELETE FROM som_trade_offers WHERE seller = 'LOADTEST'; DELETE FROM som_lab_jobs WHERE citizenid LIKE 'LOADTEST%'; DELETE FROM som_chop_log WHERE citizenid LIKE 'LOADTEST%'; DELETE FROM som_turf WHERE name = 'loadtest_zone'; DELETE FROM som_trade_offers WHERE buyer = 'LOADTEST';" >/dev/null
 }
 trap cleanup EXIT
 
 run "plant harvest" \
   "DELETE FROM som_plants WHERE citizenid='LOADTEST'; INSERT INTO som_plants (citizenid, strain, x, y, z) VALUES ('LOADTEST','s',0,0,0)" \
-  "UPDATE som_plants SET status = 'harvested' WHERE citizenid = 'LOADTEST' AND status = 'growing'" ""
+  "UPDATE som_plants SET status = 'harvested' WHERE citizenid = 'LOADTEST' AND status = 'growing'"
 
 run "trade accept" \
   "DELETE FROM som_trade_offers WHERE seller='LOADTEST'; INSERT INTO som_trade_offers (seller, buyer, item, price) VALUES ('LOADTEST','B','repairkit',200)" \
-  "UPDATE som_trade_offers SET status = 'done' WHERE seller = 'LOADTEST' AND buyer = 'B' AND status = 'pending' AND created_at > DATE_SUB(NOW(), INTERVAL 120 SECOND)" ""
+  "UPDATE som_trade_offers SET status = 'done' WHERE seller = 'LOADTEST' AND buyer = 'B' AND status = 'pending' AND created_at > DATE_SUB(NOW(), INTERVAL 120 SECOND)"
 
 run "turf claim of an unowned zone" \
   "DELETE FROM som_turf WHERE name='loadtest_zone'; INSERT INTO som_turf (name, label) VALUES ('loadtest_zone','L')" \
-  "UPDATE som_turf SET owner_gang = 'ballas', claimed_at = NOW() WHERE name = 'loadtest_zone' AND owner_gang IS NULL" ""
+  "UPDATE som_turf SET owner_gang = 'ballas', claimed_at = NOW() WHERE name = 'loadtest_zone' AND owner_gang IS NULL"
 
 run "lab start (one cook per lab)" \
   "DELETE FROM som_lab_jobs WHERE citizenid LIKE 'LOADTEST%'" \
-  "INSERT INTO som_lab_jobs (citizenid, lab, recipe, ready_at) SELECT 'LOADTEST', 'loadlab', 'r', DATE_ADD(NOW(), INTERVAL 10 MINUTE) FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM som_lab_jobs WHERE lab = 'loadlab' AND status = 'cooking')" ""
+  "INSERT INTO som_lab_jobs (citizenid, lab, recipe, ready_at) SELECT 'LOADTEST', 'loadlab', 'r', DATE_ADD(NOW(), INTERVAL 10 MINUTE) FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM som_lab_jobs WHERE lab = 'loadlab' AND status = 'cooking')"
 
 run "chop shop (drop-off and plate cooldown)" \
   "DELETE FROM som_chop_log WHERE citizenid LIKE 'LOADTEST%'" \
-  "INSERT INTO som_chop_log (citizenid, dropoff, plate) SELECT 'LOADTEST', 'loaddrop', 'LOAD1' FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM som_chop_log WHERE dropoff = 'loaddrop' AND created_at > DATE_SUB(NOW(), INTERVAL 10 MINUTE)) AND NOT EXISTS (SELECT 1 FROM som_chop_log WHERE plate = 'LOAD1' AND created_at > DATE_SUB(NOW(), INTERVAL 1440 MINUTE))" ""
+  "INSERT INTO som_chop_log (citizenid, dropoff, plate) SELECT 'LOADTEST', 'loaddrop', 'LOAD1' FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM som_chop_log WHERE dropoff = 'loaddrop' AND created_at > DATE_SUB(NOW(), INTERVAL 10 MINUTE)) AND NOT EXISTS (SELECT 1 FROM som_chop_log WHERE plate = 'LOAD1' AND created_at > DATE_SUB(NOW(), INTERVAL 1440 MINUTE))"
+
+run "roadside kit (one per hour)" \
+  "DELETE FROM som_trade_offers WHERE buyer='LOADTEST'" \
+  "INSERT INTO som_trade_offers (seller, buyer, item, price, status) SELECT 'FALLBACK', 'LOADTEST', 'repairkit', 200, 'done' FROM DUAL WHERE (SELECT COUNT(*) FROM som_trade_offers WHERE buyer = 'LOADTEST' AND seller = 'FALLBACK' AND status <> 'cancelled' AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)) < 1"
 
 [ $fail = 0 ] && echo "ok: every claim has exactly one winner under $n parallel connections" || echo "FAIL: a claim let more than one through"
 exit $fail
