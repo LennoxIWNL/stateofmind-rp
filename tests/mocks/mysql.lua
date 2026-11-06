@@ -37,6 +37,7 @@ M.db = {
     buyer = {},
     placements = {},
     trade = {},
+    shopsDb = { shops = {}, stock = {}, staff = {}, takings = 0, balance = 0 },
     shared = { accounts = { [7] = 100 }, frozen = {}, treasury = 500, updates = {}, ledger = {} },
     skills = {},
     newlife = {},
@@ -506,6 +507,151 @@ local function placements(kind, query, params)
     return false
 end
 
+local function shopsDb(kind, query, params)
+    local D = M.db.shopsDb
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    local function stockRow(shop, item) for _, r in ipairs(D.stock) do if r.shop == shop and r.item == item then return r end end end
+    local function staffRow(citizenid) for _, r in ipairs(D.staff) do if r.citizenid == citizenid then return r end end end
+    local function staffCount(shop) local n = 0 for _, r in ipairs(D.staff) do if r.shop == shop then n = n + 1 end end return n end
+    local function owns(citizenid) for _, sh in pairs(D.shops) do if sh.owner == citizenid then return true end end return false end
+
+    if kind == 'scalar' then
+        if has('SELECT 1 FROM som_shops WHERE shop_id = ? AND owner = ?') then
+            local sh = D.shops[params[1]]
+            return true, (sh and sh.owner == params[2]) and 1 or nil
+        elseif has('SELECT a.balance FROM som_businesses b JOIN som_bank_accounts a') then return true, D.balance
+        elseif has('SELECT COALESCE(SUM(t.amount), 0) FROM som_transactions t JOIN som_businesses b') then return true, D.takings
+        elseif has('SELECT bought_price FROM som_shops WHERE shop_id = ?') then return true, D.shops[params[1]] and D.shops[params[1]].price or 0
+        elseif has('SELECT owner FROM som_shops WHERE shop_id = ?') then return true, D.shops[params[1]] and D.shops[params[1]].owner
+        elseif has('SELECT shop_id FROM som_shops WHERE owner = ?') then
+            for id, sh in pairs(D.shops) do if sh.owner == params[1] then return true, id end end
+            return true, nil
+        elseif has('SELECT (SELECT COUNT(*) FROM som_shop_stock WHERE shop_id = ? AND qty > 0)') then
+            local n = 0
+            for _, r in ipairs(D.stock) do if r.shop == params[1] and r.qty > 0 then n = n + 1 end end
+            return true, n + staffCount(params[2])
+        elseif has('SELECT COUNT(*) FROM som_shop_stock WHERE shop_id = ? AND item <> ? AND qty > 0') then
+            local n = 0
+            for _, r in ipairs(D.stock) do if r.shop == params[1] and r.item ~= params[2] and r.qty > 0 then n = n + 1 end end
+            return true, n
+        elseif has('SELECT COUNT(*) FROM som_shop_staff WHERE shop_id = ?') then return true, staffCount(params[1])
+        elseif has('SELECT 1 FROM som_shop_staff WHERE citizenid = ?') then return true, staffRow(params[1]) and 1 or nil
+        end
+    elseif kind == 'single' then
+        if has('SELECT owner FROM som_shops WHERE shop_id = ?') then
+            return true, D.shops[params[1]] and { owner = D.shops[params[1]].owner } or nil
+        elseif has('SELECT st.price FROM som_shop_stock st JOIN som_shops s') then
+            local r, sh = stockRow(params[1], params[2]), D.shops[params[1]]
+            return true, (r and sh and sh.owner) and { price = r.price } or nil
+        end
+    elseif kind == 'query' then
+        if has('SELECT item, qty, price FROM som_shop_stock WHERE shop_id = ? AND qty > 0 ORDER BY item') then
+            local out = {}
+            for _, r in ipairs(D.stock) do if r.shop == params[1] and r.qty > 0 then out[#out + 1] = { item = r.item, qty = r.qty, price = r.price } end end
+            return true, out
+        elseif has('SELECT item, qty, price FROM som_shop_stock WHERE shop_id = ? ORDER BY item') then
+            local out = {}
+            for _, r in ipairs(D.stock) do if r.shop == params[1] then out[#out + 1] = { item = r.item, qty = r.qty, price = r.price } end end
+            return true, out
+        elseif has('SELECT s.citizenid, s.hourly_pay, c.firstname, c.lastname FROM som_shop_staff s') then
+            local out = {}
+            for _, r in ipairs(D.staff) do if r.shop == params[1] then out[#out + 1] = { citizenid = r.citizenid, hourly_pay = r.pay, firstname = 'Staff', lastname = r.citizenid } end end
+            return true, out
+        elseif has('SELECT s.citizenid, s.shop_id, s.hourly_pay, UNIX_TIMESTAMP(s.last_paid_at) AS paid_at') then
+            local out = {}
+            for _, r in ipairs(D.staff) do
+                local sh = D.shops[r.shop]
+                if sh and sh.owner and r.paid_at <= now() - params[1] * 60 then out[#out + 1] = { citizenid = r.citizenid, shop_id = r.shop, hourly_pay = r.pay, paid_at = r.paid_at } end
+            end
+            return true, out
+        elseif has('DELETE FROM som_shop_stock WHERE shop_id = ?') then
+            for i = #D.stock, 1, -1 do if D.stock[i].shop == params[1] then table.remove(D.stock, i) end end
+            return true, 0
+        end
+    elseif kind == 'update' then
+        if has('UPDATE som_shops SET owner = ?, bought_price = ?, bought_at = NOW(), withdraw_at = NULL') then
+            local sh = D.shops[params[3]]
+            if not sh or sh.owner or owns(params[4]) then return true, 0 end
+            sh.owner, sh.price, sh.withdraw_at = params[1], params[2], nil
+            return true, 1
+        elseif has('UPDATE som_shops SET owner = NULL, bought_price = 0 WHERE shop_id = ? AND owner = ?') then
+            local sh = D.shops[params[1]]
+            if not sh or sh.owner ~= params[2] then return true, 0 end
+            sh.owner, sh.price = nil, 0
+            return true, 1
+        elseif has('UPDATE som_shops SET owner = ?, bought_price = ? WHERE shop_id = ? AND owner IS NULL') then
+            local sh = D.shops[params[3]]
+            if not sh or sh.owner then return true, 0 end
+            sh.owner, sh.price = params[1], params[2]
+            return true, 1
+        elseif has('UPDATE som_shops SET withdraw_at = NOW()') then
+            local sh = D.shops[params[1]]
+            if not sh or sh.owner ~= params[2] or (sh.withdraw_at and sh.withdraw_at >= now() - params[3] * 60) then return true, 0 end
+            sh.withdraw_at = now()
+            return true, 1
+        elseif has('UPDATE som_shops SET withdraw_at = NULL WHERE shop_id = ? AND owner = ?') then
+            local sh = D.shops[params[1]]
+            if sh then sh.withdraw_at = nil end
+            return true, 1
+        elseif has('UPDATE som_shop_stock SET qty = qty + ?, price = ? WHERE shop_id = ? AND item = ? AND qty + ? <= ?') then
+            local r = stockRow(params[3], params[4])
+            if not r or r.qty + params[5] > params[6] then return true, 0 end
+            r.qty, r.price = r.qty + params[1], params[2]
+            return true, 1
+        elseif has('UPDATE som_shop_stock SET price = ? WHERE shop_id = ? AND item = ?') then
+            local r = stockRow(params[2], params[3])
+            if not r then return true, 0 end
+            r.price = params[1]
+            return true, 1
+        elseif has('UPDATE som_shop_stock SET qty = qty - ? WHERE shop_id = ? AND item = ? AND qty >= ? AND price = ?') then
+            local r = stockRow(params[2], params[3])
+            if not r or r.qty < params[4] or r.price ~= params[5] then return true, 0 end
+            r.qty = r.qty - params[1]
+            return true, 1
+        elseif has('UPDATE som_shop_stock SET qty = qty - ? WHERE shop_id = ? AND item = ? AND qty >= ?') then
+            local r = stockRow(params[2], params[3])
+            if not r or r.qty < params[4] then return true, 0 end
+            r.qty = r.qty - params[1]
+            return true, 1
+        elseif has('UPDATE som_shop_stock SET qty = qty + ? WHERE shop_id = ? AND item = ?') then
+            local r = stockRow(params[2], params[3])
+            if not r then return true, 0 end
+            r.qty = r.qty + params[1]
+            return true, 1
+        elseif has('UPDATE som_shop_staff SET hourly_pay = ? WHERE shop_id = ? AND citizenid = ?') then
+            local r = staffRow(params[3])
+            if not r or r.shop ~= params[2] then return true, 0 end
+            r.pay = params[1]
+            return true, 1
+        elseif has('DELETE FROM som_shop_staff WHERE shop_id = ? AND citizenid = ?') or has('DELETE FROM som_shop_staff WHERE citizenid = ?') then
+            local cid, shop = params[#params], (#params == 2) and params[1] or nil
+            for i, r in ipairs(D.staff) do
+                if r.citizenid == cid and (not shop or r.shop == shop) then table.remove(D.staff, i); return true, 1 end
+            end
+            return true, 0
+        elseif has('UPDATE som_shop_staff SET last_paid_at = NOW() WHERE citizenid = ? AND shop_id = ?') then
+            local r = staffRow(params[1])
+            if not r or r.shop ~= params[2] or r.paid_at ~= params[3] then return true, 0 end
+            r.paid_at = now()
+            return true, 1
+        elseif has('UPDATE som_shop_staff SET last_paid_at = FROM_UNIXTIME(?)') then
+            local r = staffRow(params[2])
+            if r then r.paid_at = params[1] end
+            return true, 1
+        end
+    elseif kind == 'insert' then
+        if has('INSERT IGNORE INTO som_shop_stock') then
+            if not stockRow(params[1], params[2]) then D.stock[#D.stock + 1] = { shop = params[1], item = params[2], qty = 0, price = params[3] } end
+            return true, 1
+        elseif has('INSERT IGNORE INTO som_shop_staff') then
+            if staffRow(params[1]) or staffCount(params[2]) >= params[5] then return true, 0 end
+            D.staff[#D.staff + 1] = { citizenid = params[1], shop = params[2], pay = params[3], paid_at = now() }
+            return true, 1
+        end
+    end
+    return false
+end
+
 local function sharedAccounts(kind, query, params)
     local S = M.db.shared
     local function has(text) return query:find(text, 1, true) ~= nil end
@@ -921,6 +1067,7 @@ end
 
 function M.single(query, params)
     params = params or {}
+    do local handled, value = shopsDb('single', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('single', query, params); if handled then return value end end
     do local handled, value = social('single', query, params); if handled then return value end end
     do local handled, value = city('single', query, params); if handled then return value end end
@@ -999,6 +1146,7 @@ end
 
 function M.scalar(query, params)
     params = params or {}
+    do local handled, value = shopsDb('scalar', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('scalar', query, params); if handled then return value end end
     do local handled, value = social('scalar', query, params); if handled then return value end end
     do local handled, value = city('scalar', query, params); if handled then return value end end
@@ -1110,6 +1258,7 @@ end
 
 function M.update(query, params)
     params = params or {}
+    do local handled, value = shopsDb('update', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('update', query, params); if handled then return value end end
     do local handled, value = licences('update', query, params); if handled then return value end end
     do local handled, value = social('update', query, params); if handled then return value end end
@@ -1462,6 +1611,7 @@ end
 
 function M.insert(query, params)
     params = params or {}
+    do local handled, value = shopsDb('insert', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('insert', query, params); if handled then return value end end
     do local handled, value = social('insert', query, params); if handled then return value end end
     do local handled, value = city('insert', query, params); if handled then return value end end
@@ -1632,6 +1782,7 @@ end
 
 function M.query(query, params)
     params = params or {}
+    do local handled, value = shopsDb('query', query, params); if handled then return value end end
     do local handled, value = social('query', query, params); if handled then return value end end
     do local handled, value = licences('query', query, params); if handled then return value end end
     do local handled, value = city('query', query, params); if handled then return value end end

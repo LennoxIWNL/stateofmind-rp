@@ -309,6 +309,14 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 
 - [ ] Business and city treasury balances are now changed with one conditional add, and a failed player money save is noticed and rolled back. Only the mock suite and the dev MariaDB have run them. In game: a shop sale, a seizure and a heist payout at the same moment, then check `som_transactions` against the balances. Whether oxmysql returns `false` (not an error) for a failed transaction is assumed from how it is documented, not run.
 
+## Player shops (som-shops)
+
+- [ ] Every shop ships disabled with no coordinates. Place each (staff `/place som-shops shops.alta.coords`, or set `Config.shops` coordinates and `enabled = true`) and decide the real shop list and prices. The two entries (`alta`, `strawberry`) are placeholders.
+- [ ] `setup.sql` gets three tables (`som_shops`, `som_shop_stock`, `som_shop_staff`). On start the resource creates one bank account (`SHOP-<ID>`) and one business row (`shop_<id>`) per configured shop; these are separate from the job businesses, so core paychecks never touch them.
+- [ ] Decide `Config.items` (what a shop may sell and the price range), the tax rate, the sell-back share, the withdrawal cap and cooldown, and the staff pay cap. They are first guesses, not tuned.
+- [ ] Not verified in a live server: the counter menu and the owner management menu (som-ui context and dialog shims), the hire offer dialog, the phone app, hourly payroll over a real restart, and concurrent sales. Only the mock suite and a scratch MariaDB ran the queries.
+- [ ] Shop ownership never expires: a shop whose owner stops playing stays owned, and there is no way for staff to take it back except in the database. Decide an inactivity rule later.
+- [ ] Left out on purpose: supplier ordering, several shops per owner, handing a shop to another player, staff grades or commission, shop robbery.
 ## EMS hospital transport
 
 - [ ] Sink and faucet change for staff: the hospital respawn fee (350, `Config.RespawnFee` in `som-medical`) is now paid into the `ems` business account instead of vanishing. If the credit fails the player is refunded and treated free.
