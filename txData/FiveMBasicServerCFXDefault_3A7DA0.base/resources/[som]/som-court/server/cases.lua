@@ -122,7 +122,19 @@ lib.callback.register('som-court:server:docket', function(source)
         return fail('not permitted')
     end
 
-    return { success = true, role = job, cases = rows or {} }
+    rows = rows or {}
+    if #rows > 0 then
+        local lowest, highest = rows[1].id, rows[1].id
+        for _, row in ipairs(rows) do lowest, highest = math.min(lowest, row.id), math.max(highest, row.id) end
+
+        local served = {}
+        for _, s in ipairs(MySQL.query.await('SELECT case_id FROM som_court_service WHERE case_id >= ? AND case_id <= ?', { lowest, highest }) or {}) do
+            served[s.case_id] = true
+        end
+        for _, row in ipairs(rows) do row.served = served[row.id] == true end
+    end
+
+    return { success = true, role = job, cases = rows }
 end)
 
 --- What backs a case. Judges and the bar see any case; an officer only their own.

@@ -1791,6 +1791,27 @@ CREATE TABLE IF NOT EXISTS `som_shop_staff` (
   KEY `idx_shop` (`shop_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 -- ===========================================================================
+--  7n. COURT SERVICE (som-serving)
+--
+--  One row per case, and `case_id` is UNIQUE: the insert that creates it is the
+--  claim, so two servers cannot both be paid for the same papers. The hourly
+--  cap and the per-defendant cooldown are read from this table, not memory.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_court_service` (
+  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `case_id`       BIGINT UNSIGNED NOT NULL,
+  `defendant_cid` VARCHAR(16) NOT NULL,
+  `server_cid`    VARCHAR(16) NOT NULL,
+  `fee`           BIGINT NOT NULL,
+  `served_at`     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_case` (`case_id`),
+  KEY `idx_defendant_time` (`defendant_cid`, `served_at`),
+  KEY `idx_server_time` (`server_cid`, `served_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
 --  7m. LICENCES AND DRIVING SCHOOL (som-licences)
 --
 --  Licences themselves stay in som_licenses (suspended_until above). This only

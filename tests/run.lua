@@ -30,6 +30,7 @@ local function resetDb()
     mysql.db.jailSentences = {}
     mysql.db.jailBail = {}
     mysql.db.courtCases = {}
+    mysql.db.courtService = {}
     mysql.db.courtEvents = {}
     mysql.db.courtWarrants = {}
     mysql.db.service = {}
@@ -66,7 +67,7 @@ local function resetDb()
     mysql.db.bills = {}
     mysql.db.orders = {}
     mysql.db.nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
-                        courtCases = 1, courtEvents = 1, courtWarrants = 1, service = 1, evidence = 1, custody = 1, orders = 1 }
+                        courtCases = 1, courtEvents = 1, courtWarrants = 1, courtService = 1, service = 1, evidence = 1, custody = 1, orders = 1 }
     mysql.fakeNow = nil
 end
 
@@ -6484,6 +6485,222 @@ do
         end
         f:close()
         check(bad == 0, 'boot: no ";" inside a comment in ' .. name)
+    end
+end
+
+-- som-serving
+----------------------------------------------------------------------
+do
+    local env, notes
+    local DAY = 24 * 3600
+
+    local function scene(overrides)
+        resetDb()
+        mysql.fakeNow = nil
+        Mocks.players = {
+            [3] = { citizenid = 'SERVER', job = { name = 'unemployed' }, charinfo = { firstname = 'Sam', lastname = 'Server' } },
+            [4] = { citizenid = 'OTHER', job = { name = 'unemployed' }, charinfo = { firstname = 'Otto', lastname = 'Other' } },
+            [5] = { citizenid = 'DEF1', job = { name = 'unemployed' }, charinfo = { firstname = 'Dee', lastname = 'One' } },
+            [6] = { citizenid = 'DEF2', job = { name = 'unemployed' }, charinfo = { firstname = 'Dex', lastname = 'Two' } },
+        }
+        FakePeds = { [3] = vec3(0, 0, 0), [4] = vec3(0, 0, 0), [5] = vec3(1, 0, 0), [6] = vec3(1, 0, 0) }
+        Mocks.businesses.doj = { label = 'DOJ' }
+        Mocks.bizBalance = { doj = 5000 }
+        Mocks.addMoneyFails, Mocks.addMoneyThrows, Mocks.businessSpendFails = false, false, false
+        env = loader.loadResource(REPO .. 'som-serving', { 'shared/config.lua', 'server/main.lua' })
+        for k, v in pairs(overrides or {}) do env.Config[k] = v end
+        notes = {}
+        local real = _G.TriggerClientEvent
+        _G.TriggerClientEvent = function(name, target, payload) notes[#notes + 1] = { name = name, target = target, payload = payload } end
+        return function() _G.TriggerClientEvent = real end
+    end
+
+    local function paper(id, defendant, overrides)
+        local c = { id = id, status = 'scheduled', defendant_cid = defendant, filed_by = 'OFFICER', judge_cid = 'JUDGE',
+            hearing_at = os.time() + 7200, class = 'misdemeanor', charges = 'x' }
+        for k, v in pairs(overrides or {}) do c[k] = v end
+        mysql.db.courtCases[id] = c
+        return c
+    end
+
+    local function app(source, action, payload) return Mocks.apps.papers.handler(source, action, payload or {}) end
+    local function begin(source, target)
+        Mocks.clock = (Mocks.clock or 0) + 3000
+        return RegisteredCallbacks['som-serving:server:begin'](source, target)
+    end
+    local function finish(source, target, wait)
+        Mocks.clock = (Mocks.clock or 0) + (wait or 7000)
+        return RegisteredCallbacks['som-serving:server:finish'](source, target)
+    end
+    local function serve(source, target)
+        local b = begin(source, target)
+        if not b.success then return b end
+        return finish(source, target)
+    end
+    local function later(seconds, fn)
+        local real = os.time
+        os.time = function() return real() + seconds end
+        local ok, err = pcall(fn)
+        os.time = real
+        if not ok then error(err, 0) end
+    end
+    local function titles(source)
+        local out = {}
+        for _, sec in ipairs(app(source, 'view').view.sections or {}) do
+            for _, r in ipairs(sec.rows) do out[#out + 1] = r.title end
+        end
+        return out
+    end
+
+    do
+        local restore = scene()
+        paper(1, 'DEF1'); paper(2, 'DEF2')
+        check(#titles(3) == 2 and titles(3)[1] == 'Dee One', 'serving: the list shows the defendant name and nothing about the charges')
+        local sub = app(3, 'view').view.sections[1].rows[1]
+        check(sub.sub:find('$250', 1, true) and not sub.sub:find('x', 1, true) and sub.payload.case == 1, 'serving: a row shows the hearing time and the fee only')
+        paper(3, 'DEF1', { hearing_at = os.time() + 300 })
+        paper(4, 'DEF1', { status = 'convicted' })
+        check(#titles(3) == 2, 'serving: a hearing too close or a case not scheduled is not listed')
+        paper(5, 'OTHER'); paper(6, 'DEF2', { filed_by = 'SERVER' }); paper(7, 'DEF2', { judge_cid = 'SERVER' })
+        paper(8, 'DEF2', { prosecutor_cid = 'SERVER' }); paper(9, 'DEF2', { defender_cid = 'SERVER' })
+        check(#titles(3) == 3, 'serving: the filer, judge, prosecutor, defender and the defendant never see their own case')
+        check(#titles(4) > #titles(3), 'serving: other people do see those cases')
+        Mocks.bizBalance.doj = 100
+        check(app(3, 'view').view.empty == 'The courts cannot pay for service right now', 'serving: the list is refused up front when the courts cannot pay')
+        check(app(3, 'take', { case = 1 }).error == 'the courts cannot pay for service right now', 'serving: a paper cannot be taken either')
+        restore()
+    end
+
+    do
+        local restore = scene()
+        paper(1, 'DEF1'); paper(2, 'DEF2')
+        check(app(3, 'take', { case = 'x' }).error == 'bad request' and app(3, 'take', { case = 99 }).error == 'that paper is gone', 'serving: a bad or missing case is refused')
+        check(app(3, 'take', { case = 1 }).success == true, 'serving: a paper can be taken')
+        check(app(3, 'take', { case = 2 }).error == 'you are already holding a paper', 'serving: one paper at a time')
+        check(app(4, 'take', { case = 1 }).error == 'someone else has that paper' and #titles(4) == 1, 'serving: a held paper is hidden from others')
+        check(app(3, 'drop').success == true and app(4, 'take', { case = 1 }).success == true, 'serving: handing a paper back frees it')
+        app(4, 'drop')
+        app(3, 'take', { case = 1 })
+        later(31 * 60, function()
+            check(#titles(4) == 2 and app(4, 'take', { case = 1 }).success == true, 'serving: a hold that ran out frees the paper')
+        end)
+        restore()
+    end
+
+    do
+        local restore = scene()
+        paper(1, 'DEF1'); paper(2, 'DEF2')
+        check(begin(3, 5).error == 'you are not holding a paper', 'serving: serving needs a held paper')
+        app(3, 'take', { case = 1 })
+        check(begin(3, 6).error == 'that is not the person on the paper', 'serving: the wrong person cannot be served')
+        check(begin(3, 3).error == 'that is not the person on the paper' and begin(3, 'x').error == 'that is not the person on the paper', 'serving: yourself or a bad id is refused')
+        FakePeds[5] = vec3(40, 0, 0)
+        check(begin(3, 5).error == 'you are too far away', 'serving: the distance is checked by the server')
+        FakePeds[5] = vec3(1, 0, 0)
+        check(finish(3, 5).error == 'the papers were not handed over', 'serving: finishing without beginning pays nothing')
+        check(begin(3, 5).success == true, 'serving: serving begins next to the defendant')
+        local paid = Mocks.calls.addMoney
+        check(finish(3, 5, 1000).error == 'the papers were not handed over' and Mocks.calls.addMoney == paid, 'serving: the progress time is enforced on the server')
+        begin(3, 5)
+        check(finish(3, 6).error == 'the papers were not handed over', 'serving: finishing on someone else is refused')
+        begin(3, 5)
+        FakePeds[5] = vec3(40, 0, 0)
+        check(finish(3, 5).error == 'you are too far away' and #mysql.db.courtService == 0, 'serving: moving away before the end cancels it')
+        FakePeds[5] = vec3(1, 0, 0)
+        Mocks.players[5] = nil
+        begin(3, 5)
+        check(#mysql.db.courtService == 0, 'serving: a defendant who is not loaded cannot be served')
+        restore()
+    end
+
+    do
+        local restore = scene()
+        paper(1, 'DEF1')
+        app(3, 'take', { case = 1 })
+        local before, bank = Mocks.calls.addMoney, Mocks.bizBalance.doj
+        check(serve(3, 5).success == true, 'serving: a paper is served')
+        check(#mysql.db.courtService == 1 and mysql.db.courtService[1].server_cid == 'SERVER' and mysql.db.courtService[1].defendant_cid == 'DEF1' and mysql.db.courtService[1].fee == 250, 'serving: the service is recorded in the table')
+        check(Mocks.calls.addMoney == before + 1 and Mocks.lastPaid.amount == 250 and Mocks.bizBalance.doj == bank - 250, 'serving: the fee comes out of the DOJ account')
+        local told
+        for _, n in ipairs(notes) do if n.name == 'som:client:notify' and n.target == 5 and tostring(n.payload):find('served court papers for hearing #1', 1, true) then told = true end end
+        check(told, 'serving: the defendant is told they were served')
+        check(#titles(3) == 0 and begin(3, 5).error == 'you are not holding a paper', 'serving: the paper is gone and the hold cleared')
+        check(app(4, 'take', { case = 1 }).error == 'that paper is gone', 'serving: a served case cannot be served or paid again')
+        restore()
+    end
+
+    do
+        local restore = scene()
+        paper(1, 'DEF1'); paper(2, 'DEF1', { hearing_at = os.time() + 3 * DAY }); paper(3, 'DEF2')
+        app(3, 'take', { case = 1 }); serve(3, 5)
+        check(app(3, 'take', { case = 2 }).error == 'they were served recently', 'serving: the same defendant cannot be served again for a fee within a day')
+        check(app(3, 'take', { case = 3 }).success == true, 'serving: a different defendant is still open')
+        app(3, 'drop')
+        later(DAY + 60, function()
+            check(app(3, 'take', { case = 2 }).success == true, 'serving: the per-defendant cooldown ends')
+        end)
+        restore()
+
+        restore = scene({ hourlyCap = 250 })
+        paper(1, 'DEF1'); paper(2, 'DEF2')
+        app(3, 'take', { case = 1 }); serve(3, 5)
+        check(app(3, 'take', { case = 2 }).error == 'you have served enough for this hour', 'serving: the hourly cap is checked up front')
+        later(3700, function() check(app(3, 'take', { case = 2 }).success == true, 'serving: the cap frees after an hour') end)
+        restore()
+
+        restore = scene({ hourlyCap = 500 })
+        paper(1, 'DEF1'); paper(2, 'DEF2')
+        app(3, 'take', { case = 1 }); app(4, 'take', { case = 2 })
+        serve(3, 5)
+        mysql.db.courtService[#mysql.db.courtService + 1] = { id = 99, case_id = 77, defendant_cid = 'ZZ', server_cid = 'OTHER', fee = 250, at = os.time() }
+        check(serve(4, 6).success == true, 'serving: a different server has their own cap')
+        restore()
+    end
+
+    do
+        local restore = scene()
+        paper(1, 'DEF1')
+        app(3, 'take', { case = 1 })
+        Mocks.bizBalance.doj = 100
+        local paid = Mocks.calls.addMoney
+        check(serve(3, 5).success == false and #mysql.db.courtService == 0 and Mocks.calls.addMoney == paid, 'serving: a broke DOJ pays nothing and the claim is undone')
+        Mocks.bizBalance.doj = 5000
+        Mocks.addMoneyFails = true
+        local t = Mocks.calls.businessTransact
+        check(serve(3, 5).success == false and #mysql.db.courtService == 0 and Mocks.calls.businessTransact == t + 1 and Mocks.bizBalance.doj == 5000, 'serving: a failed credit returns the money and undoes the claim')
+        Mocks.addMoneyFails = false
+        Mocks.addMoneyThrows = true
+        check(serve(3, 5).success == false and #mysql.db.courtService == 0, 'serving: a payout that throws undoes the claim')
+        Mocks.addMoneyThrows = false
+        check(serve(3, 5).success == true and #mysql.db.courtService == 1, 'serving: the same paper can be served once the courts can pay')
+        restore()
+    end
+
+    do
+        local restore = scene()
+        paper(1, 'DEF1')
+        app(3, 'take', { case = 1 })
+        mysql.db.courtService[1] = { id = 50, case_id = 1, defendant_cid = 'DEF1', server_cid = 'OTHER', fee = 250, at = os.time() }
+        begin(3, 5)
+        local paid = Mocks.calls.addMoney
+        check(finish(3, 5).error == 'that paper is gone' and Mocks.calls.addMoney == paid, 'serving: a paper served by someone else in the meantime pays nothing')
+        restore()
+    end
+
+    do
+        local restore = scene()
+        courtScene()
+        local filed = cb('file')(1, { target = 2, class = 'misdemeanor', charges = 'Assault' })
+        cb('accept')(11, filed.id)
+        cb('schedule')(10, filed.id, 1)
+        local second = cb('file')(1, { target = 2, class = 'misdemeanor', charges = 'Theft' })
+        cb('accept')(11, second.id)
+        mysql.db.courtService[1] = { id = 1, case_id = filed.id, defendant_cid = 'INMATE', server_cid = 'SERVER', fee = 250, at = os.time() }
+        local docket = cb('docket')(10)
+        local flags = {}
+        for _, c in ipairs(docket.cases) do flags[c.id] = c.served end
+        check(flags[filed.id] == true and flags[second.id] == false, 'serving: the judge docket shows which cases were served, read from the table')
+        restore()
     end
 end
 
