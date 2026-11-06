@@ -178,9 +178,12 @@ exports('incidentRolesFor', Police.IncidentRolesFor)
 -- (server/main.lua:762). Listening for the singular would have compiled,
 -- registered and simply never fired, which is the failure mode AUDIT 21.2
 -- describes: a handler on the wrong name does not error, it just never runs.
+local deleting = {}
+
 RegisterNetEvent('mdt:server:deleteIncidents', function(id)
     local incident = incidentId(id)
-    if not incident then return end
+    if not incident or deleting[incident] then return end
+    deleting[incident] = true
 
     -- This event is ps-mdt's, and ANY client can fire it with ANY id. ps-mdt
     -- checks rank before it deletes the incident, but this handler is a second,
@@ -199,10 +202,11 @@ RegisterNetEvent('mdt:server:deleteIncidents', function(id)
     CreateThread(function()
         Wait(3000)
 
-        local stillThere = MySQL.scalar.await(
+        local ok, stillThere = pcall(MySQL.scalar.await,
             'SELECT 1 FROM mdt_incidents WHERE id = ?', { incident }
         )
-        if stillThere then return end
+        deleting[incident] = nil
+        if not ok or stillThere then return end
 
         MySQL.query.await('DELETE FROM som_incident_people WHERE incident_id = ?', { incident })
     end)
