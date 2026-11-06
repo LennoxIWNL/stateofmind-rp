@@ -54,6 +54,7 @@ local function active(citizenid)
 end
 
 exports('getNewLife', active)
+exports('getDeathClass', function(citizenid) return pending[citizenid] and pending[citizenid].class end)
 
 lib.addCommand('nlr', {
     help = 'Show a player\'s new life restriction',

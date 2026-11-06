@@ -102,6 +102,9 @@ Config.RespawnFee = 350
 -- statement line exist at all.
 Config.FeeAccounts = { 'bank' }
 
+-- The business account the respawn fee is paid into.
+Config.FeeBusiness = 'ems'
+
 -- A player who cannot pay is still treated. The debt is not pursued, because a
 -- player stuck on the floor because they are broke is a player who logs off.
 -- The shortfall is simply not collected, and the treatment still happens.
