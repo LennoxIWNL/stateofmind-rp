@@ -96,6 +96,21 @@ Config.Needs = {
     thirstPerInterval = 5,
 }
 
+-- What using an item does to the needs, in points on the 0 to 100 bars. Applied on the
+-- server when ox_inventory reports the item used. Every item in ox_inventory's
+-- data/items.lua that has `client.status` needs an entry here with the same value
+-- divided by 10000 (a test checks it).
+Config.ItemStatus = {
+    testburger = { hunger = 20 },
+    burger = { hunger = 20 },
+    sandwich = { hunger = 20 },
+    water = { thirst = 20 },
+    cola = { thirst = 20 },
+    sprunk = { thirst = 20 },
+    mustard = { hunger = 2.5, thirst = 2.5 },
+    panties = { thirst = -10, stress = -2.5 },
+}
+
 -- Metadata keys created on every new character. Anything not listed here is
 -- rejected by SetMetadata, so a compromised client cannot invent state.
 Config.DefaultMetadata = {
