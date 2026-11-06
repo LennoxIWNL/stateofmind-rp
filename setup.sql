@@ -721,6 +721,27 @@ CREATE TABLE IF NOT EXISTS `som_police_impound` (
   KEY `idx_owner` (`citizenid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Armoury ledger: department weapons signed out by officers (som-police).
+-- `serial` is LSPD- plus this row's id, made by the server and written on the
+-- weapon. A row stays 'out' (or 'missing') until the same officer returns the
+-- weapon, whatever happens to their job in between. 'void' is a sign-out whose
+-- item could not be given.
+CREATE TABLE IF NOT EXISTS `som_police_armoury` (
+  `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`    VARCHAR(16) NOT NULL,
+  `officer_name` VARCHAR(64) NOT NULL DEFAULT '',
+  `item`         VARCHAR(48) NOT NULL,
+  `serial`       VARCHAR(16) DEFAULT NULL,
+  `status`       ENUM('out','returned','missing','void') NOT NULL DEFAULT 'out',
+  `issued_at`    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `returned_at`  TIMESTAMP   NULL DEFAULT NULL,
+  `flagged_by`   VARCHAR(16) DEFAULT NULL,
+  `flagged_at`   TIMESTAMP   NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_holder` (`citizenid`, `item`, `status`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Flagged plates.
 --
 -- Rows are kept and cleared rather than deleted, so "this plate was flagged for

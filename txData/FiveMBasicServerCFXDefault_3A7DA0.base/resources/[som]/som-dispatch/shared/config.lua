@@ -144,6 +144,18 @@ Config.Alerts = {
         blip = { sprite = 51, colour = 1, scale = 0.9, duration = 240 },
     },
 
+    -- Raised by som-police when a supervisor flags a department weapon missing
+    -- from the armoury ledger, at the armoury. NOT `reportable`.
+    armouryMissing = {
+        label = 'Weapon Missing',
+        code = '10-99',
+        priority = 2,
+        chance = 1.0,
+        cooldown = 60,
+        jobs = { 'police' },
+        blip = { sprite = 110, colour = 1, scale = 0.9, duration = 600 },
+    },
+
     -- Raised by som-anpr when a police plate reader scans a stolen, BOLO'd or
     -- police flagged plate, at the scanned vehicle's position. NOT `reportable`.
     flaggedVehicle = {

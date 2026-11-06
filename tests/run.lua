@@ -48,6 +48,7 @@ local function resetDb()
     mysql.db.turf = { zones = {}, events = {}, market = {} }
     mysql.db.whitelist = {}
     mysql.db.bans = {}
+    mysql.db.armoury = {}
     mysql.db.plants = {}
     mysql.db.lab = {}
     mysql.db.buyer = {}
@@ -3870,6 +3871,135 @@ do
 
     check(io.open(REPO .. 'som-staff/shared/config.lua'):read('*a'):find("['som-fuel'] = true", 1, true) ~= nil, 'fuel: stations can be placed with /place')
     for name, fn in pairs(saved) do _G[name] = fn end
+end
+
+-- ---------------------------------------------------------------------------
+-- Armoury ledger
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local files = { 'shared/config.lua', 'server/main.lua', 'server/armoury.lua' }
+    local env = loader.loadResource(REPO .. 'som-police', files)
+    local at = env.Config.Stations.mrpd.armoury.coords
+    local certs = { ['cert.rifle'] = true }
+    local function cop(grade, duty, job)
+        return { citizenid = 'P1', job = { name = job or 'police', onduty = duty ~= false, grade = grade or 3 }, charinfo = { firstname = 'Pat', lastname = 'Rol' } }
+    end
+    local notes
+    local realT = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, text) if name == 'som:client:notify' then notes[#notes + 1] = text end end
+    local function arm(e) e.Police.GetCerts = function() return certs end end
+    arm(env)
+    local function reset()
+        mysql.db.armoury = {}
+        Mocks.players = { [1] = cop(), [2] = { citizenid = 'C1', job = { name = 'unemployed', onduty = false, grade = 0 }, charinfo = { firstname = 'Civ', lastname = 'Ilian' } } }
+        Mocks.inv, Mocks.invFull = { [1] = {} }, {}
+        FakePeds[1] = at
+        Mocks.calls.dispatchAlert, notes, mysql.armouryFailSerial = 0, {}, nil
+    end
+    reset()
+    local cb = RegisteredCallbacks
+    local function carried(item) local n = 0; for _, it in pairs(Mocks.inv[1]) do if it.name == item then n = n + 1 end end; return n end
+
+    local r = cb['som-police:server:ledger'](1)
+    check(r.success and #r.loans == 2 and #r.mine == 0 and r.supervisor == false, 'ledger: an officer sees the loan weapons they may take')
+    Mocks.players[1] = cop(2)
+    r = cb['som-police:server:ledger'](1)
+    check(#r.loans == 1 and r.loans[1].item == 'weapon_pumpshotgun', 'ledger: a loan weapon above the officer rank is not offered')
+    Mocks.players[1] = cop(5)
+    check(cb['som-police:server:ledger'](1).supervisor == true, 'ledger: a supervisor is told so')
+    Mocks.players[1] = cop(3)
+
+    -- sign out
+    r = cb['som-police:server:signOut'](1, 'weapon_pumpshotgun')
+    check(r.success and r.serial == 'LSPD-0001' and carried('weapon_pumpshotgun') == 1, 'ledger: a sign out gives the weapon with a server made serial')
+    local gun
+    for _, it in pairs(Mocks.inv[1]) do gun = it end
+    check(gun.metadata.serial == 'LSPD-0001' and gun.metadata.registered == true and mysql.db.armoury[1].status == 'out', 'ledger: the serial is on the weapon and in the ledger')
+    check(cb['som-police:server:signOut'](1, 'weapon_pumpshotgun').error == 'you already have one signed out' and carried('weapon_pumpshotgun') == 1, 'ledger: one of each weapon at a time')
+    check(cb['som-police:server:signOut'](1, 'weapon_smg').serial == 'LSPD-0002', 'ledger: every sign out gets its own serial')
+
+    -- refusals
+    reset()
+    check(cb['som-police:server:signOut'](1, 'weapon_pistol').error == 'not stocked' and cb['som-police:server:signOut'](1, 42).error == 'not stocked', 'ledger: only loan weapons can be signed out')
+    Mocks.players[1] = cop(3, false)
+    check(cb['som-police:server:signOut'](1, 'weapon_smg').error == 'you are off duty', 'ledger: off duty cannot sign out')
+    Mocks.players[1] = cop(3, true, 'ambulance')
+    check(cb['som-police:server:signOut'](1, 'weapon_smg').error == 'not an officer', 'ledger: only police can sign out')
+    Mocks.players[1] = cop(3)
+    FakePeds[1] = vec3(0, 0, 0)
+    check(cb['som-police:server:signOut'](1, 'weapon_smg').error == 'you are not at the armoury', 'ledger: the armoury must be in range')
+    FakePeds[1] = at
+    Mocks.players[1] = cop(2)
+    check(cb['som-police:server:signOut'](1, 'weapon_smg').error == 'not for your rank', 'ledger: rank is checked on the server')
+    Mocks.players[1] = cop(3); certs = {}
+    check(cb['som-police:server:signOut'](1, 'weapon_smg').error == 'you are not certified for that', 'ledger: certification is checked on the server')
+    certs = { ['cert.rifle'] = true }
+    check(#mysql.db.armoury == 0, 'ledger: a refusal writes nothing')
+
+    -- failures undo the line
+    Mocks.invFull[1] = true
+    check(cb['som-police:server:signOut'](1, 'weapon_smg').error == 'no room for that' and mysql.db.armoury[1].status == 'void', 'ledger: a weapon that cannot be given voids its line')
+    Mocks.invFull[1] = false
+    mysql.armouryFailSerial = true
+    check(not cb['som-police:server:signOut'](1, 'weapon_smg').success and mysql.db.armoury[2].status == 'void' and carried('weapon_smg') == 0, 'ledger: a line whose serial could not be written is voided')
+    mysql.armouryFailSerial = nil
+    check(cb['som-police:server:signOut'](1, 'weapon_smg').serial == 'LSPD-0003', 'ledger: a voided line does not block a new sign out')
+
+    -- return
+    reset(); cb['som-police:server:signOut'](1, 'weapon_pumpshotgun')
+    local held = next(Mocks.inv[1])
+    Mocks.inv[1][held].metadata.serial = 'LSPD-9999'
+    check(cb['som-police:server:returnWeapon'](1, 'weapon_pumpshotgun').error == 'that weapon is not in your inventory' and mysql.db.armoury[1].status == 'out', 'ledger: a weapon with another serial is not accepted')
+    Mocks.inv[1][held].metadata.serial = 'LSPD-0001'
+    local oxm = exports.ox_inventory
+    local realRemove = oxm.RemoveItem
+    oxm.RemoveItem = function() return false end
+    check(cb['som-police:server:returnWeapon'](1, 'weapon_pumpshotgun').error == 'could not take the weapon back' and mysql.db.armoury[1].status == 'out', 'ledger: a failed removal puts the line back')
+    oxm.RemoveItem = realRemove
+    FakePeds[1] = vec3(0, 0, 0)
+    check(cb['som-police:server:returnWeapon'](1, 'weapon_pumpshotgun').error == 'you are not at the armoury', 'ledger: a return needs the armoury')
+    FakePeds[1] = at
+    r = cb['som-police:server:returnWeapon'](1, 'weapon_pumpshotgun')
+    check(r.success and carried('weapon_pumpshotgun') == 0 and mysql.db.armoury[1].status == 'returned', 'ledger: a return takes the weapon and closes the line')
+    check(cb['som-police:server:returnWeapon'](1, 'weapon_pumpshotgun').error == 'you have nothing signed out', 'ledger: a line cannot be returned twice')
+    check(cb['som-police:server:returnWeapon'](1, 'weapon_smg').error == 'you have nothing signed out', 'ledger: a weapon never signed out cannot be returned')
+
+    -- lost weapon: the line says out, the item is gone
+    cb['som-police:server:signOut'](1, 'weapon_pumpshotgun')
+    Mocks.inv[1] = {}
+    check(cb['som-police:server:returnWeapon'](1, 'weapon_pumpshotgun').error == 'that weapon is not in your inventory', 'ledger: nothing can be returned that the officer does not carry')
+
+    -- supervisors: audit and flag
+    check(cb['som-police:server:ledgerAudit'](1).error == 'supervisors only' and cb['som-police:server:flagMissing'](1, 2).error == 'supervisors only', 'ledger: audit and flag are for supervisors')
+    local sup = cop(5); sup.citizenid = 'S1'; Mocks.players[3] = sup; FakePeds[3] = at
+    local a = cb['som-police:server:ledgerAudit'](3)
+    check(a.success and #a.rows == 1 and a.rows[1].officer == 'Pat Rol' and a.rows[1].serial == 'LSPD-0002', 'ledger: a supervisor sees who holds what')
+    check(cb['som-police:server:flagMissing'](3, 'x').error == 'bad request', 'ledger: the line id is validated')
+    r = cb['som-police:server:flagMissing'](3, a.rows[1].id)
+    check(r.success and mysql.db.armoury[a.rows[1].id].status == 'missing' and Mocks.calls.dispatchAlert == 1 and Mocks.lastAlertType == 'armouryMissing' and Mocks.lastAlertExtra.message:find('LSPD-0002', 1, true), 'ledger: flagging a weapon missing raises one dispatch call')
+    check(cb['som-police:server:flagMissing'](3, a.rows[1].id).error:find('already') and Mocks.calls.dispatchAlert == 1, 'ledger: flagging twice does not call dispatch again')
+
+    -- nothing automatic: job change, a restart, then the return still works
+    Mocks.players[1] = cop(3, true, 'unemployed')
+    check(cb['som-police:server:returnWeapon'](1, 'weapon_pumpshotgun').error == 'not an officer' and mysql.db.armoury[a.rows[1].id].status == 'missing', 'ledger: leaving the job leaves the line open')
+    Mocks.players[1] = cop(3)
+    ResetHandlers()
+    local env2 = loader.loadResource(REPO .. 'som-police', files); arm(env2)
+    Mocks.inv[1] = { [9] = { name = 'weapon_pumpshotgun', count = 1, slot = 9, metadata = { serial = 'LSPD-0002' } } }
+    check(RegisteredCallbacks['som-police:server:returnWeapon'](1, 'weapon_pumpshotgun').success and mysql.db.armoury[a.rows[1].id].status == 'returned', 'ledger: a missing weapon can be returned after a restart')
+
+    -- off duty reminder
+    reset(); cb = RegisteredCallbacks
+    cb['som-police:server:signOut'](1, 'weapon_smg')
+    Handlers['som:server:dutyChanged'](1, 'P1', 'police', false)
+    check(#notes == 1 and notes[1]:find('1 department weapon', 1, true), 'ledger: going off duty with a weapon out gives a reminder')
+    notes = {}
+    Handlers['som:server:dutyChanged'](1, 'P1', 'police', true)
+    Handlers['som:server:dutyChanged'](1, 'P1', 'ambulance', false)
+    check(#notes == 0, 'ledger: no reminder going on duty or for another job')
+    _G.TriggerClientEvent = realT
 end
 
 -- ---------------------------------------------------------------------------

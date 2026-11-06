@@ -186,6 +186,14 @@ CreateThread(function()
                 canInteract = onDutyOfficer,
                 onSelect = openArmoury,
             },
+            {
+                name = 'police:ledger',
+                icon = 'fa-solid fa-clipboard-list',
+                label = 'Armoury ledger',
+                distance = 2.0,
+                canInteract = onDutyOfficer,
+                onSelect = function() Ledger.Open() end,
+            },
         },
     })
 
