@@ -2956,6 +2956,7 @@ do
     FakePeds[1] = vec3(50, 0, 0); hinteract(1, 'loot')
     Mocks.addMoneyThrows = false
     check(Mocks.treasury == before, 'heist: a crash after the treasury debit puts the money back')
+    check(mysql.db.heist.runs[1].clean_paid == 0, 'heist: a crashed payout does not use up the hourly cap')
     FakePeds[1] = vec3(100, 0, 0); hinteract(1, 'loot')
     check(before - Mocks.treasury > 0, 'heist: the payout lock is released after a crash, so the next loot point pays')
     restore()
@@ -3949,7 +3950,13 @@ do
     mysql.payoutThrows = true
     local recorded = cb['som-outdoors:server:sell'](1, 'fish')
     mysql.payoutThrows = false
-    check(recorded.success == true and recorded.paid > 0 and Mocks.treasury == before - recorded.paid, 'buyer: a sale that was paid stays a success when only its payout record fails, and nothing is refunded')
+    check(recorded.success == false and Mocks.treasury == before and count(1, 'codfish') == 3, 'buyer: when the payout record cannot be written nothing is paid and the fish come back')
+
+    local rows = #mysql.db.buyer
+    Mocks.addMoneyFails = true
+    cb['som-outdoors:server:sell'](1, 'fish')
+    Mocks.addMoneyFails = false
+    check(#mysql.db.buyer == rows, 'buyer: a failed credit removes its payout record so it does not use up the hourly cap')
 end
 
 -- ---------------------------------------------------------------------------
@@ -4646,6 +4653,21 @@ do
     local treasuryLost = env.Money.TreasuryTransact(-50, 'test:ledger')
     S.ledgerFails = false
     check(treasuryLost == false and S.treasury == 300 and #S.ledger == 2, 'treasury: no ledger row means the balance is put back')
+
+    check(env.Money.TreasuryTransact(2e12, 'test:huge') == false and env.Money.BusinessTransact('acme', 2e12, 'test:huge') == false and S.treasury == 300 and S.accounts[7] == 70,
+        'treasury and business: an absurd amount is refused')
+
+    S.accounts[9] = 40
+    check(env.Money.GangTransact('ballas', -15, 'test:gang') == true and S.accounts[9] == 25 and #S.ledger == 3, 'gang: a payout lowers the account and is ledgered')
+    S.ledgerFails = true
+    local gangLost = env.Money.GangTransact('ballas', -10, 'test:gang')
+    S.ledgerFails = false
+    check(gangLost == false and S.accounts[9] == 25 and #S.ledger == 3, 'gang: no ledger row means the balance is put back')
+
+    local before = player.money.bank
+    mysql.transactions = {}
+    check(env.Money.TransferToCitizen(41, 'OFFLINE1', 'bank', 5) == false and player.money.bank == before and #mysql.transactions == 0,
+        'money: a transfer without a reason moves nothing')
     _G.Player, _G.SomFormatDate = saved.Player, saved.SomFormatDate
 end
 

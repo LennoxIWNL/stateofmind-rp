@@ -185,6 +185,7 @@ function Money.Transfer(fromRef, toRef, account, amount, reason)
 
     local value = sanitiseAmount(amount)
     if not value then return false, 'invalid amount' end
+    if type(reason) ~= 'string' or reason == '' then return false, 'reason required' end
     if from.money[account] < value then return false, 'insufficient funds' end
 
     local resource = callerResource()
@@ -285,6 +286,7 @@ function Money.TransferToCitizen(fromRef, toCitizenId, account, amount, reason)
 
     local value = sanitiseAmount(amount)
     if not value then return false, 'invalid amount' end
+    if type(reason) ~= 'string' or reason == '' then return false, 'reason required' end
     if from.money[account] < value then return false, 'insufficient funds' end
 
     local resource = callerResource()
@@ -439,7 +441,7 @@ function Money.BusinessTransact(businessName, amount, reason)
     if type(businessName) ~= 'string' then return false, 'invalid business' end
 
     local delta = tonumber(amount)
-    if not delta or delta % 1 ~= 0 or delta == 0 then return false, 'invalid amount' end
+    if not delta or delta % 1 ~= 0 or delta == 0 or math.abs(delta) > 1e12 then return false, 'invalid amount' end
     if type(reason) ~= 'string' or reason == '' then return false, 'reason required' end
 
     local business = MySQL.single.await(
@@ -512,11 +514,17 @@ function Money.GangTransact(gangName, amount, reason)
     if (changed or 0) < 1 then return false, 'insufficient gang funds' end
 
     local balance = MySQL.scalar.await('SELECT balance FROM som_bank_accounts WHERE id = ?', { accountId }) or 0
-    MySQL.insert.await([[
+    local ok, id = pcall(MySQL.insert.await, [[
         INSERT INTO som_transactions
             (citizenid, account, amount, balance, direction, flow, reason, resource, counterparty)
         VALUES (NULL, 'bank', ?, ?, ?, 'transfer', ?, ?, ?)
     ]], { math.abs(delta), balance, delta > 0 and 'credit' or 'debit', reason, callerResource(), gangName })
+    if not ok or not id or id < 1 then
+        -- No ledger row means no money moved: put the balance back.
+        MySQL.update.await('UPDATE som_bank_accounts SET balance = balance - ? WHERE id = ?', { delta, accountId })
+        print(('[som-core] gang ledger write failed for %s: %s'):format(gangName, tostring(id)))
+        return false, 'database error'
+    end
 
     return true
 end
@@ -562,7 +570,7 @@ end
 ---@return boolean success, string|nil err
 function Money.TreasuryTransact(delta, reason)
     local value = tonumber(delta)
-    if not value or value ~= value or value % 1 ~= 0 or value == 0 then
+    if not value or value ~= value or value % 1 ~= 0 or value == 0 or math.abs(value) > 1e12 then
         return false, 'invalid amount'
     end
 

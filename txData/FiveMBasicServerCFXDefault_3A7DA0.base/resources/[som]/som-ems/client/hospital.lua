@@ -102,7 +102,7 @@ RegisterNetEvent('som-ems:client:admitted', function(bed, seconds)
     local anim = Config.hospital.bedAnim
     RequestAnimDict(anim.dict)
     local waited = 0
-    while not HasAnimDictLoaded(anim.dict) and waited < 2000 do Wait(50); waited += 50 end
+    while not HasAnimDictLoaded(anim.dict) and waited < 2000 do Wait(50); waited = waited + 50 end
     TaskPlayAnim(ped, anim.dict, anim.clip, 2.0, 2.0, -1, 1, 0, false, false, false)
 
     DoScreenFadeIn(800)

@@ -83,10 +83,12 @@ local function settle(source, name, b, state)
     if not core:treasuryTransact(-worth, reason) then return done(false, 'the city cannot pay right now') end
     state.debited = true
 
+    -- The cap reads these rows, so the record exists before the money does.
+    state.payoutId = MySQL.insert.await('INSERT INTO som_buyer_payouts (buyer, amount) VALUES (?, ?)', { name, worth })
+
     if not core:addMoney(source, 'bank', worth, reason) then return done(false, 'the sale fell through') end
     state.paid = true
 
-    MySQL.insert.await('INSERT INTO som_buyer_payouts (buyer, amount) VALUES (?, ?)', { name, worth })
     return done(true, nil, { paid = worth })
 end
 
@@ -108,12 +110,12 @@ lib.callback.register('som-outdoors:server:sell', function(source, name)
 
     if not ok then
         print(('[som-outdoors] sale to %s failed: %s'):format(name, tostring(result)))
-        -- Already paid (only the payout record failed): the player must not be told it failed.
-        result = state.paid and done(true, nil, { paid = state.worth }) or done(false, 'the sale fell through')
+        result = done(false, 'the sale fell through')
     end
 
     -- Anything taken or debited without a completed payment goes back.
     if not state.paid then
+        if state.payoutId then pcall(MySQL.update.await, 'DELETE FROM som_buyer_payouts WHERE id = ?', { state.payoutId }) end
         if state.debited then core:treasuryTransact(state.worth, 'buyer:' .. name .. ':refund') end
         for _, t in ipairs(state.taken) do ox:AddItem(source, t.item, t.count) end
     end

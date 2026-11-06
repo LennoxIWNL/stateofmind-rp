@@ -315,3 +315,8 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Place the hospital in `som-ems` (`Config.hospital`, ships closed): front `desk` point and a `bed` point (vec4). Admission charges the patient 250 into `ems` first, then pays the medic 60 percent (150) from `ems`, only after the charge went through. A patient who cannot pay is still admitted and the medic gets nothing. Needs at least 30 s down and a 60 s per-patient cooldown. All numbers untuned.
 - [ ] Not verified live: server side `SetPedIntoVehicle` on a downed player (seats 1 and 2 of an `ambulance`), the medic's "Load into ambulance", "Unload patient", "Check patient" and desk "admit patient" options, the bed animation (`missarmenian2` / `drunk_loop`) and fade, and that a loaded patient is not pulled back by the down anchor. Cause on "Check patient" is only "hurt by another person" or "an accident" (the server's own death classification).
 - [ ] Cut on purpose: bleeding and injury states (nothing tracks them), a second hospital, a stretcher prop, medic XP.
+## Money write follow-ups
+
+- [ ] Gang, business and treasury ledger writes undo the balance change if the ledger row cannot be written (two separate statements, not one transaction). Needs a live database check that a single `MySQL.transaction` with a `ROW_COUNT()` guard behaves the same before replacing it.
+- [ ] Heist clean cash payouts now wait for the previous payout instead of paying nothing; the wait loop is only provable in a live server with two crews looting together.
+- [ ] Buyer sales and heist clean payouts now record the payout before paying, so a database failure refuses the sale instead of paying without counting it against the hourly cap.
