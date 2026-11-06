@@ -387,3 +387,14 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Numbers are untuned defaults: 100 unit tank, drain 0.012 per second plus 0.0016 per m/s, jerry can 120 for 25 units, 5 units per pour.
 - [ ] Not verified live: `SetVehicleFuelLevel` moving the ps-hud gauge (ps-hud reads it through `som-compat`'s `GetFuel`) and cutting the engine at zero, the pump model names, the `WEAPON_PETROLCAN` metadata (`durability` and `ammo` as 0 to 100, written by the server only), the state bag `fuel` handler on the other clients, drain balance. Known limit: the drain runs on the driver's client, so a cheater can avoid draining, but no fuel can be minted: every increase is a server approved sale or can pour.
 - [ ] Cut on purpose: player owned stations, electric charging, fuel types, siphoning. cdn-fuel stays unensured.
+
+## Player leases (som-housing)
+
+- [ ] Import `setup.sql` on an existing database: it adds one table, `som_property_leases` (`CREATE TABLE IF NOT EXISTS`, safe to re-run). Until it is imported the lease sweep prints "som_property_leases is missing" and does nothing.
+- [ ] Rent range and rules are first guesses in `Config.Lease` (`shared/config.lua`): weekly rent from $100 up to 2 percent of the property price, 7 day weeks, eviction after 2 missed weeks, 2 leases per tenant, 60 second offers. Tune them with the realtors.
+- [ ] Two missed weeks while the tenant is offline evict them (a week offline counts as missed). Decide with the owner whether that is too harsh, or whether the limit should be longer (`Config.Lease.evictAfterMissed`).
+- [ ] An owner cannot end a lease early: only when the paid week has run out or the tenant is behind. A tenant can always leave if they owe nothing.
+- [ ] A tenant must be online to pay: a week they are offline or cannot afford is counted as missed and paid back on their next login (up to the eviction limit). No rent tax and no deposit.
+- [ ] Every door now has a "Let this property" option; the server only lets the owner use it. Decide whether to hide it for non-owners (needs a client-side ownership cache).
+- [ ] Not verified in a live server: the offer and answer dialogs, the Leases phone app, a real week passing, eviction while the tenant is inside the property (they are told, not moved, and lose stash access immediately).
+- [ ] Left out on purpose: city motel rooms, deposits, rent tax, subletting, mid-lease rent changes, items in the stash on eviction (they stay with the property).
