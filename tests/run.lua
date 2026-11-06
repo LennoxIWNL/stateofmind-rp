@@ -4582,6 +4582,207 @@ do
 end
 
 -- ---------------------------------------------------------------------------
+-- Player shops
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    mysql.fakeNow = 1000000
+    local env = loader.loadResource(REPO .. 'som-shops', { 'shared/config.lua', 'server/shops.lua', 'server/stock.lua', 'server/staff.lua', 'server/app.lua' })
+    local cb = RegisteredCallbacks
+    local core = exports['som-core']
+    local D = mysql.db.shopsDb
+    D.shops = { alta = { price = 0 }, strawberry = { price = 0 } }
+    D.stock, D.staff, D.balance, D.takings = {}, {}, 0, 0
+    for _, shop in ipairs(env.Config.shops) do shop.enabled, shop.coords = true, vec3(0, 0, 0) end
+
+    local function person(src, cid) return { citizenid = cid, source = src, charinfo = { firstname = 'P' .. src, lastname = 'Q' .. src } } end
+    Mocks.players = { [1] = person(1, 'OWN1'), [2] = person(2, 'CUS2'), [3] = person(3, 'STF3'), [4] = person(4, 'NEW4') }
+    Mocks.inv = { [1] = {}, [2] = {}, [3] = {}, [4] = {} }
+    FakePeds[1], FakePeds[2], FakePeds[3], FakePeds[4] = vec3(0, 0, 0), vec3(1, 0, 0), vec3(2, 0, 0), vec3(500, 0, 0)
+    Mocks.bank = { [1] = 100000, [2] = 100, [3] = 0, [4] = 100000 }
+    Mocks.treasury = 0
+    Mocks.invFull, Mocks.addMoneyFails, Mocks.taxFails = {}, false, false
+
+    local saved = { addMoney = core.addMoney, businessTransact = core.businessTransact }
+    function core:addMoney(source, _, amount)
+        if Mocks.addMoneyFails then return false, 'refused' end
+        Mocks.bank[source] = (Mocks.bank[source] or 0) + amount
+        return true
+    end
+    function core:businessTransact(_, amount)
+        if Mocks.bizFails or D.balance + amount < 0 then return false, 'refused' end
+        D.balance = D.balance + amount
+        return true
+    end
+    local function count(src, item) return exports.ox_inventory:Search(src, 'count', item) end
+    -- ox_inventory removes all of a count or nothing; the shared mock takes whatever one stack holds.
+    local realRemove = exports.ox_inventory.RemoveItem
+    function exports.ox_inventory:RemoveItem(inv, item, n)
+        if count(inv, item) < n then return false end
+        local left = n
+        for k, stack in pairs(Mocks.inv[inv]) do
+            if stack.name == item and left > 0 then
+                local take = math.min(stack.count, left)
+                stack.count = stack.count - take
+                left = left - take
+                if stack.count == 0 then Mocks.inv[inv][k] = nil end
+            end
+        end
+        return true
+    end
+    local function give(src, item, n) exports.ox_inventory:AddItem(src, item, n) end
+    local notes = {}
+    local realT = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, ...) notes[#notes + 1] = { name = name, target = target, args = { ... } } end
+
+    -- Buying
+    check(cb['som-shops:server:buyShop'](1, 'nope').error == 'not available', 'shops: an unknown shop id is refused')
+    Mocks.bank[1] = 10
+    check(cb['som-shops:server:buyShop'](1, 'alta').error == 'not enough in your bank' and D.shops.alta.owner == nil, 'shops: without the money the shop is not claimed')
+    Mocks.bank[1] = 100000
+    Mocks.taxFails = true
+    check(cb['som-shops:server:buyShop'](1, 'alta').error == 'the sale fell through' and Mocks.bank[1] == 100000 and D.shops.alta.owner == nil, 'shops: a failed payment to the city refunds the buyer and frees the shop')
+    Mocks.taxFails = false
+    local bought = cb['som-shops:server:buyShop'](1, 'alta')
+    check(bought.success and D.shops.alta.owner == 'OWN1' and Mocks.bank[1] == 40000 and Mocks.treasury == 60000, 'shops: buying moves the price to the treasury and makes you the owner')
+    check(cb['som-shops:server:buyShop'](4, 'alta').error ~= nil and D.shops.alta.owner == 'OWN1', 'shops: a shop that is owned cannot be bought again')
+    check(cb['som-shops:server:buyShop'](1, 'strawberry').error ~= nil and D.shops.strawberry.owner == nil, 'shops: nobody can own two shops')
+    FakePeds[4] = vec3(500, 0, 0)
+    check(cb['som-shops:server:buyShop'](4, 'strawberry').error == 'you are too far away', 'shops: you must be at the counter to buy')
+
+    -- Stocking and prices
+    give(1, 'water', 10)
+    check(cb['som-shops:server:stock'](2, 'alta', 'water', 5, 10).error == 'not available', 'shops: only the owner can stock')
+    check(cb['som-shops:server:stock'](1, 'alta', 'rocket', 5, 10).error == 'the shop cannot sell that', 'shops: only listed items can be sold')
+    check(cb['som-shops:server:stock'](1, 'alta', 'water', 5, 999).error ~= nil and count(1, 'water') == 10, 'shops: a price outside the range is refused and nothing is taken')
+    check(cb['som-shops:server:stock'](1, 'alta', 'water', '5', 10).error ~= nil, 'shops: a count sent as text is refused')
+    check(cb['som-shops:server:stock'](1, 'alta', 'water', 50, 10).error == 'you do not have that many', 'shops: you cannot stock what you do not carry')
+    check(cb['som-shops:server:stock'](1, 'alta', 'water', 5, 10).success and count(1, 'water') == 5 and D.stock[1].qty == 5 and D.stock[1].price == 10, 'shops: stocking moves items from the bag into the shop')
+    give(1, 'water', 100)
+    check(cb['som-shops:server:stock'](1, 'alta', 'water', 99, 10).error ~= nil and count(1, 'water') == 105 and D.stock[1].qty == 5, 'shops: going over the stock cap gives the items back')
+    check(cb['som-shops:server:setPrice'](1, 'alta', 'water', 1).error == 'that price is not allowed', 'shops: the price floor holds')
+    check(cb['som-shops:server:setPrice'](2, 'alta', 'water', 10).error == 'not available', 'shops: only the owner sets prices')
+
+    -- Buying from the shop
+    FakePeds[2] = vec3(1, 0, 0)
+    local sale = cb['som-shops:server:buy'](2, 'alta', 'water', 3)
+    check(sale.success and sale.paid == 30 and Mocks.bank[2] == 70 and D.stock[1].qty == 2 and count(2, 'water') == 3, 'shops: a sale takes the money, the stock and hands over the items')
+    check(D.balance == 28 and Mocks.treasury == 60002, 'shops: the shop keeps the sale minus the city tax')
+    Mocks.invFull[2] = true
+    check(cb['som-shops:server:buy'](2, 'alta', 'water', 1).error == 'you cannot carry that' and Mocks.bank[2] == 70 and D.stock[1].qty == 2, 'shops: a full bag is refused before anything is charged')
+    Mocks.invFull[2] = nil
+    Mocks.bizFails = true
+    check(cb['som-shops:server:buy'](2, 'alta', 'water', 1).success == false and Mocks.bank[2] == 70 and D.stock[1].qty == 2, 'shops: if the shop cannot take the payment the customer is refunded and the stock returns')
+    Mocks.bizFails = false
+    check(cb['som-shops:server:buy'](2, 'alta', 'water', 9).error == 'not enough in stock, or the price changed' and Mocks.bank[2] == 70, 'shops: you cannot buy more than is in stock')
+    check(cb['som-shops:server:buy'](2, 'alta', 'water', 0).error == 'bad request' and cb['som-shops:server:buy'](2, 'alta', 'water', '1').error == 'bad request', 'shops: the count is validated')
+    Mocks.bank[2] = 5
+    check(cb['som-shops:server:buy'](2, 'alta', 'water', 1).error == 'not enough in your bank' and D.stock[1].qty == 2, 'shops: a customer without the money leaves the stock alone')
+    Mocks.bank[2] = 70
+    check(cb['som-shops:server:buy'](2, 'strawberry', 'water', 1).error == 'they do not sell that', 'shops: an unowned shop sells nothing')
+    check(cb['som-shops:server:retrieve'](1, 'alta', 'water', 1).success and D.stock[1].qty == 1, 'shops: the owner can take stock back out')
+    check(cb['som-shops:server:retrieve'](2, 'alta', 'water', 1).error == 'not available', 'shops: only the owner takes stock back')
+
+    -- The counter view
+    check(#cb['som-shops:server:list'](1) == 2, 'shops: the counter list holds every placed shop')
+    local mine = cb['som-shops:server:open'](1, 'alta')
+    check(mine.owner == true and mine.overview.balance == 28 and mine.refund == 30000 and mine.stock[1].item == 'water', 'shops: the owner sees the balance, stock and the sell-back price')
+    local theirs = cb['som-shops:server:open'](2, 'alta')
+    check(theirs.owner == false and theirs.owned == true and theirs.overview == nil and theirs.stock[1].qty == 1, 'shops: a customer sees stock and prices but not the books')
+    check(cb['som-shops:server:open'](4, 'alta') == nil and cb['som-shops:server:open'](1, 'nope') == nil, 'shops: you must be at the counter to open it')
+
+    -- Taking money out
+    D.balance = 500
+    check(cb['som-shops:server:withdraw'](2, 'alta', 10).error == 'not available', 'shops: only the owner can take money out')
+    check(cb['som-shops:server:withdraw'](1, 'alta', 999999).error ~= nil and D.balance == 500, 'shops: a withdrawal over the cap is refused')
+    Mocks.bank[1] = 40000
+    check(cb['som-shops:server:withdraw'](1, 'alta', 100).success and Mocks.bank[1] == 40100 and D.balance == 400, 'shops: a withdrawal moves money from the shop to the owner')
+    check(cb['som-shops:server:withdraw'](1, 'alta', 100).error == 'you took money out recently, try again later' and D.balance == 400, 'shops: one withdrawal per cooldown')
+    mysql.fakeNow = mysql.fakeNow + 31 * 60
+    Mocks.addMoneyFails = true
+    check(cb['som-shops:server:withdraw'](1, 'alta', 100).success == false and D.balance == 400, 'shops: a failed credit puts the money back in the shop')
+    Mocks.addMoneyFails = false
+    check(cb['som-shops:server:withdraw'](1, 'alta', 100).success and D.balance == 300, 'shops: a failed withdrawal does not use up the cooldown')
+
+    -- Staff and payroll
+    local function hire(target, pay) return cb['som-shops:server:hire'](1, 'alta', target, pay) end
+    check(hire(2, 999).error ~= nil and hire(1, 10).error == 'there is nobody to hire' and hire(4, 10).error == 'they need to be next to you', 'shops: hiring checks the pay, the person and the distance')
+    check(hire(3, 20).success and notes[#notes].name == 'som-shops:client:hireOffer' and notes[#notes].target == 3, 'shops: the person next to you is sent the offer')
+    check(cb['som-shops:server:answerHire'](3, 'yes').error == 'not available', 'shops: the answer must be a real yes or no')
+    check(cb['som-shops:server:answerHire'](3, true).success and D.staff[1].citizenid == 'STF3' and D.staff[1].pay == 20, 'shops: accepting makes them staff at the offered pay')
+    check(hire(3, 20).error == 'they already work at a shop', 'shops: nobody holds two shop jobs')
+    check(cb['som-shops:server:answerHire'](2, true).error == 'that offer is gone', 'shops: you cannot accept an offer nobody made you')
+    env.Config.hireExpireSeconds = -1
+    check(hire(2, 15).success and cb['som-shops:server:answerHire'](2, true).error == 'that offer is gone', 'shops: an old offer cannot be accepted')
+    env.Config.hireExpireSeconds = 60
+    check(cb['som-shops:server:setPay'](2, 'alta', 'STF3', 10).error == 'bad request' or cb['som-shops:server:setPay'](2, 'alta', 'STF3', 10).error == 'not available', 'shops: only the owner changes pay')
+    check(cb['som-shops:server:setPay'](1, 'alta', 'STF3', 9999).error == 'bad request' and cb['som-shops:server:setPay'](1, 'alta', 'STF3', 30).success and D.staff[1].pay == 30, 'shops: the pay cap holds and the owner can change pay')
+
+    D.balance = 100
+    D.staff[1].paid_at = mysql.fakeNow - 3700
+    Mocks.bank[3] = 0
+    env.Shops.PayTick()
+    check(Mocks.bank[3] == 30 and D.balance == 70, 'shops: staff are paid from the shop account when the hour is up')
+    env.Shops.PayTick()
+    check(Mocks.bank[3] == 30 and D.balance == 70, 'shops: the same hour is never paid twice')
+    D.staff[1].paid_at = mysql.fakeNow - 3700
+    D.balance = 5
+    env.Shops.PayTick()
+    check(Mocks.bank[3] == 30 and D.balance == 5, 'shops: an empty shop account pays nobody')
+    env.Shops.PayTick()
+    check(Mocks.bank[3] == 30, 'shops: an unpaid hour is not retried every tick')
+    D.balance = 100
+    D.staff[1].paid_at = mysql.fakeNow - 3700
+    Mocks.addMoneyFails = true
+    env.Shops.PayTick()
+    Mocks.addMoneyFails = false
+    check(Mocks.bank[3] == 30 and D.balance == 100 and D.staff[1].paid_at == mysql.fakeNow - 3700, 'shops: a failed payout goes back to the shop and the hour stays owed')
+    Mocks.players[3] = nil
+    env.Shops.PayTick()
+    check(D.balance == 100, 'shops: staff who are offline are not paid')
+    Mocks.players[3] = person(3, 'STF3')
+
+    -- The owner's phone
+    local app = Mocks.apps.shop
+    local view = app.handler(1, 'view', {})
+    check(view.success and view.view.sections[1].rows[1].title == 'Balance $100' and view.view.sections[3].rows[1].action == 'fire', 'shops: the phone shows the owner the balance, stock and staff')
+    check(app.handler(2, 'view', {}).view.empty == 'You do not own a shop', 'shops: someone with no shop sees an empty page')
+    check(app.handler(2, 'fire', { citizenid = 'STF3' }).error == 'not available' and #D.staff == 1, 'shops: only the owner can let someone go from the phone')
+    check(app.handler(1, 'fire', { citizenid = 'STF3' }).success and #D.staff == 0, 'shops: the owner can let someone go from the phone')
+    check(hire(3, 20).success and cb['som-shops:server:answerHire'](3, true).success and cb['som-shops:server:quit'](3).success and #D.staff == 0, 'shops: staff can quit')
+    hire(3, 20); cb['som-shops:server:answerHire'](3, true)
+    check(cb['som-shops:server:fire'](1, 'alta', 'STF3').success and #D.staff == 0, 'shops: the owner can fire staff')
+
+    -- The limit on kinds counts what is on the shelves, not every row that ever existed
+    env.Config.maxItemsPerShop = 2
+    give(1, 'coffee', 2); give(1, 'cola', 2)
+    check(cb['som-shops:server:stock'](1, 'alta', 'coffee', 1, 10).success, 'shops: a second kind fits under the limit')
+    check(cb['som-shops:server:stock'](1, 'alta', 'cola', 1, 10).error == 'the shop cannot hold more kinds of item' and count(1, 'cola') == 2, 'shops: a third kind is refused and nothing is taken')
+    check(cb['som-shops:server:retrieve'](1, 'alta', 'coffee', 1).success, 'shops: the owner empties a shelf')
+    check(cb['som-shops:server:stock'](1, 'alta', 'cola', 1, 10).success, 'shops: a sold out or emptied kind no longer blocks a new one')
+    check(cb['som-shops:server:retrieve'](1, 'alta', 'cola', 1).success, 'shops: the new shelf can be emptied too')
+    env.Config.maxItemsPerShop = 8
+
+    -- Selling the shop back
+    check(cb['som-shops:server:sellShop'](1, 'alta').error ~= nil and D.shops.alta.owner == 'OWN1', 'shops: you cannot sell a shop that still holds stock or money')
+    cb['som-shops:server:retrieve'](1, 'alta', 'water', 1)
+    D.balance = 0
+    Mocks.treasury = 0
+    check(cb['som-shops:server:sellShop'](1, 'alta').error == 'the city cannot buy it back right now' and D.shops.alta.owner == 'OWN1', 'shops: if the treasury cannot pay, you keep the shop')
+    Mocks.treasury = 100000
+    local before = Mocks.bank[1]
+    local sold = cb['som-shops:server:sellShop'](1, 'alta')
+    check(sold.success and sold.paid == 30000 and Mocks.bank[1] == before + 30000 and Mocks.treasury == 70000 and D.shops.alta.owner == nil, 'shops: selling back pays less than the price, from the treasury')
+    check(cb['som-shops:server:sellShop'](1, 'alta').error == 'not available', 'shops: you cannot sell a shop you do not own')
+
+    core.addMoney, core.businessTransact = saved.addMoney, saved.businessTransact
+    exports.ox_inventory.RemoveItem = realRemove
+    _G.TriggerClientEvent = realT
+    mysql.fakeNow = nil
+end
+
+-- ---------------------------------------------------------------------------
 -- Money bus: balances are written as changes, so order cannot bring money back
 -- ---------------------------------------------------------------------------
 
@@ -5355,6 +5556,122 @@ do
     check(#Deleted == 2, 'trucking: stopping the resource removes the vehicles')
     restore()
 end
+
+-- ---------------------------------------------------------------------------
+-- ANPR
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-anpr', { 'shared/config.lua', 'server/main.lua' })
+    local ev = RegisteredEvents['wk:onPlateScanned']
+    local function cop(duty) return { citizenid = 'P1', job = { name = 'police', onduty = duty ~= false } } end
+    local world, hits
+    local saved = {}
+    for _, name in ipairs({ 'GetVehiclePedIsIn', 'GetPedInVehicleSeat', 'GetEntityModel', 'GetAllVehicles', 'GetVehicleNumberPlateText', 'TriggerClientEvent' }) do saved[name] = _G[name] end
+    _G.GetVehiclePedIsIn = function(ped) for id, v in pairs(world) do if v.driver == ped or v.passenger == ped then return id end end return 0 end
+    _G.GetPedInVehicleSeat = function(id, seat) return (seat == -1 and world[id].driver) or (seat == 0 and world[id].passenger) or 0 end
+    _G.GetEntityModel = function(id) return joaat(world[id].model) end
+    _G.GetAllVehicles = function() local out = {}; for id in pairs(world) do out[#out + 1] = id end; table.sort(out); return out end
+    _G.GetVehicleNumberPlateText = function(id) return world[id].plate end
+    _G.TriggerClientEvent = function(name, target, ...) if name == 'som-anpr:client:hit' then hits[#hits + 1] = { target = target, args = { ... } } end end
+
+    local function setup()
+        Mocks.players = { [1] = cop(), [2] = { citizenid = 'C1', job = { name = 'unemployed' } } }
+        world = { [10] = { model = 'police2', plate = 'COP 001', driver = 1 }, [20] = { model = 'sultan', plate = 'AB C123 ', driver = 2 } }
+        FakePeds[1], FakePeds[2], FakePeds[10], FakePeds[20] = vec3(0, 0, 0), vec3(30, 0, 0), vec3(0, 0, 0), vec3(30, 0, 0)
+        hits = {}
+        Mocks.calls.dispatchAlert = 0
+        Mocks.clock = Mocks.clock + 3600000
+        mysql.db.anpr = { bolos = {}, vehicleinfo = {}, flagged = { ABC123 = true } }
+    end
+    Mocks.clock = 1000000
+    setup()
+    local function scan(src, cam, plate) Mocks.clock = Mocks.clock + env.Config.minInterval + 1; _G.source = src; ev(cam, plate, 1) end
+
+    scan(1, 'front', 'ab c123')
+    check(#hits == 1 and hits[1].target == 1 and hits[1].args[1] == 'front' and hits[1].args[2] == 'ABC123' and hits[1].args[3][1] == 'police flag', 'anpr: a padded, mixed case plate is found and the officer is told the reason')
+    check(Mocks.calls.dispatchAlert == 1 and Mocks.lastAlertType == 'flaggedVehicle' and Mocks.lastAlertExtra.coords.x == 30, 'anpr: dispatch gets one call at the scanned vehicle')
+    for _, v in ipairs(hits[1].args[3]) do check(not v:find('Owner', 1, true), 'anpr: no owner in the payload') end
+
+    scan(1, 'front', 'ABC123')
+    check(#hits == 1, 'anpr: the same officer is not told again inside the cooldown')
+
+    setup(); mysql.db.anpr.flagged = {}; mysql.db.anpr.bolos.ABC123 = true; mysql.db.anpr.vehicleinfo.ABC123 = true
+    scan(1, 'rear', 'ABC123')
+    check(#hits == 1 and hits[1].args[3][1] == 'stolen' and hits[1].args[3][2] == 'BOLO', 'anpr: stolen and BOLO each show')
+
+    setup(); mysql.db.anpr.flagged = {}
+    scan(1, 'front', 'AB C123')
+    check(#hits == 0 and Mocks.calls.dispatchAlert == 0, 'anpr: a clean plate is silent')
+
+    setup(); Mocks.players[1] = cop(false)
+    scan(1, 'front', 'ABC123')
+    check(#hits == 0, 'anpr: off duty police are ignored')
+    setup(); Mocks.players[1] = { citizenid = 'X', job = { name = 'ambulance', onduty = true } }
+    scan(1, 'front', 'ABC123')
+    check(#hits == 0, 'anpr: other jobs are ignored')
+    setup(); world[10].model = 'sultan'
+    scan(1, 'front', 'ABC123')
+    check(#hits == 0, 'anpr: only listed police models count')
+    setup(); world[10].driver, world[10].passenger = 99, 1
+    scan(1, 'front', 'ABC123')
+    check(#hits == 1, 'anpr: a passenger officer can use the reader')
+    setup(); world[10].driver = 99
+    scan(1, 'front', 'ABC123')
+    check(#hits == 0, 'anpr: an officer not in a seat is ignored')
+    setup(); FakePeds[20] = vec3(500, 0, 0)
+    scan(1, 'front', 'ABC123')
+    check(#hits == 0, 'anpr: a vehicle out of range is ignored')
+    setup()
+    scan(1, 'front', 'ZZZ999')
+    check(#hits == 0 and (mysql.db.anpr.lookups or 0) == 0, 'anpr: a plate with no vehicle nearby is never looked up')
+    scan(1, 'side', 'ABC123'); scan(1, 'front', 12); scan(1, 'front', ('X'):rep(40)); scan(1, 'front', '   ')
+    check(#hits == 0 and (mysql.db.anpr.lookups or 0) == 0, 'anpr: bad cam and bad plate arguments are dropped')
+
+    -- one call per plate, and a cap overall
+    setup()
+    Mocks.players[3] = cop(); world[11] = { model = 'police', plate = 'COP 002', driver = 3 }; FakePeds[3], FakePeds[11] = vec3(0, 5, 0), vec3(0, 5, 0)
+    scan(1, 'front', 'ABC123'); scan(3, 'front', 'ABC123')
+    check(#hits == 2 and Mocks.calls.dispatchAlert == 1, 'anpr: two officers each get the hit but dispatch is called once per plate')
+    setup()
+    for i = 1, 8 do
+        local plate = 'HOT' .. i
+        world[100 + i] = { model = 'sultan', plate = plate }; FakePeds[100 + i] = vec3(10, 0, 0); mysql.db.anpr.flagged[plate] = true
+        scan(1, 'front', plate)
+    end
+    check(#hits == 8 and Mocks.calls.dispatchAlert == env.Config.callsPerMinute, 'anpr: dispatch calls are capped per minute')
+
+    -- a modified client spamming the event cannot make the server walk every vehicle each time
+    setup()
+    local scans = 0
+    local realAll = _G.GetAllVehicles
+    _G.GetAllVehicles = function() scans = scans + 1; return realAll() end
+    _G.source = 1
+    Mocks.clock = Mocks.clock + env.Config.minInterval + 1
+    for _ = 1, 50 do ev('front', 'ABC123', 1) end
+    check(scans == 1, 'anpr: a burst of 50 events from one player runs the vehicle scan once')
+    scan(1, 'front', 'ZZZ999')
+    check(scans == 2, 'anpr: the next event after the minimum interval is processed')
+    _G.GetAllVehicles = realAll
+
+    -- leaving clears the per-player throttles
+    setup()
+    scan(1, 'front', 'ABC123')
+    _G.source = 1
+    Handlers['playerDropped']()
+    hits = {}
+    scan(1, 'front', 'ABC123')
+    check(#hits == 1, 'anpr: a player who left starts clean when the id is reused')
+
+    local f = io.open(REPO .. '../[custom]/ps-mdt/shared/config.lua'):read('*a')
+    check(f:find('Config.UseWolfknightRadar = false', 1, true) ~= nil, 'anpr: ps-mdt stock plate handler is off')
+
+    for name, fn in pairs(saved) do _G[name] = fn end
+end
+
+-- ---------------------------------------------------------------------------
+-- Mechanic
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)

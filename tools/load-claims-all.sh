@@ -20,7 +20,8 @@ run() {
   local name=$1 setup=$2 claim=$3
   for r in $(seq 1 "$rounds"); do
     sql "$setup" >/dev/null
-    for i in $(seq 1 "$n"); do ( sql "$claim; SELECT ROW_COUNT();" 2>/dev/null | tail -1 >> /tmp/claimcount.$$ ) & done
+    # @N@ in a claim is 0 or 1 by connection, so one claim can be aimed at two rows.
+    for i in $(seq 1 "$n"); do ( stmt=${claim//@N@/$((i % 2))}; sql "$stmt; SELECT ROW_COUNT();" 2>/dev/null | tail -1 >> /tmp/claimcount.$$ ) & done
     wait
     wins=$(awk '{s += $1} END {print s+0}' /tmp/claimcount.$$); rm -f /tmp/claimcount.$$
     [ "$wins" = "1" ] || { echo "$name round $r: $wins winners"; fail=1; }
@@ -29,7 +30,7 @@ run() {
 }
 
 cleanup() {
-  sql "DELETE FROM som_plants WHERE citizenid = 'LOADTEST'; DELETE FROM som_trade_offers WHERE seller = 'LOADTEST'; DELETE FROM som_lab_jobs WHERE citizenid LIKE 'LOADTEST%'; DELETE FROM som_chop_log WHERE citizenid LIKE 'LOADTEST%'; DELETE FROM som_turf WHERE name = 'loadtest_zone'; DELETE FROM som_trade_offers WHERE buyer = 'LOADTEST';" >/dev/null
+  sql "DELETE FROM som_plants WHERE citizenid = 'LOADTEST'; DELETE FROM som_trade_offers WHERE seller = 'LOADTEST'; DELETE FROM som_lab_jobs WHERE citizenid LIKE 'LOADTEST%'; DELETE FROM som_chop_log WHERE citizenid LIKE 'LOADTEST%'; DELETE FROM som_turf WHERE name = 'loadtest_zone'; DELETE FROM som_trade_offers WHERE buyer = 'LOADTEST'; DELETE FROM som_shops WHERE shop_id LIKE 'loadshop%';" >/dev/null
 }
 trap cleanup EXIT
 
@@ -52,6 +53,10 @@ run "lab start (one cook per lab)" \
 run "chop shop (drop-off and plate cooldown)" \
   "DELETE FROM som_chop_log WHERE citizenid LIKE 'LOADTEST%'" \
   "INSERT INTO som_chop_log (citizenid, dropoff, plate) SELECT 'LOADTEST', 'loaddrop', 'LOAD1' FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM som_chop_log WHERE dropoff = 'loaddrop' AND created_at > DATE_SUB(NOW(), INTERVAL 10 MINUTE)) AND NOT EXISTS (SELECT 1 FROM som_chop_log WHERE plate = 'LOAD1' AND created_at > DATE_SUB(NOW(), INTERVAL 1440 MINUTE))"
+
+run "shop purchase (one shop per person, either of two shops)" \
+  "DELETE FROM som_shops WHERE shop_id LIKE 'loadshop%'; INSERT INTO som_shops (shop_id, business) VALUES ('loadshop0','x'), ('loadshop1','x')" \
+  "UPDATE som_shops SET owner = 'LOADTEST', bought_price = 1, bought_at = NOW(), withdraw_at = NULL WHERE shop_id = 'loadshop@N@' AND owner IS NULL AND (SELECT COUNT(*) FROM (SELECT 1 FROM som_shops WHERE owner = 'LOADTEST') x) = 0"
 
 # Same statement as the insert in som-mechanic/server/trade.lua fallbackBuy; change both together.
 run "roadside kit (one per hour)" \
