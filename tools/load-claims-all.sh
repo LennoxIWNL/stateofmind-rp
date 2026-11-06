@@ -53,6 +53,7 @@ run "chop shop (drop-off and plate cooldown)" \
   "DELETE FROM som_chop_log WHERE citizenid LIKE 'LOADTEST%'" \
   "INSERT INTO som_chop_log (citizenid, dropoff, plate) SELECT 'LOADTEST', 'loaddrop', 'LOAD1' FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM som_chop_log WHERE dropoff = 'loaddrop' AND created_at > DATE_SUB(NOW(), INTERVAL 10 MINUTE)) AND NOT EXISTS (SELECT 1 FROM som_chop_log WHERE plate = 'LOAD1' AND created_at > DATE_SUB(NOW(), INTERVAL 1440 MINUTE))"
 
+# Same statement as the insert in som-mechanic/server/trade.lua fallbackBuy; change both together.
 run "roadside kit (one per hour)" \
   "DELETE FROM som_trade_offers WHERE buyer='LOADTEST'" \
   "INSERT INTO som_trade_offers (seller, buyer, item, price, status) SELECT 'FALLBACK', 'LOADTEST', 'repairkit', 200, 'done' FROM DUAL WHERE (SELECT COUNT(*) FROM som_trade_offers WHERE buyer = 'LOADTEST' AND seller = 'FALLBACK' AND status <> 'cancelled' AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)) < 1"

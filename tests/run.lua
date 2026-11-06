@@ -53,7 +53,7 @@ local function resetDb()
     mysql.db.buyer = {}
     mysql.db.placements = {}
     mysql.db.trade = {}
-    mysql.db.shared = { accounts = { [7] = 100 }, treasury = 500, updates = {}, ledger = {} }
+    mysql.db.shared = { accounts = { [7] = 100 }, frozen = {}, treasury = 500, updates = {}, ledger = {} }
     mysql.db.skills = {}
     mysql.db.newlife = {}
     mysql.db.chop = { log = {}, owned = {} }
@@ -3678,6 +3678,13 @@ do
     check(crash.success == false and Mocks.treasury == 1000 and count(1, 'codfish') == 3, 'buyer: a crash after the treasury debit refunds the treasury and the fish')
     local again = cb['som-outdoors:server:sell'](1, 'fish')
     check(again.success == true, 'buyer: the lock is released after a crash, so the next sale works')
+
+    give(1, 'codfish', 3)
+    local before = Mocks.treasury
+    mysql.payoutThrows = true
+    local recorded = cb['som-outdoors:server:sell'](1, 'fish')
+    mysql.payoutThrows = false
+    check(recorded.success == true and recorded.paid > 0 and Mocks.treasury == before - recorded.paid, 'buyer: a sale that was paid stays a success when only its payout record fails, and nothing is refunded')
 end
 
 -- ---------------------------------------------------------------------------
@@ -4346,15 +4353,34 @@ do
     mysql.failTransaction = false
     check(thrown == false and player.money.bank == 95, 'money: a save that throws also rolls the balance back')
 
+    mysql.failNext = true
+    mysql.duringTransaction = function() env.Money.Add(41, 'bank', 20, 'test:inner') end
+    local outer = env.Money.Add(41, 'bank', 10, 'test:outer')
+    check(outer == false and player.money.bank == 115, 'money: a failed save undoes only its own change, not one that landed meanwhile')
+
     local S = mysql.db.shared
     check(env.Money.BusinessTransact('acme', -30, 'test:spend') == true and S.accounts[7] == 70 and #S.ledger == 1, 'business: a spend lowers the account and is ledgered')
     check(env.Money.BusinessTransact('acme', -500, 'test:overdraw') == false and S.accounts[7] == 70 and #S.ledger == 1, 'business: it cannot be overdrawn and nothing is ledgered')
     check(S.updates[1]:find('balance = balance + ?', 1, true) and not S.updates[1]:find('SET balance = ? ', 1, true), 'business: the database is told the change, not the total')
     check(env.Money.BusinessTransact('nobody', 5, 'test:none') == false, 'business: an unknown business is refused')
 
+    S.frozen[7] = true
+    local frozenOk, frozenErr = env.Money.BusinessTransact('acme', 5, 'test:frozen')
+    check(frozenOk == false and frozenErr == 'account frozen' and S.accounts[7] == 70, 'business: a frozen account is refused with its own error')
+    S.frozen[7] = nil
+
+    S.ledgerFails = true
+    local lostOk = env.Money.BusinessTransact('acme', -10, 'test:ledger')
+    S.ledgerFails = false
+    check(lostOk == false and S.accounts[7] == 70 and #S.ledger == 1, 'business: no ledger row means the balance is put back')
+
     check(env.Money.TreasuryTransact(-200, 'test:city') == true and S.treasury == 300 and #S.ledger == 2, 'treasury: a spend lowers it and is ledgered')
     check(env.Money.TreasuryTransact(-9999, 'test:over') == false and S.treasury == 300 and #S.ledger == 2, 'treasury: it cannot go below zero and nothing is ledgered')
     check(S.updates[#S.updates]:find('balance = balance + ?', 1, true), 'treasury: the database is told the change, not the total')
+    S.ledgerFails = true
+    local treasuryLost = env.Money.TreasuryTransact(-50, 'test:ledger')
+    S.ledgerFails = false
+    check(treasuryLost == false and S.treasury == 300 and #S.ledger == 2, 'treasury: no ledger row means the balance is put back')
     _G.Player, _G.SomFormatDate = saved.Player, saved.SomFormatDate
 end
 
