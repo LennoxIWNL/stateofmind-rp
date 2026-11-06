@@ -5314,5 +5314,121 @@ do
     restore()
 end
 
+-- ---------------------------------------------------------------------------
+-- ANPR
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-anpr', { 'shared/config.lua', 'server/main.lua' })
+    local ev = RegisteredEvents['wk:onPlateScanned']
+    local function cop(duty) return { citizenid = 'P1', job = { name = 'police', onduty = duty ~= false } } end
+    local world, hits
+    local saved = {}
+    for _, name in ipairs({ 'GetVehiclePedIsIn', 'GetPedInVehicleSeat', 'GetEntityModel', 'GetAllVehicles', 'GetVehicleNumberPlateText', 'TriggerClientEvent' }) do saved[name] = _G[name] end
+    _G.GetVehiclePedIsIn = function(ped) for id, v in pairs(world) do if v.driver == ped or v.passenger == ped then return id end end return 0 end
+    _G.GetPedInVehicleSeat = function(id, seat) return (seat == -1 and world[id].driver) or (seat == 0 and world[id].passenger) or 0 end
+    _G.GetEntityModel = function(id) return joaat(world[id].model) end
+    _G.GetAllVehicles = function() local out = {}; for id in pairs(world) do out[#out + 1] = id end; table.sort(out); return out end
+    _G.GetVehicleNumberPlateText = function(id) return world[id].plate end
+    _G.TriggerClientEvent = function(name, target, ...) if name == 'som-anpr:client:hit' then hits[#hits + 1] = { target = target, args = { ... } } end end
+
+    local function setup()
+        Mocks.players = { [1] = cop(), [2] = { citizenid = 'C1', job = { name = 'unemployed' } } }
+        world = { [10] = { model = 'police2', plate = 'COP 001', driver = 1 }, [20] = { model = 'sultan', plate = 'AB C123 ', driver = 2 } }
+        FakePeds[1], FakePeds[2], FakePeds[10], FakePeds[20] = vec3(0, 0, 0), vec3(30, 0, 0), vec3(0, 0, 0), vec3(30, 0, 0)
+        hits = {}
+        Mocks.calls.dispatchAlert = 0
+        Mocks.clock = Mocks.clock + 3600000
+        mysql.db.anpr = { bolos = {}, vehicleinfo = {}, flagged = { ABC123 = true } }
+    end
+    Mocks.clock = 1000000
+    setup()
+    local function scan(src, cam, plate) Mocks.clock = Mocks.clock + env.Config.minInterval + 1; _G.source = src; ev(cam, plate, 1) end
+
+    scan(1, 'front', 'ab c123')
+    check(#hits == 1 and hits[1].target == 1 and hits[1].args[1] == 'front' and hits[1].args[2] == 'ABC123' and hits[1].args[3][1] == 'police flag', 'anpr: a padded, mixed case plate is found and the officer is told the reason')
+    check(Mocks.calls.dispatchAlert == 1 and Mocks.lastAlertType == 'flaggedVehicle' and Mocks.lastAlertExtra.coords.x == 30, 'anpr: dispatch gets one call at the scanned vehicle')
+    for _, v in ipairs(hits[1].args[3]) do check(not v:find('Owner', 1, true), 'anpr: no owner in the payload') end
+
+    scan(1, 'front', 'ABC123')
+    check(#hits == 1, 'anpr: the same officer is not told again inside the cooldown')
+
+    setup(); mysql.db.anpr.flagged = {}; mysql.db.anpr.bolos.ABC123 = true; mysql.db.anpr.vehicleinfo.ABC123 = true
+    scan(1, 'rear', 'ABC123')
+    check(#hits == 1 and hits[1].args[3][1] == 'stolen' and hits[1].args[3][2] == 'BOLO', 'anpr: stolen and BOLO each show')
+
+    setup(); mysql.db.anpr.flagged = {}
+    scan(1, 'front', 'AB C123')
+    check(#hits == 0 and Mocks.calls.dispatchAlert == 0, 'anpr: a clean plate is silent')
+
+    setup(); Mocks.players[1] = cop(false)
+    scan(1, 'front', 'ABC123')
+    check(#hits == 0, 'anpr: off duty police are ignored')
+    setup(); Mocks.players[1] = { citizenid = 'X', job = { name = 'ambulance', onduty = true } }
+    scan(1, 'front', 'ABC123')
+    check(#hits == 0, 'anpr: other jobs are ignored')
+    setup(); world[10].model = 'sultan'
+    scan(1, 'front', 'ABC123')
+    check(#hits == 0, 'anpr: only listed police models count')
+    setup(); world[10].driver, world[10].passenger = 99, 1
+    scan(1, 'front', 'ABC123')
+    check(#hits == 1, 'anpr: a passenger officer can use the reader')
+    setup(); world[10].driver = 99
+    scan(1, 'front', 'ABC123')
+    check(#hits == 0, 'anpr: an officer not in a seat is ignored')
+    setup(); FakePeds[20] = vec3(500, 0, 0)
+    scan(1, 'front', 'ABC123')
+    check(#hits == 0, 'anpr: a vehicle out of range is ignored')
+    setup()
+    scan(1, 'front', 'ZZZ999')
+    check(#hits == 0 and (mysql.db.anpr.lookups or 0) == 0, 'anpr: a plate with no vehicle nearby is never looked up')
+    scan(1, 'side', 'ABC123'); scan(1, 'front', 12); scan(1, 'front', ('X'):rep(40)); scan(1, 'front', '   ')
+    check(#hits == 0 and (mysql.db.anpr.lookups or 0) == 0, 'anpr: bad cam and bad plate arguments are dropped')
+
+    -- one call per plate, and a cap overall
+    setup()
+    Mocks.players[3] = cop(); world[11] = { model = 'police', plate = 'COP 002', driver = 3 }; FakePeds[3], FakePeds[11] = vec3(0, 5, 0), vec3(0, 5, 0)
+    scan(1, 'front', 'ABC123'); scan(3, 'front', 'ABC123')
+    check(#hits == 2 and Mocks.calls.dispatchAlert == 1, 'anpr: two officers each get the hit but dispatch is called once per plate')
+    setup()
+    for i = 1, 8 do
+        local plate = 'HOT' .. i
+        world[100 + i] = { model = 'sultan', plate = plate }; FakePeds[100 + i] = vec3(10, 0, 0); mysql.db.anpr.flagged[plate] = true
+        scan(1, 'front', plate)
+    end
+    check(#hits == 8 and Mocks.calls.dispatchAlert == env.Config.callsPerMinute, 'anpr: dispatch calls are capped per minute')
+
+    -- a modified client spamming the event cannot make the server walk every vehicle each time
+    setup()
+    local scans = 0
+    local realAll = _G.GetAllVehicles
+    _G.GetAllVehicles = function() scans = scans + 1; return realAll() end
+    _G.source = 1
+    Mocks.clock = Mocks.clock + env.Config.minInterval + 1
+    for _ = 1, 50 do ev('front', 'ABC123', 1) end
+    check(scans == 1, 'anpr: a burst of 50 events from one player runs the vehicle scan once')
+    scan(1, 'front', 'ZZZ999')
+    check(scans == 2, 'anpr: the next event after the minimum interval is processed')
+    _G.GetAllVehicles = realAll
+
+    -- leaving clears the per-player throttles
+    setup()
+    scan(1, 'front', 'ABC123')
+    _G.source = 1
+    Handlers['playerDropped']()
+    hits = {}
+    scan(1, 'front', 'ABC123')
+    check(#hits == 1, 'anpr: a player who left starts clean when the id is reused')
+
+    local f = io.open(REPO .. '../[custom]/ps-mdt/shared/config.lua'):read('*a')
+    check(f:find('Config.UseWolfknightRadar = false', 1, true) ~= nil, 'anpr: ps-mdt stock plate handler is off')
+
+    for name, fn in pairs(saved) do _G[name] = fn end
+end
+
+-- ---------------------------------------------------------------------------
+-- Mechanic
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)

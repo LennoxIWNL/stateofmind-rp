@@ -33,6 +33,7 @@ M.db = {
     turf = { zones = {}, events = {}, market = {} },
     whitelist = {},
     bans = {},
+    anpr = { bolos = {}, vehicleinfo = {}, flagged = {} },
     buyer = {},
     placements = {},
     trade = {},
@@ -435,6 +436,15 @@ local function bans(kind, query, params)
         local n = 0
         for _, r in ipairs(B) do if r.identifier == params[1] and r.revoked == 0 then r.revoked = 1; n = n + 1 end end
         return true, n
+    end
+    return false
+end
+
+local function anpr(kind, query, params)
+    if kind == 'single' and query:find('FROM mdt_bolos WHERE UPPER(REPLACE(plate', 1, true) then
+        local A = M.db.anpr
+        A.lookups = (A.lookups or 0) + 1
+        return true, { bolo = A.bolos[params[1]] and 1 or 0, stolen = A.vehicleinfo[params[2]] and 1 or 0, flagged = A.flagged[params[3]] and 1 or 0 }
     end
     return false
 end
@@ -910,6 +920,7 @@ function M.single(query, params)
     do local handled, value = turf('single', query, params); if handled then return value end end
     do local handled, value = trade('single', query, params); if handled then return value end end
     do local handled, value = bans('single', query, params); if handled then return value end end
+    do local handled, value = anpr('single', query, params); if handled then return value end end
     do local handled, value = newlife('single', query, params); if handled then return value end end
     do local handled, value = plants('single', query, params); if handled then return value end end
     do local handled, value = lab('single', query, params); if handled then return value end end

@@ -332,6 +332,12 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Heist clean cash payouts now wait for the previous payout instead of paying nothing; the wait loop is only provable in a live server with two crews looting together.
 - [ ] Buyer sales and heist clean payouts now record the payout before paying, so a database failure refuses the sale instead of paying without counting it against the hourly cap.
 
+## ANPR (som-anpr)
+
+- [ ] Exact config change: `ps-mdt/shared/config.lua` now has `Config.UseWolfknightRadar = false` (it was `true`). That turns off ps-mdt's own `wk:onPlateScanned` handler, which showed the stock QBCore popup to any client and leaked registered owner names for any plate. It also turns off ps-mdt's `ps-mdt:client:trafficStop` hook, which called `ps-dispatch` (not installed).
+- [ ] `som-anpr` is ensured after `wk_wars2x`. An on duty police officer in the driver or front passenger seat of a listed model (`Config.vehicles`, a guess: police, police2, police3, police4, policeb, pranger, fbi, fbi2, pitbullbb, sheriff, sheriff2) gets a toast and the reader locks when the scanned vehicle (a real vehicle within 80 m) has a stolen mark in `mdt_vehicleinfo`, an open `mdt_bolos` row for `police`, or an open `som_police_plates` flag. Plain text only: the plate and the reason, no owner. Unregistered plates are out on purpose (every NPC car is unregistered).
+- [ ] Dispatch type `flaggedVehicle` (10-29, police, priority 2): one call per plate per 5 minutes, at most 6 calls a minute overall. No wanted level and no automatic fine.
+- [ ] Not verified live: wk firing for our cruisers, `wk:togglePlateLock` as a local event (it toggles, so a second hit on an already locked reader would unlock it), the reader's plate text matching `GetVehicleNumberPlateText`, the blip and toast. Check the real model names of the police fleet.
 ## Trucking
 
 - [ ] `som-trucking/shared/config.lua` `Config.routes` is empty, so no freight contract is offered. Add routes: `{ id, label, depot = vec4, trailer = vec4, dropoff = vec3, base, minutes }`, at least `minDistance` (1500) apart. Each route is its own entry in the Jobs app after a restart.
