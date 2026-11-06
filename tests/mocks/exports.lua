@@ -170,6 +170,12 @@ end
 
 local medical = {}
 function medical:isDowned(ref) return Mocks.downed[ref] == true end
+function medical:revive(ref, by)
+    if Mocks.reviveFails or Mocks.downed[ref] ~= true then return false end
+    Mocks.downed[ref] = nil
+    Mocks.revived = { ref = ref, by = by }
+    return true
+end
 
 local ox = {}
 function ox:Search(inv, mode, name)

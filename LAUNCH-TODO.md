@@ -297,3 +297,9 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] `/somhealth` (staff or console) reports resources, database, tables, items and convars. Its first run found two real defects, now fixed: the shops sold `cola` and `medikit`, which had no item definition (they were lost with the QBCore removal). `medikit` is defined but has no use effect: decide how medics use it (the treatment flow is in `som-medical`).
 - [ ] Set `som_phone_pepper` in the real `server.cfg` (the check fails without it) and the webhook convars you want. `set som_debug 1` turns on a one line trace of every server callback while testing; leave it off in production.
 - [ ] `health_lists.lua` is generated (`node tools/gen-health-lists.mjs`); CI fails if it is stale.
+
+## EMS revive
+
+- [ ] `som-ems`: an on-duty `ambulance` medic gets a "Treat" option on a downed player, spends one `firstaid` kit and the patient is billed 600 to the `ems` business. Price, 15 second treatment and 60 second cooldown are untuned defaults in `som-ems/shared/config.lua`.
+- [ ] Not verified live: the player target option, the CPR animation (`mini@cpr@char_a@cpr_str`), the `som:downed` state read on the medic's client, the bill arriving on the patient's phone.
+- [ ] Nothing hands out `firstaid` yet: decide the source (shop, EMS locker) and whitelist medics (`ambulance` is `whitelisted`). No heal or bandage treatment, stretcher or hospital check-in in this version.

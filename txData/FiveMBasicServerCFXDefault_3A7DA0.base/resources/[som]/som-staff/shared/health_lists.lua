@@ -10,6 +10,7 @@ HealthLists = {
     'som-court',
     'som-dispatch',
     'som-economy',
+    'som-ems',
     'som-evidence',
     'som-garage',
     'som-groups',
