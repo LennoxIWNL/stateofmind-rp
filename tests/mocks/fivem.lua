@@ -5,7 +5,9 @@
 local function vec3(x, y, z)
     local v = { x = x or 0.0, y = y or 0.0, z = z or 0.0 }
     return setmetatable(v, {
-        __sub = function(a, b) return vec3(a.x - b.x, a.y - b.y, a.z - b.z) end,
+        __sub = function(a, b)
+            assert(getmetatable(a) and getmetatable(b), 'vector arithmetic on a plain table')
+            return vec3(a.x - b.x, a.y - b.y, a.z - b.z) end,
         __len = function(a) return math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z) end,
     })
 end
@@ -91,6 +93,14 @@ _G.joaat = function(name) local h = 5381; for i = 1, #name do h = (h * 33 + name
 
 _G.GetVehicleNumberPlateText = function(e) return (_G.Vehicles[e] or {}).plate end
 _G.Deleted = {}
+_G.Spawned = {}
+_G.CreateVehicle = function(hash)
+    local id = 7000 + #_G.Spawned + 1
+    _G.Spawned[#_G.Spawned + 1] = id
+    _G.Vehicles[id] = { body = 1000.0, engine = 1000.0 }
+    return id
+end
+_G.MockCreateVehicle = _G.CreateVehicle
 _G.DeleteEntity = function(e) _G.Deleted[#_G.Deleted + 1] = e; _G.Vehicles[e] = nil end
 
 _G.Dropped = {}
