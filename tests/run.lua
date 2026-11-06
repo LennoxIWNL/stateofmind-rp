@@ -3601,6 +3601,82 @@ do
 end
 
 -- ---------------------------------------------------------------------------
+-- EMS revive
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-ems', { 'shared/config.lua', 'server/main.lua' })
+    local function medic(duty) return { citizenid = 'E1', job = { name = 'ambulance', onduty = duty ~= false }, charinfo = { firstname = 'Me', lastname = 'Dic' } } end
+    Mocks.players = { [1] = medic(), [2] = { citizenid = 'E2', job = { name = 'unemployed' }, charinfo = { firstname = 'Pa', lastname = 'Tient' } } }
+    Mocks.inv = { [1] = {}, [2] = {} }
+    Mocks.bills = {}
+    Mocks.downed = {}
+    Mocks.reviveFails = false
+    Mocks.revived = nil
+    Mocks.clock = 1000000
+    FakePeds[1], FakePeds[2] = vec3(0, 0, 0), vec3(1, 0, 0)
+    local cb = RegisteredCallbacks
+    local function kit() Mocks.inv[1][#Mocks.inv[1] + 301] = { name = 'firstaid', count = 1, slot = #Mocks.inv[1] + 301 } end
+    local function kits() local n = 0; for _, it in pairs(Mocks.inv[1]) do if it.name == 'firstaid' then n = n + it.count end end; return n end
+
+    check(cb['som-ems:server:begin'](1, 2).error == 'nobody here needs help', 'ems: a patient who is not down is refused')
+    Mocks.downed[2] = true
+    Mocks.players[1] = medic(false)
+    check(cb['som-ems:server:begin'](1, 2).error == 'you are not on duty as a paramedic', 'ems: off duty cannot treat')
+    Mocks.players[1] = medic()
+    check(cb['som-ems:server:begin'](1, 'x').error == 'nobody here needs help' and cb['som-ems:server:begin'](1, 1).error == 'nobody here needs help', 'ems: target is validated and cannot be self')
+    FakePeds[1] = vec3(50, 0, 0)
+    check(cb['som-ems:server:begin'](1, 2).error == 'nobody here needs help', 'ems: distance is checked')
+    FakePeds[1] = vec3(0, 0, 0)
+
+    check(cb['som-ems:server:revive'](1, 2).error == 'treatment was not finished', 'ems: revive without begin is refused')
+    check(cb['som-ems:server:begin'](1, 2).success == true, 'ems: begin accepted')
+    check(cb['som-ems:server:revive'](1, 2).error == 'treatment was not finished', 'ems: finishing too early is refused')
+    check(cb['som-ems:server:begin'](1, 2).success == true, 'ems: begin again')
+    Mocks.clock = Mocks.clock + 20000
+    check(cb['som-ems:server:revive'](1, 2).error:find('you need'), 'ems: the kit is required')
+
+    kit()
+    Mocks.reviveFails = true
+    cb['som-ems:server:begin'](1, 2)
+    Mocks.clock = Mocks.clock + 20000
+    check(cb['som-ems:server:revive'](1, 2).success == false and kits() == 1 and #Mocks.bills == 0, 'ems: a failed revive returns the kit and bills nobody')
+    Mocks.reviveFails = false
+
+    cb['som-ems:server:begin'](1, 2)
+    Mocks.clock = Mocks.clock + 20000
+    check(cb['som-ems:server:revive'](1, 2).success == true and kits() == 0 and Mocks.revived.ref == 2 and Mocks.revived.by == 1, 'ems: success uses the kit and revives the patient')
+    check(#Mocks.bills == 1 and Mocks.bills[1].citizenid == 'E2' and Mocks.bills[1].business == 'ems' and Mocks.bills[1].amount == 600 and Mocks.bills[1].opts.issuerCitizenid == 'E1', 'ems: the patient is billed for the service')
+
+    Mocks.downed[2] = true
+    check(cb['som-ems:server:begin'](1, 2).error == 'give them a moment', 'ems: one patient cannot be farmed')
+
+    Mocks.clock = Mocks.clock + 70000
+    kit()
+    cb['som-ems:server:begin'](1, 2)
+    Mocks.clock = Mocks.clock + 200000
+    check(cb['som-ems:server:revive'](1, 2).error == 'treatment was not finished' and kits() == 1, 'ems: a treatment started long ago and never finished cannot be used later')
+
+    local L = env.Config.locker
+    check(cb['som-ems:server:lockerTake'](1).error == 'the locker is closed' and cb['som-ems:server:lockerInfo'](1) == nil, 'ems: the locker ships closed')
+    L.enabled, L.coords = true, vec3(0, 0, 0)
+    Mocks.players[1] = medic(false)
+    check(cb['som-ems:server:lockerTake'](1).error == 'you are not on duty as a paramedic', 'ems: only an on duty medic can use the locker')
+    Mocks.players[1] = medic()
+    FakePeds[1] = vec3(50, 0, 0)
+    check(cb['som-ems:server:lockerTake'](1).error == 'you are too far away', 'ems: the locker needs you nearby')
+    FakePeds[1] = vec3(0, 0, 0)
+    Mocks.inv[1] = {}
+    Mocks.issueFails = true
+    check(cb['som-ems:server:lockerTake'](1).error == 'not employed by this department' and kits() == 0, 'ems: the department issue check decides')
+    Mocks.issueFails = false
+    check(cb['som-ems:server:lockerTake'](1).success == true and kits() == 1 and Mocks.issued.dept == 'ems' and Mocks.issued.item == 'firstaid', 'ems: the locker issues a kit from the department')
+    Mocks.inv[1][400] = { name = 'firstaid', count = 2, slot = 400 }
+    check(cb['som-ems:server:lockerTake'](1).error == 'you already carry enough', 'ems: the locker will not stock a medic past the cap')
+end
+
+-- ---------------------------------------------------------------------------
 -- Fishing and the buyer
 -- ---------------------------------------------------------------------------
 

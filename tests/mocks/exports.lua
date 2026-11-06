@@ -145,6 +145,11 @@ function economy:businessSpend(name, amount, reason)
     return not Mocks.businessSpendFails
 end
 
+function economy:issueEquipment(source, dept, item)
+    Mocks.issued = { source = source, dept = dept, item = item }
+    return not Mocks.issueFails, Mocks.issueFails and 'not employed by this department' or nil
+end
+
 function economy:getBusiness(name) return Mocks.businesses[name] end
 
 local phone = {}
@@ -170,6 +175,12 @@ end
 
 local medical = {}
 function medical:isDowned(ref) return Mocks.downed[ref] == true end
+function medical:revive(ref, by)
+    if Mocks.reviveFails or Mocks.downed[ref] ~= true then return false end
+    Mocks.downed[ref] = nil
+    Mocks.revived = { ref = ref, by = by }
+    return true
+end
 
 local ox = {}
 function ox:Search(inv, mode, name)
