@@ -22,6 +22,7 @@ local watching = false
 -- Where the body fell. Everything that tries to move it is measured against
 -- this, so a cancelled animation cannot become a step.
 local anchor = nil
+local carried = false
 
 -- ---------------------------------------------------------------------------
 -- Reporting a death
@@ -166,7 +167,7 @@ local function holdDown()
             -- from a ragdoll is a stand up, which is a free revive.
             SetPedCanRagdoll(ped, false)
 
-            ensureAnim(ped, first)
+            if not carried then ensureAnim(ped, first) end
             first = false
 
             -- Put back where they fell.
@@ -177,7 +178,7 @@ local function holdDown()
             -- the raw key, NOT through the control system, so DisableControl
             -- does not touch them. dpemotes binds X to cancelemote, which calls
             -- ClearPedTasks. Without this, spamming X is a walk.
-            if anchor then
+            if anchor and not carried then
                 local at = GetEntityCoords(ped)
 
                 if #(at - anchor) > (Config.AnchorRadius or 0.75) then
@@ -273,6 +274,8 @@ end)
 RegisterNetEvent('som-medical:client:revive', function()
     if not isDown then return end
 
+    carried = false
+
     isDown = false
     anchor = nil
     -- Armed again for the next death. Without this the second death of a
@@ -289,6 +292,23 @@ RegisterNetEvent('som-medical:client:revive', function()
 
     SendNUIMessage({ action = 'up' })
     exports['som-ui']:playSound('success')
+end)
+
+-- A medic loaded this player into an ambulance (state true) or took them out
+-- again (state false, placed at the given point). The server decided it; this
+-- only stops the anchor and the animation fighting the vehicle seat.
+RegisterNetEvent('som-medical:client:carried', function(state, at)
+    if not isDown then return end
+    carried = state == true
+    if carried then return end
+
+    ClearPedTasksImmediately(cache.ped)
+    if type(at) == 'table' then
+        SetEntityCoordsNoOffset(cache.ped, at.x + 0.0, at.y + 0.0, at.z + 0.0, false, false, false)
+        anchor = vec3(at.x + 0.0, at.y + 0.0, at.z + 0.0)
+    else
+        anchor = GetEntityCoords(cache.ped)
+    end
 end)
 
 -- ---------------------------------------------------------------------------
@@ -326,6 +346,7 @@ local function requestRespawn()
     while not IsScreenFadedOut() do Wait(0) end
 
     isDown = false
+    carried = false
     anchor = nil
     reported = false
 

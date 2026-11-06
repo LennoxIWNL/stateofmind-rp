@@ -68,6 +68,7 @@ function core:addMoney(source, account, amount, reason)
     if Mocks.addMoneyThrows then error('simulated crash after the treasury was debited') end
     if Mocks.addMoneyFails then return false, 'refused' end
     Mocks.paid = (Mocks.paid or 0) + amount
+    Mocks.credits[#Mocks.credits + 1] = { source = source, account = account, amount = amount, reason = reason }
     Mocks.lastPaid = { account = account, amount = amount, reason = reason }
     return true
 end
@@ -77,6 +78,8 @@ Mocks.gangDefs = {
 }
 Mocks.gangFunds = {}
 Mocks.bank = {}
+Mocks.business = {}
+Mocks.credits = {}
 function core:getGangs() return Mocks.gangDefs end
 function core:setGang(source, gang, grade)
     local def = Mocks.gangDefs[gang]
@@ -105,9 +108,17 @@ function core:removeMoney(source, account, amount, reason)
     Mocks.bank[source] = Mocks.bank[source] - amount
     return true
 end
+function core:hasMoney(source, account, amount) return (Mocks.bank[source] or 0) >= amount end
 function core:businessTransact(name, amount, reason)
     Mocks.calls.businessTransact = Mocks.calls.businessTransact + 1
     Mocks.lastTransact = { name = name, amount = amount }
+    if Mocks.businessThrowAt == Mocks.calls.businessTransact then error('simulated crash in businessTransact') end
+    if Mocks.businessFails then return false, 'refused' end
+    -- Balances are tracked only for a business a test has seeded in Mocks.business.
+    if Mocks.business[name] ~= nil then
+        if Mocks.business[name] + amount < 0 then return false, 'insufficient business funds' end
+        Mocks.business[name] = Mocks.business[name] + amount
+    end
     return true
 end
 function core:treasuryTransact(delta, reason)
@@ -175,6 +186,11 @@ end
 
 local medical = {}
 function medical:isDowned(ref) return Mocks.downed[ref] == true end
+function medical:getDownInfo(ref)
+    if Mocks.downed[ref] ~= true then return nil end
+    return { since = (Mocks.downSince or {})[ref] or (os.time() - 100) }
+end
+function medical:getDeathClass(cid) return Mocks.deathClass end
 function medical:revive(ref, by)
     if Mocks.reviveFails or Mocks.downed[ref] ~= true then return false end
     Mocks.downed[ref] = nil

@@ -19,6 +19,8 @@ local function medic(source)
     return player
 end
 
+Ems = { Medic = medic, Done = done, Cooldown = lastRevive }
+
 local function patient(source, target)
     target = tonumber(target)
     if not target or target % 1 ~= 0 or target == source then return nil end
@@ -30,6 +32,8 @@ local function patient(source, target)
     if a == 0 or b == 0 or #(GetEntityCoords(a) - GetEntityCoords(b)) > Config.distance then return nil end
     return player, target
 end
+
+Ems.Patient = patient
 
 lib.callback.register('som-ems:server:begin', function(source, target)
     if not medic(source) then return done(false, 'you are not on duty as a paramedic') end
@@ -114,4 +118,3 @@ AddEventHandler('onResourceStop', function(name)
     if name == GetCurrentResourceName() then started, lastRevive, taking = {}, {}, {} end
 end)
 
-CreateThread(function() SomPlacements.Apply(Config) end)
