@@ -388,6 +388,14 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Not verified live: `SetVehicleFuelLevel` moving the ps-hud gauge (ps-hud reads it through `som-compat`'s `GetFuel`) and cutting the engine at zero, the pump model names, the `WEAPON_PETROLCAN` metadata (`durability` and `ammo` as 0 to 100, written by the server only), the state bag `fuel` handler on the other clients, drain balance. Known limit: the drain runs on the driver's client, so a cheater can avoid draining, but no fuel can be minted: every increase is a server approved sale or can pour.
 - [ ] Cut on purpose: player owned stations, electric charging, fuel types, siphoning. cdn-fuel stays unensured.
 
+## Player vehicle sales (som-carsales)
+
+- [ ] Existing databases: import the new `som_vehicle_sales` table (`setup.sql` section 7n). Nothing else changes.
+- [ ] A seller stands at their own car (it must be out in the world, not in a garage), uses "Sell this vehicle", types a price and the person beside them gets an on-screen offer for 60 seconds. Price $100 to $2000000, tax 5 percent rounded up taken from what the seller receives, and the buyer pays the whole price from the bank. All untuned.
+- [ ] Refused on purpose: garaged or impounded cars, business, gang and pool cars, cars signed out to someone, police flagged plates and cars marked stolen in the MDT.
+- [ ] The glovebox and boot belong to the car (they are keyed on the vehicle id), so their contents go to the buyer. The seller is told to empty them.
+- [ ] There is no vehicle key mechanism and no vehicle finance or insurance in this codebase, so nothing like that moves in a sale. If keys are added later they must move in `som-carsales`.
+- [ ] Never run in a game: the "Sell this vehicle" option on a car, picking the closest player, the buyer dialog, and the plate the server reads from a real vehicle (padding and case). The plate is trimmed and compared exactly with `som_vehicles.plate`; if real plates differ from the stored text the sale says "that is not your vehicle".
 ## Process serving (som-serving)
 
 - [ ] Import the new `som_court_service` table on an existing database (section 7n of `setup.sql`, `CREATE TABLE IF NOT EXISTS`). Run on the dev database already; not on production.
@@ -417,3 +425,12 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Registration belongs to the vehicle id, so a car sold to another player keeps whatever time it had left, and a plate change keeps it too. Nothing was added to the dealership or `som-carsales` flows.
 - [ ] A plate change is refused while the old glovebox or boot is loaded and holds items. Those inventories are keyed on the plate while open, and saved by vehicle id, so this stops contents disappearing for the session.
 - [ ] Never run in a game: the counter menu, a plate change reaching the spawned car (it spawns with the new plate from the database), the police menu line and the ANPR note. The SQL has only run against the mock, not MariaDB (`GREATEST`, `FROM_UNIXTIME`, `INSERT IGNORE`, and the unique key on `som_vehicles.plate` raising the "taken" error that is caught).
+## Phone loans (som-loans)
+
+- [ ] Import `setup.sql` on an existing database: it adds one table, `som_loans` (`CREATE TABLE IF NOT EXISTS`, safe to re-run). Until it is imported the sweep prints "som_loans is missing" and does nothing, and borrowing fails.
+- [ ] The treasury starts at 0 and the floor is $50,000, so nobody can borrow until fines and taxes have filled it. Decide `Config.treasuryFloor`, `Config.globalCap` (total still owed across everyone), the amounts and terms lists, the flat fee (10 percent) and the weeks before default (3) in `som-loans/shared/config.lua`. They are first guesses.
+- [ ] Loans are the treasury's money: the principal leaves the treasury and every repayment, including the fee, goes back. A default leaves the treasury short, bounded by the cap. The only thing that creates money is staff forgiveness (`/forgiveloan <id>`, needs `som.admin`, ledgered as `loan:forgiven`); use it deliberately.
+- [ ] A borrower must be online to pay: a week offline or short of money is counted as missed and paid back on their next login. Three missed weeks is a default, and from then every sweep (30 minutes) takes what is in their bank until it is paid. That is harsh on purpose; decide if it should be gentler.
+- [ ] The treasury floor is checked under the loan lock, but other treasury spending (department budgets, heist and buyer payouts) can still lower it at the same moment; the floor is a guard, not a reservation.
+- [ ] Not verified in a live server: the Bank loans phone app, a real week passing, collection from a defaulted borrower in game.
+- [ ] Left out on purpose: business loans and loans to shops, interest that changes over time, credit scores, co-signers, seizing property on default, an early payoff rebate, a bank branch.
