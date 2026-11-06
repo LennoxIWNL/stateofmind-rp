@@ -60,6 +60,7 @@ local function resetDb()
     mysql.db.licences = { rows = {}, attempts = {} }
     mysql.db.staff = { reports = {}, audit = {} }
     mysql.db.taxi = { earned = {} }
+    mysql.db.dmv = { vehicles = {}, registration = {}, log = {}, mdt = {}, flagged = {}, bolo = {}, wanted = {} }
     mysql.db.gangs = { chars = {}, log = {} }
     mysql.db.vehicles = {}
     mysql.db.social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} }
@@ -5945,6 +5946,14 @@ do
     scan(1, 'front', 'AB C123')
     check(#hits == 0 and Mocks.calls.dispatchAlert == 0, 'anpr: a clean plate is silent')
 
+    setup(); mysql.db.anpr.flagged = {}; Mocks.registrationOf = { ABC123 = 'expired' }
+    scan(1, 'front', 'AB C123')
+    check(#hits == 1 and hits[1].args[3][1] == 'registration expired' and Mocks.calls.dispatchAlert == 0, 'anpr: an expired registration tells the officer and never calls dispatch')
+    setup(); Mocks.registrationOf = { ABC123 = 'expired' }
+    scan(1, 'front', 'AB C123')
+    check(#hits == 1 and hits[1].args[3][1] == 'police flag' and hits[1].args[3][2] == 'registration expired' and Mocks.calls.dispatchAlert == 1, 'anpr: a hard reason still reaches dispatch, with the registration note for the officer')
+    Mocks.registrationOf = nil
+
     setup(); Mocks.players[1] = cop(false)
     scan(1, 'front', 'ABC123')
     check(#hits == 0, 'anpr: off duty police are ignored')
@@ -6485,6 +6494,128 @@ do
         f:close()
         check(bad == 0, 'boot: no ";" inside a comment in ' .. name)
     end
+end
+
+
+do
+    resetDb()
+    local realThread = _G.CreateThread
+    _G.CreateThread = function() end
+    local env = loader.loadResource(REPO .. 'som-dmv', { 'shared/config.lua', 'server/main.lua' })
+    _G.CreateThread = realThread
+    local cb, C = RegisteredCallbacks, env.Config
+    local D = mysql.db.dmv
+    local registration = Mocks.exported['registration']
+    local core = exports['som-core']
+    local base = 1800000000
+
+    local function car(id, extra)
+        local v = { id = id, citizenid = 'O1', plate = 'ABC123', model = 'sultan', state = 'garaged', group_restricted = 0 }
+        for k, val in pairs(extra or {}) do v[k] = val end
+        D.vehicles[id] = v
+        return v
+    end
+    local function owner(bank)
+        Mocks.players[1] = { source = 1, citizenid = 'O1', job = { name = 'unemployed' }, charinfo = { firstname = 'O', lastname = 'One' } }
+        FakePeds[1] = vec3(0, 0, 0)
+        Mocks.bank[1] = bank or 10000
+    end
+    local function step() Mocks.clock = Mocks.clock + C.registration.cooldownMs + 1 end
+
+    mysql.fakeNow = base
+    Mocks.clock = 5000000
+    owner()
+    car(1); car(2, { plate = 'XYZ789', state = 'out' }); car(3, { plate = 'IMP111', state = 'impounded' })
+    car(4, { plate = 'LSPD01', owner_group = 'lspd' }); car(5, { plate = 'THEIR1', citizenid = 'O2' })
+
+    check(cb['som-dmv:server:list'](1).error == 'you are not at the counter', 'dmv: the counter ships closed')
+    C.desk.enabled, C.desk.coords = true, vec3(0, 0, 0)
+    FakePeds[1] = vec3(40, 0, 0)
+    check(cb['som-dmv:server:list'](1).error == 'you are not at the counter', 'dmv: the owner has to be at the counter')
+    FakePeds[1] = vec3(0, 0, 0)
+
+    local list = cb['som-dmv:server:list'](1)
+    check(list.success and #list.vehicles == 2 and list.vehicles[1].plate == 'ABC123' and not list.vehicles[1].expired and list.vehicles[1].daysLeft == C.registration.days,
+        'dmv: only your own, non impounded, private cars are listed, with the grace period')
+    check(D.registration[1] and D.registration[1].expires == base + C.registration.days * 86400, 'dmv: the server creates the registration the first time it is asked')
+
+    check(registration(' abc 123 ') == 'valid' and registration('NOPE') == nil and registration(5) == nil, 'dmv: registration is reported for owned plates only')
+
+    -- Renewal.
+    local renew = cb['som-dmv:server:renew']
+    check(renew(1, '1').error == 'bad request', 'dmv: renewal wants a whole vehicle id')
+    local notMine = true
+    for _, id in ipairs({ 5, 3, 4 }) do step(); notMine = notMine and renew(1, id).error == 'that is not your vehicle' end
+    check(notMine, 'dmv: only your own private cars can be renewed')
+    step()
+    check(renew(1, 1).error == 'it is already registered for a while yet', 'dmv: a fresh registration is not renewed early')
+
+    mysql.fakeNow = base + 15 * 86400
+    check(registration('ABC123') == 'expired', 'dmv: it expires by the database clock')
+    local treasury = Mocks.treasury
+    step()
+    check(renew(1, 1).success and Mocks.bank[1] == 10000 - C.registration.fee and Mocks.treasury == treasury + C.registration.fee, 'dmv: renewing is paid into the city treasury')
+    check(registration('ABC123') == 'valid', 'dmv: and the registration is valid again')
+    check(renew(1, 1).error == 'one moment', 'dmv: actions are spaced out')
+    step()
+    check(renew(1, 1).error == 'it is already registered for a while yet', 'dmv: a double renewal does not charge twice')
+
+    mysql.fakeNow = base + 40 * 86400
+    local before = D.registration[1].expires
+    Mocks.bank[1] = 10; step()
+    check(renew(1, 1).error:find('you need') and D.registration[1].expires == before, 'dmv: a renewal that cannot be paid is undone')
+    Mocks.bank[1] = 10000; Mocks.taxFails = true; step()
+    local r = renew(1, 1)
+    Mocks.taxFails = nil
+    check(not r.success and D.registration[1].expires == before and Mocks.lastPaid.reason == 'dmv:registration:refund', 'dmv: a fee the city cannot take is refunded and the renewal undone')
+
+    -- Plates.
+    local change = cb['som-dmv:server:changePlate']
+    Mocks.bank[1] = 10000; Mocks.treasury = 0
+    step()
+    check(change(1, 1, 5).error == 'bad request' and change(1, '1', 'AB').error == 'bad request', 'dmv: the request must be well formed')
+    step(); check(change(1, 1, 'A').error:find('2 to 8'), 'dmv: too short a plate is refused')
+    step(); check(change(1, 1, 'ABCDEFGHI').error:find('2 to 8'), 'dmv: too long a plate is refused')
+    step(); check(change(1, 1, 'AB-1').error:find('letters, numbers'), 'dmv: odd characters are refused')
+    step(); check(change(1, 1, 'A  B').error:find('letters, numbers'), 'dmv: double spaces are refused')
+    step(); check(change(1, 1, 'lspd 9').error == 'that plate is not allowed', 'dmv: police looking plates are blocked, however they are spaced')
+    step(); check(change(1, 1, 'NAZI').error == 'that plate is not allowed', 'dmv: the word blocklist applies')
+    step(); local impounded = change(1, 3, 'FREE1').error
+    step(); local group = change(1, 4, 'FREE1').error
+    step(); check(impounded == 'put it in a garage first' and group == 'that is not your vehicle' and change(1, 5, 'FREE1').error == 'that is not your vehicle', 'dmv: only your own private car, in a garage')
+    step(); check(change(1, 2, 'FREE1').error == 'put it in a garage first', 'dmv: the car must be in a garage')
+    step(); check(change(1, 1, 'abc123').error == 'it already has that plate', 'dmv: the same plate is refused')
+    for _, k in ipairs({ 'flagged', 'bolo', 'wanted' }) do
+        D[k].ABC123 = true
+        step(); check(change(1, 1, 'FREE1').error == 'the police have a hold on that vehicle' and D.vehicles[1].plate == 'ABC123', 'dmv: a plate with a police ' .. k .. ' hold cannot be changed')
+        D[k].ABC123 = nil
+    end
+    Mocks.inv['gloveABC123'] = { { name = 'pistol' } }
+    step(); check(change(1, 1, 'FREE1').error == 'empty the glovebox and boot first', 'dmv: a car with things in the glovebox keeps its plate')
+    Mocks.inv['gloveABC123'] = nil
+    step(); check(change(1, 1, 'XYZ789').error == 'that plate is taken' and D.vehicles[1].plate == 'ABC123' and Mocks.bank[1] == 10000, 'dmv: a taken plate is refused by the unique key and costs nothing')
+
+    D.mdt = { { plate = 'ABC123', notes = 'x' } }
+    step()
+    r = change(1, 1, 'free 1')
+    check(r.success and r.plate == 'FREE 1' and D.vehicles[1].plate == 'FREE 1', 'dmv: the plate changes, upper case')
+    check(D.mdt[1].plate == 'FREE 1' and #D.log == 1 and D.log[1].old == 'ABC123', 'dmv: the MDT record moves with it and the change is logged')
+    check(Mocks.bank[1] == 10000 - C.vanity.fee and Mocks.treasury == C.vanity.fee, 'dmv: the plate fee goes to the treasury')
+    step(); check(change(1, 1, 'ANOTHER').error:find('once every'), 'dmv: plate changes are spaced out per person')
+    mysql.fakeNow = base + 40 * 86400 + C.vanity.cooldownMinutes * 60 + 1
+
+    -- Failures after the claim put everything back.
+    D.mdtFails = 'NEW1'
+    step(); r = change(1, 1, 'NEW1')
+    D.mdtFails = nil
+    check(not r.success and D.vehicles[1].plate == 'FREE 1' and D.mdt[1].plate == 'FREE 1' and Mocks.bank[1] == 10000 - C.vanity.fee, 'dmv: a failed MDT move undoes the plate and charges nothing')
+    Mocks.taxFails = true
+    step(); r = change(1, 1, 'NEW2')
+    Mocks.taxFails = nil
+    check(not r.success and D.vehicles[1].plate == 'FREE 1' and D.mdt[1].plate == 'FREE 1' and Mocks.lastPaid.reason == 'dmv:plate:refund', 'dmv: a failed fee undoes the plate and refunds')
+    Mocks.bank[1] = 100
+    step(); r = change(1, 1, 'NEW3')
+    check(r.error:find('you need') and D.vehicles[1].plate == 'FREE 1' and D.mdt[1].plate == 'FREE 1' and #D.log == 1, 'dmv: not enough money undoes the plate')
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))

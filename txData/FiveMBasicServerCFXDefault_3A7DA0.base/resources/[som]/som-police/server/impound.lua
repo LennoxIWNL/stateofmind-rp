@@ -226,11 +226,14 @@ lib.callback.register('som-police:server:checkPlate', function(source, netId)
         WHERE v.plate = ?
     ]], { plate })
 
+    local ok, registration = pcall(function() return exports['som-dmv']:registration(plate) end)
+
     return {
         success = true,
         plate = plate,
         owner = owner and ('%s %s'):format(owner.firstname, owner.lastname) or 'Unregistered',
         flagged = flag and flag.reason or nil,
+        registration = ok and registration or nil,
     }
 end)
 

@@ -41,6 +41,10 @@ CreateThread(function()
                     title = res.plate,
                     options = {
                         { title = 'Registered to', description = res.owner, icon = 'user' },
+                        res.registration and {
+                            title = res.registration == 'expired' and 'REGISTRATION EXPIRED' or 'Registration valid',
+                            icon = res.registration == 'expired' and 'triangle-exclamation' or 'circle-check',
+                        } or nil,
                         {
                             title = res.flagged and 'FLAGGED' or 'Not flagged',
                             description = res.flagged or 'No active flag on this plate',

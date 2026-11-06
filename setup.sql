@@ -1841,3 +1841,30 @@ CREATE TABLE IF NOT EXISTS `som_property_leases` (
   KEY `idx_landlord` (`landlord`, `status`),
   KEY `idx_due` (`status`, `next_due`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
+--  7o. REGISTRATION AND PLATES (som-dmv)
+--
+--  Registration belongs to the vehicle id, so it survives a sale and a plate
+--  change. A car with no row is given the grace period by the server the first
+--  time anything asks. The plate log is the audit trail and the per-person
+--  cooldown for plate changes. No foreign keys: both outlive the vehicle.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_vehicle_registration` (
+  `vehicle_id` INT UNSIGNED NOT NULL,
+  `expires_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `renewed_by` VARCHAR(16) DEFAULT NULL,
+  PRIMARY KEY (`vehicle_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_dmv_plate_log` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `vehicle_id` INT UNSIGNED NOT NULL,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `old_plate`  VARCHAR(12) NOT NULL,
+  `new_plate`  VARCHAR(12) NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_citizen_time` (`citizenid`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
