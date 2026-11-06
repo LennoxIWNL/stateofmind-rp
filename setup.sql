@@ -1749,6 +1749,37 @@ CREATE TABLE IF NOT EXISTS `som_placements` (
   KEY `idx_resource` (`resource`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Player-run shops (som-shops). A shop is bought from the city, stocked and priced by its owner,
+-- and staffed by hired players. Its takings go to its own business account (`shop_<id>`).
+CREATE TABLE IF NOT EXISTS `som_shops` (
+  `shop_id`      VARCHAR(32) NOT NULL,
+  `business`     VARCHAR(48) NOT NULL,
+  `owner`        VARCHAR(16) DEFAULT NULL,
+  `bought_price` BIGINT NOT NULL DEFAULT 0,
+  `bought_at`    TIMESTAMP NULL DEFAULT NULL,
+  `withdraw_at`  TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (`shop_id`),
+  KEY `idx_owner` (`owner`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_shop_stock` (
+  `shop_id` VARCHAR(32) NOT NULL,
+  `item`    VARCHAR(48) NOT NULL,
+  `qty`     INT UNSIGNED NOT NULL DEFAULT 0,
+  `price`   BIGINT NOT NULL,
+  PRIMARY KEY (`shop_id`, `item`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- One job per character (the primary key), paid hourly from the shop account. last_paid_at is
+-- claimed with a conditional UPDATE so two ticks or a restart cannot pay twice.
+CREATE TABLE IF NOT EXISTS `som_shop_staff` (
+  `citizenid`    VARCHAR(16) NOT NULL,
+  `shop_id`      VARCHAR(32) NOT NULL,
+  `hourly_pay`   BIGINT NOT NULL,
+  `last_paid_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`citizenid`),
+  KEY `idx_shop` (`shop_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 -- ===========================================================================
 --  7m. LICENCES AND DRIVING SCHOOL (som-licences)
 --

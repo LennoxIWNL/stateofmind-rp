@@ -309,6 +309,20 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 
 - [ ] Business and city treasury balances are now changed with one conditional add, and a failed player money save is noticed and rolled back. Only the mock suite and the dev MariaDB have run them. In game: a shop sale, a seizure and a heist payout at the same moment, then check `som_transactions` against the balances. Whether oxmysql returns `false` (not an error) for a failed transaction is assumed from how it is documented, not run.
 
+## Player shops (som-shops)
+
+- [ ] Every shop ships disabled with no coordinates. Place each (staff `/place som-shops shops.alta.coords`, or set `Config.shops` coordinates and `enabled = true`) and decide the real shop list and prices. The two entries (`alta`, `strawberry`) are placeholders.
+- [ ] `setup.sql` gets three tables (`som_shops`, `som_shop_stock`, `som_shop_staff`). On start the resource creates one bank account (`SHOP-<ID>`) and one business row (`shop_<id>`) per configured shop; these are separate from the job businesses, so core paychecks never touch them.
+- [ ] Decide `Config.items` (what a shop may sell and the price range), the tax rate, the sell-back share, the withdrawal cap and cooldown, and the staff pay cap. They are first guesses, not tuned.
+- [ ] Not verified in a live server: the counter menu and the owner management menu (som-ui context and dialog shims), the hire offer dialog, the phone app, hourly payroll over a real restart, and concurrent sales. Only the mock suite and a scratch MariaDB ran the queries.
+- [ ] Shop ownership never expires: a shop whose owner stops playing stays owned, and there is no way for staff to take it back except in the database. Decide an inactivity rule later.
+- [ ] Left out on purpose: supplier ordering, several shops per owner, handing a shop to another player, staff grades or commission, shop robbery.
+## EMS hospital transport
+
+- [ ] Sink and faucet change for staff: the hospital respawn fee (350, `Config.RespawnFee` in `som-medical`) is now paid into the `ems` business account instead of vanishing. If the credit fails the player is refunded and treated free.
+- [ ] Place the hospital in `som-ems` (`Config.hospital`, ships closed): front `desk` point and a `bed` point (vec4). Admission charges the patient 250 into `ems` first, then pays the medic 60 percent (150) from `ems`, only after the charge went through. A patient who cannot pay is still admitted and the medic gets nothing. Needs at least 30 s down and a 60 s per-patient cooldown. All numbers untuned.
+- [ ] Not verified live: server side `SetPedIntoVehicle` on a downed player (seats 1 and 2 of an `ambulance`), the medic's "Load into ambulance", "Unload patient", "Check patient" and desk "admit patient" options, the bed animation (`missarmenian2` / `drunk_loop`) and fade, and that a loaded patient is not pulled back by the down anchor. Cause on "Check patient" is only "hurt by another person" or "an accident" (the server's own death classification).
+- [ ] Cut on purpose: bleeding and injury states (nothing tracks them), a second hospital, a stretcher prop, medic XP.
 ## Licences and driving school (som-licences)
 
 - [ ] Existing databases: `ALTER TABLE som_licenses ADD COLUMN suspended_until TIMESTAMP NULL DEFAULT NULL;` and import the new `som_licence_attempts` table (`setup.sql` section 7m).
@@ -336,3 +350,19 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] The `trash` model, the blip sprite 318, the `anim@heists@narcotics@trash` throw animation and the bin positions are unchecked guesses. The sort is read from the bin colour label, by design.
 - [ ] Not detected: a dead or jailed member keeps the round until it expires (40 minutes plus 15) and then the truck is removed.
 - [ ] Not verified live: the server spawned truck, bin interaction zones, a crew of three, a real payout from the treasury.
+## ANPR (som-anpr)
+
+- [ ] Exact config change: `ps-mdt/shared/config.lua` now has `Config.UseWolfknightRadar = false` (it was `true`). That turns off ps-mdt's own `wk:onPlateScanned` handler, which showed the stock QBCore popup to any client and leaked registered owner names for any plate. It also turns off ps-mdt's `ps-mdt:client:trafficStop` hook, which called `ps-dispatch` (not installed).
+- [ ] `som-anpr` is ensured after `wk_wars2x`. An on duty police officer in the driver or front passenger seat of a listed model (`Config.vehicles`, a guess: police, police2, police3, police4, policeb, pranger, fbi, fbi2, pitbullbb, sheriff, sheriff2) gets a toast and the reader locks when the scanned vehicle (a real vehicle within 80 m) has a stolen mark in `mdt_vehicleinfo`, an open `mdt_bolos` row for `police`, or an open `som_police_plates` flag. Plain text only: the plate and the reason, no owner. Unregistered plates are out on purpose (every NPC car is unregistered).
+- [ ] Dispatch type `flaggedVehicle` (10-29, police, priority 2): one call per plate per 5 minutes, at most 6 calls a minute overall. No wanted level and no automatic fine.
+- [ ] Not verified live: wk firing for our cruisers, `wk:togglePlateLock` as a local event (it toggles, so a second hit on an already locked reader would unlock it), the reader's plate text matching `GetVehicleNumberPlateText`, the blip and toast. Check the real model names of the police fleet.
+## Trucking
+
+- [ ] `som-trucking/shared/config.lua` `Config.routes` is empty, so no freight contract is offered. Add routes: `{ id, label, depot = vec4, trailer = vec4, dropoff = vec3, base, minutes }`, at least `minDistance` (1500) apart. Each route is its own entry in the Jobs app after a restart.
+- [ ] Trucking and courier draw from the same Post OP account, so heavy trucking can leave couriers unpaid. Staff decide who funds Post OP (or whether freight gets its own business account) before launch.
+- [ ] Pay comes from the `postop` business, the same account `som-courier` uses; nothing new funds it (no mint, no treasury top-up). Its balance is whatever Post OP earns from sales, so a broke company means unpaid hauls: check the balance against `base` and the `hourlyCap` (2500 per citizen per hour, held in memory, reset by a restart).
+- [ ] Untuned defaults: damage takes at most 50%, a late drop 25%, the floor is 25% of base, two drivers get +20% on the pool, abandon or timeout locks the crew out for 15 minutes.
+- [ ] Models `phantom` and `trailers` are vanilla GTA names assumed to spawn; the blip sprites 477 and 479 are unchecked guesses.
+- [ ] Not detected: a member who is dead or in jail keeps the run until it expires (route minutes plus 15) and then the truck is removed. The trailer being hooked to the truck is not checked, only that it sits in the yard.
+- [ ] Not verified live: server spawned vehicles, trailer body health read on the server in OneSync, a real crew of two, the unhook progress bar, `/abandonhaul`.
+- [ ] Trucking: if the game errors (not just refuses) while crediting a driver right after the company was debited, that one payment is lost by the company and nobody is paid; the run ends so nobody is paid twice. Rare, but staff should know the Post OP balance can drift by one payment.
