@@ -4418,5 +4418,73 @@ do
     _G.Player, _G.SomFormatDate = saved.Player, saved.SomFormatDate
 end
 
+-- ---------------------------------------------------------------------------
+-- Paychecks, MDT delete guard and status budget
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local realCreate, realWait = _G.CreateThread, _G.Wait
+    local threads = {}
+    _G.CreateThread = function(fn) threads[#threads + 1] = fn end
+    local env = loader.loadResource(REPO .. 'som-core', {
+        'shared/config.lua', 'shared/tiers.lua', 'shared/jobs.lua', 'shared/gangs.lua',
+        'server/permissions.lua', 'server/player.lua', 'server/money.lua', 'server/main.lua',
+    })
+    _G.CreateThread = realCreate
+
+    local calls = {}
+    env.Money.BusinessTransact = function(name, amount, reason) calls[#calls + 1] = { name, amount, reason }; return true end
+    env.Money.Add = function() return true end
+    local cop = { source = 1, citizenid = 'PC1', job = { name = 'police', onduty = true, payment = 1200 } }
+
+    env.PayCheck(cop)
+    check(#calls == 1 and calls[1][2] == -1200, 'paycheck: the business is debited the pay')
+
+    calls = {}
+    env.Money.Add = function() return false, 'database error' end
+    env.PayCheck(cop)
+    check(#calls == 2 and calls[2][2] == 1200 and calls[2][3]:find('refund', 1, true), 'paycheck: a failed credit returns the money to the business')
+
+    calls = {}
+    env.Money.BusinessTransact = function() error('database down') end
+    local fine = pcall(env.PayCheck, cop)
+    check(not fine, 'paycheck: a database error surfaces to the loop')
+
+    local paid = {}
+    env.Money.BusinessTransact = function(_, amount) if paid.first == nil then paid.first = true; error('database down') end return true end
+    env.Money.Add = function(source) paid[#paid + 1] = source; return true end
+    env.Players.GetAll = function() return { cop, { source = 2, citizenid = 'PC2', job = { name = 'police', onduty = true, payment = 1200 } } } end
+    local waits = 0
+    _G.Wait = function() waits = waits + 1; if waits > 1 then error('stop loop') end end
+    for _, thread in ipairs(threads) do waits = 0; pcall(thread) end
+    _G.Wait = realWait
+    check(#paid == 1 and paid[1] == 2, 'paycheck: one failed player does not stop the next one being paid')
+
+    _G.source = 1
+    local status = function(_, key, delta) RegisteredEvents['som:server:adjustStatus'](key, delta) end
+    local meta = { hunger = 0 }
+    env.Players.Get = function() return { metadata = meta, setMetadata = function(_, k, v) meta[k] = v end } end
+    Mocks.clock = 100000
+    for _ = 1, 5 do Mocks.clock = Mocks.clock + 600; status(1, 'hunger', 50) end
+    check(meta.hunger == 100, 'status: client-sent changes stop after the per-minute budget')
+    Mocks.clock = Mocks.clock + 61000
+    status(1, 'hunger', 50)
+    _G.source = nil
+    check(meta.hunger == 150, 'status: the budget comes back after a minute')
+end
+
+do
+    resetDb()
+    local realCreate = _G.CreateThread
+    local started = 0
+    _G.CreateThread = function() started = started + 1 end
+    loader.loadResource(REPO .. 'som-police', { 'shared/config.lua', 'server/main.lua', 'server/incidents.lua' })
+    started = 0
+    for _ = 1, 100 do RegisteredEvents['mdt:server:deleteIncidents'](7) end
+    _G.CreateThread = realCreate
+    check(started == 1, 'mdt: repeated delete events for one incident start one check')
+end
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)

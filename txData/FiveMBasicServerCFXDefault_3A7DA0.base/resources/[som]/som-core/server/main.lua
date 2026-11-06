@@ -82,46 +82,56 @@ end)
 -- mechanism that makes the Phase 4 faucet side of the economy bounded.
 -- ---------------------------------------------------------------------------
 
+function PayCheck(player)
+    local job = player.job
+    local jobDef = Jobs[job.name]
+    local payment = job.payment or 0
+
+    -- Hard ceiling, applied here rather than trusted from config, so a
+    -- mistake in a job definition cannot flood the economy.
+    local ceiling = Config.Money.maxHourlyPaycheck
+    if ceiling and payment > ceiling then payment = ceiling end
+
+    if payment <= 0 or not jobDef then return end
+
+    local eligible = job.onduty
+        or jobDef.offDutyPay
+        or Config.Money.payOffDutyByDefault
+    if not eligible then return end
+
+    local reason = ('paycheck:%s'):format(job.name)
+
+    if not jobDef.business then
+        -- Jobs with no business register entry are a faucet.
+        -- Only 'unemployed' should reach this branch.
+        Money.Add(player.source, 'bank', payment, reason)
+        return
+    end
+
+    if not Money.BusinessTransact(jobDef.business, -payment, ('payroll:%s'):format(job.name)) then
+        if Config.Debug then
+            print(('[som-core] %s could not cover payroll for %s'):format(jobDef.business, player.citizenid))
+        end
+        return
+    end
+
+    local paid = Money.Add(player.source, 'bank', payment, reason, {
+        counterparty = jobDef.business,
+        flow = 'transfer',
+    })
+    if not paid then
+        Money.BusinessTransact(jobDef.business, payment, ('payroll:%s:refund'):format(job.name))
+    end
+end
+
 CreateThread(function()
     while true do
         Wait(paycheckInterval)
 
         for _, player in ipairs(Players.GetAll()) do
-            local job = player.job
-            local jobDef = Jobs[job.name]
-            local payment = job.payment or 0
-
-            -- Hard ceiling, applied here rather than trusted from config, so a
-            -- mistake in a job definition cannot flood the economy.
-            local ceiling = Config.Money.maxHourlyPaycheck
-            if ceiling and payment > ceiling then payment = ceiling end
-
-            if payment > 0 and jobDef then
-                local eligible = job.onduty
-                    or jobDef.offDutyPay
-                    or Config.Money.payOffDutyByDefault
-
-                if eligible then
-                    if jobDef.business then
-                        local paid = Money.BusinessTransact(
-                            jobDef.business, -payment, ('payroll:%s'):format(job.name)
-                        )
-                        if paid then
-                            Money.Add(player.source, 'bank', payment, ('paycheck:%s'):format(job.name), {
-                                counterparty = jobDef.business,
-                                flow = 'transfer',
-                            })
-                        elseif Config.Debug then
-                            print(('[som-core] %s could not cover payroll for %s')
-                                :format(jobDef.business, player.citizenid))
-                        end
-                    else
-                        -- Jobs with no business register entry are a faucet.
-                        -- Only 'unemployed' should reach this branch.
-                        Money.Add(player.source, 'bank', payment, ('paycheck:%s'):format(job.name))
-                    end
-                end
-            end
+            -- One failed database call must not end paychecks for everyone.
+            local ok, err = pcall(PayCheck, player)
+            if not ok then print(('[som-core] paycheck failed for %s: %s'):format(player.citizenid, tostring(err))) end
         end
     end
 end)
@@ -144,8 +154,11 @@ end)
 local STATUS_KEYS = { hunger = true, thirst = true, stress = true }
 local MAX_STATUS_DELTA = 50
 local STATUS_COOLDOWN = 500
+local STATUS_BUDGET = 100
+local STATUS_WINDOW = 60000
 
 local lastStatusCall = {}
+local statusSpent = {}
 
 RegisterNetEvent('som:server:adjustStatus', function(key, delta)
     local source = source
@@ -162,6 +175,17 @@ RegisterNetEvent('som:server:adjustStatus', function(key, delta)
     if value > MAX_STATUS_DELTA then value = MAX_STATUS_DELTA end
     if value < -MAX_STATUS_DELTA then value = -MAX_STATUS_DELTA end
 
+    -- The cooldown alone still allows +/-50 twice a second, enough to zero stress on demand.
+    local window = statusSpent[source]
+    if not window or now - window.at >= STATUS_WINDOW then
+        window = { at = now, total = 0 }
+        statusSpent[source] = window
+    end
+    local room = STATUS_BUDGET - window.total
+    if room <= 0 then return end
+    if math.abs(value) > room then value = value < 0 and -room or room end
+    window.total = window.total + math.abs(value)
+
     local player = Players.Get(source)
     if not player then return end
 
@@ -170,6 +194,7 @@ end)
 
 AddEventHandler('playerDropped', function()
     lastStatusCall[source] = nil
+    statusSpent[source] = nil
 end)
 
 -- ---------------------------------------------------------------------------
