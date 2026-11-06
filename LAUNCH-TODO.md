@@ -314,3 +314,14 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Gang, business and treasury ledger writes undo the balance change if the ledger row cannot be written (two separate statements, not one transaction). Needs a live database check that a single `MySQL.transaction` with a `ROW_COUNT()` guard behaves the same before replacing it.
 - [ ] Heist clean cash payouts now wait for the previous payout instead of paying nothing; the wait loop is only provable in a live server with two crews looting together.
 - [ ] Buyer sales and heist clean payouts now record the payout before paying, so a database failure refuses the sale instead of paying without counting it against the hourly cap.
+
+## Trucking
+
+- [ ] `som-trucking/shared/config.lua` `Config.routes` is empty, so no freight contract is offered. Add routes: `{ id, label, depot = vec4, trailer = vec4, dropoff = vec3, base, minutes }`, at least `minDistance` (1500) apart. Each route is its own entry in the Jobs app after a restart.
+- [ ] Trucking and courier draw from the same Post OP account, so heavy trucking can leave couriers unpaid. Staff decide who funds Post OP (or whether freight gets its own business account) before launch.
+- [ ] Pay comes from the `postop` business, the same account `som-courier` uses; nothing new funds it (no mint, no treasury top-up). Its balance is whatever Post OP earns from sales, so a broke company means unpaid hauls: check the balance against `base` and the `hourlyCap` (2500 per citizen per hour, held in memory, reset by a restart).
+- [ ] Untuned defaults: damage takes at most 50%, a late drop 25%, the floor is 25% of base, two drivers get +20% on the pool, abandon or timeout locks the crew out for 15 minutes.
+- [ ] Models `phantom` and `trailers` are vanilla GTA names assumed to spawn; the blip sprites 477 and 479 are unchecked guesses.
+- [ ] Not detected: a member who is dead or in jail keeps the run until it expires (route minutes plus 15) and then the truck is removed. The trailer being hooked to the truck is not checked, only that it sits in the yard.
+- [ ] Not verified live: server spawned vehicles, trailer body health read on the server in OneSync, a real crew of two, the unhook progress bar, `/abandonhaul`.
+- [ ] Trucking: if the game errors (not just refuses) while crediting a driver right after the company was debited, that one payment is lost by the company and nobody is paid; the run ends so nobody is paid twice. Rare, but staff should know the Post OP balance can drift by one payment.

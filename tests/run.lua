@@ -4550,5 +4550,229 @@ do
     check(started == 1, 'mdt: repeated delete events for one incident start one check')
 end
 
+-- som-trucking
+----------------------------------------------------------------------
+local truckEnv
+local DROP = vec3(3000, 0, 0)
+
+local function truckScene(overrides)
+    boardScene()
+    Spawned, Vehicles, Deleted = {}, {}, {}
+    truckEnv = loader.loadResource(REPO .. 'som-trucking', { 'shared/config.lua', 'server/main.lua' })
+    truckEnv.Config.hourlyCap = 100000
+    for k, v in pairs(overrides or {}) do truckEnv.Config[k] = v end
+    truckEnv.Config.routes = { { id = 'sand', label = 'Sand to the quarry', depot = { x = 0, y = 0, z = 0, w = 0 },
+        trailer = { x = 10, y = 0, z = 0, w = 0 }, dropoff = DROP, base = 1000, minutes = 30 } }
+    truckEnv.Trucking.Register()
+    local seen = {}
+    local real = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, payload)
+        if name == 'som-trucking:client:objective' then seen[#seen + 1] = { target = target, goal = payload } end
+    end
+    _G.GetCurrentResourceName = function() return 'som-trucking' end
+    return truckEnv, seen, function() _G.TriggerClientEvent = real end
+end
+
+local function haulCall(name, source)
+    Mocks.clock = (Mocks.clock or 0) + 3000
+    return RegisteredCallbacks['som-trucking:server:' .. name](source)
+end
+
+local function startHaul(size)
+    crew(size or 1)
+    j(1, 'queue', { provider = 'trucking_sand' })
+    boardEnv.JobBoard.Draw('trucking_sand')
+    return j(1, 'accept')
+end
+
+local function later(seconds, fn)
+    local real = os.time
+    os.time = function() return real() + seconds end
+    local ok, err = pcall(fn)
+    os.time = real
+    if not ok then error(err, 0) end
+end
+
+local function yard(size)
+    for i = 1, (size or 1) do FakePeds[i] = DROP end
+    FakePeds[Spawned[2]] = DROP
+end
+
+do
+    local env, seen, restore = truckScene()
+    env.Config.routes = { { id = 'bad', label = 'Bad', depot = { x = 0, y = 0, z = 0, w = 0 }, trailer = { x = 0, y = 0, z = 0, w = 0 }, dropoff = { x = 5000, y = 0, z = 0 }, base = 100, minutes = 5 } }
+    check(pcall(env.Trucking.Register), 'trucking: a route with a plain table position cannot break the resource')
+    crew(1)
+    check(j(1, 'queue', { provider = 'trucking_bad' }).success ~= true, 'trucking: the broken route is skipped, not offered')
+    check(#env.Config.routes == 1 and not pcall(function() return vec3(0, 0, 0) - { x = 1, y = 0, z = 0 } end), 'trucking: the vec3 mock rejects arithmetic on a plain table')
+    check(env.Trucking.Start({ id = 1, members = {} }, nil) == false and env.Trucking.Start({ id = 1, members = {} }, { id = 'x' }) == false, 'trucking: a missing or broken route is refused')
+    env.Config.routes[1].dropoff = vec3(500, 0, 0)
+    check(env.Trucking.Start({ id = 1, members = { { citizenid = 'P1', source = 1 } } }, env.Config.routes[1]) == false and #Spawned == 0, 'trucking: a route shorter than the minimum distance is refused')
+    restore()
+end
+
+do
+    local env, seen, restore = truckScene()
+    FakePeds[1] = vec3(0, 0, 0)
+    check(startHaul(1).success == true and #Spawned == 2, 'trucking: an accepted contract spawns a truck and a trailer')
+    check(seen[1].goal and seen[1].goal.coords == DROP and seen[1].goal.depot.x == 10, 'trucking: the crew is shown the trailer and the yard')
+    check(haulCall('deliver', 9).error == 'you have no haul', 'trucking: an outsider cannot hand in')
+    check(haulCall('deliver', 1).error == 'you are too far away', 'trucking: the server checks the player distance')
+    FakePeds[1] = DROP
+    check(haulCall('deliver', 1).error == 'bring the trailer into the yard', 'trucking: the trailer must be in the yard')
+    FakePeds[Spawned[2]] = DROP
+    check(haulCall('deliver', 1).error == 'you have not driven that far yet', 'trucking: a drop cannot be paid right after the spawn')
+    local before = Mocks.calls.addMoney
+    Mocks.clock = (Mocks.clock or 0) + 3000
+    local first = RegisteredCallbacks['som-trucking:server:deliver'](1)
+    check(first.error == 'you have not driven that far yet', 'trucking: still too early')
+    check(RegisteredCallbacks['som-trucking:server:deliver'](1).error == 'slow down', 'trucking: repeat calls are rate limited')
+    later(100, function()
+        local spend = Mocks.calls.businessSpend
+        check(haulCall('deliver', 1).success == true, 'trucking: a trailer in the yard after the driving time is paid')
+        check(Mocks.lastPaid.amount == 1000 and Mocks.calls.addMoney == before + 1 and Mocks.calls.businessSpend == spend + 1, 'trucking: full pay, debited from the business first')
+    end)
+    check(#Deleted == 2 and Mocks.exported.getGroup(1).busy == nil and haulCall('deliver', 1).error == 'you have no haul', 'trucking: both vehicles are removed, the group is free and a second hand in pays nothing')
+    check(seen[#seen].goal == nil, 'trucking: the objective is cleared')
+    restore()
+end
+
+do
+    local env, seen, restore = truckScene()
+    FakePeds[1] = vec3(0, 0, 0)
+    startHaul(1); yard(1)
+    Vehicles[Spawned[2]].body = 0
+    later(100, function() haulCall('deliver', 1) end)
+    check(Mocks.lastPaid.amount == 500, 'trucking: damage takes at most half the pay')
+    restore()
+
+    env, seen, restore = truckScene()
+    FakePeds[1] = vec3(0, 0, 0)
+    startHaul(1); yard(1)
+    Vehicles[Spawned[2]].body = 800
+    later(31 * 60, function() haulCall('deliver', 1) end)
+    check(Mocks.lastPaid.amount == 600, 'trucking: damage and a late drop both reduce the pay (0.8 x 0.75)')
+    restore()
+
+    env, seen, restore = truckScene({ maxDamage = 1.0, latePenalty = 0.9 })
+    FakePeds[1] = vec3(0, 0, 0)
+    startHaul(1); yard(1)
+    Vehicles[Spawned[2]].body = 0
+    later(31 * 60, function() haulCall('deliver', 1) end)
+    check(Mocks.lastPaid.amount == 250, 'trucking: the pay never falls below the floor')
+    restore()
+end
+
+do
+    local env, seen, restore = truckScene()
+    FakePeds[1] = vec3(0, 0, 0); FakePeds[2] = vec3(0, 0, 0)
+    startHaul(2); yard(2)
+    local paid0 = Mocks.calls.addMoney
+    later(100, function() haulCall('deliver', 2) end)
+    check(Mocks.calls.addMoney == paid0 + 2 and Mocks.lastPaid.amount == 600, 'trucking: two drivers at the drop split the pool with the group bonus')
+    restore()
+
+    env, seen, restore = truckScene()
+    FakePeds[1] = vec3(0, 0, 0); FakePeds[2] = vec3(0, 0, 0)
+    startHaul(2); yard(2)
+    FakePeds[2] = vec3(-9000, 0, 0)
+    paid0 = Mocks.calls.addMoney
+    later(100, function() haulCall('deliver', 1) end)
+    check(Mocks.calls.addMoney == paid0 + 1 and Mocks.lastPaid.amount == 1000, 'trucking: a member far from the drop is not paid and the bonus needs both present')
+    restore()
+end
+
+do
+    local env, seen, restore = truckScene()
+    FakePeds[1] = vec3(0, 0, 0); FakePeds[2] = vec3(0, 0, 0)
+    startHaul(2); yard(2)
+    local notify = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, payload, ...)
+        if name == 'som:client:notify' and tostring(payload):find('Delivered', 1, true) then Mocks.addMoneyThrows = true end
+        return notify(name, target, payload, ...)
+    end
+    local paid0, calls0 = Mocks.paid or 0, Mocks.calls.addMoney
+    later(100, function()
+        check(haulCall('deliver', 1).success == false, 'trucking: a payout that throws reports a failure')
+        Mocks.addMoneyThrows = false
+        check(Mocks.calls.addMoney == calls0 + 2 and (Mocks.paid or 0) == paid0 + 600, 'trucking: the member paid before the throw stays paid')
+        check(#Deleted == 2 and Mocks.exported.getGroup(1).busy == nil, 'trucking: the run ends and the vehicles are removed')
+        check(haulCall('deliver', 1).error == 'you have no haul' and haulCall('deliver', 2).error == 'you have no haul', 'trucking: nobody can be paid twice')
+    end)
+    _G.TriggerClientEvent = notify
+    restore()
+end
+
+do
+    local env, seen, restore = truckScene({ hourlyCap = 1400 })
+    FakePeds[1] = vec3(0, 0, 0)
+    startHaul(1); yard(1)
+    later(100, function() haulCall('deliver', 1) end)
+    check(Mocks.lastPaid.amount == 1000, 'trucking: pay under the hourly cap')
+    startHaul(1); yard(1)
+    FakePeds[Spawned[4]] = DROP
+    later(100, function() haulCall('deliver', 1) end)
+    check(Mocks.lastPaid.amount == 400, 'trucking: the hourly cap trims the next haul')
+    restore()
+end
+
+do
+    local env, seen, restore = truckScene()
+    FakePeds[1] = vec3(0, 0, 0)
+    startHaul(1); yard(1)
+    Mocks.businessSpendFails = true
+    local paid = Mocks.calls.addMoney
+    later(100, function()
+        check(haulCall('deliver', 1).success == false and Mocks.calls.addMoney == paid, 'trucking: a broke company pays nothing, no money is created')
+        Mocks.businessSpendFails = false
+        Mocks.addMoneyFails = true
+        local t = Mocks.calls.businessTransact
+        check(haulCall('deliver', 1).success == false and Mocks.calls.businessTransact == t + 1 and Mocks.lastTransact.amount == 1000, 'trucking: a failed credit returns the money to the business')
+        Mocks.addMoneyFails = false
+        check(haulCall('deliver', 1).success == true, 'trucking: a failed payout can be retried')
+    end)
+    restore()
+end
+
+do
+    local env, seen, restore = truckScene()
+    FakePeds[1] = vec3(0, 0, 0)
+    startHaul(1)
+    local paid = Mocks.calls.addMoney
+    check(haulCall('abandon', 9).error == 'you have no haul', 'trucking: only a member can abandon')
+    check(haulCall('abandon', 1).success == true and Mocks.calls.addMoney == paid, 'trucking: abandoning pays nothing')
+    check(#Deleted == 2 and Mocks.exported.getGroup(1).busy == nil, 'trucking: abandoning removes both vehicles and frees the group')
+    g(1, 'ready', { ready = true })
+    check(j(1, 'queue', { provider = 'trucking_sand' }).error == 'a crew member abandoned a haul recently', 'trucking: a cooldown stops abandon and re-accept')
+    later(env.Config.abandonCooldown + 5, function()
+        check(j(1, 'queue', { provider = 'trucking_sand' }).success == true, 'trucking: the cooldown ends')
+    end)
+    restore()
+end
+
+do
+    local env, seen, restore = truckScene()
+    FakePeds[1] = vec3(0, 0, 0)
+    startHaul(1)
+    later(30 * 60 + env.Config.graceMinutes * 60 + 5, function() env.Trucking.Sweep() end)
+    check(#Deleted == 2 and Mocks.exported.getGroup(1).busy == nil, 'trucking: a haul that runs out of time is cleaned up')
+
+    env, seen, restore = truckScene()
+    startHaul(1); Deleted = {}
+    g(1, 'leave')
+    check(#Deleted == 2 and seen[#seen].goal == nil, 'trucking: a disbanded group loses its vehicles')
+
+    env, seen, restore = truckScene()
+    startHaul(1); Deleted = {}
+    Handlers['som:server:playerUnloaded'](1, 'P1')
+    check(#Deleted == 2, 'trucking: the last member leaving removes the vehicles')
+
+    env, seen, restore = truckScene()
+    startHaul(1); Deleted = {}
+    Handlers['onResourceStop']('som-trucking')
+    check(#Deleted == 2, 'trucking: stopping the resource removes the vehicles')
+    restore()
+end
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)
