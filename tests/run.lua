@@ -59,6 +59,7 @@ local function resetDb()
     mysql.db.chop = { log = {}, owned = {} }
     mysql.db.licences = { rows = {}, attempts = {} }
     mysql.db.staff = { reports = {}, audit = {} }
+    mysql.db.taxi = { earned = {} }
     mysql.db.gangs = { chars = {}, log = {} }
     mysql.db.vehicles = {}
     mysql.db.social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} }
@@ -5803,6 +5804,182 @@ end
 
 -- ---------------------------------------------------------------------------
 -- Mechanic
+
+do
+    resetDb()
+    local realJobs = Mocks.jobs
+    Mocks.jobs = { mechanic = {}, ambulance = {}, police = {}, unemployed = {} }
+    local env = loader.loadResource(REPO .. 'som-duty', { 'shared/config.lua', 'server/main.lua' })
+    local toggle = RegisteredCallbacks['som-duty:server:toggle']
+    Mocks.clock = 1000
+    Mocks.players[1] = { citizenid = 'M1', job = { name = 'mechanic', onduty = true } }
+    check(toggle(1).onduty == false and Mocks.players[1].job.onduty == false, 'duty: a mechanic can clock out')
+    check(toggle(1).error == 'one moment', 'duty: clocking again at once is refused')
+    Mocks.clock = Mocks.clock + 6000
+    check(toggle(1).onduty == true and Mocks.players[1].job.onduty == true, 'duty: and back in')
+    Mocks.players[2] = { citizenid = 'A2', job = { name = 'ambulance', onduty = false } }
+    check(toggle(2).onduty == true, 'duty: a paramedic can go on duty, which had no way before')
+    Mocks.players[3] = { citizenid = 'P3', job = { name = 'police', onduty = false } }
+    check(toggle(3).error == 'your job has no clock in' and Mocks.players[3].job.onduty == false, 'duty: the police keep their own duty point')
+    Mocks.players[4] = { citizenid = 'U4', job = { name = 'unemployed', onduty = true } }
+    check(toggle(4).success == false, 'duty: no job, nothing to clock into')
+    Mocks.players[5] = { citizenid = 'X5', job = { name = 'madeup', onduty = false } }
+    check(toggle(5).success == false, 'duty: a job the framework does not know is refused')
+    Mocks.jobs = realJobs
+end
+
+do
+    resetDb()
+    local realThread, realWait, realTrigger = _G.CreateThread, _G.Wait, _G.TriggerClientEvent
+    local tickFn
+    _G.CreateThread = function(fn) tickFn = fn end
+    local env = loader.loadResource(REPO .. 'som-taxi', { 'shared/config.lua', 'server/main.lua' })
+    _G.CreateThread = realThread
+    local cb, C = RegisteredCallbacks, env.Config
+    local core = exports['som-core']
+
+    local sent = {}
+    _G.TriggerClientEvent = function(name, src, ...) sent[#sent + 1] = { name = name, src = src, args = { ... } } end
+    local function lastSent(name) for i = #sent, 1, -1 do if sent[i].name == name and sent[i].args[1] ~= nil then return sent[i] end end end
+
+    local function runTicks(n)
+        local left = n + 1
+        _G.Wait = function() left = left - 1; if left <= 0 then error('stop') end end
+        pcall(tickFn)
+        _G.Wait = realWait
+    end
+
+    local seated, speed, CAB = {}, 10, 700
+    _G.GetVehiclePedIsIn = function(ped) return seated[ped] or 0 end
+    _G.GetPedInVehicleSeat = function(_, seat) return seat == -1 and seated.driverPed or 0 end
+    _G.GetEntityModel = function() return joaat('taxi') end
+    _G.GetEntitySpeed = function() return speed end
+
+    local function person(src, cid, job)
+        Mocks.players[src] = { source = src, citizenid = cid, job = job or { name = 'unemployed' }, charinfo = { firstname = cid, lastname = 'T' } }
+        FakePeds[src] = vec3(0, 0, 0)
+        Mocks.bank[src] = 1000
+    end
+    local function drive(ticks, step)
+        for _ = 1, ticks do
+            FakePeds[CAB] = vec3(FakePeds[CAB].x + (step or 50), 0, 0)
+            runTicks(1)
+        end
+    end
+    Mocks.clock = 5000000
+    person(1, 'T1', { name = 'taxi', onduty = true })
+    person(2, 'R2')
+    FakePeds[CAB] = vec3(0, 0, 0)
+    local act, answer = cb['som-taxi:server:act'], cb['som-taxi:server:answer']
+
+    check(act(2, 'start').error == 'you are not on duty as a cab driver', 'taxi: only an on duty cab driver runs the meter')
+    check(act(1, 'bad').error == 'bad request', 'taxi: an unknown action is refused')
+    check(act(1, 'start').error == 'sit in the driver seat of a cab', 'taxi: the meter needs a cab')
+    seated[1], seated.driverPed = CAB, 1
+    check(act(1, 'start').success and act(1, 'start').error == 'the meter is already running', 'taxi: the meter starts once')
+
+    seated[2] = CAB
+    runTicks(1)
+    check(act(1, 'charge').error:find('too short'), 'taxi: a ride under the minimum distance is free')
+
+    drive(4)
+    check(act(1, 'charge').error:find('too short'), 'taxi: a short ride stays free however long it takes')
+    drive(9)
+    local before = #sent
+    FakePeds[CAB] = vec3(FakePeds[CAB].x + 5000, 0, 0)
+    runTicks(1)
+    check(act(1, 'charge').success, 'taxi: after enough driving the fare can be sent')
+    local fareMsg = lastSent('som-taxi:client:fare')
+    local fare, meters = fareMsg.args[1], fareMsg.args[2]
+    check(fareMsg.src == 2 and meters >= C.minMeters and meters < 1000, 'taxi: a teleport is not counted as distance')
+    check(fare == math.floor(C.baseFare + C.perKm * meters / 1000), 'taxi: the fare comes from the measured distance')
+    check(act(1, 'charge').error == 'nobody has ridden yet' or act(1, 'charge').error == 'they are already deciding', 'taxi: a fare cannot be sent twice')
+
+    check(answer(3, true).error == 'no fare to pay', 'taxi: a stranger cannot pay or accept a fare')
+    check(answer(2, false).error == 'declined' and Mocks.bank[2] == 1000, 'taxi: a refused fare takes nothing')
+
+    local function newFare()
+        drive(10)
+        assert(act(1, 'charge').success)
+        return lastSent('som-taxi:client:fare').args[1]
+    end
+
+    fare = newFare()
+    Mocks.clock = Mocks.clock + (C.offerSeconds + 1) * 1000
+    check(answer(2, true).error == 'the fare request ran out' and Mocks.bank[2] == 1000, 'taxi: an old fare cannot be accepted')
+
+    fare = newFare()
+    Mocks.treasury = 0
+    local callsBefore = Mocks.calls.businessTransact
+    local r = answer(2, true)
+    local pay = math.floor(fare * C.commission)
+    check(r.success and r.fare == fare and Mocks.bank[2] == 1000 - fare, 'taxi: the passenger pays the fare from the bank')
+    check(Mocks.calls.businessTransact == callsBefore + 2 and Mocks.lastTransact.name == C.business and Mocks.lastTransact.amount == -pay,
+        'taxi: the company gets the fare, then pays the commission')
+    check(r.paid == pay and pay < fare and Mocks.lastPaid.reason == 'taxi:commission' and Mocks.lastPaid.amount == pay,
+        'taxi: the driver gets a commission below the fare')
+    check(Mocks.lastPaid.opts and Mocks.lastPaid.opts.flow == 'transfer' and Mocks.lastPaid.opts.counterparty == C.business, 'taxi: the commission is booked as a transfer, not new money')
+    check(answer(2, true).error == 'no fare to pay', 'taxi: a fare is paid once')
+
+    -- Hourly cap on the driver's commission.
+    fare = newFare()
+    mysql.db.taxi.earned['T1'] = C.hourlyCommissionCap - 2
+    r = answer(2, true)
+    check(r.success and r.paid == 2, 'taxi: the driver commission stops at the hourly cap')
+    mysql.db.taxi.earned['T1'] = C.hourlyCommissionCap
+    fare = newFare()
+    r = answer(2, true)
+    check(r.success and r.paid == 0, 'taxi: at the cap the passenger still pays and the driver gets nothing more')
+    mysql.db.taxi.earned['T1'] = 0
+
+    -- A failed company credit gives the passenger the money back.
+    fare = newFare()
+    local realBT = core.businessTransact
+    core.businessTransact = function(self, name, amount, reason) if amount > 0 then return false end return realBT(self, name, amount, reason) end
+    r = answer(2, true)
+    core.businessTransact = realBT
+    check(not r.success and Mocks.lastPaid.reason == 'taxi:fare:refund' and Mocks.lastPaid.amount == fare, 'taxi: a fare the company cannot take is refunded')
+
+    -- A failed driver credit puts the commission back.
+    fare = newFare()
+    Mocks.addMoneyFails = true
+    r = answer(2, true)
+    Mocks.addMoneyFails = false
+    check(r.success and r.paid == 0 and Mocks.lastTransact.amount > 0, 'taxi: a commission that cannot be paid goes back to the company')
+
+    -- Poor passenger.
+    fare = newFare()
+    Mocks.bank[2] = 1
+    check(answer(2, true).error:find('you need'), 'taxi: a passenger who cannot pay is not charged')
+    Mocks.bank[2] = 1000
+
+    -- Driver off duty before the answer.
+    fare = newFare()
+    Mocks.players[1].job.onduty = false
+    local bank2 = Mocks.bank[2]
+    check(answer(2, true).error == 'the driver is no longer on duty' and Mocks.bank[2] == bank2, 'taxi: no charge when the driver went off duty')
+    Mocks.players[1].job.onduty = true
+
+    -- No fares to yourself.
+    Mocks.players[2].citizenid = 'T1'
+    drive(10)
+    check(act(1, 'charge').error == 'you cannot charge yourself', 'taxi: a character cannot pay itself')
+    Mocks.players[2].citizenid = 'R2'
+
+    -- A passenger who walked away cannot be charged.
+    drive(10)
+    FakePeds[2] = vec3(500, 0, 0)
+    check(act(1, 'charge').error == 'the passenger is gone', 'taxi: a passenger far away is not charged')
+    FakePeds[2] = vec3(0, 0, 0)
+
+    -- Leaving the cab ends the meter.
+    seated[1] = nil
+    runTicks(1)
+    check(act(1, 'charge').error == 'the meter is not running', 'taxi: leaving the cab stops the meter')
+    _G.TriggerClientEvent = realTrigger
+    _G.Wait = realWait
+end
+
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)
