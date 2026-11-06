@@ -415,6 +415,13 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Not verified in a live server: the offer and answer dialogs, the Leases phone app, a real week passing, eviction while the tenant is inside the property (they are told, not moved, and lose stash access immediately).
 - [ ] Left out on purpose: city motel rooms, deposits, rent tax, subletting, mid-lease rent changes, items in the stash on eviction (they stay with the property).
 
+## Armoury ledger (som-police)
+
+- [ ] Existing databases: import the new `som_police_armoury` table (`setup.sql` section 7b, `CREATE TABLE IF NOT EXISTS`). Nothing else changes.
+- [ ] At the armoury, on duty officers get an "Armoury ledger" entry next to "Armoury". They sign out department weapons from `Config.Armoury.loan` (defaults: shotgun, and an SMG from grade 3, both needing `cert.rifle`; change the list and gates to taste), return them there, and supervisors (grade `Config.SupervisorGrade`, 5) see who holds what and can flag one missing. Flagging raises one police dispatch call (`armouryMissing`, 10-99) per weapon; no wanted level, no fine, no automatic penalty. Job change, death or jail leave a line open, and a missing weapon can still be returned.
+- [ ] Each loan weapon gets a server made serial `LSPD-<line id>` written on the item, so a casing from it already carries that serial (`som-evidence` reads `metadata.serial`, no change was needed). Weapons bought at the armoury still get the old non unique `POL<last 5 of citizenid>` serial, unchanged on purpose.
+- [ ] A weapon flagged missing keeps blocking a new sign out of that type for that officer until it is returned. There is no write off button; staff clear it with `UPDATE som_police_armoury SET status = 'void' WHERE id = <id>;`. The audit list shows the 50 oldest open lines.
+- [ ] Not verified live: the context menu on the armoury zone, ox_inventory slot metadata for weapons (`metadata.serial` surviving into the slot the return looks for), and the serial reaching evidence casings.
 ## DMV: registration and vanity plates (som-dmv)
 
 - [ ] Existing databases: import the two new tables `som_vehicle_registration` and `som_dmv_plate_log` (`setup.sql` section 7o).

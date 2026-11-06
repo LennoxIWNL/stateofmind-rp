@@ -168,6 +168,13 @@ Config.Armoury = {
         { item = 'handcuffs',  label = 'Handcuffs',  count = 1 },
     },
 
+    -- Department weapons, signed out and returned through the armoury ledger
+    -- (server/armoury.lua). Free, and each one is tracked by a unique serial.
+    loan = {
+        { item = 'weapon_pumpshotgun', label = 'Shotgun', cert = 'cert.rifle' },
+        { item = 'weapon_smg',         label = 'SMG',     cert = 'cert.rifle', grade = 3 },
+    },
+
     -- Bought by the officer, cash or card. `weapon` items are given with a
     -- serial so evidence can tie a casing back to them later.
     personal = {
