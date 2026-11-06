@@ -57,6 +57,7 @@ local function resetDb()
     mysql.db.skills = {}
     mysql.db.newlife = {}
     mysql.db.chop = { log = {}, owned = {} }
+    mysql.db.licences = { rows = {}, attempts = {} }
     mysql.db.staff = { reports = {}, audit = {} }
     mysql.db.gangs = { chars = {}, log = {} }
     mysql.db.vehicles = {}
@@ -4550,6 +4551,355 @@ do
     check(started == 1, 'mdt: repeated delete events for one incident start one check')
 end
 
+
+do
+    resetDb()
+    local realThread, realWait = _G.CreateThread, _G.Wait
+    local locked = {}
+    _G.SetVehicleDoorsLocked = function(e, state) locked[e] = state end
+    local tickFn
+    _G.CreateThread = function(fn) tickFn = fn end
+    local env = loader.loadResource(REPO .. 'som-licences', {
+        'shared/config.lua', 'server/questions.lua', 'server/licences.lua', 'server/police.lua', 'server/school.lua',
+    })
+    _G.CreateThread = realThread
+    local cb = RegisteredCallbacks
+    local C = env.Config
+
+    local function runTicks(n)
+        local left = n + 1
+        _G.Wait = function() left = left - 1; if left <= 0 then error('stop') end end
+        pcall(tickFn)
+        _G.Wait = realWait
+    end
+
+    local car = { id = 500, inCar = true, speed = 0 }
+    _G.CreateVehicle = function() car.id = car.id + 1; _G.Vehicles[car.id] = { body = 1000.0 }; return car.id end
+    _G.SetVehicleNumberPlateText = function() end
+    _G.NetworkGetNetworkIdFromEntity = function(e) return e end
+    _G.GetVehiclePedIsIn = function() return car.inCar and car.id or 0 end
+    _G.GetEntitySpeed = function() return car.speed end
+    _G.joaat = _G.joaat or function() return 1 end
+
+    local function person(src, cid, extra)
+        local p = { source = src, citizenid = cid, job = { name = 'unemployed', grade = 0 },
+            charinfo = { firstname = cid, lastname = 'Test' }, metadata = {} }
+        for k, v in pairs(extra or {}) do p[k] = v end
+        Mocks.players[src] = p
+        FakePeds[src] = vec3(0, 0, 0)
+        Mocks.bank[src] = 1000
+        Mocks.inv[src] = {}
+        return p
+    end
+
+    local function itemCount(src, name)
+        local n = 0
+        for _, it in pairs(Mocks.inv[src] or {}) do if it.name == name then n = n + 1 end end
+        return n
+    end
+
+    local function takeTheory(src, correct, resume)
+        local r = resume and { success = true, question = cb['som-licences:server:answer'](src, 1).question }
+        r = r or cb['som-licences:server:beginTheory'](src)
+        if not r.success then return r end
+        while true do
+            local q = r.question
+            local key
+            for _, row in ipairs(env.Questions) do if row.q == q.text then key = row.answer end end
+            local pick = correct and key or (key % #q.options) + 1
+            r = cb['som-licences:server:answer'](src, pick)
+            if r.done or not r.success then return r end
+        end
+    end
+
+    local function rows() local n = 0; for _ in pairs(mysql.db.licences.rows) do n = n + 1 end return n end
+
+    Mocks.clock = 1000000
+    local base = 1800000000
+    mysql.fakeNow = base
+    person(1, 'D1')
+
+    check(cb['som-licences:server:beginTheory'](1).error == 'the driving school is closed', 'licences: the school ships closed')
+
+    C.school.enabled, C.school.coords, C.school.spawn = true, vec3(0, 0, 0), vec4(10, 0, 0, 0)
+    C.practical.route = { vec3(100, 0, 0), vec3(200, 0, 0) }
+
+    local begin = cb['som-licences:server:beginTheory'](1)
+    check(begin.success and begin.question.text and #begin.question.options >= 2 and begin.question.answer == nil,
+        'licences: the client is sent the question and options, never the answer')
+    check(cb['som-licences:server:beginTheory'](1).error == 'you are already taking a test', 'licences: one test at a time')
+    check(cb['som-licences:server:answer'](1, 99).error == 'bad answer' and cb['som-licences:server:answer'](1, 1.5).error == 'bad answer',
+        'licences: an answer outside the options is rejected')
+    cb['som-licences:server:answer'](1, 1)
+    check(cb['som-licences:server:answer'](2, 1).error == 'no test in progress', 'licences: answering with no test is rejected')
+
+    -- Finish the half-done test as a failure, so the retry cooldown is exercised.
+    local r = takeTheory(1, false, true)
+    check(r.done and r.passed == false, 'licences: wrong answers fail the theory test')
+    local res
+
+    mysql.fakeNow = base + 60
+    check(cb['som-licences:server:beginTheory'](1).error:find('wait'), 'licences: a failed test blocks a retry for a while')
+    mysql.fakeNow = base + 31 * 60
+
+    Mocks.bank[1] = 100
+    check(cb['som-licences:server:beginTheory'](1).error:find('costs'), 'licences: cannot start without the fee in the bank')
+    Mocks.bank[1] = 1000
+
+    check(cb['som-licences:server:startPractical'](1).error == 'pass the theory test first', 'licences: no drive without a theory pass')
+
+    res = takeTheory(1, true)
+    check(res.done and res.passed and res.score == C.theory.questions, 'licences: right answers pass')
+
+    FakePeds[1] = vec3(50, 0, 0)
+    check(cb['som-licences:server:startPractical'](1).error == 'too far away', 'licences: the drive starts at the school')
+    FakePeds[1] = vec3(0, 0, 0)
+    check(cb['som-licences:server:startPractical'](1).success, 'licences: a theory pass starts the drive')
+    check(cb['som-licences:server:startPractical'](1).error == 'you are already driving', 'licences: one drive at a time')
+    check(rows() == 0, 'licences: no licence before the drive is finished')
+
+    FakePeds[1] = vec3(100, 0, 0)
+    Mocks.clock = Mocks.clock + 500
+    runTicks(1)
+    check(rows() == 0, 'licences: teleporting to a checkpoint sooner than the route allows does not count')
+    Mocks.clock = Mocks.clock + 2000
+    runTicks(1)
+    FakePeds[1] = vec3(200, 0, 0)
+    Mocks.clock = Mocks.clock + 500
+    runTicks(1)
+    check(rows() == 0, 'licences: the second checkpoint also needs the travel time')
+    Mocks.clock = Mocks.clock + 3000
+    runTicks(1)
+
+    check(rows() == 1 and mysql.db.licences.rows['D1:driver'].revoked == 0, 'licences: finishing the route issues the licence')
+    check(Mocks.bank[1] == 1000 - C.school.fee and Mocks.treasury >= C.school.fee, 'licences: the fee moves from the player to the treasury')
+    check(itemCount(1, 'driver_license') == 1, 'licences: the card is handed over')
+    check(Mocks.players[1].metadata.licenses.driver == true, 'licences: the metadata mirror is written')
+    check(#_G.Deleted >= 1, 'licences: the school car is removed at the end')
+    FakePeds[1] = vec3(0, 0, 0)
+    check(cb['som-licences:server:beginTheory'](1).error:find('already hold'), 'licences: a holder cannot sit the test again')
+
+    -- A failed credit hands the money back and leaves no licence behind.
+    person(3, 'D3')
+    takeTheory(3, true)
+    cb['som-licences:server:startPractical'](3)
+    FakePeds[3] = vec3(100, 0, 0); Mocks.clock = Mocks.clock + 3000; runTicks(1)
+    FakePeds[3] = vec3(200, 0, 0)
+    Mocks.taxFails = true
+    local treasuryBefore = Mocks.treasury
+    Mocks.clock = Mocks.clock + 3000; runTicks(1)
+    Mocks.taxFails = nil
+    check(rows() == 1 and Mocks.lastPaid.reason == 'licence:driver:refund' and Mocks.lastPaid.amount == C.school.fee and itemCount(3, 'driver_license') == 0 and Mocks.treasury == treasuryBefore,
+        'licences: a fee that cannot be credited is refunded and the licence is undone')
+
+    -- Too poor at the end: the claim is undone.
+    person(4, 'D4')
+    mysql.fakeNow = mysql.fakeNow + 1
+    takeTheory(4, true)
+    cb['som-licences:server:startPractical'](4)
+    Mocks.bank[4] = 0
+    FakePeds[4] = vec3(100, 0, 0); Mocks.clock = Mocks.clock + 3000; runTicks(1)
+    FakePeds[4] = vec3(200, 0, 0); Mocks.clock = Mocks.clock + 3000; runTicks(1)
+    check(rows() == 1 and itemCount(4, 'driver_license') == 0, 'licences: no money at the end means no licence and no card')
+
+    -- Faults
+    person(5, 'D5')
+    takeTheory(5, true)
+    cb['som-licences:server:startPractical'](5)
+    local deletedBefore = #_G.Deleted
+    car.speed = 100
+    for _ = 1, 5 do Mocks.clock = Mocks.clock + 4000; runTicks(1) end
+    car.speed = 0
+    check(#_G.Deleted == deletedBefore + 1 and rows() == 1, 'licences: too many faults fail the drive and remove the car')
+
+    person(6, 'D6')
+    takeTheory(6, true)
+    cb['som-licences:server:startPractical'](6)
+    car.inCar = false
+    Mocks.clock = Mocks.clock + 1000; runTicks(1)
+    Mocks.clock = Mocks.clock + 16000; runTicks(1)
+    car.inCar = true
+    check(cb['som-licences:server:startPractical'](6).error == 'pass the theory test first', 'licences: leaving the car fails the drive and the pass is spent')
+
+    -- A drop mid-drive cleans up.
+    person(7, 'D7')
+    takeTheory(7, true)
+    cb['som-licences:server:startPractical'](7)
+    deletedBefore = #_G.Deleted
+    Handlers['som:server:playerUnloaded'](7, 'D7')
+    check(#_G.Deleted == deletedBefore + 1, 'licences: dropping out removes the school car')
+
+    -- An abandoned test stops blocking after its time, and counts as a fail.
+    person(8, 'D8')
+    check(cb['som-licences:server:beginTheory'](8).success, 'licences: a test starts')
+    Mocks.clock = Mocks.clock + (C.theory.maxMinutes + 1) * 60000
+    check(cb['som-licences:server:beginTheory'](8).error:find('wait'), 'licences: an abandoned test times out and counts as a failed one')
+    person(9, 'D9')
+    cb['som-licences:server:beginTheory'](9)
+    Handlers['som:server:playerUnloaded'](9, 'D9')
+    person(9, 'D9')
+    check(cb['som-licences:server:beginTheory'](9).error:find('wait'), 'licences: quitting mid-test does not skip the retry wait')
+
+    -- Police
+    local civ = person(10, 'C10')
+    FakePeds[10] = vec3(1, 0, 0)
+    mysql.db.licences.rows['C10:driver'] = { citizenid = 'C10', type = 'driver', revoked = 0 }
+    mysql.db.licences.rows['C10:weapon'] = { citizenid = 'C10', type = 'weapon', revoked = 0 }
+    local cop = person(11, 'O11', { job = { name = 'police', onduty = true, grade = 3 } })
+    local low = person(12, 'O12', { job = { name = 'police', onduty = true, grade = 1 } })
+    Handlers['som:server:playerLoaded'](10)
+    check(civ.metadata.licenses.driver == true and civ.metadata.licenses.weapon == true, 'licences: the mirror is rebuilt from the table at load')
+
+    civ.metadata.licenses.driver = false
+    civ.metadata.licenses.weapon = nil
+    civ.metadata.licenses = { driver = true, weapon = true }
+    mysql.db.licences.rows['C10:weapon'].revoked = 1
+    Handlers['som:server:playerLoaded'](10)
+    check(civ.metadata.licenses.weapon == false, 'licences: a forged metadata licence is overwritten by the table')
+
+    mysql.db.licences.rows['C10:weapon'].revoked = 0
+    check(cb['som-licences:server:check'](10, 10).error == 'you are not on duty', 'licences: a civilian cannot check licences')
+    check(cb['som-licences:server:check'](11, 10).success, 'licences: an officer can check a licence')
+    FakePeds[11] = vec3(50, 0, 0)
+    check(cb['som-licences:server:check'](11, 10).error == 'too far away', 'licences: the check needs the officer to be close')
+    FakePeds[11] = vec3(0, 0, 0)
+
+    local act = cb['som-licences:server:act']
+    check(act(12, 10, 'driver', 'suspend', 3).error == 'your rank cannot do that', 'licences: a low rank cannot suspend')
+    check(act(10, 10, 'driver', 'revoke').success == false, 'licences: a civilian cannot revoke')
+    check(act(11, 10, 'driver', 'suspend', 99).error:find('days'), 'licences: suspension length is capped')
+    check(act(11, 10, 'pilot', 'suspend', 3).error == 'bad request', 'licences: unknown licence types are rejected')
+    check(act(11, 10, 'driver', 'suspend', 3).success, 'licences: command can suspend')
+    check(civ.metadata.licenses.driver == false, 'licences: a suspension reaches the mirror')
+    Handlers['som:server:metadataChanged'](10, 'C10', 'licenses', { driver = false })
+    check(mysql.db.licences.rows['C10:driver'].revoked == 0, 'licences: a suspension is not turned into a revoke by its own mirror')
+    mysql.fakeNow = mysql.fakeNow + 4 * 86400
+    local lines = cb['som-licences:server:check'](11, 10).lines
+    check(lines[1]:find('valid') or lines[2]:find('valid'), 'licences: a suspension ends by the database clock')
+
+    check(act(11, 10, 'driver', 'revoke').success and mysql.db.licences.rows['C10:driver'].revoked == 1, 'licences: command can revoke')
+    check(act(11, 10, 'driver', 'revoke').error == 'they have no such licence', 'licences: revoking twice changes nothing')
+    check(act(11, 10, 'driver', 'reinstate').success and civ.metadata.licenses.driver == true, 'licences: command can reinstate')
+
+    Handlers['som:server:metadataChanged'](10, 'C10', 'licenses', { driver = false, weapon = true })
+    check(mysql.db.licences.rows['C10:driver'].revoked == 1, 'licences: an MDT revoke lands in the table')
+
+    -- Weapon licence: the officer makes an offer, the buyer answers it later.
+    local wp = person(20, 'W20')
+    Mocks.bank[20] = 6000
+    FakePeds[20] = vec3(1, 0, 0)
+    local issue, answer = cb['som-licences:server:issueWeapon'], cb['som-licences:server:answerWeapon']
+    check(issue(12, 20).error == 'your rank cannot do that', 'licences: a low rank cannot issue a weapon licence')
+    check(answer(20, true).error == 'no offer', 'licences: a buyer cannot accept an offer nobody made')
+    check(issue(11, 20).success and not mysql.db.licences.rows['W20:weapon'], 'licences: an offer alone issues nothing')
+    check(answer(20, true).success, 'licences: the buyer accepting issues the licence')
+    check(Mocks.bank[20] == 6000 - C.weapon.fee and Mocks.lastTransact.name == C.weapon.business and Mocks.lastTransact.amount == C.weapon.fee,
+        'licences: the weapon fee goes to the police account')
+    check(itemCount(20, 'weaponlicense') == 1 and wp.metadata.licenses.weapon == true, 'licences: the weapon card and mirror are set')
+    check(issue(11, 20).error:find('already hold'), 'licences: a second weapon licence is refused')
+
+    person(21, 'W21'); FakePeds[21] = vec3(1, 0, 0)
+    issue(11, 21)
+    answer(21, false)
+    check(Mocks.bank[21] == 1000 and not mysql.db.licences.rows['W21:weapon'], 'licences: a buyer who declines is not charged')
+    check(answer(21, true).error == 'no offer', 'licences: an answered offer cannot be reused')
+
+    person(22, 'W22'); FakePeds[22] = vec3(1, 0, 0)
+    issue(11, 22)
+    cop.job.onduty = false
+    check(answer(22, true).error == 'you are not on duty' and Mocks.bank[22] == 1000 and not mysql.db.licences.rows['W22:weapon'],
+        'licences: an officer who went off duty before the buyer agreed issues nothing')
+    cop.job.onduty = true
+
+    person(23, 'W23'); FakePeds[23] = vec3(1, 0, 0)
+    issue(11, 23)
+    FakePeds[23] = vec3(80, 0, 0)
+    check(answer(23, true).error == 'too far away' and not mysql.db.licences.rows['W23:weapon'], 'licences: an officer who walked away issues nothing')
+
+    person(24, 'W24'); FakePeds[24] = vec3(1, 0, 0)
+    issue(11, 24)
+    cop.job.grade = 1
+    check(answer(24, true).error == 'the officer can no longer issue it', 'licences: an officer demoted before the buyer agreed issues nothing')
+    cop.job.grade = 3
+
+    person(25, 'W25'); FakePeds[25] = vec3(1, 0, 0)
+    issue(11, 25)
+    Mocks.clock = Mocks.clock + (C.weapon.offerSeconds + 1) * 1000
+    check(answer(25, true).error == 'the offer ran out' and not mysql.db.licences.rows['W25:weapon'], 'licences: an old offer cannot be accepted')
+
+    local lockedAll, lockedCount = true, 0
+    for _, state in pairs(locked) do lockedCount = lockedCount + 1; lockedAll = lockedAll and state == 2 end
+    check(lockedCount >= 5 and lockedAll, 'licences: every school car is locked to everyone else')
+
+    _G.Wait = realWait
+end
+
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local realCreate, realWait = _G.CreateThread, _G.Wait
+    local threads = {}
+    _G.CreateThread = function(fn) threads[#threads + 1] = fn end
+    local env = loader.loadResource(REPO .. 'som-core', {
+        'shared/config.lua', 'shared/tiers.lua', 'shared/jobs.lua', 'shared/gangs.lua',
+        'server/permissions.lua', 'server/player.lua', 'server/money.lua', 'server/main.lua',
+    })
+    _G.CreateThread = realCreate
+
+    local calls = {}
+    env.Money.BusinessTransact = function(name, amount, reason) calls[#calls + 1] = { name, amount, reason }; return true end
+    env.Money.Add = function() return true end
+    local cop = { source = 1, citizenid = 'PC1', job = { name = 'police', onduty = true, payment = 1200 } }
+
+    env.PayCheck(cop)
+    check(#calls == 1 and calls[1][2] == -1200, 'paycheck: the business is debited the pay')
+
+    calls = {}
+    env.Money.Add = function() return false, 'database error' end
+    env.PayCheck(cop)
+    check(#calls == 2 and calls[2][2] == 1200 and calls[2][3]:find('refund', 1, true), 'paycheck: a failed credit returns the money to the business')
+
+    calls = {}
+    env.Money.BusinessTransact = function() error('database down') end
+    local fine = pcall(env.PayCheck, cop)
+    check(not fine, 'paycheck: a database error surfaces to the loop')
+
+    local paid = {}
+    env.Money.BusinessTransact = function(_, amount) if paid.first == nil then paid.first = true; error('database down') end return true end
+    env.Money.Add = function(source) paid[#paid + 1] = source; return true end
+    env.Players.GetAll = function() return { cop, { source = 2, citizenid = 'PC2', job = { name = 'police', onduty = true, payment = 1200 } } } end
+    local waits = 0
+    _G.Wait = function() waits = waits + 1; if waits > 1 then error('stop loop') end end
+    for _, thread in ipairs(threads) do waits = 0; pcall(thread) end
+    _G.Wait = realWait
+    check(#paid == 1 and paid[1] == 2, 'paycheck: one failed player does not stop the next one being paid')
+
+    _G.source = 1
+    local status = function(_, key, delta) RegisteredEvents['som:server:adjustStatus'](key, delta) end
+    local meta = { hunger = 0 }
+    env.Players.Get = function() return { metadata = meta, setMetadata = function(_, k, v) meta[k] = v end } end
+    Mocks.clock = 100000
+    for _ = 1, 5 do Mocks.clock = Mocks.clock + 600; status(1, 'hunger', 50) end
+    check(meta.hunger == 100, 'status: client-sent changes stop after the per-minute budget')
+    Mocks.clock = Mocks.clock + 61000
+    status(1, 'hunger', 50)
+    _G.source = nil
+    check(meta.hunger == 150, 'status: the budget comes back after a minute')
+end
+
+do
+    resetDb()
+    local realCreate = _G.CreateThread
+    local started = 0
+    _G.CreateThread = function() started = started + 1 end
+    loader.loadResource(REPO .. 'som-police', { 'shared/config.lua', 'server/main.lua', 'server/incidents.lua' })
+    started = 0
+    for _ = 1, 100 do RegisteredEvents['mdt:server:deleteIncidents'](7) end
+    _G.CreateThread = realCreate
+    check(started == 1, 'mdt: repeated delete events for one incident start one check')
+end
+
 -- som-trucking
 ----------------------------------------------------------------------
 local truckEnv
@@ -4558,6 +4908,7 @@ local DROP = vec3(3000, 0, 0)
 local function truckScene(overrides)
     boardScene()
     Spawned, Vehicles, Deleted = {}, {}, {}
+    _G.CreateVehicle = _G.MockCreateVehicle
     truckEnv = loader.loadResource(REPO .. 'som-trucking', { 'shared/config.lua', 'server/main.lua' })
     truckEnv.Config.hourlyCap = 100000
     for k, v in pairs(overrides or {}) do truckEnv.Config[k] = v end

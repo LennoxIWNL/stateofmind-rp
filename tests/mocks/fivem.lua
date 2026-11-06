@@ -100,6 +100,7 @@ _G.CreateVehicle = function(hash)
     _G.Vehicles[id] = { body = 1000.0, engine = 1000.0 }
     return id
 end
+_G.MockCreateVehicle = _G.CreateVehicle
 _G.DeleteEntity = function(e) _G.Deleted[#_G.Deleted + 1] = e; _G.Vehicles[e] = nil end
 
 _G.Dropped = {}

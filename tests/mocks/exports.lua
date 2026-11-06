@@ -105,6 +105,7 @@ function core:removeMoney(source, account, amount, reason)
     Mocks.bank[source] = Mocks.bank[source] - amount
     return true
 end
+function core:hasMoney(source, account, amount) return (Mocks.bank[source] or 0) >= amount end
 function core:businessTransact(name, amount, reason)
     Mocks.calls.businessTransact = Mocks.calls.businessTransact + 1
     Mocks.lastTransact = { name = name, amount = amount }

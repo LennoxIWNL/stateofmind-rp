@@ -4,7 +4,8 @@
 // the object, padded square and scaled to 100x100 with a transparent
 // background. Usage: node tools/icon-process.mjs <in.png> <out.png> [size]
 // Cutouts that already have transparency are only cropped and scaled. Pass `dark` as a
-// fourth argument for dark objects so soft cast shadows are removed too.
+// fourth argument for dark objects so soft cast shadows are removed too, or `holes` to
+// also clear enclosed gaps (inside ring handles, chain links).
 // Made by Lennox.
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
@@ -56,6 +57,27 @@ const result = await page.evaluate(async ({ dataUrl, size, mode }) => {
     if (x < w - 1) stack.push(x + 1, y)
     if (y > 0) stack.push(x, y - 1)
     if (y < h - 1) stack.push(x, y + 1)
+  }
+  // `holes` mode: near-white areas the edge fill cannot reach (the gap inside a ring
+  // handle) are background too, unless tiny, so highlights on the object survive.
+  if (mode === 'holes' && !hasAlpha) {
+    const minHole = w * h * 0.002
+    for (let s = 0; s < w * h; s++) {
+      if (seen[s] || !near(s * 4)) continue
+      const comp = [], q = [s]
+      const mark = new Set([s])
+      while (q.length) {
+        const p = q.pop()
+        comp.push(p)
+        const x = p % w, y = (p - x) / w
+        for (const n of [x > 0 && p - 1, x < w - 1 && p + 1, y > 0 && p - w, y < h - 1 && p + w]) {
+          if (n !== false && !mark.has(n) && !seen[n] && near(n * 4)) { mark.add(n); q.push(n) }
+        }
+      }
+      if (comp.length >= minHole) for (const p of comp) seen[p] = 1
+      else for (const p of comp) seen[p] = 2
+    }
+    for (let p = 0; p < w * h; p++) if (seen[p] === 2) seen[p] = 0
   }
   // Soft shadow: grey pixels touching the background fade out instead of vanishing.
   let minX = w, minY = h, maxX = 0, maxY = 0
