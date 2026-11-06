@@ -7,6 +7,7 @@ local ox = exports.ox_inventory
 
 local started = {}  -- [medic source] = { target, at }
 local lastRevive = {} -- [patient citizenid] = GetGameTimer()
+local taking = {}
 
 local function done(ok, err)
     return { success = ok == true, error = (not ok) and err or nil }
@@ -49,7 +50,8 @@ lib.callback.register('som-ems:server:revive', function(source, target)
     local run = started[source]
     started[source] = nil
     local r = Config.revive
-    if not run or run.target ~= tonumber(target) or GetGameTimer() - run.at < r.seconds * 900 then
+    local age = run and GetGameTimer() - run.at
+    if not run or run.target ~= tonumber(target) or age < r.seconds * 900 or age > Config.staleSeconds * 1000 then
         return done(false, 'treatment was not finished')
     end
 
@@ -63,7 +65,11 @@ lib.callback.register('som-ems:server:revive', function(source, target)
         return done(false, 'nobody here needs help')
     end
 
-    lastRevive[patientPlayer.citizenid] = GetGameTimer()
+    local now = GetGameTimer()
+    for cid, at in pairs(lastRevive) do
+        if now - at > Config.cooldownSeconds * 1000 then lastRevive[cid] = nil end
+    end
+    lastRevive[patientPlayer.citizenid] = now
     exports['som-phone']:billCitizen(patientPlayer.citizenid, Config.business, r.price, 'Emergency treatment', {
         issuerCitizenid = player.citizenid,
         fromName = ('%s %s'):format(player.charinfo.firstname, player.charinfo.lastname),
@@ -71,8 +77,41 @@ lib.callback.register('som-ems:server:revive', function(source, target)
     return done(true)
 end)
 
-AddEventHandler('playerDropped', function() started[source] = nil end)
+local function lockerOpen()
+    return Config.locker.enabled and Config.locker.coords ~= nil
+end
+
+lib.callback.register('som-ems:server:lockerInfo', function(source)
+    if not lockerOpen() or not medic(source) then return nil end
+    local l = Config.locker
+    return { label = l.label, coords = l.coords }
+end)
+
+lib.callback.register('som-ems:server:lockerTake', function(source)
+    if not medic(source) then return done(false, 'you are not on duty as a paramedic') end
+    if not lockerOpen() then return done(false, 'the locker is closed') end
+    if taking[source] then return done(false, 'one moment') end
+
+    local l = Config.locker
+    local ped = GetPlayerPed(source)
+    if ped == 0 or #(GetEntityCoords(ped) - l.coords) > l.distance then return done(false, 'you are too far away') end
+
+    taking[source] = true
+    local ok, err = pcall(function()
+        if (ox:Search(source, 'count', l.item) or 0) >= l.max then error('you already carry enough', 0) end
+        local issued, why = exports['som-economy']:issueEquipment(source, Config.business, l.item)
+        if not issued then error(why or 'not available', 0) end
+        if not ox:AddItem(source, l.item, 1) then error('you cannot carry it', 0) end
+    end)
+    taking[source] = nil
+    if not ok then return done(false, tostring(err)) end
+    return done(true)
+end)
+
+AddEventHandler('playerDropped', function() started[source] = nil; taking[source] = nil end)
 
 AddEventHandler('onResourceStop', function(name)
-    if name == GetCurrentResourceName() then started, lastRevive = {}, {} end
+    if name == GetCurrentResourceName() then started, lastRevive, taking = {}, {}, {} end
 end)
+
+CreateThread(function() SomPlacements.Apply(Config) end)

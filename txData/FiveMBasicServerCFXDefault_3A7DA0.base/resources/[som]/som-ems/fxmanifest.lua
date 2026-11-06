@@ -19,6 +19,8 @@ client_scripts {
 }
 
 server_scripts {
+    '@oxmysql/lib/MySQL.lua',
+    '@som-core/server/placements.lua',
     'server/main.lua',
 }
 
@@ -28,6 +30,7 @@ dependencies {
     'som-core',
     'som-interact',
     'som-ui',
+    'som-economy',
     'som-medical',
     'som-phone',
 }

@@ -210,6 +210,7 @@ Config.Armoury = {
     -- Paid for by the department account. Free to the officer.
     departmentIssue = {
         ifaks = 0,
+        firstaid = 0,
         bandage = 0,
         armour = 0,
         radio = 0,

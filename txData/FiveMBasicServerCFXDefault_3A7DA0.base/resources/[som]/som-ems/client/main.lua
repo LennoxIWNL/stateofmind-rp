@@ -44,11 +44,35 @@ CreateThread(function()
                 if not job or job.name ~= Config.job or not job.onduty then return false end
                 local index = NetworkGetPlayerIndexFromPed(entity)
                 if index == -1 then return false end
-                return Player(GetPlayerServerId(index)).state['som:downed'] ~= nil and Player(GetPlayerServerId(index)).state['som:downed'] ~= false
+                local down = Player(GetPlayerServerId(index)).state['som:downed']
+                return down ~= nil and down ~= false
             end,
             onSelect = function(data)
                 if data and data.entity then treat(data.entity) end
             end,
         },
     })
+end)
+
+local zone
+local function buildLocker()
+    if zone then exports['som-interact']:removeZone(zone); zone = nil end
+    local info = lib.callback.await('som-ems:server:lockerInfo', false)
+    if type(info) ~= 'table' then return end
+    zone = exports['som-interact']:addSphereZone({
+        name = 'som_ems_locker',
+        coords = vec3(info.coords.x, info.coords.y, info.coords.z),
+        radius = 1.5,
+        options = { { name = 'som_ems_locker_take', label = info.label, icon = 'fa-solid fa-suitcase-medical', distance = 2.0,
+            onSelect = function()
+                local result = lib.callback.await('som-ems:server:lockerTake', false)
+                say(result.success and 'Kit taken' or (result.error or 'Failed'), result.success and 'success' or 'error')
+            end } },
+    })
+end
+
+AddEventHandler('som:client:playerLoaded', buildLocker)
+CreateThread(function() Wait(3500); buildLocker() end)
+AddEventHandler('onResourceStop', function(name)
+    if name == GetCurrentResourceName() and zone then exports['som-interact']:removeZone(zone) end
 end)

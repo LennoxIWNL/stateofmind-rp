@@ -302,4 +302,4 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 
 - [ ] `som-ems`: an on-duty `ambulance` medic gets a "Treat" option on a downed player, spends one `firstaid` kit and the patient is billed 600 to the `ems` business. Price, 15 second treatment and 60 second cooldown are untuned defaults in `som-ems/shared/config.lua`.
 - [ ] Not verified live: the player target option, the CPR animation (`mini@cpr@char_a@cpr_str`), the `som:downed` state read on the medic's client, the bill arriving on the patient's phone.
-- [ ] Nothing hands out `firstaid` yet: decide the source (shop, EMS locker) and whitelist medics (`ambulance` is `whitelisted`). No heal or bandage treatment, stretcher or hospital check-in in this version.
+- [ ] Place the EMS supply locker (`Config.locker` in `som-ems`, ships disabled): it issues a free `firstaid` kit from the department (`firstaid = 0` in `Config.Armoury.departmentIssue`), up to 3 carried. Medics are `whitelisted`. No heal or bandage treatment, stretcher or hospital check-in in this version.

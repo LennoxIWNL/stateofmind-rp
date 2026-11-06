@@ -145,6 +145,11 @@ function economy:businessSpend(name, amount, reason)
     return not Mocks.businessSpendFails
 end
 
+function economy:issueEquipment(source, dept, item)
+    Mocks.issued = { source = source, dept = dept, item = item }
+    return not Mocks.issueFails, Mocks.issueFails and 'not employed by this department' or nil
+end
+
 function economy:getBusiness(name) return Mocks.businesses[name] end
 
 local phone = {}

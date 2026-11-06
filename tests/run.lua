@@ -3651,6 +3651,29 @@ do
 
     Mocks.downed[2] = true
     check(cb['som-ems:server:begin'](1, 2).error == 'give them a moment', 'ems: one patient cannot be farmed')
+
+    Mocks.clock = Mocks.clock + 70000
+    kit()
+    cb['som-ems:server:begin'](1, 2)
+    Mocks.clock = Mocks.clock + 200000
+    check(cb['som-ems:server:revive'](1, 2).error == 'treatment was not finished' and kits() == 1, 'ems: a treatment started long ago and never finished cannot be used later')
+
+    local L = env.Config.locker
+    check(cb['som-ems:server:lockerTake'](1).error == 'the locker is closed' and cb['som-ems:server:lockerInfo'](1) == nil, 'ems: the locker ships closed')
+    L.enabled, L.coords = true, vec3(0, 0, 0)
+    Mocks.players[1] = medic(false)
+    check(cb['som-ems:server:lockerTake'](1).error == 'you are not on duty as a paramedic', 'ems: only an on duty medic can use the locker')
+    Mocks.players[1] = medic()
+    FakePeds[1] = vec3(50, 0, 0)
+    check(cb['som-ems:server:lockerTake'](1).error == 'you are too far away', 'ems: the locker needs you nearby')
+    FakePeds[1] = vec3(0, 0, 0)
+    Mocks.inv[1] = {}
+    Mocks.issueFails = true
+    check(cb['som-ems:server:lockerTake'](1).error == 'not employed by this department' and kits() == 0, 'ems: the department issue check decides')
+    Mocks.issueFails = false
+    check(cb['som-ems:server:lockerTake'](1).success == true and kits() == 1 and Mocks.issued.dept == 'ems' and Mocks.issued.item == 'firstaid', 'ems: the locker issues a kit from the department')
+    Mocks.inv[1][400] = { name = 'firstaid', count = 2, slot = 400 }
+    check(cb['som-ems:server:lockerTake'](1).error == 'you already carry enough', 'ems: the locker will not stock a medic past the cap')
 end
 
 -- ---------------------------------------------------------------------------
