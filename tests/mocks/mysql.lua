@@ -34,6 +34,7 @@ M.db = {
     whitelist = {},
     bans = {},
     buyer = {},
+    placements = {},
     trade = {},
     skills = {},
     newlife = {},
@@ -465,10 +466,45 @@ local function newlife(kind, query, params)
     return false
 end
 
+local function placements(kind, query, params)
+    local P = M.db.placements
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    if kind == 'query' and has('SELECT path, kind, value FROM som_placements WHERE resource = ?') then
+        local out = {}
+        for _, r in ipairs(P) do if r.resource == params[1] then out[#out + 1] = { path = r.path, kind = r.kind, value = r.value } end end
+        return true, out
+    elseif kind == 'query' and has('FROM som_placements ORDER BY resource, id') then
+        local out = {}
+        for _, r in ipairs(P) do out[#out + 1] = { resource = r.resource, path = r.path, kind = r.kind, value = r.value } end
+        return true, out
+    elseif kind == 'update' and has('DELETE FROM som_placements WHERE resource = ? AND path = ?') then
+        local n, keep = 0, {}
+        for _, r in ipairs(P) do if r.resource == params[1] and r.path == params[2] then n = n + 1 else keep[#keep + 1] = r end end
+        M.db.placements = keep
+        return true, n
+    elseif kind == 'insert' and has('INSERT INTO som_placements') then
+        P[#P + 1] = { resource = params[1], path = params[2], kind = params[3], value = params[4], by = params[5] }
+        return true, #P
+    end
+    return false
+end
+
+local function moneyRows(kind, query, params)
+    if kind == 'scalar' and query:find('SELECT 1 FROM som_character_money WHERE citizenid = ?', 1, true) then
+        return true, params[1] == 'OFFLINE1' and 1 or nil
+    end
+    return false
+end
+
 local function trade(kind, query, params)
     local T = M.db.trade
     local function has(text) return query:find(text, 1, true) ~= nil end
-    if kind == 'insert' and has('INSERT INTO som_trade_offers (seller, buyer, item, price, status)') then
+    if kind == 'insert' and has("SELECT 'FALLBACK', ?, ?, ?, 'done' FROM DUAL") then
+        local n = 0
+        for _, o in ipairs(T) do
+            if o.seller == 'FALLBACK' and o.buyer == params[4] and o.status ~= 'cancelled' and o.ts > now() - 3600 then n = n + 1 end
+        end
+        if n >= params[5] then return true, 0 end
         T[#T + 1] = { id = #T + 1, seller = 'FALLBACK', buyer = params[1], item = params[2], price = params[3], status = 'done', ts = now() }
         return true, #T
     elseif kind == 'insert' and has('INSERT INTO som_trade_offers') then
@@ -860,6 +896,7 @@ function M.scalar(query, params)
     do local handled, value = chop('scalar', query, params); if handled then return value end end
     do local handled, value = skills('scalar', query, params); if handled then return value end end
     do local handled, value = trade('scalar', query, params); if handled then return value end end
+    do local handled, value = moneyRows('scalar', query, params); if handled then return value end end
     do local handled, value = whitelist('scalar', query, params); if handled then return value end end
     if query:find('SELECT role FROM som_property_owners WHERE property_id = ? AND citizenid = ?', 1, true) then
         local o = findOwner(params[1], params[2])
@@ -965,6 +1002,7 @@ function M.update(query, params)
     do local handled, value = staff('update', query, params); if handled then return value end end
     do local handled, value = skills('update', query, params); if handled then return value end end
     do local handled, value = trade('update', query, params); if handled then return value end end
+    do local handled, value = placements('update', query, params); if handled then return value end end
     do local handled, value = gangs('update', query, params); if handled then return value end end
     do local handled, value = plants('update', query, params); if handled then return value end end
     do local handled, value = lab('update', query, params); if handled then return value end end
@@ -1316,6 +1354,7 @@ function M.insert(query, params)
     do local handled, value = buyer('insert', query, params); if handled then return value end end
     do local handled, value = chop('insert', query, params); if handled then return value end end
     do local handled, value = trade('insert', query, params); if handled then return value end end
+    do local handled, value = placements('insert', query, params); if handled then return value end end
     do local handled, value = newlife('insert', query, params); if handled then return value end end
     if query:find('INSERT INTO som_property_owners', 1, true) then
         local propertyId, citizenid, role, grantedBy = params[1], params[2], params[3], params[4]
@@ -1478,6 +1517,7 @@ function M.query(query, params)
     do local handled, value = staff('query', query, params); if handled then return value end end
     do local handled, value = skills('query', query, params); if handled then return value end end
     do local handled, value = trade('query', query, params); if handled then return value end end
+    do local handled, value = placements('query', query, params); if handled then return value end end
     do local handled, value = gangs('query', query, params); if handled then return value end end
     do local handled, value = plants('query', query, params); if handled then return value end end
     -- jail.lua's sweep: every serving sentence, with elapsed.
@@ -1635,6 +1675,13 @@ _G.MySQL = {
     update = { await = function(q, p) return M.update(q, p) end },
     insert = { await = function(q, p) return M.insert(q, p) end },
     query  = { await = function(q, p) return M.query(q, p) end },
+    -- Records each transaction so a test can check what would reach the database.
+    transaction = { await = function(queries)
+        if M.failTransaction then error('simulated database failure') end
+        M.transactions[#M.transactions + 1] = queries
+        return true
+    end },
 }
+M.transactions = {}
 
 return M

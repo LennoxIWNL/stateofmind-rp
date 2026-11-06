@@ -45,6 +45,51 @@ lib.callback.register('som-outdoors:server:buyers', function()
     return out
 end)
 
+---Does the sale. `state` records how far it got so a failure part way can be undone.
+local function settle(source, name, b, state)
+    local total, sold = 0, {}
+    for item, price in pairs(b.prices) do
+        local have = ox:Search(source, 'count', item) or 0
+        if have > 0 then
+            total = total + have * price
+            sold[#sold + 1] = { item = item, count = have }
+        end
+    end
+    if total < 1 then return done(false, 'you have nothing they want') end
+
+    local spent = tonumber(MySQL.scalar.await(
+        'SELECT COALESCE(SUM(amount), 0) FROM som_buyer_payouts WHERE buyer = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)',
+        { name })) or 0
+    local pay = math.min(total, math.max(0, b.hourlyCap - spent))
+    if pay < 1 then return done(false, 'they cannot pay any more right now') end
+
+    -- Sell items worth at most `pay`, in list order, so a capped sale takes
+    -- only what is paid for.
+    local worth = 0
+    for _, s in ipairs(sold) do
+        local price = b.prices[s.item]
+        local n = math.min(s.count, math.floor((pay - worth) / price))
+        if n > 0 then
+            if not ox:RemoveItem(source, s.item, n) then break end
+            state.taken[#state.taken + 1] = { item = s.item, count = n }
+            worth = worth + n * price
+        end
+    end
+    state.worth = worth
+
+    if worth < 1 then return done(false, 'they cannot pay any more right now') end
+
+    local reason = 'buyer:' .. name
+    if not core:treasuryTransact(-worth, reason) then return done(false, 'the city cannot pay right now') end
+    state.debited = true
+
+    if not core:addMoney(source, 'bank', worth, reason) then return done(false, 'the sale fell through') end
+    state.paid = true
+
+    MySQL.insert.await('INSERT INTO som_buyer_payouts (buyer, amount) VALUES (?, ?)', { name, worth })
+    return done(true, nil, { paid = worth })
+end
+
 ---Sells everything the player carries that this buyer wants.
 lib.callback.register('som-outdoors:server:sell', function(source, name)
     if not core:getPlayer(source) then return done(false, 'not available') end
@@ -57,65 +102,21 @@ lib.callback.register('som-outdoors:server:sell', function(source, name)
     if busy then return done(false, 'try again in a moment') end
     busy = true
 
-    local total, sold = 0, {}
-    for item, price in pairs(b.prices) do
-        local have = ox:Search(source, 'count', item) or 0
-        if have > 0 then
-            total = total + have * price
-            sold[#sold + 1] = { item = item, count = have }
-        end
+    local state = { taken = {}, worth = 0, debited = false, paid = false }
+    local ok, result = pcall(settle, source, name, b, state)
+    busy = false  -- always cleared, even when something above threw
+
+    if not ok then
+        print(('[som-outdoors] sale to %s failed: %s'):format(name, tostring(result)))
+        result = done(false, 'the sale fell through')
     end
 
-    if total < 1 then
-        busy = false
-        return done(false, 'you have nothing they want')
+    -- Anything taken or debited without a completed payment goes back.
+    if not state.paid then
+        if state.debited then core:treasuryTransact(state.worth, 'buyer:' .. name .. ':refund') end
+        for _, t in ipairs(state.taken) do ox:AddItem(source, t.item, t.count) end
     end
-
-    local spent = tonumber(MySQL.scalar.await(
-        'SELECT COALESCE(SUM(amount), 0) FROM som_buyer_payouts WHERE buyer = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)',
-        { name })) or 0
-    local pay = math.min(total, math.max(0, b.hourlyCap - spent))
-    if pay < 1 then
-        busy = false
-        return done(false, 'they cannot pay any more right now')
-    end
-
-    -- Sell items worth at most `pay`, in list order, so a capped sale takes
-    -- only what is paid for.
-    local taken, worth = {}, 0
-    for _, s in ipairs(sold) do
-        local price = b.prices[s.item]
-        local n = math.min(s.count, math.floor((pay - worth) / price))
-        if n > 0 then
-            if not ox:RemoveItem(source, s.item, n) then break end
-            taken[#taken + 1] = { item = s.item, count = n }
-            worth = worth + n * price
-        end
-    end
-
-    local function giveBack()
-        for _, t in ipairs(taken) do ox:AddItem(source, t.item, t.count) end
-    end
-
-    if worth < 1 then
-        busy = false
-        return done(false, 'they cannot pay any more right now')
-    end
-
-    local reason = 'buyer:' .. name
-    if not core:treasuryTransact(-worth, reason) then
-        giveBack()
-        busy = false
-        return done(false, 'the city cannot pay right now')
-    end
-    if not core:addMoney(source, 'bank', worth, reason) then
-        core:treasuryTransact(worth, reason .. ':refund')
-        giveBack()
-        busy = false
-        return done(false, 'the sale fell through')
-    end
-
-    MySQL.insert.await('INSERT INTO som_buyer_payouts (buyer, amount) VALUES (?, ?)', { name, worth })
-    busy = false
-    return done(true, nil, { paid = worth })
+    return result
 end)
+
+CreateThread(function() SomPlacements.Apply(Config) end)

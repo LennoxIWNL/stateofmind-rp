@@ -51,6 +51,7 @@ local function resetDb()
     mysql.db.plants = {}
     mysql.db.lab = {}
     mysql.db.buyer = {}
+    mysql.db.placements = {}
     mysql.db.trade = {}
     mysql.db.skills = {}
     mysql.db.newlife = {}
@@ -2946,6 +2947,19 @@ do
     restore()
 
     env, seen, restore = heistScene()
+    heistCrew(1)
+    j(1, 'queue', { provider = 'heist_store' }); boardEnv.JobBoard.Draw('heist_store'); j(1, 'accept')
+    FakePeds[1] = vec3(0, 0, 0); hinteract(1, 'hack')
+    local before = Mocks.treasury
+    Mocks.addMoneyThrows = true
+    FakePeds[1] = vec3(50, 0, 0); hinteract(1, 'loot')
+    Mocks.addMoneyThrows = false
+    check(Mocks.treasury == before, 'heist: a crash after the treasury debit puts the money back')
+    FakePeds[1] = vec3(100, 0, 0); hinteract(1, 'loot')
+    check(before - Mocks.treasury > 0, 'heist: the payout lock is released after a crash, so the next loot point pays')
+    restore()
+
+    env, seen, restore = heistScene()
     Mocks.treasury = 0
     heistCrew(1)
     j(1, 'queue', { provider = 'heist_store' }); boardEnv.JobBoard.Draw('heist_store'); j(1, 'accept')
@@ -3656,6 +3670,13 @@ do
     Mocks.addMoneyFails = true
     check(cb['som-outdoors:server:sell'](1, 'fish').success == false and Mocks.treasury == 1000 and count(1, 'codfish') == 3, 'buyer: a failed credit refunds the treasury and the fish')
     Mocks.addMoneyFails = false
+
+    Mocks.addMoneyThrows = true
+    local crash = cb['som-outdoors:server:sell'](1, 'fish')
+    Mocks.addMoneyThrows = false
+    check(crash.success == false and Mocks.treasury == 1000 and count(1, 'codfish') == 3, 'buyer: a crash after the treasury debit refunds the treasury and the fish')
+    local again = cb['som-outdoors:server:sell'](1, 'fish')
+    check(again.success == true, 'buyer: the lock is released after a crash, so the next sale works')
 end
 
 -- ---------------------------------------------------------------------------
@@ -4130,6 +4151,195 @@ do
     mysql.fakeNow = mysql.fakeNow + 4000
     local paid0 = Mocks.paid or 0
     check(cb['som-mechanic:server:fallbackBuy'](2).success == false and (Mocks.paid or 0) == paid0 + 700, 'fallback: a full pack is refunded')
+end
+
+-- ---------------------------------------------------------------------------
+-- Callback trace (som_debug)
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local origRegister = lib.callback.register
+    local lines, realPrint = {}, print
+    _G.print = function(text) lines[#lines + 1] = text end
+    _G.IsDuplicityVersion = function() return true end
+    local hadName = _G.GetCurrentResourceName
+    _G.GetCurrentResourceName = _G.GetCurrentResourceName or function() return 'trace-test' end
+
+    Mocks.convars = {}
+    loader.loadResource(REPO .. 'som-core', { 'shared/trace.lua' })
+    check(lib.callback.register == origRegister, 'trace: nothing is wrapped while som_debug is off')
+
+    Mocks.convars = { som_debug = '1' }
+    loader.loadResource(REPO .. 'som-core', { 'shared/trace.lua' })
+    check(lib.callback.register ~= origRegister, 'trace: som_debug wraps callback registration')
+    lib.callback.register('trace:demo', function(source, a) if a == 'boom' then error('exploded') end return { success = false, error = 'nope' } end)
+    local result = RegisteredCallbacks['trace:demo'](7, 'x')
+    check(result.error == 'nope' and lines[1]:find('trace:demo') and lines[1]:find('src=7') and lines[1]:find('refused: nope'), 'trace: a call logs its name, source and result and still returns it')
+    local ok, err = pcall(RegisteredCallbacks['trace:demo'], 7, 'boom')
+    check(ok == false and tostring(err):find('exploded') and lines[2]:find('ERROR'), 'trace: a failing handler is logged and the error still propagates')
+
+    lib.callback.register = origRegister
+    _G.IsDuplicityVersion = nil
+    _G.GetCurrentResourceName = hadName
+    _G.print = realPrint
+    Mocks.convars = {}
+end
+
+-- ---------------------------------------------------------------------------
+-- /somhealth
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-staff', { 'shared/config.lua', 'shared/health_lists.lua', 'server/health.lua' })
+    local lists = { resources = { 'a', 'b' }, tables = { 'som_one', 'som_two' }, items = { 'water', 'ghost' } }
+    local function snap(over)
+        local s = { states = { a = 'started', b = 'started' }, dbOk = true, tables = { som_one = true, som_two = true }, items = { water = true, ghost = true },
+            convars = { som_phone_pepper = 'x', som_whitelist = '1', som_phone_webhook = 'u', som_heist_webhook = 'u', som_launder_webhook = 'u', lac_webhook_bans = 'u' }, lists = lists }
+        for k, v in pairs(over or {}) do s[k] = v end
+        return s
+    end
+    local function levels(rows) local o = {}; for _, r in ipairs(rows) do o[#o + 1] = r.level end; return table.concat(o, ',') end
+
+    check(levels(env.Health.Evaluate(snap())) == 'PASS,PASS,PASS,PASS,PASS', 'health: a healthy server passes every check')
+    local rows = env.Health.Evaluate(snap({ states = { a = 'started', b = 'stopped' } }))
+    check(rows[1].level == 'FAIL' and rows[1].text:find('b %(stopped%)'), 'health: a stopped resource is named')
+    rows = env.Health.Evaluate(snap({ tables = { som_one = true } }))
+    check(rows[3].level == 'FAIL' and rows[3].text:find('som_two'), 'health: a missing table is named')
+    rows = env.Health.Evaluate(snap({ dbOk = false }))
+    check(rows[2].level == 'FAIL' and #rows == 4, 'health: a dead database fails and skips the table check')
+    rows = env.Health.Evaluate(snap({ items = { water = true } }))
+    check(rows[4].level == 'FAIL' and rows[4].text:find('ghost'), 'health: a missing item is named')
+    local c = snap(); c.convars.som_phone_pepper = ''; c.convars.som_whitelist = 'false'
+    rows = env.Health.Evaluate(c)
+    local fail, warn = 0, 0
+    for _, r in ipairs(rows) do if r.level == 'FAIL' then fail = fail + 1 elseif r.level == 'WARN' then warn = warn + 1 end end
+    check(fail == 1 and warn == 1, 'health: a missing pepper fails and an open whitelist warns')
+
+    local said
+    local realT = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, text) if name == 'som:client:notify' then said = text end end
+    Mocks.admins = {}
+    Mocks.commands.somhealth(3, {})
+    check(said == 'You do not have permission to do that', 'health: only admins can run it')
+    _G.TriggerClientEvent = realT
+end
+
+-- ---------------------------------------------------------------------------
+-- Placements
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-core', { 'server/placements.lua' })
+    local P = env.SomPlacements
+    local cfg = {
+        zones = { { name = 'grove', enabled = false, center = nil, radius = nil, tag = nil } },
+        buyers = { fish = { enabled = false, coords = nil } },
+        sites = { { id = 's1', enabled = false, terminal = nil, lootPoints = {} } },
+        Fronts = { laundromat = { enabled = false, set = false, coords = vec3(0, 0, 0) } },
+        fishing = { spots = { { name = 'pier_1', enabled = false } } },
+    }
+    check(P.ApplyOne(cfg, 'zones.grove.tag', vec3(1, 2, 3)) and cfg.zones[1].tag.x == 1 and cfg.zones[1].enabled == true, 'place: a point lands on a named list entry and switches it on')
+    check(P.ApplyOne(cfg, 'zones.grove.radius', 40) and cfg.zones[1].radius == 40, 'place: a radius is a number')
+    check(P.ApplyOne(cfg, 'buyers.fish.coords', vec3(5, 6, 7)) and cfg.buyers.fish.enabled == true, 'place: map entries are found by key')
+    check(P.ApplyOne(cfg, 'Fronts.laundromat.coords', vec3(9, 9, 9)) and cfg.Fronts.laundromat.set == true, 'place: a launder front is marked set')
+    check(P.ApplyOne(cfg, 'fishing.spots.pier_1.center', vec3(1, 1, 1)) and cfg.fishing.spots[1].enabled == true, 'place: nested lists are walked')
+    check(P.ApplyOne(cfg, 'sites.s1.lootPoints+', vec3(1, 0, 0)) and P.ApplyOne(cfg, 'sites.s1.lootPoints+', vec3(2, 0, 0)) and #cfg.sites[1].lootPoints == 2, 'place: a trailing plus appends points')
+    check(not P.ApplyOne(cfg, 'zones.nope.tag', vec3(1, 2, 3)) and not P.ApplyOne(cfg, 'zones.grove.label', 'x') and not P.ApplyOne(cfg, 'zones.grove.__index', true), 'place: unknown entries and fields are refused')
+
+    mysql.db.placements = {
+        { resource = 'som-turf', path = 'zones.grove.tag', kind = 'point', value = '{x=10,y=20,z=30,w=0}' },
+        { resource = 'som-turf', path = 'zones.ghost.tag', kind = 'point', value = '{x=1,y=1,z=1,w=0}' },
+        { resource = 'other', path = 'zones.grove.tag', kind = 'point', value = '{x=99,y=99,z=99,w=0}' },
+    }
+    local fresh = { zones = { { name = 'grove', enabled = false } } }
+    local lines, realPrint = {}, print
+    _G.print = function(t) lines[#lines + 1] = t end
+    local applied, missing = P.Apply(fresh, 'som-turf')
+    _G.print = realPrint
+    check(applied == 1 and #missing == 1 and fresh.zones[1].tag.x == 10 and (lines[1] .. (lines[2] or '')):find('zones.ghost.tag'), 'place: stored rows apply for their own resource and report dead paths')
+end
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-staff', { 'shared/config.lua', 'server/placements.lua' })
+    Mocks.players = { [1] = { citizenid = 'A1' }, [2] = { citizenid = 'B2' } }
+    Mocks.admins = { [1] = true }
+    FakePeds[1], FakePeds[2] = vec3(10, 20, 30), vec3(0, 0, 0)
+    local said
+    local realT = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, text) if name == 'som:client:notify' then said = text end end
+    local cmd = Mocks.commands
+    mysql.db.staff = { reports = {}, audit = {} }
+
+    cmd.place(2, { resource = 'som-turf', path = 'zones.grove.tag' })
+    check(said == 'You do not have permission to do that' and #mysql.db.placements == 0, 'place: only admins can place')
+    cmd.place(1, { resource = 'som-bank', path = 'zones.grove.tag' })
+    check(said:find('unknown resource') and #mysql.db.placements == 0, 'place: only listed resources can be placed')
+    cmd.place(1, { resource = 'som-turf', path = '../etc' })
+    check(said:find('bad path') and #mysql.db.placements == 0, 'place: paths are validated')
+    cmd.place(1, { resource = 'som-turf', path = 'zones.grove.label' })
+    check(said:find('cannot be placed'), 'place: only known fields')
+    cmd.place(1, { resource = 'som-turf', path = 'zones.grove.radius', value = '9000' })
+    check(said:find('radius between'), 'place: the radius is range checked')
+
+    cmd.place(1, { resource = 'som-turf', path = 'zones.grove.tag' })
+    check(#mysql.db.placements == 1 and mysql.db.placements[1].kind == 'point' and mysql.db.placements[1].value:find('x=10'), 'place: a point is stored where the admin stands')
+    cmd.place(1, { resource = 'som-turf', path = 'zones.grove.tag' })
+    check(#mysql.db.placements == 1, 'place: placing again replaces instead of stacking')
+    cmd.place(1, { resource = 'som-heists', path = 'sites.store_1.lootPoints+' })
+    cmd.place(1, { resource = 'som-heists', path = 'sites.store_1.lootPoints+' })
+    check(#mysql.db.placements == 3, 'place: a trailing plus keeps every point')
+    cmd.place(1, { resource = 'som-turf', path = 'zones.grove.enabled', value = 'false' })
+    check(mysql.db.placements[#mysql.db.placements].kind == 'bool', 'place: enabled can be switched')
+    check(#mysql.db.staff.audit >= 5 and mysql.db.staff.audit[1].action == 'place', 'place: every placement is audited')
+    cmd.unplace(1, { resource = 'som-turf', path = 'zones.grove.tag' })
+    check(said:find('Removed') and #mysql.db.placements == 3, 'place: unplace removes a placement')
+    _G.TriggerClientEvent = realT
+end
+
+-- ---------------------------------------------------------------------------
+-- Money bus: balances are written as changes, so order cannot bring money back
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    mysql.transactions = {}
+    mysql.failTransaction = false
+    local saved = { Player = _G.Player, SomFormatDate = _G.SomFormatDate }
+    _G.Player = function() return { state = { set = function() end } } end
+    _G.SomFormatDate = _G.SomFormatDate or function(d) return tostring(d) end
+    local env = loader.loadResource(REPO .. 'som-core', { 'shared/config.lua', 'shared/tiers.lua', 'shared/jobs.lua', 'shared/gangs.lua', 'server/player.lua', 'server/money.lua' })
+    local player = env.Players.Create(41, { citizenid = 'MONEY1', license = 'license:x', slot = 1, firstname = 'Mo', lastname = 'Ney', dob = '2000-01-01', gender = 0, nationality = 'LS', phone = '555-4100', job = 'unemployed', job_grade = 0, job_duty = 0, gang = 'none', gang_grade = 0 }, { cash = 0, bank = 100, crypto = 0, dirty = 0 })
+
+    check(env.Money.Add(41, 'bank', 50, 'test:add') == true and player.money.bank == 150, 'money: an add changes the balance')
+    check(env.Money.Remove(41, 'bank', 30, 'test:remove') == true and player.money.bank == 120, 'money: a remove changes the balance')
+    check(env.Money.Remove(41, 'bank', 9999, 'test:overdraw') == false and player.money.bank == 120, 'money: you cannot go below zero')
+
+    local updates = {}
+    for _, tx in ipairs(mysql.transactions) do updates[#updates + 1] = tx[1] end
+    check(#updates == 2 and updates[1].query:find('+ ? WHERE', 1, true) and not updates[1].query:find('= ? WHERE', 1, true) and updates[1].values[1] == 50 and updates[2].values[1] == -30,
+        'money: the database is told the change, not the result')
+
+    local total = 100
+    for i = #updates, 1, -1 do total = total + updates[i].values[1] end
+    check(total == player.money.bank, 'money: applying the changes in the opposite order still lands on the same total')
+
+    mysql.failTransaction = true
+    local ok = env.Money.Add(41, 'bank', 10, 'test:fail')
+    mysql.failTransaction = false
+    check(ok == false and player.money.bank == 120, 'money: a failed save rolls the in-memory balance back')
+
+    mysql.transactions = {}
+    check(env.Money.TransferToCitizen(41, 'NOBODY', 'bank', 5, 'x') == false and player.money.bank == 120, 'money: paying a character that does not exist fails')
+    mysql.transactions = {}
+    local paid = env.Money.TransferToCitizen(41, 'OFFLINE1', 'bank', 25, 'test:offline')
+    local credit = mysql.transactions[2]
+    check(paid == true and player.money.bank == 95 and credit and credit[1].query:find('+ ? WHERE', 1, true) and credit[1].values[1] == 25 and credit[2].query:find('FROM som_character_money', 1, true),
+        'money: an offline credit is added in the database and the ledger reads the balance from it')
+    _G.Player, _G.SomFormatDate = saved.Player, saved.SomFormatDate
 end
 
 -- ---------------------------------------------------------------------------

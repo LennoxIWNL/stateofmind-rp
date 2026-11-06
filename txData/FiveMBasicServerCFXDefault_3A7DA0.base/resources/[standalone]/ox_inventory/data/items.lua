@@ -94,6 +94,24 @@ return {
 		}
 	},
 
+	['cola'] = {
+		label = 'Cola',
+		weight = 350,
+		client = {
+			status = { thirst = 200000 },
+			anim = { dict = 'mp_player_intdrink', clip = 'loop_bottle' },
+			prop = { model = `prop_ld_can_01`, pos = vec3(0.01, 0.01, 0.06), rot = vec3(5.0, 5.0, -180.5) },
+			usetime = 2500,
+			notification = 'You drank a cold cola'
+		}
+	},
+
+	['medikit'] = {
+		label = 'Medical Kit',
+		weight = 1500,
+		description = 'A kit for treating injuries. Medics use it on patients.',
+	},
+
 	['parachute'] = {
 		label = 'Parachute',
 		weight = 30000,

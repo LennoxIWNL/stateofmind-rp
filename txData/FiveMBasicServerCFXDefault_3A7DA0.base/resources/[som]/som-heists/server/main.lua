@@ -156,24 +156,27 @@ local function payClean(source, run, wanted)
     if wanted < 1 or treasuryBusy then return 0 end
     treasuryBusy = true
 
-    local cfg = Config.tiers[run.tier]
-    local spent = tonumber(MySQL.scalar.await(
-        'SELECT COALESCE(SUM(clean_paid), 0) FROM som_heist_runs WHERE tier = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)',
-        { run.tier })) or 0
+    local debited, paid = 0, 0
+    local ok, err = pcall(function()
+        local cfg = Config.tiers[run.tier]
+        local spent = tonumber(MySQL.scalar.await(
+            'SELECT COALESCE(SUM(clean_paid), 0) FROM som_heist_runs WHERE tier = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)',
+            { run.tier })) or 0
 
-    local amount = math.min(wanted, math.max(0, cfg.hourlyCleanCap - spent))
-    local paid = 0
-
-    if amount >= 1 and core:treasuryTransact(-amount, ('heist:%s'):format(run.site.id)) then
-        if core:addMoney(source, 'bank', amount, ('heist:%s'):format(run.site.id)) then
-            paid = amount
-            MySQL.update.await('UPDATE som_heist_runs SET clean_paid = clean_paid + ? WHERE id = ?', { paid, run.id })
-        else
-            core:treasuryTransact(amount, ('heist:%s:refund'):format(run.site.id))
+        local amount = math.min(wanted, math.max(0, cfg.hourlyCleanCap - spent))
+        if amount >= 1 and core:treasuryTransact(-amount, ('heist:%s'):format(run.site.id)) then
+            debited = amount
+            if core:addMoney(source, 'bank', amount, ('heist:%s'):format(run.site.id)) then
+                paid = amount
+                MySQL.update.await('UPDATE som_heist_runs SET clean_paid = clean_paid + ? WHERE id = ?', { paid, run.id })
+            end
         end
-    end
+    end)
 
+    -- The lock is always released, and a debit that never reached the player goes back.
     treasuryBusy = false
+    if not ok then print(('[som-heists] clean payout failed: %s'):format(tostring(err))) end
+    if debited > 0 and paid == 0 then core:treasuryTransact(debited, ('heist:%s:refund'):format(run.site.id)) end
     return paid
 end
 
@@ -385,3 +388,5 @@ CreateThread(function()
         pcall(Heists.Sweep)
     end
 end)
+
+CreateThread(function() SomPlacements.Apply(Config) end)

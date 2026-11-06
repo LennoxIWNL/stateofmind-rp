@@ -11,11 +11,15 @@ replaces one manual pass on the beta server.
 - Cron example on the host: `15 4 * * * DB_HOST=127.0.0.1 DB_USER=backup DB_PASS=... /srv/som/tools/backup.sh /var/backups/som 14`. Use a database user with only SELECT, LOCK TABLES, SHOW VIEW, TRIGGER and EVENT rights. Copy the folder off the machine as well; a backup on the same disk is not one.
 - Run `restore-check.sh` on the newest backup weekly and before every promotion.
 
-## Concurrency check (built, `tools/load-claims.sh`)
+## Concurrency check (built, `tools/load-claims.sh` and `tools/load-claims-all.sh`)
+
+`tools/load-claims-all.sh` runs the plant harvest, trade accept, turf claim, lab start and chop shop claims with 30 parallel connections on the real MariaDB and requires exactly one winner each time. Result on the dev database: one winner in every round, every claim.
 
 Fires many parallel connections at the heist site claim query (the conditional insert) on a real MariaDB and checks exactly one wins per site. Result on the dev container: 15 rounds of 40 parallel claimers, one winner each. This covers the claim query only. The property buy, mortgage and vehicle purchase claims are plain conditional UPDATEs (`Properties.Claim` pattern) and have not been put under this kind of load.
 
-## Full boot out of DEV MODE (not done)
+## Full boot out of DEV MODE (not done; the step by step checklist and the 42 test flows are in `TEST-SCRIPT.md`)
+
+Run `somhealth` first after every boot; `set som_debug 1` logs every server callback for bug reports.
 
 `som.cfg` still boots the framework only. To leave it:
 1. On the beta server, comment out the DEV MODE block and enable FULL BOOT.

@@ -9,6 +9,7 @@ version '0.1.0'
 
 shared_scripts {
     '@ox_lib/init.lua',
+    '@som-core/shared/trace.lua',
     'shared/config.lua',
 }
 
@@ -22,6 +23,7 @@ client_scripts {
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
+    '@som-core/server/placements.lua',
     'server/main.lua',
     'server/gang.lua',
     'server/payroll.lua',
