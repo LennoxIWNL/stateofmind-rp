@@ -6261,5 +6261,23 @@ end
 
 
 
+-- ---------------------------------------------------------------------------
+-- Boot config
+-- ---------------------------------------------------------------------------
+
+do
+    -- FXServer splits a line on ';' before it looks for the comment marker, so the
+    -- text after a ';' inside a '#' comment runs as a console command.
+    for _, name in ipairs({ 'som.cfg', 'server.cfg.example' }) do
+        local f = io.open(REPO .. '../../' .. name)
+        local bad = 0
+        for line in f:lines() do
+            if line:match('^%s*#') and line:find(';', 1, true) then bad = bad + 1 end
+        end
+        f:close()
+        check(bad == 0, 'boot: no ";" inside a comment in ' .. name)
+    end
+end
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)

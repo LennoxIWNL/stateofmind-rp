@@ -5,7 +5,7 @@
 ## SOM FRAMEWORK REBUILD IN PROGRESS.
 ## The QBox framework layer has been removed. som-core is not finished, so
 ## this config will NOT produce a playable server yet. The ensure list below
-## reflects the target state; lines that depend on unfinished work are
+## reflects the target state, lines that depend on unfinished work are
 ## commented out and marked TODO.
 
 ## You CAN edit the following:
