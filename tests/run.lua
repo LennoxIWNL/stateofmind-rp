@@ -59,6 +59,7 @@ local function resetDb()
     mysql.db.chop = { log = {}, owned = {} }
     mysql.db.licences = { rows = {}, attempts = {} }
     mysql.db.staff = { reports = {}, audit = {} }
+    mysql.db.taxi = { earned = {} }
     mysql.db.gangs = { chars = {}, log = {} }
     mysql.db.vehicles = {}
     mysql.db.social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} }
@@ -3741,21 +3742,134 @@ do
 end
 
 -- ---------------------------------------------------------------------------
--- Boot config
+-- Fuel
 -- ---------------------------------------------------------------------------
 
 do
-    -- FXServer splits a line on ';' before it looks for the comment marker, so the
-    -- text after a ';' inside a '#' comment runs as a console command.
-    for _, name in ipairs({ 'som.cfg', 'server.cfg.example' }) do
-        local f = io.open(REPO .. '../../' .. name)
-        local bad = 0
-        for line in f:lines() do
-            if line:match('^%s*#') and line:find(';', 1, true) then bad = bad + 1 end
-        end
-        f:close()
-        check(bad == 0, 'boot: no ";" inside a comment in ' .. name)
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-fuel', { 'shared/config.lua', 'server/main.lua', 'server/can.lua' })
+    local C = env.Config
+    local cb = RegisteredCallbacks
+    local bags, inVehicle = {}, {}
+    local saved = {}
+    for _, name in ipairs({ 'Entity', 'GetVehiclePedIsIn' }) do saved[name] = _G[name] end
+    _G.Entity = function(e) bags[e] = bags[e] or {}; return { state = setmetatable({ set = function(_, k, v) bags[e][k] = v end }, { __index = bags[e] }) } end
+    _G.GetVehiclePedIsIn = function(ped) return inVehicle[ped] or 0 end
+
+    local function setup()
+        Mocks.players = { [1] = { citizenid = 'F1', job = { name = 'unemployed' } } }
+        Mocks.inv = { [1] = {} }
+        Mocks.weapons, Mocks.business = {}, { fuelco = 0 }
+        Mocks.payWithFails, Mocks.businessFails, Mocks.invFull, Mocks.credits, Mocks.lastPay = false, false, {}, {}, nil
+        Mocks.clock = Mocks.clock + 60000
+        Vehicles = { [800] = { plate = 'CAR 1' } }
+        FakePeds[1], FakePeds[800] = vec3(0, 0, 0), vec3(2, 0, 0)
+        bags = { [800] = { fuel = 20.0 } }
+        inVehicle = {}
+        C.stations[1].enabled, C.stations[1].coords, C.stations[1].price = true, vec3(5, 0, 0), nil
     end
+    Mocks.clock = 1000000
+    setup()
+    local function buy(litres, claimed, extra) return cb['som-fuel:server:buy'](1, 800, litres, claimed, extra) end
+    local function later() Mocks.clock = Mocks.clock + 5000 end
+
+    -- closed until placed
+    C.stations[1].enabled, C.stations[1].coords = false, nil
+    check(buy(10).error == 'no gas station here' and #cb['som-fuel:server:stations'](1) == 0, 'fuel: no station is open until staff place one')
+    setup()
+    check(#cb['som-fuel:server:stations'](1) == 1, 'fuel: a placed station is listed for the pump options')
+
+    local q = cb['som-fuel:server:quote'](1, 800, 0)
+    check(q.success and q.price == 4 and q.room == 80, 'fuel: the quote reads the vehicle state bag, not the client claim')
+
+    -- a normal sale: priced by the server, player first, station second
+    local r = buy(30, 0, 'bank')
+    check(r.success and r.litres == 30 and r.total == 120 and bags[800].fuel == 50.0, 'fuel: litres are priced on the server and the tank is set from the state bag')
+    check(Mocks.lastPay.amount == 120 and Mocks.lastPay.account == 'bank' and Mocks.business.fuelco == 120, 'fuel: the player pays and the station business is credited the same amount')
+    later()
+    check(buy(5, 0, 'dirty').success and Mocks.lastPay.account == C.accounts[#C.accounts], 'fuel: an unknown payment account falls back to the default')
+
+    -- validation
+    setup()
+    for _, bad in ipairs({ 0, -3, 2.5, 'x', 101 }) do
+        check(buy(bad).error == 'bad request', 'fuel: litres ' .. tostring(bad) .. ' is refused')
+    end
+    check(buy(nil).error == 'bad request', 'fuel: missing litres is refused')
+    check(cb['som-fuel:server:buy'](1, 'x', 10).error == 'no vehicle here' and cb['som-fuel:server:buy'](1, 999, 10).error == 'no vehicle here', 'fuel: the vehicle id is validated')
+    FakePeds[800] = vec3(50, 0, 0)
+    check(buy(10).error == 'no vehicle here', 'fuel: the vehicle must be beside the player')
+    FakePeds[800] = vec3(2, 0, 0); FakePeds[1] = vec3(60, 0, 0)
+    check(buy(10).error == 'no gas station here', 'fuel: the player must be at the station')
+    FakePeds[1] = vec3(0, 0, 0); inVehicle[1] = 900
+    check(buy(10).error == 'no vehicle here', 'fuel: a player inside another vehicle cannot fill this one')
+    inVehicle[1] = 800
+    check(buy(10).success, 'fuel: the driver can fill their own vehicle')
+
+    -- the tank cap and the claim
+    setup(); bags[800].fuel = 95.0
+    r = buy(30)
+    check(r.success and r.litres == 5 and r.total == 20 and bags[800].fuel == 100.0, 'fuel: litres are capped at the tank')
+    later()
+    check(buy(10).error == 'the tank is full', 'fuel: a full tank sells nothing')
+    setup(); bags[800] = {}
+    r = cb['som-fuel:server:buy'](1, 800, 30, 90)
+    check(r.litres == 10, 'fuel: without a state bag the claimed level is used and still capped')
+
+    -- cooldown and failures
+    setup()
+    check(buy(5).success and buy(5).error == 'one moment', 'fuel: money actions are rate limited per player')
+    setup(); Mocks.payWithFails = true
+    r = buy(10)
+    check(not r.success and bags[800].fuel == 20.0 and Mocks.business.fuelco == 0, 'fuel: a failed charge changes nothing')
+    setup(); Mocks.businessFails = true
+    r = buy(10)
+    check(not r.success and bags[800].fuel == 20.0 and Mocks.credits[1] and Mocks.credits[1].amount == 40 and Mocks.credits[1].reason:find(':refund', 1, true), 'fuel: a failed station credit refunds the player and gives no fuel')
+    setup(); C.stations[1].price = 10
+    check(buy(2).total == 20, 'fuel: a station can set its own price')
+
+    -- jerry cans
+    setup()
+    check(cb['som-fuel:server:canBuy'](1, 'bank').success and Mocks.inv[1][Mocks.slot].name == 'WEAPON_PETROLCAN' and Mocks.inv[1][Mocks.slot].metadata.durability == 100 and Mocks.business.fuelco == C.can.price, 'fuel: a bought can comes full and the station is paid')
+    setup(); Mocks.invFull[1] = true
+    r = cb['som-fuel:server:canBuy'](1, 'bank')
+    check(not r.success and Mocks.business.fuelco == 0 and Mocks.credits[1] and Mocks.credits[1].amount == C.can.price, 'fuel: a can that cannot be carried is refunded from the station')
+    setup(); Mocks.payWithFails = true
+    check(not cb['som-fuel:server:canBuy'](1, 'bank').success and Mocks.inv[1][1] == nil, 'fuel: a can is not given when the charge fails')
+
+    local function holdCan(durability)
+        Mocks.inv[1] = { [5] = { name = 'WEAPON_PETROLCAN', slot = 5, count = 1, metadata = { durability = durability, ammo = durability, serial = 'S1' } } }
+        Mocks.weapons[1] = Mocks.inv[1][5]
+    end
+    setup()
+    check(cb['som-fuel:server:canRefill'](1, 'bank').error == 'hold your jerry can', 'fuel: refilling needs the can in hand')
+    holdCan(20)
+    r = cb['som-fuel:server:canRefill'](1, 'bank')
+    check(r.success and r.litres == 20 and r.total == 80 and Mocks.weapons[1].metadata.durability == 100 and Mocks.weapons[1].metadata.ammo == 100 and Mocks.weapons[1].metadata.serial == 'S1', 'fuel: a refill charges only what is missing and keeps the can metadata')
+    later()
+    check(cb['som-fuel:server:canRefill'](1, 'bank').error == 'the can is full', 'fuel: a full can is not sold again')
+    setup(); holdCan(20); Mocks.metadataRefused = true
+    r = cb['som-fuel:server:canRefill'](1, 'bank')
+    Mocks.metadataRefused = false
+    check(not r.success and Mocks.business.fuelco == 0 and #Mocks.credits == 1, 'fuel: a refill the inventory refused is paid back')
+
+    setup(); holdCan(100)
+    r = cb['som-fuel:server:canUse'](1, 800)
+    check(r.success and r.litres == 5 and bags[800].fuel == 25.0 and Mocks.weapons[1].metadata.durability == 80, 'fuel: using a can takes its fuel on the server and fuels the car')
+    later(); inVehicle[1] = 800
+    check(cb['som-fuel:server:canUse'](1, 800).error == 'get out first', 'fuel: a can is used on foot')
+    inVehicle[1] = nil; FakePeds[800] = vec3(40, 0, 0)
+    check(cb['som-fuel:server:canUse'](1, 800).error == 'no vehicle here', 'fuel: a can needs the vehicle beside you')
+    FakePeds[800] = vec3(2, 0, 0); holdCan(0)
+    check(cb['som-fuel:server:canUse'](1, 800).error == 'the can is empty', 'fuel: an empty can pours nothing')
+    holdCan(3); later()
+    check(cb['som-fuel:server:canUse'](1, 800).error == 'the can is empty', 'fuel: a can with under a litre left is empty')
+    setup(); holdCan(100); bags[800].fuel = 100.0
+    check(cb['som-fuel:server:canUse'](1, 800).error == 'the tank is full' and Mocks.weapons[1].metadata.durability == 100, 'fuel: a full tank takes nothing from the can')
+    Mocks.weapons[1] = nil
+    check(cb['som-fuel:server:canUse'](1, 800).error == 'hold your jerry can', 'fuel: a can must be held')
+
+    check(io.open(REPO .. 'som-staff/shared/config.lua'):read('*a'):find("['som-fuel'] = true", 1, true) ~= nil, 'fuel: stations can be placed with /place')
+    for name, fn in pairs(saved) do _G[name] = fn end
 end
 
 -- ---------------------------------------------------------------------------
@@ -4892,7 +5006,7 @@ do
 end
 
 -- ---------------------------------------------------------------------------
--- Paychecks, MDT delete guard and status budget
+-- Paychecks and MDT delete guard
 -- ---------------------------------------------------------------------------
 
 do
@@ -4933,18 +5047,71 @@ do
     for _, thread in ipairs(threads) do waits = 0; pcall(thread) end
     _G.Wait = realWait
     check(#paid == 1 and paid[1] == 2, 'paycheck: one failed player does not stop the next one being paid')
+end
 
-    _G.source = 1
-    local status = function(_, key, delta) RegisteredEvents['som:server:adjustStatus'](key, delta) end
-    local meta = { hunger = 0 }
-    env.Players.Get = function() return { metadata = meta, setMetadata = function(_, k, v) meta[k] = v end } end
-    Mocks.clock = 100000
-    for _ = 1, 5 do Mocks.clock = Mocks.clock + 600; status(1, 'hunger', 50) end
-    check(meta.hunger == 100, 'status: client-sent changes stop after the per-minute budget')
-    Mocks.clock = Mocks.clock + 61000
-    status(1, 'hunger', 50)
-    _G.source = nil
-    check(meta.hunger == 150, 'status: the budget comes back after a minute')
+-- ---------------------------------------------------------------------------
+-- Status from item use (server owned)
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-core', {
+        'shared/config.lua', 'shared/tiers.lua', 'shared/jobs.lua', 'shared/gangs.lua',
+        'server/permissions.lua', 'server/player.lua', 'server/money.lua', 'server/main.lua',
+    })
+    local meta
+    local function reset(values) meta = values end
+    env.Players.Get = function(src)
+        if src ~= 1 then return nil end
+        return { metadata = meta, setMetadata = function(_, k, v) meta[k] = math.max(0, math.min(100, v)) end }
+    end
+    local function used(src, name) Handlers['ox_inventory:usedItem'](src, name, 3, nil) end
+
+    reset({ hunger = 50, thirst = 50, stress = 10 })
+    used(1, 'water')
+    check(meta.thirst == 70 and meta.hunger == 50, 'status: water gives thirst and nothing else')
+    used(1, 'sandwich')
+    check(meta.hunger == 70, 'status: food gives hunger')
+    reset({ hunger = 90, thirst = 95, stress = 0 })
+    used(1, 'burger'); used(1, 'cola')
+    check(meta.hunger == 100 and meta.thirst == 100, 'status: the result is clamped to 100')
+    reset({ hunger = 50, thirst = 50, stress = 1 })
+    used(1, 'panties')
+    check(meta.thirst == 40 and meta.stress == 0, 'status: an item can lower thirst and stress, clamped at 0')
+    reset({ hunger = 10, thirst = 10, stress = 10 })
+    used(1, 'mustard')
+    check(meta.hunger == 12.5 and meta.thirst == 12.5 and meta.stress == 10, 'status: an item with two effects applies both')
+
+    reset({ hunger = 50, thirst = 50, stress = 10 })
+    used(1, 'water'); used(1, 'water')
+    check(meta.thirst == 90, 'status: two uses in a row apply twice')
+
+    reset({ hunger = 50, thirst = 50, stress = 10 })
+    used(1, 'bandage'); used(1, 'nothing_like_this'); used(1, nil); used(1, 7); used(1, {})
+    check(meta.hunger == 50 and meta.thirst == 50 and meta.stress == 10, 'status: items without an effect and bad names change nothing')
+    check(pcall(used, 2, 'water'), 'status: a use by a player who is not loaded does nothing and does not error')
+    check(meta.thirst == 50, 'status: a cancelled or failed use (no usedItem event) leaves the needs alone')
+
+    check(RegisteredEvents['som:server:adjustStatus'] == nil and RegisteredEvents['ox_inventory:usedItem'] == nil,
+        'status: a client has no event it can send to change its needs')
+
+    local f = assert(io.open(REPO .. '../[standalone]/ox_inventory/data/items.lua', 'rb'))
+    local src = f:read('a')
+    f:close()
+    local defined, problems = {}, {}
+    for name, body in src:gmatch("\n\t%['([%w_%-]+)'%]%s*=%s*{(.-)\n\t},") do
+        local inner = body:match('status%s*=%s*{([^}]*)}')
+        if inner then
+            defined[name] = true
+            local effect = env.Config.ItemStatus[name]
+            if not effect then problems[#problems + 1] = name .. ' has no effect in som-core' end
+            for key, value in inner:gmatch('(%w+)%s*=%s*(-?%d+)') do
+                if not effect or effect[key] ~= tonumber(value) * 0.0001 then problems[#problems + 1] = name .. '.' .. key .. ' differs' end
+            end
+        end
+    end
+    for name in pairs(env.Config.ItemStatus) do if not defined[name] then problems[#problems + 1] = name .. ' is not in items.lua' end end
+    check(#problems == 0, 'status: Config.ItemStatus matches every client.status in ox_inventory items.lua ' .. table.concat(problems, ', '))
 end
 
 do
@@ -5283,17 +5450,6 @@ do
     _G.Wait = realWait
     check(#paid == 1 and paid[1] == 2, 'paycheck: one failed player does not stop the next one being paid')
 
-    _G.source = 1
-    local status = function(_, key, delta) RegisteredEvents['som:server:adjustStatus'](key, delta) end
-    local meta = { hunger = 0 }
-    env.Players.Get = function() return { metadata = meta, setMetadata = function(_, k, v) meta[k] = v end } end
-    Mocks.clock = 100000
-    for _ = 1, 5 do Mocks.clock = Mocks.clock + 600; status(1, 'hunger', 50) end
-    check(meta.hunger == 100, 'status: client-sent changes stop after the per-minute budget')
-    Mocks.clock = Mocks.clock + 61000
-    status(1, 'hunger', 50)
-    _G.source = nil
-    check(meta.hunger == 150, 'status: the budget comes back after a minute')
 end
 
 do
@@ -5648,6 +5804,200 @@ end
 
 -- ---------------------------------------------------------------------------
 -- Mechanic
+
+do
+    resetDb()
+    local realJobs = Mocks.jobs
+    Mocks.jobs = { mechanic = {}, ambulance = {}, police = {}, unemployed = {} }
+    local env = loader.loadResource(REPO .. 'som-duty', { 'shared/config.lua', 'server/main.lua' })
+    local toggle = RegisteredCallbacks['som-duty:server:toggle']
+    Mocks.clock = 1000
+    Mocks.players[1] = { citizenid = 'M1', job = { name = 'mechanic', onduty = true } }
+    check(toggle(1).onduty == false and Mocks.players[1].job.onduty == false, 'duty: a mechanic can clock out')
+    check(toggle(1).error == 'one moment', 'duty: clocking again at once is refused')
+    Mocks.clock = Mocks.clock + 6000
+    check(toggle(1).onduty == true and Mocks.players[1].job.onduty == true, 'duty: and back in')
+    Mocks.players[2] = { citizenid = 'A2', job = { name = 'ambulance', onduty = false } }
+    check(toggle(2).onduty == true, 'duty: a paramedic can go on duty, which had no way before')
+    Mocks.players[3] = { citizenid = 'P3', job = { name = 'police', onduty = false } }
+    check(toggle(3).error == 'your job has no clock in' and Mocks.players[3].job.onduty == false, 'duty: the police keep their own duty point')
+    Mocks.players[4] = { citizenid = 'U4', job = { name = 'unemployed', onduty = true } }
+    check(toggle(4).success == false, 'duty: no job, nothing to clock into')
+    Mocks.players[5] = { citizenid = 'X5', job = { name = 'madeup', onduty = false } }
+    check(toggle(5).success == false, 'duty: a job the framework does not know is refused')
+    Mocks.jobs = realJobs
+end
+
+do
+    resetDb()
+    local realThread, realWait, realTrigger = _G.CreateThread, _G.Wait, _G.TriggerClientEvent
+    local tickFn
+    _G.CreateThread = function(fn) tickFn = fn end
+    local env = loader.loadResource(REPO .. 'som-taxi', { 'shared/config.lua', 'server/main.lua' })
+    _G.CreateThread = realThread
+    local cb, C = RegisteredCallbacks, env.Config
+    local core = exports['som-core']
+
+    local sent = {}
+    _G.TriggerClientEvent = function(name, src, ...) sent[#sent + 1] = { name = name, src = src, args = { ... } } end
+    local function lastSent(name) for i = #sent, 1, -1 do if sent[i].name == name and sent[i].args[1] ~= nil then return sent[i] end end end
+
+    local function runTicks(n)
+        local left = n + 1
+        _G.Wait = function() left = left - 1; if left <= 0 then error('stop') end end
+        pcall(tickFn)
+        _G.Wait = realWait
+    end
+
+    local seated, speed, CAB = {}, 10, 700
+    _G.GetVehiclePedIsIn = function(ped) return seated[ped] or 0 end
+    _G.GetPedInVehicleSeat = function(_, seat) return seat == -1 and seated.driverPed or 0 end
+    _G.GetEntityModel = function() return joaat('taxi') end
+    _G.GetEntitySpeed = function() return speed end
+
+    local function person(src, cid, job)
+        Mocks.players[src] = { source = src, citizenid = cid, job = job or { name = 'unemployed' }, charinfo = { firstname = cid, lastname = 'T' } }
+        FakePeds[src] = vec3(0, 0, 0)
+        Mocks.bank[src] = 1000
+    end
+    local function drive(ticks, step)
+        for _ = 1, ticks do
+            FakePeds[CAB] = vec3(FakePeds[CAB].x + (step or 50), 0, 0)
+            runTicks(1)
+        end
+    end
+    Mocks.clock = 5000000
+    person(1, 'T1', { name = 'taxi', onduty = true })
+    person(2, 'R2')
+    FakePeds[CAB] = vec3(0, 0, 0)
+    local act, answer = cb['som-taxi:server:act'], cb['som-taxi:server:answer']
+
+    check(act(2, 'start').error == 'you are not on duty as a cab driver', 'taxi: only an on duty cab driver runs the meter')
+    check(act(1, 'bad').error == 'bad request', 'taxi: an unknown action is refused')
+    check(act(1, 'start').error == 'sit in the driver seat of a cab', 'taxi: the meter needs a cab')
+    seated[1], seated.driverPed = CAB, 1
+    check(act(1, 'start').success and act(1, 'start').error == 'the meter is already running', 'taxi: the meter starts once')
+
+    seated[2] = CAB
+    runTicks(1)
+    check(act(1, 'charge').error:find('too short'), 'taxi: a ride under the minimum distance is free')
+
+    drive(4)
+    check(act(1, 'charge').error:find('too short'), 'taxi: a short ride stays free however long it takes')
+    drive(9)
+    local before = #sent
+    FakePeds[CAB] = vec3(FakePeds[CAB].x + 5000, 0, 0)
+    runTicks(1)
+    check(act(1, 'charge').success, 'taxi: after enough driving the fare can be sent')
+    local fareMsg = lastSent('som-taxi:client:fare')
+    local fare, meters = fareMsg.args[1], fareMsg.args[2]
+    check(fareMsg.src == 2 and meters >= C.minMeters and meters < 1000, 'taxi: a teleport is not counted as distance')
+    check(fare == math.floor(C.baseFare + C.perKm * meters / 1000), 'taxi: the fare comes from the measured distance')
+    check(act(1, 'charge').error == 'nobody has ridden yet' or act(1, 'charge').error == 'they are already deciding', 'taxi: a fare cannot be sent twice')
+
+    check(answer(3, true).error == 'no fare to pay', 'taxi: a stranger cannot pay or accept a fare')
+    check(answer(2, false).error == 'declined' and Mocks.bank[2] == 1000, 'taxi: a refused fare takes nothing')
+
+    local function newFare()
+        drive(10)
+        assert(act(1, 'charge').success)
+        return lastSent('som-taxi:client:fare').args[1]
+    end
+
+    fare = newFare()
+    Mocks.clock = Mocks.clock + (C.offerSeconds + 1) * 1000
+    check(answer(2, true).error == 'the fare request ran out' and Mocks.bank[2] == 1000, 'taxi: an old fare cannot be accepted')
+
+    fare = newFare()
+    Mocks.treasury = 0
+    local callsBefore = Mocks.calls.businessTransact
+    local r = answer(2, true)
+    local pay = math.floor(fare * C.commission)
+    check(r.success and r.fare == fare and Mocks.bank[2] == 1000 - fare, 'taxi: the passenger pays the fare from the bank')
+    check(Mocks.calls.businessTransact == callsBefore + 2 and Mocks.lastTransact.name == C.business and Mocks.lastTransact.amount == -pay,
+        'taxi: the company gets the fare, then pays the commission')
+    check(r.paid == pay and pay < fare and Mocks.lastPaid.reason == 'taxi:commission' and Mocks.lastPaid.amount == pay,
+        'taxi: the driver gets a commission below the fare')
+    check(Mocks.lastPaid.opts and Mocks.lastPaid.opts.flow == 'transfer' and Mocks.lastPaid.opts.counterparty == C.business, 'taxi: the commission is booked as a transfer, not new money')
+    check(answer(2, true).error == 'no fare to pay', 'taxi: a fare is paid once')
+
+    -- Hourly cap on the driver's commission.
+    fare = newFare()
+    mysql.db.taxi.earned['T1'] = C.hourlyCommissionCap - 2
+    r = answer(2, true)
+    check(r.success and r.paid == 2, 'taxi: the driver commission stops at the hourly cap')
+    mysql.db.taxi.earned['T1'] = C.hourlyCommissionCap
+    fare = newFare()
+    r = answer(2, true)
+    check(r.success and r.paid == 0, 'taxi: at the cap the passenger still pays and the driver gets nothing more')
+    mysql.db.taxi.earned['T1'] = 0
+
+    -- A failed company credit gives the passenger the money back.
+    fare = newFare()
+    local realBT = core.businessTransact
+    core.businessTransact = function(self, name, amount, reason) if amount > 0 then return false end return realBT(self, name, amount, reason) end
+    r = answer(2, true)
+    core.businessTransact = realBT
+    check(not r.success and Mocks.lastPaid.reason == 'taxi:fare:refund' and Mocks.lastPaid.amount == fare, 'taxi: a fare the company cannot take is refunded')
+
+    -- A failed driver credit puts the commission back.
+    fare = newFare()
+    Mocks.addMoneyFails = true
+    r = answer(2, true)
+    Mocks.addMoneyFails = false
+    check(r.success and r.paid == 0 and Mocks.lastTransact.amount > 0, 'taxi: a commission that cannot be paid goes back to the company')
+
+    -- Poor passenger.
+    fare = newFare()
+    Mocks.bank[2] = 1
+    check(answer(2, true).error:find('you need'), 'taxi: a passenger who cannot pay is not charged')
+    Mocks.bank[2] = 1000
+
+    -- Driver off duty before the answer.
+    fare = newFare()
+    Mocks.players[1].job.onduty = false
+    local bank2 = Mocks.bank[2]
+    check(answer(2, true).error == 'the driver is no longer on duty' and Mocks.bank[2] == bank2, 'taxi: no charge when the driver went off duty')
+    Mocks.players[1].job.onduty = true
+
+    -- No fares to yourself.
+    Mocks.players[2].citizenid = 'T1'
+    drive(10)
+    check(act(1, 'charge').error == 'you cannot charge yourself', 'taxi: a character cannot pay itself')
+    Mocks.players[2].citizenid = 'R2'
+
+    -- A passenger who walked away cannot be charged.
+    drive(10)
+    FakePeds[2] = vec3(500, 0, 0)
+    check(act(1, 'charge').error == 'the passenger is gone', 'taxi: a passenger far away is not charged')
+    FakePeds[2] = vec3(0, 0, 0)
+
+    -- Leaving the cab ends the meter.
+    seated[1] = nil
+    runTicks(1)
+    check(act(1, 'charge').error == 'the meter is not running', 'taxi: leaving the cab stops the meter')
+    _G.TriggerClientEvent = realTrigger
+    _G.Wait = realWait
+end
+
+
+-- ---------------------------------------------------------------------------
+-- Boot config
+-- ---------------------------------------------------------------------------
+
+do
+    -- FXServer splits a line on ';' before it looks for the comment marker, so the
+    -- text after a ';' inside a '#' comment runs as a console command.
+    for _, name in ipairs({ 'som.cfg', 'server.cfg.example' }) do
+        local f = io.open(REPO .. '../../' .. name)
+        local bad = 0
+        for line in f:lines() do
+            if line:match('^%s*#') and line:find(';', 1, true) then bad = bad + 1 end
+        end
+        f:close()
+        check(bad == 0, 'boot: no ";" inside a comment in ' .. name)
+    end
+end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)
