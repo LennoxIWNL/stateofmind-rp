@@ -61,6 +61,7 @@ end
 function core:payWith(source, account, amount, reason)
     Mocks.calls.payWith = Mocks.calls.payWith + 1
     if Mocks.payWithFails then return false, 'insufficient funds' end
+    Mocks.lastPay = { source = source, account = account, amount = amount, reason = reason }
     return true
 end
 function core:addMoney(source, account, amount, reason)
