@@ -53,7 +53,7 @@ M.db = {
     vehicles = {},
     social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} },
     nextId = { properties = 1, owners = 1, finance = 1, jailSentences = 1, jailBail = 1,
-               courtCases = 1, courtEvents = 1, courtWarrants = 1, service = 1, evidence = 1, custody = 1, orders = 1 },
+               courtCases = 1, courtEvents = 1, courtWarrants = 1, courtService = 1, service = 1, evidence = 1, custody = 1, orders = 1 },
 }
 
 -- Overridable "now" for jail/bail elapsed-time math, so a test can jump a
@@ -1263,9 +1263,81 @@ local function fail(query)
     error('tests/mocks/mysql.lua: unhandled query: ' .. query, 3)
 end
 
+
+-- som-serving: court service. Papers eligible for serving, the atomic claim insert, the cap reads.
+local function courtService(kind, query, params)
+    local S = M.db.courtService
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    local function nameFor(cid)
+        for _, p in pairs(_G.Mocks.players) do
+            if p.citizenid == cid then return p.charinfo.firstname, p.charinfo.lastname end
+        end
+        return 'Unknown', 'Person'
+    end
+    local function served(caseId)
+        for _, r in ipairs(S) do if r.case_id == caseId then return true end end
+        return false
+    end
+
+    if (kind == 'single' or kind == 'query') and has('FROM som_court_cases c') and has('JOIN som_characters ch') then
+        local cid, byId = params[2], has('AND c.id = ?')
+        local rows = {}
+        for id, c in pairs(M.db.courtCases) do
+            local ok = c.status == 'scheduled' and c.hearing_at and c.hearing_at > now() + params[1] * 60 and not served(id)
+                and c.defendant_cid ~= cid and c.filed_by ~= cid and c.prosecutor_cid ~= cid and c.judge_cid ~= cid and c.defender_cid ~= cid
+            if ok and (not byId or id == params[7]) then
+                local first, last = nameFor(c.defendant_cid)
+                rows[#rows + 1] = { id = id, defendant_cid = c.defendant_cid, firstname = first, lastname = last,
+                    minutes = (c.hearing_at - now()) // 60 }
+            end
+        end
+        table.sort(rows, function(a, b) return M.db.courtCases[a.id].hearing_at < M.db.courtCases[b.id].hearing_at end)
+        if kind == 'single' then return true, rows[1] end
+        return true, rows
+    elseif kind == 'query' and has('SELECT case_id FROM som_court_service WHERE case_id >= ? AND case_id <= ?') then
+        local out = {}
+        for _, r in ipairs(S) do
+            if r.case_id >= params[1] and r.case_id <= params[2] then out[#out + 1] = { case_id = r.case_id } end
+        end
+        return true, out
+    elseif kind == 'scalar' and has('SELECT COUNT(*) FROM som_court_service WHERE defendant_cid = ?') then
+        local n = 0
+        for _, r in ipairs(S) do
+            if r.defendant_cid == params[1] and r.at > now() - params[2] * 3600 then n = n + 1 end
+        end
+        return true, n
+    elseif kind == 'scalar' and has('SELECT COALESCE(SUM(fee), 0) FROM som_court_service WHERE server_cid = ?') then
+        local sum = 0
+        for _, r in ipairs(S) do
+            if r.server_cid == params[1] and r.at > now() - 3600 then sum = sum + r.fee end
+        end
+        return true, sum
+    elseif kind == 'insert' and has('INSERT IGNORE INTO som_court_service') then
+        local caseId, defendant, server, fee, _, hours, _, _, cap = table.unpack(params)
+        if served(caseId) then return true, 0 end
+        local spent = 0
+        for _, r in ipairs(S) do
+            if r.defendant_cid == defendant and r.at > now() - hours * 3600 then return true, 0 end
+            if r.server_cid == server and r.at > now() - 3600 then spent = spent + r.fee end
+        end
+        if spent + fee > cap then return true, 0 end
+        local id = M.db.nextId.courtService
+        M.db.nextId.courtService = id + 1
+        S[#S + 1] = { id = id, case_id = caseId, defendant_cid = defendant, server_cid = server, fee = fee, at = now() }
+        return true, id
+    elseif kind == 'update' and has('DELETE FROM som_court_service WHERE id = ?') then
+        for i, r in ipairs(S) do
+            if r.id == params[1] then table.remove(S, i); return true, 1 end
+        end
+        return true, 0
+    end
+    return false
+end
+
 function M.single(query, params)
     params = params or {}
     do local handled, value = loansDb('single', query, params); if handled then return value end end
+    do local handled, value = courtService('single', query, params); if handled then return value end end
     do local handled, value = leases('single', query, params); if handled then return value end end
     do local handled, value = shopsDb('single', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('single', query, params); if handled then return value end end
@@ -1347,6 +1419,7 @@ end
 function M.scalar(query, params)
     params = params or {}
     do local handled, value = loansDb('scalar', query, params); if handled then return value end end
+    do local handled, value = courtService('scalar', query, params); if handled then return value end end
     do local handled, value = leases('scalar', query, params); if handled then return value end end
     if query:find('FROM som_transactions WHERE citizenid IS NULL AND reason = ?', 1, true) then
         return _G.Mocks.budgetDrawn or 0
@@ -1464,6 +1537,7 @@ end
 function M.update(query, params)
     params = params or {}
     do local handled, value = loansDb('update', query, params); if handled then return value end end
+    do local handled, value = courtService('update', query, params); if handled then return value end end
     do local handled, value = leases('update', query, params); if handled then return value end end
     do local handled, value = shopsDb('update', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('update', query, params); if handled then return value end end
@@ -1819,6 +1893,7 @@ end
 function M.insert(query, params)
     params = params or {}
     do local handled, value = loansDb('insert', query, params); if handled then return value end end
+    do local handled, value = courtService('insert', query, params); if handled then return value end end
     do local handled, value = leases('insert', query, params); if handled then return value end end
     do local handled, value = shopsDb('insert', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('insert', query, params); if handled then return value end end
@@ -1990,6 +2065,7 @@ function M.insert(query, params)
 end
 
 function M.query(query, params)
+    do local handled, value = courtService('query', query, params); if handled then return value end end
     if query:find('FROM som_businesses b', 1, true) then return M.db.businessRows or {} end
     params = params or {}
     do local handled, value = loansDb('query', query, params); if handled then return value end end

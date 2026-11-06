@@ -143,7 +143,7 @@ function Menus.Docket()
     for _, case in ipairs(res.cases) do
         options[#options + 1] = {
             title = caseTitle(case),
-            description = ('%s, defendant %s'):format(case.status, case.defendant_cid),
+            description = ('%s, defendant %s, %s'):format(case.status, case.defendant_cid, case.served and 'served' or 'not served'),
             onSelect = function() showCase(res.role, case) end,
         }
     end
