@@ -44,7 +44,8 @@ lib.callback.register('som-shops:server:answerHire', function(source, accept)
     local shop = Shops.Find(offer.shop)
     if not shop or not owner or owner.citizenid ~= offer.owner or not Shops.Owns(owner, shop.id) then return done(false, 'that offer is gone') end
 
-    local hired = MySQL.insert.await([[
+    -- Affected rows, not insertId: this table has no AUTO_INCREMENT, so insertId is 0 even when the row went in.
+    local hired = MySQL.update.await([[
         INSERT IGNORE INTO som_shop_staff (citizenid, shop_id, hourly_pay)
         SELECT ?, ?, ? FROM DUAL WHERE (SELECT COUNT(*) FROM som_shop_staff WHERE shop_id = ?) < ?
     ]], { player.citizenid, shop.id, offer.pay, shop.id, Config.maxStaff })
