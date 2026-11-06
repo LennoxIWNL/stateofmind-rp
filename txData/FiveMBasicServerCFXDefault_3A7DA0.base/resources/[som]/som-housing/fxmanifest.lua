@@ -39,6 +39,8 @@ server_scripts {
     'server/properties.lua',
     'server/ownership.lua',
     'server/finance.lua',
+    -- Leases read Properties and Ownership, so after both.
+    'server/lease.lua',
     -- raid before interior: entering consults Raid.CanEnter for a forced door.
     'server/raid.lua',
     'server/interior.lua',

@@ -396,3 +396,13 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] The glovebox and boot belong to the car (they are keyed on the vehicle id), so their contents go to the buyer. The seller is told to empty them.
 - [ ] There is no vehicle key mechanism and no vehicle finance or insurance in this codebase, so nothing like that moves in a sale. If keys are added later they must move in `som-carsales`.
 - [ ] Never run in a game: the "Sell this vehicle" option on a car, picking the closest player, the buyer dialog, and the plate the server reads from a real vehicle (padding and case). The plate is trimmed and compared exactly with `som_vehicles.plate`; if real plates differ from the stored text the sale says "that is not your vehicle".
+## Player leases (som-housing)
+
+- [ ] Import `setup.sql` on an existing database: it adds one table, `som_property_leases` (`CREATE TABLE IF NOT EXISTS`, safe to re-run). Until it is imported the lease sweep prints "som_property_leases is missing" and does nothing.
+- [ ] Rent range and rules are first guesses in `Config.Lease` (`shared/config.lua`): weekly rent from $100 up to 2 percent of the property price, 7 day weeks, eviction after 2 missed weeks, 2 leases per tenant, 60 second offers. Tune them with the realtors.
+- [ ] Two missed weeks while the tenant is offline evict them (a week offline counts as missed). Decide with the owner whether that is too harsh, or whether the limit should be longer (`Config.Lease.evictAfterMissed`).
+- [ ] An owner cannot end a lease early: only when the paid week has run out or the tenant is behind. A tenant can always leave if they owe nothing.
+- [ ] A tenant must be online to pay: a week they are offline or cannot afford is counted as missed and paid back on their next login (up to the eviction limit). No rent tax and no deposit.
+- [ ] Every door now has a "Let this property" option; the server only lets the owner use it. Decide whether to hide it for non-owners (needs a client-side ownership cache).
+- [ ] Not verified in a live server: the offer and answer dialogs, the Leases phone app, a real week passing, eviction while the tenant is inside the property (they are told, not moved, and lose stash access immediately).
+- [ ] Left out on purpose: city motel rooms, deposits, rent tax, subletting, mid-lease rent changes, items in the stash on eviction (they stay with the property).

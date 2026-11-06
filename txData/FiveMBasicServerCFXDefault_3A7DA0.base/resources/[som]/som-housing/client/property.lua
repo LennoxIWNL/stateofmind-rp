@@ -191,6 +191,55 @@ local function mortgage(slug)
         ('%s sold. %d payments, your cut $%d.'):format(res.label, res.cycles, res.commission), 'success')
 end
 
+--- Offering a lease, from the owner's side. The server checks that the caller owns the property, that
+--- the other person is next to them and that the rent is in range; the answer is theirs alone.
+---@param slug string
+local function lease(slug)
+    local nearby = lib.callback.await('som-housing:server:nearbyBuyers', false)
+
+    if not nearby or not nearby.success or #nearby.players == 0 then
+        return TriggerEvent('som:client:notify', 'Nobody is standing with you', 'error')
+    end
+
+    local people = {}
+    for i, person in ipairs(nearby.players) do
+        people[i] = { value = person.source, label = person.name }
+    end
+
+    local answer = lib.inputDialog('Let this property', {
+        { type = 'select', label = 'Tenant', options = people, required = true },
+        { type = 'number', label = 'Rent a week', min = Config.Lease.minRent, required = true },
+    })
+
+    if not answer or not answer[1] or not answer[2] then return end
+
+    local res = lib.callback.await('som-housing:server:leaseOffer', false, {
+        slug = slug,
+        target = answer[1],
+        rent = math.floor(answer[2]),
+    })
+
+    TriggerEvent('som:client:notify', res and res.success and 'Offer sent' or (res and res.error or 'Could not make the offer'), res and res.success and 'success' or 'error')
+end
+
+RegisterNetEvent('som-housing:client:leaseOffer', function(label, ownerName, rent)
+    if type(label) ~= 'string' or type(ownerName) ~= 'string' or type(rent) ~= 'number' then return end
+
+    local answer = lib.alertDialog({
+        header = label,
+        content = ('%s offers you a lease at $%d a week. The first week is paid now.'):format(ownerName, rent),
+        centered = true,
+        cancel = true,
+    })
+
+    local res = lib.callback.await('som-housing:server:leaseAnswer', false, answer == 'confirm')
+    if res and res.success and answer == 'confirm' then
+        TriggerEvent('som:client:notify', ('You now rent %s'):format(res.label), 'success')
+    elseif res and res.error then
+        TriggerEvent('som:client:notify', res.error, 'error')
+    end
+end)
+
 -- ---------------------------------------------------------------------------
 -- Door zones
 -- ---------------------------------------------------------------------------
@@ -238,6 +287,14 @@ CreateThread(function()
                         return core:hasJob(Config.Finance.job, nil, true)
                     end,
                     onSelect = function() mortgage(property.slug) end,
+                },
+                {
+                    name = ('property:%s:lease'):format(property.slug),
+                    icon = 'fa-solid fa-key',
+                    label = 'Let this property',
+                    distance = 2.0,
+                    -- A UI filter: the server only lets the owner offer a lease.
+                    onSelect = function() lease(property.slug) end,
                 },
                 {
                     name = ('property:%s:view'):format(property.slug),

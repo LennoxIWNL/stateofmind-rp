@@ -104,6 +104,13 @@ function core:taxToTreasury(amount, reason)
     Mocks.treasury = Mocks.treasury + amount
     return true
 end
+function core:transferToCitizen(from, toCitizenId, account, amount, reason)
+    if Mocks.transferFails or type(reason) ~= 'string' or (Mocks.bank[from] or 0) < amount then return false, 'insufficient funds' end
+    Mocks.bank[from] = Mocks.bank[from] - amount
+    Mocks.credited = Mocks.credited or {}
+    Mocks.credited[toCitizenId] = (Mocks.credited[toCitizenId] or 0) + amount
+    return true
+end
 function core:removeMoney(source, account, amount, reason)
     if (Mocks.bank[source] or 0) < amount then return false, 'insufficient funds' end
     Mocks.bank[source] = Mocks.bank[source] - amount
