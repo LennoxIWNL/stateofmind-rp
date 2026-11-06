@@ -40,6 +40,7 @@ M.db = {
     skills = {},
     newlife = {},
     chop = { log = {}, owned = {} },
+    licences = { rows = {}, attempts = {} },
     lab = {},
     plants = {},
     gangs = { chars = {}, log = {} },
@@ -610,6 +611,53 @@ local function skills(kind, query, params)
     return false
 end
 
+local function licences(kind, query, params)
+    local L = M.db.licences
+    local function key(cid, t) return cid .. ':' .. t end
+    if kind == 'query' and query:find('FROM som_licenses WHERE citizenid = ?', 1, true) and query:find('suspended_until IS NOT NULL', 1, true) then
+        local out = {}
+        for _, r in pairs(L.rows) do
+            if r.citizenid == params[1] then
+                local susp = r.suspendedUntil ~= nil and r.suspendedUntil > now()
+                out[#out + 1] = { type = r.type, revoked = r.revoked, suspended = susp and 1 or 0, until_at = susp and '2099-01-01 00:00' or nil }
+            end
+        end
+        return true, out
+    elseif kind == 'update' and query:find('INSERT INTO som_licenses (citizenid, type, issued_by)', 1, true) then
+        assert(params[3] ~= nil, 'licence claim: issuer must not be nil, a hole in the parameter list breaks oxmysql')
+        local k = key(params[1], params[2])
+        if L.rows[k] then return true, 0 end
+        L.rows[k] = { citizenid = params[1], type = params[2], issuedBy = params[3], revoked = 0 }
+        return true, 1
+    elseif kind == 'update' and query:find('DELETE FROM som_licenses WHERE citizenid = ? AND type = ?', 1, true) then
+        local r = L.rows[key(params[1], params[2])]
+        if r and r.revoked == 0 and r.suspendedUntil == nil then L.rows[key(params[1], params[2])] = nil; return true, 1 end
+        return true, 0
+    elseif kind == 'update' and query:find('SET revoked = 1, suspended_until = NULL WHERE citizenid = ? AND type = ? AND revoked = 0', 1, true) then
+        local r = L.rows[key(params[1], params[2])]
+        if r and r.revoked == 0 then r.revoked, r.suspendedUntil = 1, nil; return true, 1 end
+        return true, 0
+    elseif kind == 'update' and query:find('SET suspended_until = DATE_ADD(NOW(), INTERVAL ? DAY)', 1, true) then
+        local r = L.rows[key(params[2], params[3])]
+        if r and r.revoked == 0 then r.suspendedUntil = now() + params[1] * 86400; return true, 1 end
+        return true, 0
+    elseif kind == 'update' and query:find('SET revoked = 0, suspended_until = NULL WHERE citizenid = ? AND type = ?', 1, true) then
+        local r = L.rows[key(params[1], params[2])]
+        if r then r.revoked, r.suspendedUntil = 0, nil; return true, 1 end
+        return true, 0
+    elseif kind == 'insert' and query:find('INSERT INTO som_licence_attempts', 1, true) then
+        L.attempts[#L.attempts + 1] = { citizenid = params[1], kind = params[2], passed = params[3], score = params[4], ts = now() }
+        return true, #L.attempts
+    elseif kind == 'scalar' and query:find('FROM som_licence_attempts', 1, true) then
+        local n = 0
+        for _, a in ipairs(L.attempts) do
+            if a.citizenid == params[1] and a.kind == 'theory' and a.passed == 0 and a.ts > now() - params[2] * 60 then n = n + 1 end
+        end
+        return true, n
+    end
+    return false
+end
+
 local function chop(kind, query, params)
     local C = M.db.chop
     if kind == 'scalar' and query:find('SELECT 1 FROM som_vehicles WHERE plate = ?', 1, true) then
@@ -942,6 +990,7 @@ function M.scalar(query, params)
     do local handled, value = lab('scalar', query, params); if handled then return value end end
     do local handled, value = buyer('scalar', query, params); if handled then return value end end
     do local handled, value = chop('scalar', query, params); if handled then return value end end
+    do local handled, value = licences('scalar', query, params); if handled then return value end end
     do local handled, value = skills('scalar', query, params); if handled then return value end end
     do local handled, value = trade('scalar', query, params); if handled then return value end end
     do local handled, value = moneyRows('scalar', query, params); if handled then return value end end
@@ -1042,6 +1091,7 @@ end
 function M.update(query, params)
     params = params or {}
     do local handled, value = sharedAccounts('update', query, params); if handled then return value end end
+    do local handled, value = licences('update', query, params); if handled then return value end end
     do local handled, value = social('update', query, params); if handled then return value end end
     do local handled, value = city('update', query, params); if handled then return value end end
     do local handled, value = heist('update', query, params); if handled then return value end end
@@ -1404,6 +1454,7 @@ function M.insert(query, params)
     do local handled, value = lab('insert', query, params); if handled then return value end end
     do local handled, value = buyer('insert', query, params); if handled then return value end end
     do local handled, value = chop('insert', query, params); if handled then return value end end
+    do local handled, value = licences('insert', query, params); if handled then return value end end
     do local handled, value = trade('insert', query, params); if handled then return value end end
     do local handled, value = placements('insert', query, params); if handled then return value end end
     do local handled, value = newlife('insert', query, params); if handled then return value end end
@@ -1562,6 +1613,7 @@ end
 function M.query(query, params)
     params = params or {}
     do local handled, value = social('query', query, params); if handled then return value end end
+    do local handled, value = licences('query', query, params); if handled then return value end end
     do local handled, value = city('query', query, params); if handled then return value end end
     do local handled, value = heist('query', query, params); if handled then return value end end
     do local handled, value = turf('query', query, params); if handled then return value end end
