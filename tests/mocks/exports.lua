@@ -63,12 +63,12 @@ function core:payWith(source, account, amount, reason)
     if Mocks.payWithFails then return false, 'insufficient funds' end
     return true
 end
-function core:addMoney(source, account, amount, reason)
+function core:addMoney(source, account, amount, reason, opts)
     Mocks.calls.addMoney = Mocks.calls.addMoney + 1
     if Mocks.addMoneyThrows then error('simulated crash after the treasury was debited') end
     if Mocks.addMoneyFails then return false, 'refused' end
     Mocks.paid = (Mocks.paid or 0) + amount
-    Mocks.lastPaid = { account = account, amount = amount, reason = reason }
+    Mocks.lastPaid = { account = account, amount = amount, reason = reason, opts = opts }
     return true
 end
 Mocks.gangDefs = {
@@ -103,6 +103,12 @@ end
 function core:removeMoney(source, account, amount, reason)
     if (Mocks.bank[source] or 0) < amount then return false, 'insufficient funds' end
     Mocks.bank[source] = Mocks.bank[source] - amount
+    return true
+end
+function core:setDuty(source, onduty)
+    local p = Mocks.players[source]
+    if not p or type(onduty) ~= 'boolean' then return false, 'duty must be a boolean' end
+    p.job.onduty = onduty
     return true
 end
 function core:hasMoney(source, account, amount) return (Mocks.bank[source] or 0) >= amount end

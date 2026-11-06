@@ -41,6 +41,7 @@ M.db = {
     newlife = {},
     chop = { log = {}, owned = {} },
     licences = { rows = {}, attempts = {} },
+    taxi = { earned = {} },
     lab = {},
     plants = {},
     gangs = { chars = {}, log = {} },
@@ -611,6 +612,13 @@ local function skills(kind, query, params)
     return false
 end
 
+local function taxi(kind, query, params)
+    if kind == 'scalar' and query:find("reason = 'taxi:commission'", 1, true) then
+        return true, M.db.taxi.earned[params[1]] or 0
+    end
+    return false
+end
+
 local function licences(kind, query, params)
     local L = M.db.licences
     local function key(cid, t) return cid .. ':' .. t end
@@ -991,6 +999,7 @@ function M.scalar(query, params)
     do local handled, value = buyer('scalar', query, params); if handled then return value end end
     do local handled, value = chop('scalar', query, params); if handled then return value end end
     do local handled, value = licences('scalar', query, params); if handled then return value end end
+    do local handled, value = taxi('scalar', query, params); if handled then return value end end
     do local handled, value = skills('scalar', query, params); if handled then return value end end
     do local handled, value = trade('scalar', query, params); if handled then return value end end
     do local handled, value = moneyRows('scalar', query, params); if handled then return value end end
