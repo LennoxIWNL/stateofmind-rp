@@ -70,17 +70,6 @@ RegisterNetEvent('som:client:onGangChanged', function(gang)
     client.setPlayerData('groups', groups)
 end)
 
----Applies item status effects (food, drink) to SOM metadata.
----ox passes deltas in its own scale; som-core clamps to 0-100 server side.
----@diagnostic disable-next-line: duplicate-set-field
-function client.setPlayerStatus(values)
-    for name, value in pairs(values) do
-        -- ox_inventory item definitions use the large ESX-style scale
-        -- (hunger = 200000). Normalise before handing it to som-core.
-        if value > 100 or value < -100 then
-            value = value * 0.0001
-        end
-
-        TriggerServerEvent('som:server:adjustStatus', name, value)
-    end
-end
+-- Item status effects (food, drink) are applied by som-core on the server when ox_inventory
+-- reports the item used, so there is no client.setPlayerStatus here: client.lua only calls it
+-- when it exists, and nothing on the client may change these needs.

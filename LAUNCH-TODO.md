@@ -350,6 +350,11 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] The `trash` model, the blip sprite 318, the `anim@heists@narcotics@trash` throw animation and the bin positions are unchecked guesses. The sort is read from the bin colour label, by design.
 - [ ] Not detected: a dead or jailed member keeps the round until it expires (40 minutes plus 15) and then the truck is removed.
 - [ ] Not verified live: the server spawned truck, bin interaction zones, a crew of three, a real payout from the treasury.
+## Server-owned hunger, thirst and stress
+
+- [ ] Item use now changes the needs on the server: som-core listens for the server event `ox_inventory:usedItem` and applies `Config.ItemStatus` (the 8 food and drink items, same numbers as before). `som:server:adjustStatus` and its stopgap budget are gone, and the ox bridge no longer has `client.setPlayerStatus`. Not run in a live server: eat and drink each of the 8 items and confirm the bar moves, that cancelling the progress bar changes nothing, and that the HUD (som-hud and ps-hud) still follows. A new food item in `ox_inventory/data/items.lua` needs an entry in `Config.ItemStatus` (a test fails until it has one).
+- [ ] Stress has no passive decay (it never had); only items lower it.
+
 ## ANPR (som-anpr)
 
 - [ ] Exact config change: `ps-mdt/shared/config.lua` now has `Config.UseWolfknightRadar = false` (it was `true`). That turns off ps-mdt's own `wk:onPlateScanned` handler, which showed the stock QBCore popup to any client and leaked registered owner names for any plate. It also turns off ps-mdt's `ps-mdt:client:trafficStop` hook, which called `ps-dispatch` (not installed).
@@ -366,3 +371,11 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Not detected: a member who is dead or in jail keeps the run until it expires (route minutes plus 15) and then the truck is removed. The trailer being hooked to the truck is not checked, only that it sits in the yard.
 - [ ] Not verified live: server spawned vehicles, trailer body health read on the server in OneSync, a real crew of two, the unhook progress bar, `/abandonhaul`.
 - [ ] Trucking: if the game errors (not just refuses) while crediting a driver right after the company was debited, that one payment is lost by the company and nobody is paid; the run ends so nobody is paid twice. Rare, but staff should know the Post OP balance can drift by one payment.
+
+## Fuel (som-fuel)
+
+- [ ] Existing databases: import the new seed from `setup.sql` (account `BUS-FUEL` and business `fuelco`, both `INSERT IGNORE`, opening balance 0). Without the `fuelco` business every fuel sale refunds the player. The account only ever holds what players paid at the pump, no seeded float and no treasury money. Decide who may withdraw from it.
+- [ ] Place the gas stations: `/place som-fuel stations.station_1.coords` (up to `station_8`; add more entries in `som-fuel/shared/config.lua`). None is open until placed, and a station may set its own `price` (default 4 a litre). Stand within 15 m of the point; pumps are detected by prop model (`prop_gas_pump_*`, `prop_vintage_pump`).
+- [ ] Numbers are untuned defaults: 100 unit tank, drain 0.012 per second plus 0.0016 per m/s, jerry can 120 for 25 units, 5 units per pour.
+- [ ] Not verified live: `SetVehicleFuelLevel` moving the ps-hud gauge (ps-hud reads it through `som-compat`'s `GetFuel`) and cutting the engine at zero, the pump model names, the `WEAPON_PETROLCAN` metadata (`durability` and `ammo` as 0 to 100, written by the server only), the state bag `fuel` handler on the other clients, drain balance. Known limit: the drain runs on the driver's client, so a cheater can avoid draining, but no fuel can be minted: every increase is a server approved sale or can pour.
+- [ ] Cut on purpose: player owned stations, electric charging, fuel types, siphoning. cdn-fuel stays unensured.

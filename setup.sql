@@ -1512,6 +1512,16 @@ VALUES
   ('pdm',         'Premium Deluxe Motorsport',    'cardealer', (SELECT id FROM som_bank_accounts WHERE account_no='BUS-PDM'),    0.0000, 'sales',    'private',    1, 0.0800),
   ('dynasty8',    'Dynasty 8 Real Estate',        'realtor',   (SELECT id FROM som_bank_accounts WHERE account_no='BUS-DYN8'),   0.0000, 'sales',    'private',    1, 0.0800);
 
+-- Fuel station sales (som-fuel). Opens at zero on purpose: its only income is
+-- what players pay at the pump, never a seeded float or treasury money.
+INSERT IGNORE INTO `som_bank_accounts` (`account_no`, `label`, `type`, `balance`) VALUES
+  ('BUS-FUEL', 'Fuel Station Sales', 'business', 0);
+
+INSERT IGNORE INTO `som_businesses`
+  (`name`, `label`, `job`, `account_id`, `tax_rate`, `funding`, `category`, `active`, `treasury_cut`)
+VALUES
+  ('fuelco', 'Fuel Station Sales', NULL, (SELECT id FROM som_bank_accounts WHERE account_no='BUS-FUEL'), 0.0000, 'sales', 'private', 1, 0.0800);
+
 -- Corrections for databases seeded before the funding model existed, where
 -- INSERT IGNORE above skipped the rows and left them on column defaults.
 UPDATE `som_businesses`
