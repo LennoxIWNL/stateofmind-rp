@@ -13,6 +13,7 @@ HealthLists = {
     'som-economy',
     'som-ems',
     'som-evidence',
+    'som-fuel',
     'som-garage',
     'som-groups',
     'som-hack',
