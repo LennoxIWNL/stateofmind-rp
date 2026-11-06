@@ -4716,6 +4716,167 @@ do
 end
 
 -- ---------------------------------------------------------------------------
+-- Phone loans
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    resetMocks()
+    mysql.fakeNow = 1000000
+    mysql.db.loans = {}
+    local env = loader.loadResource(REPO .. 'som-loans', { 'shared/config.lua', 'server/loans.lua' })
+    local core = exports['som-core']
+    local C = env.Config
+    local app = Mocks.apps.loans
+    local DAY = 86400
+
+    local function person(src, cid) return { citizenid = cid, source = src, charinfo = { firstname = 'P' .. src, lastname = 'Q' .. src } } end
+    Mocks.players = { [1] = person(1, 'BOR1'), [2] = person(2, 'BOR2'), [3] = person(3, 'STAFF3') }
+    Mocks.bank = { [1] = 0, [2] = 0, [3] = 0 }
+    Mocks.treasury = 200000
+    Mocks.addMoneyFails, Mocks.admins = false, { [3] = true }
+    local saved = { addMoney = core.addMoney }
+    function core:addMoney(source, _, amount)
+        if Mocks.addMoneyFails then return false, 'refused' end
+        Mocks.bank[source] = (Mocks.bank[source] or 0) + amount
+        return true
+    end
+    function core:getMoney(source) return Mocks.bank[source] or 0 end
+    local notes = {}
+    local realT = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, ...) notes[#notes + 1] = { name = name, target = target, args = { ... } } end
+
+    local function loanOf(cid) for i = #mysql.db.loans, 1, -1 do if mysql.db.loans[i].citizenid == cid then return mysql.db.loans[i] end end end
+    local function borrow(src, amount, weeks)
+        local picked = app.handler(src, 'pick', { amount = amount })
+        if not picked.success then return picked end
+        return app.handler(src, 'borrow', { weeks = weeks })
+    end
+    local function week() mysql.fakeNow = mysql.fakeNow + 8 * DAY end
+
+    -- Asking
+    check(#app.handler(1, 'view', {}).view.sections[1].rows == #C.amounts, 'loans: the phone offers the listed amounts')
+    check(app.handler(1, 'pick', { amount = 750 }).error == 'bad request' and app.handler(1, 'pick', { amount = '500' }).error == 'bad request' and app.handler(1, 'pick', {}).error == 'bad request', 'loans: only listed amounts can be chosen')
+    check(app.handler(1, 'borrow', { weeks = 4 }).error == 'bad request', 'loans: nothing is lent without a chosen amount')
+    app.handler(1, 'pick', { amount = 1000 })
+    check(app.handler(1, 'borrow', { weeks = 5 }).error == 'bad request' and app.handler(1, 'borrow', { weeks = '4' }).error == 'bad request', 'loans: only listed terms can be chosen')
+    check(#app.handler(1, 'view', {}).view.sections == 2, 'loans: the phone shows the terms once an amount is chosen')
+
+    -- Lending
+    local made = app.handler(1, 'borrow', { weeks = 4, amount = 99999, fee = 0, instalment = 1 })
+    local loan = loanOf('BOR1')
+    check(made.success and loan.principal == 1000 and loan.fee == 100 and loan.instalment == 275 and loan.remaining == 1100, 'loans: the fee and instalment are worked out on the server')
+    check(Mocks.bank[1] == 1000 and Mocks.treasury == 199000, 'loans: the money comes from the treasury')
+    check(borrow(1, 500, 4).error == 'you already have a loan open', 'loans: one open loan per person')
+
+    Mocks.treasury = 50500
+    check(borrow(2, 1000, 4).error == 'the bank cannot lend right now' and loanOf('BOR2') == nil and Mocks.treasury == 50500, 'loans: the treasury floor holds')
+    Mocks.treasury = 199000
+    C.globalCap = 1500
+    check(borrow(2, 500, 4).error == 'the bank is not lending more right now' and loanOf('BOR2') == nil and Mocks.treasury == 199000, 'loans: the total owed is capped')
+    C.globalCap = 100000
+    Mocks.addMoneyFails = true
+    check(borrow(2, 500, 4).success == false and Mocks.treasury == 199000 and loanOf('BOR2').status == 'cancelled', 'loans: a failed credit refunds the treasury and cancels the loan')
+    Mocks.addMoneyFails = false
+    check(borrow(2, 500, 4).success and loanOf('BOR2').status == 'active', 'loans: a cancelled loan does not block a new one')
+    -- Take that loan out again so the weeks below are about one borrower at a time.
+    table.remove(mysql.db.loans)
+    Mocks.treasury, Mocks.bank[2] = 199000, 0
+
+    -- Weeks
+    Mocks.bank[1] = 1000
+    week()
+    env.Loans.Sweep()
+    check(loan.remaining == 825 and Mocks.bank[1] == 725 and Mocks.treasury == 199275 and loan.missed == 0, 'loans: an instalment is taken from the bank and goes to the treasury')
+    env.Loans.Sweep()
+    check(loan.remaining == 825, 'loans: the same week is never taken twice')
+    local row = { id = loan.id, citizenid = 'BOR1', instalment = 275, remaining = loan.remaining, due = loan.due }
+    week()
+    local bankBefore, treasuryBefore = Mocks.bank[1], Mocks.treasury
+    env.Loans.Collect(row); env.Loans.Collect(row)
+    check(loan.remaining == 550 and Mocks.bank[1] == bankBefore - 275 and Mocks.treasury == treasuryBefore + 275, 'loans: two ticks on the same week take it once, in money as well as in the balance')
+
+    Mocks.bank[1] = 0
+    week()
+    env.Loans.Sweep()
+    check(loan.remaining == 550 and loan.missed == 1 and loan.status == 'active', 'loans: a week that cannot be paid is counted as missed')
+    env.Loans.Sweep()
+    check(loan.missed == 1, 'loans: a missed week is not counted again on the next tick')
+
+    Mocks.bank[1] = 100
+    Mocks.treasury = 199275
+    Mocks.transferBlocked = nil
+    env.Loans.Settle('BOR1')
+    check(loan.missed == 1 and loan.remaining == 550 and Mocks.bank[1] == 100, 'loans: a settle the borrower cannot afford puts the missed week back')
+    Mocks.bank[1] = 1000
+    env.Loans.Settle('BOR1')
+    check(loan.missed == 0 and loan.remaining == 275 and Mocks.bank[1] == 725, 'loans: a returning borrower pays what they missed')
+    env.Loans.Settle('BOR1')
+    check(loan.remaining == 275, 'loans: missed weeks are paid once')
+
+    -- Last instalment, offline weeks and default
+    loan.remaining = 200
+    week()
+    env.Loans.Sweep()
+    check(loan.status == 'paid' and loan.remaining == 0 and Mocks.bank[1] == 525, 'loans: the last instalment is only what is left and closes the loan')
+
+    check(borrow(2, 500, 4).success, 'loans: a second borrower takes a loan')
+    local second = loanOf('BOR2')
+    Mocks.players[2] = nil
+    week(); env.Loans.Sweep()
+    check(second.missed == 1 and second.remaining == 550 and second.status == 'active', 'loans: an offline borrower is not charged, the week is counted')
+    week(); env.Loans.Sweep()
+    week(); env.Loans.Sweep()
+    check(second.status == 'defaulted' and second.missed == 3, 'loans: three missed weeks put the loan in default')
+    Mocks.players[2] = person(2, 'BOR2')
+
+    -- Collection and the block on new loans
+    Mocks.bank[2] = 0
+    env.Loans.Sweep()
+    check(second.remaining == 550 and Mocks.bank[2] == 0, 'loans: collection takes nothing from an empty bank')
+    Mocks.bank[2] = 200
+    local before = Mocks.treasury
+    env.Loans.Sweep()
+    check(second.remaining == 350 and Mocks.bank[2] == 0 and Mocks.treasury == before + 200, 'loans: collection takes what is in the bank and no more')
+    check(borrow(2, 500, 4).error == 'you already have a loan open', 'loans: a loan in default blocks a new one')
+    check(app.handler(2, 'payoff', {}).error == 'not enough in your bank' and second.remaining == 350 and second.status == 'defaulted', 'loans: a payoff the borrower cannot afford changes nothing')
+    Mocks.bank[2] = 1000
+    check(app.handler(2, 'payoff', {}).success and second.remaining == 0 and second.status == 'paid' and Mocks.bank[2] == 650 and Mocks.treasury == before + 550, 'loans: an early payoff pays only what is left')
+    check(app.handler(2, 'payoff', {}).error == 'you have no loan', 'loans: there is nothing to pay off once it is paid')
+    check(borrow(2, 500, 4).success, 'loans: a cleared debt lets the borrower borrow again')
+
+    -- Money is conserved
+    local t0 = Mocks.treasury
+    Mocks.bank[1] = 5000
+    local full = borrow(1, 1000, 4)
+    local fl = loanOf('BOR1')
+    Mocks.players[2] = nil
+    for _ = 1, 4 do week(); env.Loans.Sweep() end
+    Mocks.players[2] = person(2, 'BOR2')
+    check(full.success and fl.status == 'paid' and Mocks.treasury == t0 - 1000 + 1100, 'loans: over a full loan the treasury gets back the amount plus the flat fee')
+
+    -- Staff
+    local forgive = Mocks.commands.forgiveloan
+    local third = loanOf('BOR2')
+    check(pcall(forgive, 2, { id = third.id }) and third.status == 'defaulted', 'loans: a player cannot forgive a loan')
+    forgive(3, { id = 9999 })
+    check(third.status == 'defaulted', 'loans: forgiving an unknown loan does nothing')
+    mysql.ledgerFails = true
+    forgive(3, { id = third.id })
+    mysql.ledgerFails = false
+    check(third.status == 'defaulted' and third.remaining == 550, 'loans: if the ledger row cannot be written nothing is forgiven')
+    local owed = third.remaining
+    forgive(3, { id = third.id })
+    check(third.status == 'forgiven' and third.remaining == 0 and mysql.loanLedger[1].amount == owed and mysql.loanLedger[1].citizenid == 'BOR2', 'loans: forgiving writes off the debt and ledgers it')
+    forgive(3, { id = third.id })
+    check(#mysql.loanLedger == 1, 'loans: a debt is only forgiven once')
+
+    core.addMoney = saved.addMoney
+    _G.TriggerClientEvent = realT
+    mysql.fakeNow = nil
+end
+
+-- ---------------------------------------------------------------------------
 -- Player leases
 -- ---------------------------------------------------------------------------
 
