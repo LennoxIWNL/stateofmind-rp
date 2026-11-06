@@ -30,7 +30,7 @@ run() {
 }
 
 cleanup() {
-  sql "DELETE FROM som_plants WHERE citizenid = 'LOADTEST'; DELETE FROM som_trade_offers WHERE seller = 'LOADTEST'; DELETE FROM som_lab_jobs WHERE citizenid LIKE 'LOADTEST%'; DELETE FROM som_chop_log WHERE citizenid LIKE 'LOADTEST%'; DELETE FROM som_turf WHERE name = 'loadtest_zone'; DELETE FROM som_trade_offers WHERE buyer = 'LOADTEST'; DELETE FROM som_shops WHERE shop_id LIKE 'loadshop%';" >/dev/null
+  sql "DELETE FROM som_plants WHERE citizenid = 'LOADTEST'; DELETE FROM som_trade_offers WHERE seller = 'LOADTEST'; DELETE FROM som_lab_jobs WHERE citizenid LIKE 'LOADTEST%'; DELETE FROM som_chop_log WHERE citizenid LIKE 'LOADTEST%'; DELETE FROM som_turf WHERE name = 'loadtest_zone'; DELETE FROM som_trade_offers WHERE buyer = 'LOADTEST'; DELETE FROM som_shops WHERE shop_id LIKE 'loadshop%'; DELETE FROM som_property_leases WHERE property_id IN (99998, 99999);" >/dev/null
 }
 trap cleanup EXIT
 
@@ -57,6 +57,14 @@ run "chop shop (drop-off and plate cooldown)" \
 run "shop purchase (one shop per person, either of two shops)" \
   "DELETE FROM som_shops WHERE shop_id LIKE 'loadshop%'; INSERT INTO som_shops (shop_id, business) VALUES ('loadshop0','x'), ('loadshop1','x')" \
   "UPDATE som_shops SET owner = 'LOADTEST', bought_price = 1, bought_at = NOW(), withdraw_at = NULL WHERE shop_id = 'loadshop@N@' AND owner IS NULL AND (SELECT COUNT(*) FROM (SELECT 1 FROM som_shops WHERE owner = 'LOADTEST') x) = 0"
+
+run "lease start (one lease per property, two would-be tenants)" \
+  "DELETE FROM som_property_leases WHERE property_id = 99999" \
+  "INSERT INTO som_property_leases (property_id, landlord, tenant, rent, next_due) SELECT 99999, 'LOADTEST', 'LOADT@N@', 500, DATE_ADD(NOW(), INTERVAL 7 DAY) FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM som_property_leases WHERE property_id = 99999 AND status = 'active') AND (SELECT COUNT(*) FROM som_property_leases WHERE tenant = 'LOADT@N@' AND status = 'active') < 2"
+
+run "lease rent week (one charge per due week)" \
+  "DELETE FROM som_property_leases WHERE property_id = 99998; INSERT INTO som_property_leases (id, property_id, landlord, tenant, rent, next_due) VALUES (900001, 99998, 'LOADTEST', 'LOADT0', 500, '2026-01-01 00:00:00')" \
+  "UPDATE som_property_leases SET next_due = DATE_ADD(next_due, INTERVAL 7 DAY), missed_cycles = missed_cycles + 0 WHERE id = 900001 AND status = 'active' AND UNIX_TIMESTAMP(next_due) = UNIX_TIMESTAMP('2026-01-01 00:00:00')"
 
 # Same statement as the insert in som-mechanic/server/trade.lua fallbackBuy; change both together.
 run "roadside kit (one per hour)" \

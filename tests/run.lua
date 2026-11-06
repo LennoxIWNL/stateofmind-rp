@@ -4715,6 +4715,214 @@ do
 end
 
 -- ---------------------------------------------------------------------------
+-- Player leases
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    resetMocks()
+    mysql.fakeNow = 1000000
+    local env = loader.loadResource(REPO .. 'som-housing', {
+        'shared/shells.lua', 'shared/config.lua', 'server/properties.lua', 'server/ownership.lua', 'server/finance.lua', 'server/lease.lua',
+    })
+    local cb = RegisteredCallbacks
+    local C = env.Config.Lease
+    local DAY = 86400
+
+    local function person(src, cid) return { citizenid = cid, source = src, charinfo = { firstname = 'P' .. src, lastname = 'Q' .. src } } end
+    Mocks.players = { [1] = person(1, 'LAND1'), [2] = person(2, 'TEN2'), [3] = person(3, 'TEN3'), [4] = person(4, 'FAR4') }
+    placePed(1, 0, 0, 0); placePed(2, 1, 0, 0); placePed(3, 2, 0, 0); placePed(4, 500, 0, 0)
+    Mocks.bank = { [1] = 0, [2] = 5000, [3] = 5000, [4] = 5000 }
+    Mocks.credited, Mocks.transferFails = {}, false
+    local notes = {}
+    local realT = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, ...) notes[#notes + 1] = { name = name, target = target, args = { ... } } end
+
+    local function prop()
+        local p = seedProperty({ price = 100000 })
+        env.Ownership.Grant(p.id, 'LAND1', 'owner')
+        return p
+    end
+    local function offer(p, target, rent, from) return cb['som-housing:server:leaseOffer'](from or 1, { slug = p.slug, target = target, rent = rent }) end
+    local function answer(src, yes) return cb['som-housing:server:leaseAnswer'](src, yes) end
+    local function leaseOf(p) for _, l in ipairs(mysql.db.leases) do if l.property_id == p.id then return l end end end
+    local function role(cid, p) return env.Ownership.RoleOf(cid, p.id) end
+    local function let(p, src)
+        local o = offer(p, src, 500)
+        if not o.success then return o end
+        return answer(src, true)
+    end
+    local function fresh() mysql.db.leases = {}; Mocks.credited = {}; Mocks.bank[2], Mocks.bank[3] = 5000, 5000 end
+
+    -- Offering
+    local p = prop()
+    check(offer(p, 2, 500, 3).error == 'only the owner can offer a lease', 'lease: only the owner can offer')
+    check(offer(p, 2, 50).error ~= nil and offer(p, 2, 99999).error ~= nil and offer(p, 2, '500').error ~= nil, 'lease: the rent must be a number inside the range')
+    check(offer(p, 4, 500).error == 'they need to be next to you', 'lease: the tenant must be next to the owner')
+    check(offer(p, 1, 500).error == 'they are not here' and offer(p, 99, 500).error == 'they are not here', 'lease: you cannot let to yourself or to nobody')
+    env.Ownership.Grant(p.id, 'TEN3', 'co_owner', 'LAND1')
+    check(offer(p, 3, 500).error == 'they already have a key here', 'lease: someone who already holds a key is not offered a lease')
+    env.Ownership.Revoke(p.id, 'TEN3')
+    check(offer(p, 2, 500).success and notes[#notes].name == 'som-housing:client:leaseOffer' and notes[#notes].target == 2, 'lease: the person next to you is sent the offer')
+
+    -- Answering
+    check(answer(2, 'yes').error == 'not available', 'lease: the answer must be a real yes or no')
+    local first = answer(2, true)
+    local lease = leaseOf(p)
+    check(first.success and lease.status == 'active' and role('TEN2', p) == 'tenant', 'lease: accepting starts the lease and gives a tenant key')
+    check(Mocks.bank[2] == 4500 and Mocks.credited.LAND1 == 500, 'lease: the first week moves from the tenant to the owner')
+    check(answer(2, true).error == 'that offer is gone', 'lease: an offer can only be answered once')
+    check(offer(p, 3, 500).error == 'this property is already let', 'lease: a let property cannot be offered again')
+
+    fresh()
+    local q = prop()
+    offer(q, 2, 500); offer(q, 3, 500)
+    check(answer(2, true).success, 'lease: the first of two offers is accepted')
+    check(answer(3, true).error == 'this property is let already, or you have too many leases' and role('TEN3', q) == nil, 'lease: the second of two offers on one property loses')
+
+    fresh()
+    local d = prop()
+    offer(d, 2, 500)
+    check(answer(2, false).success and leaseOf(d) == nil and role('TEN2', d) == nil, 'lease: declining leaves nothing behind')
+    offer(d, 2, 500)
+    env.Config.Lease.offerSeconds = -1
+    offer(d, 2, 500)
+    env.Config.Lease.offerSeconds = 60
+    check(answer(2, true).error == 'that offer is gone', 'lease: an old offer cannot be accepted')
+    offer(d, 2, 500)
+    env.Ownership.Revoke(d.id, 'LAND1')
+    check(answer(2, true).error == 'that offer is gone' and leaseOf(d) == nil, 'lease: the offer dies if the offerer no longer owns the property')
+
+    fresh()
+    local a1, a2, a3 = prop(), prop(), prop()
+    check(let(a1, 2).success and let(a2, 2).success, 'lease: a tenant can rent up to the cap')
+    check(let(a3, 2).error == 'this property is let already, or you have too many leases' and leaseOf(a3) == nil and role('TEN2', a3) == nil, 'lease: a tenant over the cap is refused and gets no key')
+
+    fresh()
+    local poor = prop()
+    Mocks.bank[3] = 10
+    local broke = let(poor, 3)
+    check(broke.error == 'you cannot afford the first week' and role('TEN3', poor) == nil and leaseOf(poor).status == 'ended', 'lease: a tenant who cannot pay the first week gets no key')
+    check(Mocks.credited.LAND1 == nil, 'lease: nothing reaches the owner when the first week fails')
+
+    -- Rent weeks
+    fresh()
+    local r = prop()
+    let(r, 2)
+    local rentOf = leaseOf(r)
+    mysql.fakeNow = mysql.fakeNow + 8 * DAY
+    Mocks.credited = {}
+    env.Lease.Sweep()
+    check(Mocks.credited.LAND1 == 500 and Mocks.bank[2] == 4000 and rentOf.missed == 0, 'lease: a due week is charged once')
+    env.Lease.Sweep()
+    check(Mocks.credited.LAND1 == 500, 'lease: the same week is never charged twice')
+
+    mysql.fakeNow = mysql.fakeNow + 8 * DAY
+    local dueRow = { id = rentOf.id, property_id = r.id, landlord = 'LAND1', tenant = 'TEN2', rent = 500, due = rentOf.due }
+    Mocks.credited = {}
+    env.Lease.Collect(dueRow); env.Lease.Collect(dueRow)
+    check(Mocks.credited.LAND1 == 500, 'lease: two ticks on the same week charge it once')
+
+    -- A tenant short of money: the week is counted, then eviction
+    mysql.fakeNow = mysql.fakeNow + 8 * DAY
+    Mocks.bank[2] = 0
+    env.Lease.Sweep()
+    check(rentOf.missed == 1 and rentOf.status == 'active' and role('TEN2', r) == 'tenant', 'lease: a week that cannot be paid is counted as missed, not retried')
+    env.Lease.Sweep()
+    check(rentOf.missed == 1, 'lease: a missed week is not counted again on the next tick')
+    mysql.fakeNow = mysql.fakeNow + 8 * DAY
+    env.Lease.Sweep()
+    check(rentOf.status == 'evicted' and role('TEN2', r) == nil, 'lease: two missed weeks evict the tenant and take the key')
+    check(notes[#notes - 1].name == 'som:client:notify' or notes[#notes].name == 'som:client:notify', 'lease: the tenant is told, not moved')
+
+    -- An offline tenant: counted, evicted, key removed by citizenid
+    fresh()
+    local o = prop()
+    let(o, 2)
+    local ol = leaseOf(o)
+    Mocks.players[2] = nil
+    Mocks.credited = {}
+    mysql.fakeNow = mysql.fakeNow + 8 * DAY
+    env.Lease.Sweep()
+    check(ol.missed == 1 and Mocks.credited.LAND1 == nil, 'lease: an offline tenant is not charged, the week is counted')
+    mysql.fakeNow = mysql.fakeNow + 8 * DAY
+    env.Lease.Sweep()
+    check(ol.status == 'evicted' and role('TEN2', o) == nil, 'lease: an offline tenant is evicted and loses the key')
+    Mocks.players[2] = person(2, 'TEN2')
+
+    -- Settling on login
+    fresh()
+    local s = prop()
+    let(s, 2)
+    local sl = leaseOf(s)
+    sl.missed = 1
+    Mocks.credited = {}
+    Mocks.transferFails = true
+    env.Lease.Settle('TEN2')
+    Mocks.transferFails = false
+    check(sl.missed == 1 and Mocks.credited.LAND1 == nil, 'lease: a failed settle puts the missed weeks back')
+    env.Lease.Settle('TEN2')
+    check(sl.missed == 0 and Mocks.credited.LAND1 == 500, 'lease: a returning tenant pays what they owe')
+    env.Lease.Settle('TEN2')
+    check(Mocks.credited.LAND1 == 500, 'lease: owed weeks are paid once')
+
+    -- Leases that cannot continue
+    fresh()
+    local g = prop()
+    let(g, 2)
+    local gl = leaseOf(g)
+    env.Ownership.Revoke(g.id, 'LAND1')
+    mysql.fakeNow = mysql.fakeNow + 8 * DAY
+    Mocks.credited = {}
+    env.Lease.Sweep()
+    check(gl.status == 'ended' and role('TEN2', g) == nil and Mocks.credited.LAND1 == nil, 'lease: a lease ends without a charge when the owner no longer owns the property')
+
+    fresh()
+    local k = prop()
+    let(k, 2)
+    local kl = leaseOf(k)
+    env.Ownership.Revoke(k.id, 'TEN2')
+    mysql.fakeNow = mysql.fakeNow + 8 * DAY
+    Mocks.credited = {}
+    env.Lease.Sweep()
+    check(kl.status == 'ended' and Mocks.credited.LAND1 == nil, 'lease: a lease ends without a charge when the tenant key was taken back')
+
+    -- Ending from the phone
+    fresh()
+    local e = prop()
+    let(e, 2)
+    local el = leaseOf(e)
+    local app = Mocks.apps.leases
+    check(app.handler(3, 'end', { id = el.id }).error == 'this lease is already over' and el.status == 'active', 'lease: only the owner of the lease can end it')
+    check(app.handler(2, 'end', { id = el.id }).error == 'this lease is already over', 'lease: the tenant cannot end it as an owner')
+    el.missed = 1
+    check(app.handler(2, 'leave', { id = el.id }).error ~= nil and el.status == 'active', 'lease: a tenant who owes rent cannot just leave')
+    el.missed = 0
+    local view = app.handler(2, 'view', {})
+    check(view.success and view.view.sections[1].rows[1].action == 'leave', 'lease: the tenant sees the lease on the phone')
+    check(app.handler(1, 'view', {}).view.sections[2].rows[1].action == 'end', 'lease: the owner sees the lease on the phone')
+    check(app.handler(1, 'end', { id = '1' }).error == 'bad request', 'lease: the id must be a number')
+    check(app.handler(1, 'end', { id = el.id }).error == 'wait until the week is up' and el.status == 'active' and role('TEN2', e) == 'tenant', 'lease: the owner cannot end a lease right after taking the first week')
+    mysql.fakeNow = mysql.fakeNow + 8 * DAY
+    env.Ownership.Grant(e.id, 'TEN2', 'co_owner', 'LAND1')
+    check(app.handler(1, 'end', { id = el.id }).success and el.status == 'ended' and role('TEN2', e) == 'co_owner', 'lease: ending a lease only removes a tenant key, not a better one')
+    fresh()
+    local e3 = prop()
+    let(e3, 2)
+    local el3 = leaseOf(e3)
+    el3.missed = 1
+    check(app.handler(1, 'end', { id = el3.id }).success and el3.status == 'ended' and role('TEN2', e3) == nil, 'lease: the owner can end a lease when the tenant is behind')
+    fresh()
+    local e2 = prop()
+    let(e2, 2)
+    local el2 = leaseOf(e2)
+    check(app.handler(2, 'leave', { id = el2.id }).success and role('TEN2', e2) == nil, 'lease: a tenant can give up a lease and loses the key')
+
+    _G.TriggerClientEvent = realT
+    mysql.fakeNow = nil
+end
+
+-- ---------------------------------------------------------------------------
 -- Player shops
 -- ---------------------------------------------------------------------------
 

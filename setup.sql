@@ -1840,3 +1840,25 @@ CREATE TABLE IF NOT EXISTS `som_licence_attempts` (
 -- INSERT IGNORE INTO som_licenses (citizenid, type, issued_by)
 --   SELECT citizenid, 'driver', 'legacy' FROM som_characters
 --   WHERE JSON_VALUE(metadata, '$.licenses.driver') = 'true';
+
+-- Player leases (som-housing). The owner of a property lets it to one tenant for a weekly rent. The
+-- tenant holds a 'tenant' key in som_property_owners while the lease is active. next_due and
+-- missed_cycles are changed only by conditional UPDATEs, so a sweep tick and a login settle cannot
+-- charge the same week twice.
+CREATE TABLE IF NOT EXISTS `som_property_leases` (
+  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `property_id`   INT UNSIGNED NOT NULL,
+  `landlord`      VARCHAR(16) NOT NULL,
+  `tenant`        VARCHAR(16) NOT NULL,
+  `rent`          BIGINT NOT NULL,
+  `next_due`      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `missed_cycles` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `status`        ENUM('active','ended','evicted') NOT NULL DEFAULT 'active',
+  `started_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `ended_at`      TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_property` (`property_id`, `status`),
+  KEY `idx_tenant` (`tenant`, `status`),
+  KEY `idx_landlord` (`landlord`, `status`),
+  KEY `idx_due` (`status`, `next_due`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

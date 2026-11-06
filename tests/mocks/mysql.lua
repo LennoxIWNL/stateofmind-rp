@@ -37,6 +37,7 @@ M.db = {
     buyer = {},
     placements = {},
     trade = {},
+    leases = {},
     shopsDb = { shops = {}, stock = {}, staff = {}, takings = 0, balance = 0 },
     shared = { accounts = { [7] = 100 }, frozen = {}, treasury = 500, updates = {}, ledger = {} },
     skills = {},
@@ -503,6 +504,94 @@ local function placements(kind, query, params)
     elseif kind == 'insert' and has('INSERT INTO som_placements') then
         P[#P + 1] = { resource = params[1], path = params[2], kind = params[3], value = params[4], by = params[5] }
         return true, #P
+    end
+    return false
+end
+
+local function leases(kind, query, params)
+    local L = M.db.leases
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    local function byId(id) for _, l in ipairs(L) do if l.id == id then return l end end end
+    local function active(l) return l.status == 'active' end
+
+    if kind == 'scalar' and has("SELECT 1 FROM som_property_leases WHERE property_id = ? AND status = 'active'") then
+        for _, l in ipairs(L) do if l.property_id == params[1] and active(l) then return true, 1 end end
+        return true, nil
+    elseif kind == 'insert' and has('INSERT INTO som_property_leases (property_id, landlord, tenant, rent, next_due)') then
+        local pid, tenant = params[1], params[3]
+        local mine = 0
+        for _, l in ipairs(L) do
+            if l.property_id == pid and active(l) then return true, 0 end
+            if l.tenant == tenant and active(l) then mine = mine + 1 end
+        end
+        if mine >= params[8] then return true, 0 end
+        L[#L + 1] = { id = #L + 1, property_id = pid, landlord = params[2], tenant = tenant, rent = params[4], due = now() + params[5] * 86400, missed = 0, status = 'active' }
+        return true, #L
+    elseif kind == 'update' and has("UPDATE som_property_leases SET status = ?, ended_at = NOW() WHERE id = ? AND status = 'active'") then
+        local l = byId(params[2])
+        if not l or not active(l) then return true, 0 end
+        if has(' AND missed_cycles >= ?') and l.missed < params[3] then return true, 0 end
+        if has(' AND landlord = ?') and l.landlord ~= params[3] then return true, 0 end
+        if has('(missed_cycles > 0 OR next_due <= NOW())') and l.missed == 0 and l.due > now() then return true, 0 end
+        if has(' AND tenant = ? AND missed_cycles = 0') and (l.tenant ~= params[3] or l.missed ~= 0) then return true, 0 end
+        l.status = params[1]
+        return true, 1
+    elseif kind == 'scalar' and has("SELECT 1 FROM som_property_leases WHERE id = ? AND landlord = ? AND status = 'active'") then
+        local l = byId(params[1])
+        return true, (l and l.landlord == params[2] and active(l)) and 1 or nil
+    elseif kind == 'single' and has('SELECT property_id, landlord, tenant FROM som_property_leases WHERE id = ?') then
+        local l = byId(params[1])
+        return true, l and { property_id = l.property_id, landlord = l.landlord, tenant = l.tenant } or nil
+    elseif kind == 'update' and has("DELETE FROM som_property_owners WHERE role = 'tenant' AND property_id = ? AND citizenid = ?") then
+        for i, o in ipairs(M.db.owners) do
+            if o.property_id == params[1] and o.citizenid == params[2] and o.role == 'tenant' then table.remove(M.db.owners, i); return true, 1 end
+        end
+        return true, 0
+    elseif kind == 'update' and has('UPDATE som_property_leases SET next_due = DATE_ADD(next_due, INTERVAL ? DAY), missed_cycles = missed_cycles + ?') then
+        local l = byId(params[3])
+        if not l or not active(l) or l.due ~= params[4] then return true, 0 end
+        l.due = l.due + params[1] * 86400
+        l.missed = l.missed + params[2]
+        return true, 1
+    elseif kind == 'update' and has("UPDATE som_property_leases SET missed_cycles = missed_cycles + 1 WHERE id = ? AND status = 'active'") then
+        local l = byId(params[1])
+        if not l or not active(l) then return true, 0 end
+        l.missed = l.missed + 1
+        return true, 1
+    elseif kind == 'update' and has("UPDATE som_property_leases SET missed_cycles = 0 WHERE id = ? AND status = 'active' AND missed_cycles = ?") then
+        local l = byId(params[1])
+        if not l or not active(l) or l.missed ~= params[2] then return true, 0 end
+        l.missed = 0
+        return true, 1
+    elseif kind == 'update' and has("UPDATE som_property_leases SET missed_cycles = missed_cycles + ? WHERE id = ? AND status = 'active'") then
+        local l = byId(params[2])
+        if not l or not active(l) then return true, 0 end
+        l.missed = l.missed + params[1]
+        return true, 1
+    elseif kind == 'query' and has('SELECT id, property_id, landlord, rent, missed_cycles FROM som_property_leases WHERE tenant = ?') then
+        local out = {}
+        for _, l in ipairs(L) do
+            if l.tenant == params[1] and active(l) and l.missed > 0 then out[#out + 1] = { id = l.id, property_id = l.property_id, landlord = l.landlord, rent = l.rent, missed_cycles = l.missed } end
+        end
+        return true, out
+    elseif kind == 'query' and has('SELECT id, property_id, landlord, tenant, rent, UNIX_TIMESTAMP(next_due) AS due') then
+        local out = {}
+        for _, l in ipairs(L) do
+            if active(l) and l.due <= now() then out[#out + 1] = { id = l.id, property_id = l.property_id, landlord = l.landlord, tenant = l.tenant, rent = l.rent, due = l.due } end
+        end
+        return true, out
+    elseif kind == 'query' and has("WHERE l.tenant = ? AND l.status = 'active' ORDER BY l.id") then
+        local out = {}
+        for _, l in ipairs(L) do
+            if l.tenant == params[1] and active(l) then out[#out + 1] = { id = l.id, rent = l.rent, missed_cycles = l.missed, secs = math.max(0, l.due - now()), label = 'Test Property' } end
+        end
+        return true, out
+    elseif kind == 'query' and has("WHERE l.landlord = ? AND l.status = 'active' ORDER BY l.id") then
+        local out = {}
+        for _, l in ipairs(L) do
+            if l.landlord == params[1] and active(l) then out[#out + 1] = { id = l.id, rent = l.rent, missed_cycles = l.missed, label = 'Test Property', firstname = 'Ten', lastname = l.tenant } end
+        end
+        return true, out
     end
     return false
 end
@@ -1139,6 +1228,7 @@ end
 function M.single(query, params)
     params = params or {}
     do local handled, value = courtService('single', query, params); if handled then return value end end
+    do local handled, value = leases('single', query, params); if handled then return value end end
     do local handled, value = shopsDb('single', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('single', query, params); if handled then return value end end
     do local handled, value = social('single', query, params); if handled then return value end end
@@ -1219,6 +1309,7 @@ end
 function M.scalar(query, params)
     params = params or {}
     do local handled, value = courtService('scalar', query, params); if handled then return value end end
+    do local handled, value = leases('scalar', query, params); if handled then return value end end
     if query:find('FROM som_transactions WHERE citizenid IS NULL AND reason = ?', 1, true) then
         return _G.Mocks.budgetDrawn or 0
     end
@@ -1335,6 +1426,7 @@ end
 function M.update(query, params)
     params = params or {}
     do local handled, value = courtService('update', query, params); if handled then return value end end
+    do local handled, value = leases('update', query, params); if handled then return value end end
     do local handled, value = shopsDb('update', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('update', query, params); if handled then return value end end
     do local handled, value = licences('update', query, params); if handled then return value end end
@@ -1689,6 +1781,7 @@ end
 function M.insert(query, params)
     params = params or {}
     do local handled, value = courtService('insert', query, params); if handled then return value end end
+    do local handled, value = leases('insert', query, params); if handled then return value end end
     do local handled, value = shopsDb('insert', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('insert', query, params); if handled then return value end end
     do local handled, value = social('insert', query, params); if handled then return value end end
@@ -1862,6 +1955,7 @@ function M.query(query, params)
     do local handled, value = courtService('query', query, params); if handled then return value end end
     if query:find('FROM som_businesses b', 1, true) then return M.db.businessRows or {} end
     params = params or {}
+    do local handled, value = leases('query', query, params); if handled then return value end end
     do local handled, value = shopsDb('query', query, params); if handled then return value end end
     do local handled, value = social('query', query, params); if handled then return value end end
     do local handled, value = licences('query', query, params); if handled then return value end end

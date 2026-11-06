@@ -110,6 +110,7 @@ HealthLists = {
     'som_properties',
     'som_property_finance',
     'som_property_furniture',
+    'som_property_leases',
     'som_property_owners',
     'som_property_raids',
     'som_property_warrants',
