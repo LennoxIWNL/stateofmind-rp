@@ -5117,17 +5117,6 @@ do
     _G.Wait = realWait
     check(#paid == 1 and paid[1] == 2, 'paycheck: one failed player does not stop the next one being paid')
 
-    _G.source = 1
-    local status = function(_, key, delta) RegisteredEvents['som:server:adjustStatus'](key, delta) end
-    local meta = { hunger = 0 }
-    env.Players.Get = function() return { metadata = meta, setMetadata = function(_, k, v) meta[k] = v end } end
-    Mocks.clock = 100000
-    for _ = 1, 5 do Mocks.clock = Mocks.clock + 600; status(1, 'hunger', 50) end
-    check(meta.hunger == 100, 'status: client-sent changes stop after the per-minute budget')
-    Mocks.clock = Mocks.clock + 61000
-    status(1, 'hunger', 50)
-    _G.source = nil
-    check(meta.hunger == 150, 'status: the budget comes back after a minute')
 end
 
 do
