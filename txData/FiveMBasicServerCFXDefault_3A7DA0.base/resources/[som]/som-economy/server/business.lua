@@ -126,10 +126,17 @@ function Business.FundFromTreasury(name, amount)
 
     -- Signed treasury path: taxToTreasury only accepts positives, so spending
     -- has to go through treasuryTransact or it silently fails.
-    local ok = exports['som-core']:treasuryTransact(-amount, ('budget:%s'):format(name))
+    local reason = ('budget:%s'):format(name)
+    local ok = exports['som-core']:treasuryTransact(-amount, reason)
     if not ok then return false end
 
-    exports['som-core']:businessTransact(name, amount, 'city-budget')
+    local called, credited = pcall(function()
+        return exports['som-core']:businessTransact(name, amount, 'city-budget')
+    end)
+    if not called or not credited then
+        exports['som-core']:treasuryTransact(amount, reason .. ':refund')
+        return false
+    end
 
     return true
 end
@@ -256,5 +263,6 @@ exports('getBusinesses', Business.GetAll)
 exports('getBusinessBalance', Business.GetBalance)
 exports('recordBusinessRevenue', Business.RecordRevenue)
 exports('businessSpend', Business.Spend)
+exports('fundFromTreasury', Business.FundFromTreasury)
 exports('issueEquipment', Business.IssueEquipment)
 exports('armouryPrice', Business.ArmouryPrice)
