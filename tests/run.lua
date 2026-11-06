@@ -60,6 +60,7 @@ local function resetDb()
     mysql.db.licences = { rows = {}, attempts = {} }
     mysql.db.staff = { reports = {}, audit = {} }
     mysql.db.taxi = { earned = {} }
+    mysql.db.carsales = { vehicles = {}, flagged = {}, stolen = {}, sales = {} }
     mysql.db.gangs = { chars = {}, log = {} }
     mysql.db.vehicles = {}
     mysql.db.social = { handles = {}, posts = {}, likes = {}, reports = {}, adverts = {}, optin = {}, people = {} }
@@ -6277,6 +6278,152 @@ do
         f:close()
         check(bad == 0, 'boot: no ";" inside a comment in ' .. name)
     end
+end
+
+
+do
+    resetDb()
+    local realTrigger = _G.TriggerClientEvent
+    local sent = {}
+    _G.TriggerClientEvent = function(name, src, ...) sent[#sent + 1] = { name = name, src = src, args = { ... } } end
+    local env = loader.loadResource(REPO .. 'som-carsales', { 'shared/config.lua', 'server/main.lua' })
+    local cb, C = RegisteredCallbacks, env.Config
+    local core = exports['som-core']
+    local DB = mysql.db.carsales
+
+    _G.NetworkGetEntityFromNetworkId = function(id) return id end
+    _G.GetEntityType = function() return 2 end
+    _G.Vehicles[900] = { plate = 'ABC123' }
+    FakePeds[900] = vec3(0, 0, 0)
+
+    local function person(src, cid, bank)
+        Mocks.players[src] = { source = src, citizenid = cid, job = { name = 'unemployed' }, charinfo = { firstname = cid, lastname = 'T' } }
+        FakePeds[src] = vec3(1, 0, 0)
+        Mocks.bank[src] = bank
+    end
+    local function car(extra)
+        local row = { id = 7, citizenid = 'S1', plate = 'ABC123', model = 'sultan', state = 'out', owner_group = nil, group_restricted = 0, assigned_to = nil, purchase_price = 5000 }
+        for k, v in pairs(extra or {}) do row[k] = v end
+        DB.vehicles['ABC123'] = row
+        return row
+    end
+    local rawOffer, answer = cb['som-carsales:server:offer'], cb['som-carsales:server:answer']
+    local function offer(...) Mocks.clock = Mocks.clock + (C.offerCooldownSeconds + 1) * 1000; return rawOffer(...) end
+
+    Mocks.clock = 1000
+    person(1, 'S1', 0); person(2, 'B2', 100000)
+    car()
+    Mocks.treasury = 0
+
+    check(offer(1, 'x', 2, 5000).error == 'bad request' and offer(1, 900, 2, 50.5).error == 'bad request', 'carsales: the request must be whole numbers')
+    check(offer(1, 900, 2, C.minPrice - 1).error:find('the price must be') and offer(1, 900, 2, C.maxPrice + 1).error:find('the price must be'), 'carsales: the price must be in range')
+    check(offer(1, 900, 1, 5000).error == 'pick somebody to sell to', 'carsales: nobody sells to themselves')
+    FakePeds[2] = vec3(100, 0, 0)
+    check(offer(1, 900, 2, 5000).error == 'they need to be standing with you', 'carsales: the buyer has to be close')
+    FakePeds[2] = vec3(1, 0, 0)
+    FakePeds[1], FakePeds[2] = vec3(50, 0, 0), vec3(51, 0, 0)
+    check(offer(1, 900, 2, 5000).error == 'you are not at that vehicle', 'carsales: the seller has to be at the car')
+    FakePeds[1], FakePeds[2] = vec3(1, 0, 0), vec3(1, 0, 0)
+
+    car({ citizenid = 'OTHER' })
+    check(offer(1, 900, 2, 5000).error == 'that is not your vehicle', 'carsales: only the owner can sell')
+    car({ state = 'garaged' })
+    check(offer(1, 900, 2, 5000).error == 'take it out of the garage first', 'carsales: a garaged car is taken out first')
+    car({ state = 'impounded' })
+    check(offer(1, 900, 2, 5000).error == 'take it out of the garage first', 'carsales: an impounded car cannot be sold')
+    car({ owner_group = 'lspd' })
+    check(offer(1, 900, 2, 5000).error:find('cannot be sold'), 'carsales: a business or pool car cannot be sold')
+    car({ group_restricted = 1 })
+    check(offer(1, 900, 2, 5000).error:find('cannot be sold'), 'carsales: a group restricted car cannot be sold')
+    car({ assigned_to = 'O1' })
+    check(offer(1, 900, 2, 5000).error:find('cannot be sold'), 'carsales: a car signed out to somebody cannot be sold')
+    car()
+    DB.flagged['ABC123'] = true
+    check(offer(1, 900, 2, 5000).error == 'the police have a hold on that vehicle', 'carsales: a police flagged plate cannot be sold')
+    DB.flagged['ABC123'] = nil
+    DB.stolen['ABC123'] = true
+    check(offer(1, 900, 2, 5000).error == 'the police have a hold on that vehicle', 'carsales: a car marked stolen cannot be sold')
+    DB.stolen['ABC123'] = nil
+
+    check(answer(2, true).error == 'no offer', 'carsales: nothing to accept with no offer')
+    Mocks.clock = Mocks.clock + 6000
+    check(rawOffer(1, 900, 2, 5000).success and rawOffer(1, 900, 2, 5000).error == 'one moment', 'carsales: offers from one seller are spaced out')
+    check(offer(1, 900, 2, 5000).success, 'carsales: the owner can make an offer')
+    check(answer(3, true).error == 'no offer', 'carsales: somebody else cannot accept it')
+    check(answer(2, false).error == 'declined' and DB.vehicles['ABC123'].citizenid == 'S1' and Mocks.bank[2] == 100000, 'carsales: declining changes nothing')
+
+    offer(1, 900, 2, 5000)
+    Mocks.clock = Mocks.clock + (C.offerSeconds + 1) * 1000
+    check(answer(2, true).error == 'the offer ran out' and DB.vehicles['ABC123'].citizenid == 'S1', 'carsales: an old offer cannot be accepted')
+
+    -- A good sale at a price where the tax needs rounding up: 101 * 5 percent = 5.05 -> 6.
+    offer(1, 900, 2, 101)
+    local ok = answer(2, true)
+    local row = DB.vehicles['ABC123']
+    check(ok.success and row.citizenid == 'B2' and row.purchase_price == 101, 'carsales: the car changes hands and keeps the price')
+    check(Mocks.bank[2] == 100000 - 101 and Mocks.treasury == 6 and Mocks.lastPaid.amount == 95 and Mocks.lastPaid.reason == 'carsale:sell',
+        'carsales: the buyer pays the price, the city gets the rounded up tax and the seller the rest')
+    check(#DB.sales == 1 and DB.sales[1].seller == 'S1' and DB.sales[1].buyer == 'B2' and DB.sales[1].tax == 6, 'carsales: the sale is recorded')
+    check(answer(2, true).error == 'no offer', 'carsales: an offer is used once')
+    check(offer(1, 900, 2, 500).error == 'that is not your vehicle', 'carsales: the old owner cannot sell it again')
+
+    -- Minimum price still pays the seller something.
+    car(); Mocks.treasury = 0
+    offer(1, 900, 2, C.minPrice)
+    answer(2, true)
+    check(Mocks.treasury == 5 and Mocks.lastPaid.amount == C.minPrice - 5, 'carsales: the smallest price still pays the seller')
+
+    -- Buyer cannot pay: nothing moves.
+    car(); Mocks.bank[2] = 5; Mocks.treasury = 0
+    offer(1, 900, 2, 5000)
+    check(answer(2, true).error:find('you need') and DB.vehicles['ABC123'].citizenid == 'S1' and Mocks.treasury == 0, 'carsales: a buyer without the money does not get the car')
+    Mocks.bank[2] = 100000
+
+    -- The tax cannot be taken: buyer refunded, car goes back.
+    car(); Mocks.treasury = 0
+    offer(1, 900, 2, 5000)
+    Mocks.taxFails = true
+    local r = answer(2, true)
+    Mocks.taxFails = nil
+    check(not r.success and DB.vehicles['ABC123'].citizenid == 'S1' and Mocks.lastPaid.reason == 'carsale:refund' and Mocks.lastPaid.amount == 5000,
+        'carsales: a failed tax step refunds the buyer and returns the car')
+
+    -- The seller cannot be paid: tax taken back, buyer refunded, car goes back.
+    car(); Mocks.treasury = 0
+    offer(1, 900, 2, 5000)
+    local realAdd = core.addMoney
+    core.addMoney = function(self, src, account, amount, reason, opts) if reason == 'carsale:sell' then return false end return realAdd(self, src, account, amount, reason, opts) end
+    r = answer(2, true)
+    core.addMoney = realAdd
+    check(not r.success and DB.vehicles['ABC123'].citizenid == 'S1' and Mocks.treasury == 0 and Mocks.lastPaid.reason == 'carsale:refund',
+        'carsales: a seller who cannot be paid cancels the sale, with the tax and the price returned')
+
+    -- Things that change between the offer and the answer.
+    car(); offer(1, 900, 2, 5000); FakePeds[1] = vec3(200, 0, 0)
+    check(answer(2, true).error == 'you have to be standing with the seller' and DB.vehicles['ABC123'].citizenid == 'S1', 'carsales: the seller walking away voids the offer')
+    FakePeds[1] = vec3(1, 0, 0)
+    car(); offer(1, 900, 2, 5000); Mocks.players[1] = nil
+    check(answer(2, true).error == 'the seller is no longer here', 'carsales: a seller who left voids the offer')
+    person(1, 'S1', 0)
+    car(); offer(1, 900, 2, 5000); DB.flagged['ABC123'] = true
+    check(answer(2, true).error == 'the police have a hold on that vehicle' and DB.vehicles['ABC123'].citizenid == 'S1', 'carsales: a flag set after the offer stops the sale')
+    DB.flagged['ABC123'] = nil
+    car(); offer(1, 900, 2, 5000); DB.vehicles['ABC123'].state = 'garaged'
+    check(answer(2, true).error == 'take it out of the garage first', 'carsales: a car stored after the offer cannot be sold')
+    car(); offer(1, 900, 2, 5000); _G.Vehicles[900].plate = 'ZZZ999'
+    check(answer(2, true).error == 'that is not the same vehicle', 'carsales: the offer is for that car and no other')
+    _G.Vehicles[900].plate = 'ABC123'
+
+    -- Two buyers: only one claim wins, and the loser pays nothing.
+    car(); Mocks.bank[2] = 100000
+    offer(1, 900, 2, 5000)
+    DB.claimRaces = true
+    local bank = Mocks.bank[2]
+    r = answer(2, true)
+    DB.claimRaces = nil
+    check(r.error == 'the vehicle is no longer for sale' and Mocks.bank[2] == bank, 'carsales: losing the claim race takes no money')
+
+    _G.TriggerClientEvent = realTrigger
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))

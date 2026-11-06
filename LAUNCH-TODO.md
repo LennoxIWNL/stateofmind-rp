@@ -387,3 +387,12 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Numbers are untuned defaults: 100 unit tank, drain 0.012 per second plus 0.0016 per m/s, jerry can 120 for 25 units, 5 units per pour.
 - [ ] Not verified live: `SetVehicleFuelLevel` moving the ps-hud gauge (ps-hud reads it through `som-compat`'s `GetFuel`) and cutting the engine at zero, the pump model names, the `WEAPON_PETROLCAN` metadata (`durability` and `ammo` as 0 to 100, written by the server only), the state bag `fuel` handler on the other clients, drain balance. Known limit: the drain runs on the driver's client, so a cheater can avoid draining, but no fuel can be minted: every increase is a server approved sale or can pour.
 - [ ] Cut on purpose: player owned stations, electric charging, fuel types, siphoning. cdn-fuel stays unensured.
+
+## Player vehicle sales (som-carsales)
+
+- [ ] Existing databases: import the new `som_vehicle_sales` table (`setup.sql` section 7n). Nothing else changes.
+- [ ] A seller stands at their own car (it must be out in the world, not in a garage), uses "Sell this vehicle", types a price and the person beside them gets an on-screen offer for 60 seconds. Price $100 to $2000000, tax 5 percent rounded up taken from what the seller receives, and the buyer pays the whole price from the bank. All untuned.
+- [ ] Refused on purpose: garaged or impounded cars, business, gang and pool cars, cars signed out to someone, police flagged plates and cars marked stolen in the MDT.
+- [ ] The glovebox and boot belong to the car (they are keyed on the vehicle id), so their contents go to the buyer. The seller is told to empty them.
+- [ ] There is no vehicle key mechanism and no vehicle finance or insurance in this codebase, so nothing like that moves in a sale. If keys are added later they must move in `som-carsales`.
+- [ ] Never run in a game: the "Sell this vehicle" option on a car, picking the closest player, the buyer dialog, and the plate the server reads from a real vehicle (padding and case). The plate is trimmed and compared exactly with `som_vehicles.plate`; if real plates differ from the stored text the sale says "that is not your vehicle".

@@ -1819,3 +1819,25 @@ CREATE TABLE IF NOT EXISTS `som_licence_attempts` (
 -- INSERT IGNORE INTO som_licenses (citizenid, type, issued_by)
 --   SELECT citizenid, 'driver', 'legacy' FROM som_characters
 --   WHERE JSON_VALUE(metadata, '$.licenses.driver') = 'true';
+
+-- ===========================================================================
+--  7n. PLAYER VEHICLE SALES (som-carsales)
+--
+--  An audit trail only; the owner of a car is som_vehicles.citizenid. No foreign
+--  keys, so the record outlives either character.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_vehicle_sales` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `vehicle_id` INT UNSIGNED NOT NULL,
+  `plate`      VARCHAR(12) NOT NULL,
+  `seller`     VARCHAR(16) NOT NULL,
+  `buyer`      VARCHAR(16) NOT NULL,
+  `price`      BIGINT NOT NULL,
+  `tax`        BIGINT NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_plate` (`plate`),
+  KEY `idx_seller` (`seller`),
+  KEY `idx_buyer` (`buyer`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
