@@ -106,15 +106,21 @@ function core:removeMoney(source, account, amount, reason)
     return true
 end
 function core:hasMoney(source, account, amount) return (Mocks.bank[source] or 0) >= amount end
+function core:getTreasury() return Mocks.treasury or 0 end
 function core:businessTransact(name, amount, reason)
     Mocks.calls.businessTransact = Mocks.calls.businessTransact + 1
+    if Mocks.businessTransactThrows then error('simulated crash in the business credit') end
+    if Mocks.businessTransactFails then return false, 'refused' end
+    if Mocks.bizBalance and Mocks.bizBalance[name] then Mocks.bizBalance[name] = Mocks.bizBalance[name] + amount end
     Mocks.lastTransact = { name = name, amount = amount }
     return true
 end
 function core:treasuryTransact(delta, reason)
     Mocks.treasury = Mocks.treasury or 0
+    Mocks.treasuryLog = Mocks.treasuryLog or {}
     if Mocks.treasury + delta < 0 then return false, 'insufficient treasury funds' end
     Mocks.treasury = Mocks.treasury + delta
+    Mocks.treasuryLog[#Mocks.treasuryLog + 1] = { delta = delta, reason = reason }
     return true
 end
 function core:hasPermission(source, ace)
@@ -143,7 +149,23 @@ function economy:issueFine(source, targetId, amount, reason)
 end
 function economy:businessSpend(name, amount, reason)
     Mocks.calls.businessSpend = Mocks.calls.businessSpend + 1
-    return not Mocks.businessSpendFails
+    if Mocks.businessSpendFails then return false end
+    local balances = Mocks.bizBalance
+    if balances and balances[name] then
+        if balances[name] < amount then return false end
+        balances[name] = balances[name] - amount
+    end
+    return true
+end
+function economy:getBusinessBalance(name) return (Mocks.bizBalance or {})[name] or 0 end
+function economy:fundFromTreasury(name, amount)
+    Mocks.calls.fund = (Mocks.calls.fund or 0) + 1
+    if Mocks.fundThrows then error('simulated crash in the treasury draw') end
+    if Mocks.fundFails or (Mocks.treasury or 0) < amount then return false end
+    Mocks.treasury = Mocks.treasury - amount
+    Mocks.bizBalance[name] = (Mocks.bizBalance[name] or 0) + amount
+    Mocks.budgetDrawn = (Mocks.budgetDrawn or 0) + amount
+    return true
 end
 
 function economy:issueEquipment(source, dept, item)

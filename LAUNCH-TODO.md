@@ -325,3 +325,14 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Gang, business and treasury ledger writes undo the balance change if the ledger row cannot be written (two separate statements, not one transaction). Needs a live database check that a single `MySQL.transaction` with a `ROW_COUNT()` guard behaves the same before replacing it.
 - [ ] Heist clean cash payouts now wait for the previous payout instead of paying nothing; the wait loop is only provable in a live server with two crews looting together.
 - [ ] Buyer sales and heist clean payouts now record the payout before paying, so a database failure refuses the sale instead of paying without counting it against the hourly cap.
+
+## Garbage round
+
+- [ ] Import the new seed rows on an existing database (they are `INSERT IGNORE`, section 9 of `setup.sql`): the `GOV-SAN` bank account and the `sanitation` business row (funding `treasury`, category `government`). The business cache loads at start, so restart `som-economy` after importing. Without the row the Jobs app says "the sanitation department is not set up".
+- [ ] `som-garbage/shared/config.lua` `Config.routes` is empty, so the job is refused. Add a depot (vec4), the landfill and recycling centre (vec3) and stops with bins (`id`, `kind` general or recycle, `coords`).
+- [ ] Funding: Sanitation pays crews from its own account, which starts at 0. Short payouts are topped up from the city treasury (`fundFromTreasury`, now exported by `som-economy`), at most `monthlyBudget` (150000) per 30 days, counted from the treasury ledger rows with reason `budget:sanitation`. The treasury starts at 0 and fills from taxes, so until it holds money every round is refused at the board ("the city cannot fund a round right now") and nothing is created. Staff decide the monthly figure and whether to seed the treasury or the account.
+- [ ] A job is only offered when the account plus the allowed top-up covers a full round, so a crew is never sent out unpaid at the start; a round can still go unpaid if other payouts drain the account meanwhile.
+- [ ] Hourly cap per citizen (2000) is held in memory and resets on restart. Untuned defaults: 12 per bag, +10 for a correctly sorted recycling bag, 15 minute lockout after abandon (`/abandonround`), expiry or disband.
+- [ ] The `trash` model, the blip sprite 318, the `anim@heists@narcotics@trash` throw animation and the bin positions are unchecked guesses. The sort is read from the bin colour label, by design.
+- [ ] Not detected: a dead or jailed member keeps the round until it expires (40 minutes plus 15) and then the truck is removed.
+- [ ] Not verified live: the server spawned truck, bin interaction zones, a crew of three, a real payout from the treasury.

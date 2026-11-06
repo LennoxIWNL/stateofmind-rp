@@ -4834,5 +4834,283 @@ do
     _G.Wait = realWait
 end
 
+-- som-economy: funding a treasury department from the city budget
+----------------------------------------------------------------------
+do
+    resetDb()
+    mysql.db.businessRows = { { name = 'sanitation', funding = 'treasury' }, { name = 'shop', funding = 'sales' } }
+    local env = loader.loadResource(REPO .. 'som-economy', { 'shared/config.lua', 'server/business.lua' })
+    env.Business.Load()
+    Mocks.treasury, Mocks.treasuryLog, Mocks.businessTransactFails, Mocks.businessTransactThrows = 1000, {}, false, false
+    local t0 = Mocks.calls.businessTransact
+
+    check(env.Business.FundFromTreasury('sanitation', 300) == true and Mocks.treasury == 700 and Mocks.calls.businessTransact == t0 + 1, 'fund: a top-up moves money from the treasury to the department')
+    check(env.Business.FundFromTreasury('shop', 100) == false and env.Business.FundFromTreasury('nope', 100) == false and Mocks.treasury == 700, 'fund: only treasury funded departments can be topped up')
+    check(env.Business.FundFromTreasury('sanitation', 5000) == false and Mocks.treasury == 700, 'fund: a top-up bigger than the treasury is refused')
+
+    Mocks.businessTransactFails = true
+    check(env.Business.FundFromTreasury('sanitation', 200) == false and Mocks.treasury == 700, 'fund: a failed department credit gives the treasury its money back')
+    check(Mocks.treasuryLog[#Mocks.treasuryLog].reason == 'budget:sanitation:refund' and Mocks.treasuryLog[#Mocks.treasuryLog].delta == 200, 'fund: the refund is recorded under its own reason')
+
+    Mocks.businessTransactFails, Mocks.businessTransactThrows = false, true
+    check(env.Business.FundFromTreasury('sanitation', 100) == false and Mocks.treasury == 700, 'fund: a crash in the department credit also gives the money back')
+    Mocks.businessTransactThrows = false
+end
+
+-- som-garbage
+----------------------------------------------------------------------
+do
+    local DUMP, RECYCLE = vec3(3000, 0, 0), vec3(3500, 0, 0)
+    local seen
+
+    local function scene(overrides, withRoute)
+        boardScene()
+        Spawned, Vehicles, Deleted = {}, {}, {}
+        local env = loader.loadResource(REPO .. 'som-garbage', { 'shared/config.lua', 'server/main.lua' })
+        for k, v in pairs(overrides or {}) do env.Config[k] = v end
+        if withRoute ~= false then
+            env.Config.routes = { {
+                depot = { x = 0, y = 0, z = 0, w = 0 }, dump = DUMP, recycle = RECYCLE,
+                stops = {
+                    { label = 'Mill Street', coords = vec3(500, 0, 0), bins = {
+                        { id = 'g1', kind = 'general', coords = vec3(500, 0, 0) },
+                        { id = 'r1', kind = 'recycle', coords = vec3(505, 0, 0) } } },
+                    { label = 'Vine Street', coords = vec3(1000, 0, 0), bins = {
+                        { id = 'g2', kind = 'general', coords = vec3(1000, 0, 0) } } },
+                },
+            } }
+        end
+        Mocks.businesses.sanitation = { label = 'Sanitation' }
+        Mocks.bizBalance = { sanitation = 0 }
+        Mocks.treasury, Mocks.budgetDrawn = 100000, 0
+        Mocks.calls.fund = 0
+        seen = {}
+        local real = _G.TriggerClientEvent
+        _G.TriggerClientEvent = function(name, target, payload)
+            if name == 'som-garbage:client:objective' then seen[#seen + 1] = { target = target, goal = payload } end
+        end
+        _G.GetCurrentResourceName = function() return 'som-garbage' end
+        local realCreate = _G.CreateVehicle
+        _G.CreateVehicle = function()
+            local id = 7000 + #Spawned + 1
+            Spawned[#Spawned + 1] = id
+            Vehicles[id] = { body = 1000.0, engine = 1000.0 }
+            return id
+        end
+        return env, function() _G.TriggerClientEvent = real; _G.CreateVehicle = realCreate end
+    end
+
+    local function call(name, source, ...)
+        Mocks.clock = (Mocks.clock or 0) + 5000
+        return RegisteredCallbacks['som-garbage:server:' .. name](source, ...)
+    end
+
+    local function start(size)
+        crew(size or 1)
+        j(1, 'queue', { provider = 'garbage' })
+        boardEnv.JobBoard.Draw('garbage')
+        return j(1, 'accept')
+    end
+
+    local function later(seconds, fn)
+        local real = os.time
+        os.time = function() return real() + seconds end
+        local ok, err = pcall(fn)
+        os.time = real
+        if not ok then error(err, 0) end
+    end
+
+    local function at(pos) FakePeds[1] = pos; FakePeds[Spawned[1]] = pos end
+
+    local function loadAll(sorts)
+        at(vec3(500, 0, 0))
+        call('bag', 1, 'g1', sorts and sorts.g1 or 'general')
+        FakePeds[1] = vec3(505, 0, 0)
+        call('bag', 1, 'r1', sorts and sorts.r1 or 'recycle')
+        at(vec3(1000, 0, 0))
+        call('bag', 1, 'g2', sorts and sorts.g2 or 'general')
+    end
+
+    do
+        local env, restore = scene(nil, false)
+        crew(1)
+        check(j(1, 'queue', { provider = 'garbage' }).error == 'no rounds are open yet', 'garbage: with no routes the board refuses every group')
+        restore()
+
+        env, restore = scene()
+        Mocks.businesses.sanitation = nil
+        crew(1)
+        check(j(1, 'queue', { provider = 'garbage' }).error == 'the sanitation department is not set up', 'garbage: a missing sanitation business refuses the job')
+        restore()
+
+        env, restore = scene()
+        Mocks.treasury = 0
+        crew(1)
+        check(j(1, 'queue', { provider = 'garbage' }).error == 'the city cannot fund a round right now', 'garbage: an empty department and treasury refuse the job before it starts')
+        Mocks.treasury = 100000
+        Mocks.budgetDrawn = env.Config.monthlyBudget
+        check(j(1, 'queue', { provider = 'garbage' }).error == 'the city cannot fund a round right now', 'garbage: an exhausted monthly budget refuses the job before it starts')
+        Mocks.budgetDrawn = 0
+        check(j(1, 'queue', { provider = 'garbage' }).success == true, 'garbage: a funded round can be queued')
+        restore()
+    end
+
+    do
+        local env, restore = scene()
+        FakePeds[1] = vec3(0, 0, 0)
+        check(start(2).success == true and #Spawned == 1, 'garbage: an accepted round spawns one truck')
+        check(seen[1].goal.kind == 'stop' and #seen[1].goal.bins == 2, 'garbage: the crew is shown the first stop and its bins')
+        at(vec3(500, 0, 0))
+        check(call('bag', 1, 5, 'general').error == 'bad request' and call('bag', 1, 'g1', 'metal').error == 'bad request', 'garbage: bad arguments are refused')
+        check(call('bag', 9, 'g1', 'general').error == 'you have no round', 'garbage: an outsider cannot bag')
+        check(call('bag', 1, 'g2', 'general').error == 'that is not a bin on this stop', 'garbage: a bin from another stop is refused')
+        check(call('bag', 1, 'zzz', 'general').error == 'that is not a bin on this stop', 'garbage: an unknown bin is refused')
+        FakePeds[1] = vec3(0, 0, 0)
+        check(call('bag', 1, 'g1', 'general').error == 'you are too far from the bin', 'garbage: the player must be at the bin')
+        at(vec3(500, 0, 0)); FakePeds[Spawned[1]] = vec3(-9000, 0, 0)
+        check(call('bag', 1, 'g1', 'general').error == 'bring the truck closer', 'garbage: the truck must be at the bin')
+        at(vec3(500, 0, 0))
+        check(call('bag', 1, 'g1', 'general').success == true, 'garbage: a bag is counted')
+        check(call('bag', 1, 'g1', 'general').error == 'already emptied', 'garbage: a bin counts once')
+        FakePeds[1] = vec3(505, 0, 0)
+        local fast = RegisteredCallbacks['som-garbage:server:bag'](1, 'r1', 'recycle')
+        check(fast.error == 'slow down', 'garbage: pickups are rate limited')
+        Mocks.clock = Mocks.clock + 1000
+        check(RegisteredCallbacks['som-garbage:server:bag'](1, 'r1', 'recycle').error == 'slow down', 'garbage: the minimum time between pickups holds')
+        check(call('bag', 1, 'r1', 'recycle').success == true and seen[#seen].goal.label == 'Vine Street', 'garbage: clearing a stop moves the crew on')
+        check(call('tip', 1, 'general').error == 'finish the stops first', 'garbage: nothing can be tipped before the stops are done')
+        restore()
+    end
+
+    do
+        local env, restore = scene()
+        start(1)
+        loadAll({ g2 = 'recycle' })
+        check(seen[#seen].goal.kind == 'dump' and #seen[#seen].goal.bays == 2, 'garbage: after the last stop both dump points are shown')
+        at(vec3(0, 0, 0))
+        check(call('tip', 1, 'general').error == 'you are too far away', 'garbage: tipping needs the player at the bay')
+        at(DUMP)
+        check(call('tip', 1, 'general').error == 'that load is not ready yet', 'garbage: a load cannot be tipped sooner than the bags took')
+        later(60, function()
+            FakePeds[Spawned[1]] = vec3(-9000, 0, 0)
+            check(call('tip', 1, 'general').error == 'bring the truck in', 'garbage: the truck must be at the bay')
+            at(DUMP)
+            local before = Mocks.calls.addMoney
+            check(call('tip', 1, 'general').success == true, 'garbage: general waste is tipped at the landfill')
+            check(Mocks.lastPaid.amount == 24 and Mocks.calls.addMoney == before + 1, 'garbage: a wrong sort counts as general waste (2 bags x 12)')
+            check(Mocks.calls.fund == 1 and Mocks.budgetDrawn == 24 and Mocks.treasury == 100000 - 24, 'garbage: the department is topped up from the treasury by exactly the shortfall')
+            check(call('tip', 1, 'general').error == 'already tipped', 'garbage: a load pays once')
+            check(call('tip', 1, 'recycle').error == 'you are too far away', 'garbage: the recycling bay needs the player there')
+            at(RECYCLE)
+            check(call('tip', 1, 'recycle').success == true and Mocks.lastPaid.amount == 22, 'garbage: a sorted recycling bag pays the bonus (12 + 10)')
+            check(Mocks.bizBalance.sanitation == 0 and Mocks.budgetDrawn == 46, 'garbage: every payout was debited from the department first')
+        end)
+        check(#Deleted == 1 and Mocks.exported.getGroup(1).busy == nil, 'garbage: the truck is removed and the group is free at the end')
+        check(call('tip', 1, 'general').error == 'you have no round', 'garbage: nothing is paid after the round')
+        restore()
+    end
+
+    do
+        local env, restore = scene()
+        start(1); loadAll()
+        Mocks.budgetDrawn = env.Config.monthlyBudget - 30
+        later(60, function()
+            at(DUMP)
+            check(call('tip', 1, 'general').success == true, 'garbage: a top-up inside the monthly cap pays')
+            at(RECYCLE)
+            local paid = Mocks.calls.addMoney
+            check(call('tip', 1, 'recycle').error == 'nothing could be paid' and Mocks.calls.addMoney == paid, 'garbage: a top-up never exceeds the remaining monthly cap')
+            check(Mocks.budgetDrawn == env.Config.monthlyBudget - 30 + 24 and Mocks.treasury == 100000 - 24, 'garbage: the treasury was not drawn past the cap')
+        end)
+        restore()
+
+        env, restore = scene()
+        start(1); loadAll()
+        Mocks.treasury = 0
+        later(60, function()
+            at(DUMP)
+            local paid = Mocks.calls.addMoney
+            check(call('tip', 1, 'general').error == 'nothing could be paid' and Mocks.calls.addMoney == paid, 'garbage: an empty treasury pays nothing and creates no money')
+            Mocks.treasury = 100000
+            check(call('tip', 1, 'general').success == true, 'garbage: the same tip can be retried once funded')
+            Mocks.fundThrows = true
+            at(RECYCLE)
+            check(call('tip', 1, 'recycle').error == 'nothing could be paid', 'garbage: a crash in the treasury draw pays nothing')
+            Mocks.fundThrows = false
+            check(call('tip', 1, 'recycle').success == true, 'garbage: the funding lock is released after a crash')
+        end)
+        restore()
+    end
+
+    do
+        local env, restore = scene({ hourlyCap = 10 })
+        start(1); loadAll()
+        later(60, function() at(DUMP); call('tip', 1, 'general') end)
+        check(Mocks.lastPaid.amount == 10, 'garbage: the hourly cap trims the payout')
+        restore()
+
+        env, restore = scene()
+        start(1); loadAll()
+        later(60, function()
+            at(DUMP)
+            Mocks.addMoneyFails = true
+            local t = Mocks.calls.businessTransact
+            check(call('tip', 1, 'general').success == false and Mocks.calls.businessTransact == t + 1 and Mocks.bizBalance.sanitation == 24, 'garbage: a failed credit returns the money to the department')
+            Mocks.addMoneyFails = false
+        end)
+        restore()
+
+        env, restore = scene()
+        start(1); loadAll()
+        later(60, function()
+            at(DUMP)
+            Mocks.addMoneyThrows = true
+            check(call('tip', 1, 'general').success == false, 'garbage: a payout that throws reports a failure')
+            Mocks.addMoneyThrows = false
+            check(#Deleted == 1 and Mocks.exported.getGroup(1).busy == nil and call('tip', 1, 'general').error == 'you have no round', 'garbage: a failed payout ends the round and nobody is paid twice')
+        end)
+        restore()
+    end
+
+    do
+        local env, restore = scene()
+        start(1)
+        local paid = Mocks.calls.addMoney
+        check(call('abandon', 9).error == 'you have no round', 'garbage: only a member can abandon')
+        check(call('abandon', 1).success == true and Mocks.calls.addMoney == paid, 'garbage: abandoning pays nothing')
+        check(#Deleted == 1 and Mocks.exported.getGroup(1).busy == nil, 'garbage: abandoning removes the truck and frees the group')
+        g(1, 'ready', { ready = true })
+        check(j(1, 'queue', { provider = 'garbage' }).error == 'a crew member abandoned a round recently', 'garbage: a cooldown stops abandon and re-accept')
+        later(env.Config.abandonCooldown + 5, function()
+            check(j(1, 'queue', { provider = 'garbage' }).success == true, 'garbage: the cooldown ends')
+        end)
+        restore()
+
+        env, restore = scene()
+        start(1)
+        later((env.Config.minutes + env.Config.graceMinutes) * 60 + 5, function() env.Garbage.Sweep() end)
+        check(#Deleted == 1 and Mocks.exported.getGroup(1).busy == nil, 'garbage: a round that runs out of time is cleaned up')
+        restore()
+
+        env, restore = scene()
+        start(1); Deleted = {}
+        g(1, 'leave')
+        check(#Deleted == 1 and seen[#seen].goal == nil, 'garbage: a disbanded group loses its truck')
+        restore()
+
+        env, restore = scene()
+        start(1); Deleted = {}
+        Handlers['som:server:playerUnloaded'](1, 'P1')
+        check(#Deleted == 1, 'garbage: the last member leaving removes the truck')
+        restore()
+
+        env, restore = scene()
+        start(1); Deleted = {}
+        Handlers['onResourceStop']('som-garbage')
+        check(#Deleted == 1, 'garbage: stopping the resource removes the truck')
+        restore()
+    end
+end
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)

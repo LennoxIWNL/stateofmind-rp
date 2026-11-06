@@ -1478,6 +1478,7 @@ INSERT IGNORE INTO `som_bank_accounts` (`account_no`, `label`, `type`, `balance`
   ('GOV-BCSO',  'Blaine County Sheriff Office',   'business', 0),
   ('GOV-SASP',  'San Andreas State Police',       'business', 0),
   ('GOV-EMS',   'San Andreas Medical Services',   'business', 500000),
+  ('GOV-SAN',   'Los Santos Sanitation',          'business', 0),
   ('GOV-DOJ',   'Department of Justice',          'business', 300000),
   ('BUS-LSC',   'Los Santos Customs',             'business', 150000),
   ('BUS-CAB',   'Downtown Cab Co.',               'business', 100000),
@@ -1502,6 +1503,8 @@ VALUES
   ('ems',         'San Andreas Medical Services', 'ambulance', (SELECT id FROM som_bank_accounts WHERE account_no='GOV-EMS'),    0.0000, 'treasury', 'emergency',  1, 0.0000),
   -- The court. Funding is 'fines' so som-economy lets a judge issue one; the
   -- same 70/30 department/treasury split applies and the judge receives nothing.
+  -- Sanitation is paid out of the city budget, a capped monthly top-up.
+  ('sanitation',  'Los Santos Sanitation',        NULL,        (SELECT id FROM som_bank_accounts WHERE account_no='GOV-SAN'),    0.0000, 'treasury', 'government', 1, 0.0000),
   ('doj',         'Department of Justice',        NULL,        (SELECT id FROM som_bank_accounts WHERE account_no='GOV-DOJ'),    0.0000, 'fines',    'government', 1, 0.0000),
   ('lscustoms',   'Los Santos Customs',           'mechanic',  (SELECT id FROM som_bank_accounts WHERE account_no='BUS-LSC'),    0.0000, 'sales',    'private',    1, 0.0800),
   ('downtowncab', 'Downtown Cab Co.',             'taxi',      (SELECT id FROM som_bank_accounts WHERE account_no='BUS-CAB'),    0.0000, 'sales',    'private',    1, 0.0800),

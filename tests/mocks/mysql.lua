@@ -980,6 +980,9 @@ end
 
 function M.scalar(query, params)
     params = params or {}
+    if query:find('FROM som_transactions WHERE citizenid IS NULL AND reason = ?', 1, true) then
+        return _G.Mocks.budgetDrawn or 0
+    end
     do local handled, value = sharedAccounts('scalar', query, params); if handled then return value end end
     do local handled, value = social('scalar', query, params); if handled then return value end end
     do local handled, value = city('scalar', query, params); if handled then return value end end
@@ -1611,6 +1614,7 @@ function M.insert(query, params)
 end
 
 function M.query(query, params)
+    if query:find('FROM som_businesses b', 1, true) then return M.db.businessRows or {} end
     params = params or {}
     do local handled, value = social('query', query, params); if handled then return value end end
     do local handled, value = licences('query', query, params); if handled then return value end end
