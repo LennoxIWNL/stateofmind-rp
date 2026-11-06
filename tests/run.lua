@@ -4,14 +4,6 @@
 --
 -- Run with: lua5.4 tests/run.lua
 
-    setup(); mysql.db.anpr.flagged = {}; Mocks.registrationOf = { ABC123 = 'expired' }
-    scan(1, 'front', 'AB C123')
-    check(#hits == 1 and hits[1].args[3][1] == 'registration expired' and Mocks.calls.dispatchAlert == 0, 'anpr: an expired registration tells the officer and never calls dispatch')
-    setup(); Mocks.registrationOf = { ABC123 = 'expired' }
-    scan(1, 'front', 'AB C123')
-    check(#hits == 1 and hits[1].args[3][1] == 'police flag' and hits[1].args[3][2] == 'registration expired' and Mocks.calls.dispatchAlert == 1, 'anpr: a hard reason still reaches dispatch, with the registration note for the officer')
-    Mocks.registrationOf = nil
-
 local dir = (arg[0]:match('(.*/)') or './')
 dofile(dir .. 'mocks/fivem.lua')
 dofile(dir .. 'mocks/exports.lua')
@@ -5954,6 +5946,14 @@ do
     setup(); mysql.db.anpr.flagged = {}
     scan(1, 'front', 'AB C123')
     check(#hits == 0 and Mocks.calls.dispatchAlert == 0, 'anpr: a clean plate is silent')
+
+    setup(); mysql.db.anpr.flagged = {}; Mocks.registrationOf = { ABC123 = 'expired' }
+    scan(1, 'front', 'AB C123')
+    check(#hits == 1 and hits[1].args[3][1] == 'registration expired' and Mocks.calls.dispatchAlert == 0, 'anpr: an expired registration tells the officer and never calls dispatch')
+    setup(); Mocks.registrationOf = { ABC123 = 'expired' }
+    scan(1, 'front', 'AB C123')
+    check(#hits == 1 and hits[1].args[3][1] == 'police flag' and hits[1].args[3][2] == 'registration expired' and Mocks.calls.dispatchAlert == 1, 'anpr: a hard reason still reaches dispatch, with the registration note for the officer')
+    Mocks.registrationOf = nil
 
     setup(); Mocks.players[1] = cop(false)
     scan(1, 'front', 'ABC123')
