@@ -5,7 +5,9 @@
 local function vec3(x, y, z)
     local v = { x = x or 0.0, y = y or 0.0, z = z or 0.0 }
     return setmetatable(v, {
-        __sub = function(a, b) return vec3(a.x - b.x, a.y - b.y, a.z - b.z) end,
+        __sub = function(a, b)
+            assert(getmetatable(a) and getmetatable(b), 'vector arithmetic on a plain table')
+            return vec3(a.x - b.x, a.y - b.y, a.z - b.z) end,
         __len = function(a) return math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z) end,
     })
 end
@@ -74,7 +76,7 @@ _G.Animals = {}
 _G.NetworkGetEntityFromNetworkId = function(netId) return (_G.Vehicles[netId] or _G.Animals[netId]) and netId or 0 end
 _G.DoesEntityExist = function(e) return _G.Vehicles[e] ~= nil or _G.Animals[e] ~= nil end
 _G.GetEntityType = function(e) return _G.Animals[e] and 1 or 2 end
-_G.GetEntityModel = function(e) return _G.joaat(_G.Animals[e].model) end
+_G.GetEntityModel = function(e) return _G.joaat((_G.Vehicles[e] or _G.Animals[e]).model) end
 _G.GetEntityHealth = function(e) return _G.Animals[e].health end
 _G.PedKillers, _G.PlayerPeds = {}, {}
 _G.GetPedSourceOfDeath = function(e) return (_G.Animals[e] and _G.Animals[e].killer) or _G.PedKillers[e] or 0 end
@@ -86,11 +88,29 @@ _G.Entity = function(e)
 end
 _G.GetVehicleEngineHealth = function(e) return _G.Vehicles[e].engine end
 _G.GetVehicleBodyHealth = function(e) return _G.Vehicles[e].body end
-_G.GetPedInVehicleSeat = function(e) return _G.Vehicles[e].driver or 0 end
+_G.GetPedInVehicleSeat = function(e, seat)
+    local v = _G.Vehicles[e]
+    if seat and seat ~= -1 then return v.seats and v.seats[seat] or 0 end
+    return v.driver or 0
+end
+_G.GetVehiclePedIsIn = function(ped) return _G.PedVehicle and _G.PedVehicle[ped] or 0 end
+_G.SetPedIntoVehicle = function(ped, vehicle, seat)
+    _G.PedVehicle = _G.PedVehicle or {}
+    _G.PedVehicle[ped] = vehicle
+    _G.Seated = { ped = ped, vehicle = vehicle, seat = seat }
+end
 _G.joaat = function(name) local h = 5381; for i = 1, #name do h = (h * 33 + name:byte(i)) % 4294967296 end; return h end
 
 _G.GetVehicleNumberPlateText = function(e) return (_G.Vehicles[e] or {}).plate end
 _G.Deleted = {}
+_G.Spawned = {}
+_G.CreateVehicle = function(hash)
+    local id = 7000 + #_G.Spawned + 1
+    _G.Spawned[#_G.Spawned + 1] = id
+    _G.Vehicles[id] = { body = 1000.0, engine = 1000.0 }
+    return id
+end
+_G.MockCreateVehicle = _G.CreateVehicle
 _G.DeleteEntity = function(e) _G.Deleted[#_G.Deleted + 1] = e; _G.Vehicles[e] = nil end
 
 _G.Dropped = {}

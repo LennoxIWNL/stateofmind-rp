@@ -39,6 +39,7 @@ HealthLists = {
     'som-rentals',
     'som-staff',
     'som-theft',
+    'som-trucking',
     'som-turf',
     'som-ui',
     },

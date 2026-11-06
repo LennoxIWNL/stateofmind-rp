@@ -16,12 +16,14 @@ shared_scripts {
 client_scripts {
     '@som-ui/client/progressbar.lua',
     'client/main.lua',
+    'client/hospital.lua',
 }
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     '@som-core/server/placements.lua',
     'server/main.lua',
+    'server/hospital.lua',
 }
 
 dependencies {
