@@ -340,6 +340,11 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Heist clean cash payouts now wait for the previous payout instead of paying nothing; the wait loop is only provable in a live server with two crews looting together.
 - [ ] Buyer sales and heist clean payouts now record the payout before paying, so a database failure refuses the sale instead of paying without counting it against the hourly cap.
 
+## Server-owned hunger, thirst and stress
+
+- [ ] Item use now changes the needs on the server: som-core listens for the server event `ox_inventory:usedItem` and applies `Config.ItemStatus` (the 8 food and drink items, same numbers as before). `som:server:adjustStatus` and its stopgap budget are gone, and the ox bridge no longer has `client.setPlayerStatus`. Not run in a live server: eat and drink each of the 8 items and confirm the bar moves, that cancelling the progress bar changes nothing, and that the HUD (som-hud and ps-hud) still follows. A new food item in `ox_inventory/data/items.lua` needs an entry in `Config.ItemStatus` (a test fails until it has one).
+- [ ] Stress has no passive decay (it never had); only items lower it.
+
 ## ANPR (som-anpr)
 
 - [ ] Exact config change: `ps-mdt/shared/config.lua` now has `Config.UseWolfknightRadar = false` (it was `true`). That turns off ps-mdt's own `wk:onPlateScanned` handler, which showed the stock QBCore popup to any client and leaked registered owner names for any plate. It also turns off ps-mdt's `ps-mdt:client:trafficStop` hook, which called `ps-dispatch` (not installed).

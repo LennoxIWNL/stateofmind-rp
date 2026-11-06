@@ -4874,7 +4874,7 @@ do
 end
 
 -- ---------------------------------------------------------------------------
--- Paychecks, MDT delete guard and status budget
+-- Paychecks and MDT delete guard
 -- ---------------------------------------------------------------------------
 
 do
@@ -4915,18 +4915,71 @@ do
     for _, thread in ipairs(threads) do waits = 0; pcall(thread) end
     _G.Wait = realWait
     check(#paid == 1 and paid[1] == 2, 'paycheck: one failed player does not stop the next one being paid')
+end
 
-    _G.source = 1
-    local status = function(_, key, delta) RegisteredEvents['som:server:adjustStatus'](key, delta) end
-    local meta = { hunger = 0 }
-    env.Players.Get = function() return { metadata = meta, setMetadata = function(_, k, v) meta[k] = v end } end
-    Mocks.clock = 100000
-    for _ = 1, 5 do Mocks.clock = Mocks.clock + 600; status(1, 'hunger', 50) end
-    check(meta.hunger == 100, 'status: client-sent changes stop after the per-minute budget')
-    Mocks.clock = Mocks.clock + 61000
-    status(1, 'hunger', 50)
-    _G.source = nil
-    check(meta.hunger == 150, 'status: the budget comes back after a minute')
+-- ---------------------------------------------------------------------------
+-- Status from item use (server owned)
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-core', {
+        'shared/config.lua', 'shared/tiers.lua', 'shared/jobs.lua', 'shared/gangs.lua',
+        'server/permissions.lua', 'server/player.lua', 'server/money.lua', 'server/main.lua',
+    })
+    local meta
+    local function reset(values) meta = values end
+    env.Players.Get = function(src)
+        if src ~= 1 then return nil end
+        return { metadata = meta, setMetadata = function(_, k, v) meta[k] = math.max(0, math.min(100, v)) end }
+    end
+    local function used(src, name) Handlers['ox_inventory:usedItem'](src, name, 3, nil) end
+
+    reset({ hunger = 50, thirst = 50, stress = 10 })
+    used(1, 'water')
+    check(meta.thirst == 70 and meta.hunger == 50, 'status: water gives thirst and nothing else')
+    used(1, 'sandwich')
+    check(meta.hunger == 70, 'status: food gives hunger')
+    reset({ hunger = 90, thirst = 95, stress = 0 })
+    used(1, 'burger'); used(1, 'cola')
+    check(meta.hunger == 100 and meta.thirst == 100, 'status: the result is clamped to 100')
+    reset({ hunger = 50, thirst = 50, stress = 1 })
+    used(1, 'panties')
+    check(meta.thirst == 40 and meta.stress == 0, 'status: an item can lower thirst and stress, clamped at 0')
+    reset({ hunger = 10, thirst = 10, stress = 10 })
+    used(1, 'mustard')
+    check(meta.hunger == 12.5 and meta.thirst == 12.5 and meta.stress == 10, 'status: an item with two effects applies both')
+
+    reset({ hunger = 50, thirst = 50, stress = 10 })
+    used(1, 'water'); used(1, 'water')
+    check(meta.thirst == 90, 'status: two uses in a row apply twice')
+
+    reset({ hunger = 50, thirst = 50, stress = 10 })
+    used(1, 'bandage'); used(1, 'nothing_like_this'); used(1, nil); used(1, 7); used(1, {})
+    check(meta.hunger == 50 and meta.thirst == 50 and meta.stress == 10, 'status: items without an effect and bad names change nothing')
+    check(pcall(used, 2, 'water'), 'status: a use by a player who is not loaded does nothing and does not error')
+    check(meta.thirst == 50, 'status: a cancelled or failed use (no usedItem event) leaves the needs alone')
+
+    check(RegisteredEvents['som:server:adjustStatus'] == nil and RegisteredEvents['ox_inventory:usedItem'] == nil,
+        'status: a client has no event it can send to change its needs')
+
+    local f = assert(io.open(REPO .. '../[standalone]/ox_inventory/data/items.lua', 'rb'))
+    local src = f:read('a')
+    f:close()
+    local defined, problems = {}, {}
+    for name, body in src:gmatch("\n\t%['([%w_%-]+)'%]%s*=%s*{(.-)\n\t},") do
+        local inner = body:match('status%s*=%s*{([^}]*)}')
+        if inner then
+            defined[name] = true
+            local effect = env.Config.ItemStatus[name]
+            if not effect then problems[#problems + 1] = name .. ' has no effect in som-core' end
+            for key, value in inner:gmatch('(%w+)%s*=%s*(-?%d+)') do
+                if not effect or effect[key] ~= tonumber(value) * 0.0001 then problems[#problems + 1] = name .. '.' .. key .. ' differs' end
+            end
+        end
+    end
+    for name in pairs(env.Config.ItemStatus) do if not defined[name] then problems[#problems + 1] = name .. ' is not in items.lua' end end
+    check(#problems == 0, 'status: Config.ItemStatus matches every client.status in ox_inventory items.lua ' .. table.concat(problems, ', '))
 end
 
 do
@@ -5265,17 +5318,6 @@ do
     _G.Wait = realWait
     check(#paid == 1 and paid[1] == 2, 'paycheck: one failed player does not stop the next one being paid')
 
-    _G.source = 1
-    local status = function(_, key, delta) RegisteredEvents['som:server:adjustStatus'](key, delta) end
-    local meta = { hunger = 0 }
-    env.Players.Get = function() return { metadata = meta, setMetadata = function(_, k, v) meta[k] = v end } end
-    Mocks.clock = 100000
-    for _ = 1, 5 do Mocks.clock = Mocks.clock + 600; status(1, 'hunger', 50) end
-    check(meta.hunger == 100, 'status: client-sent changes stop after the per-minute budget')
-    Mocks.clock = Mocks.clock + 61000
-    status(1, 'hunger', 50)
-    _G.source = nil
-    check(meta.hunger == 150, 'status: the budget comes back after a minute')
 end
 
 do
