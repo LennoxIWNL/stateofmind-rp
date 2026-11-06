@@ -58,17 +58,11 @@ Config.EngineWarnBelow = 700
 -- ---------------------------------------------------------------------------
 -- Fuel.
 --
--- NOT WIRED, and deliberately so. No fuel resource runs on this server:
--- cdn-fuel hard-depends on qb-target, qb-input, qb-menu and qbx_core's locale
--- and fails at load, and ox_fuel is not installed. GetVehicleFuelLevel on a
--- vanilla vehicle does not meaningfully deplete, so the gauge would sit at one
--- number forever, which is exactly what teaches a player to ignore a HUD.
---
--- The gauge is BUILT. Set this to the fuel resource's name once one exists and
--- it starts reading.
+-- Wired to som-fuel, which drains the native fuel level while the engine runs, so
+-- the gauge moves. Set it back to false if the fuel resource is not running.
 -- ---------------------------------------------------------------------------
 
-Config.FuelResource = false
+Config.FuelResource = 'som-fuel'
 
 -- ---------------------------------------------------------------------------
 -- Seatbelt.

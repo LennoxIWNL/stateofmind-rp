@@ -137,64 +137,24 @@ CreateThread(function()
 end)
 
 -- ---------------------------------------------------------------------------
--- Status adjustment from item use
+-- Status from item use
 --
--- TRUST BOUNDARY. ox_inventory applies item status effects on the client
--- (modules/bridge/som/client.lua -> client.setPlayerStatus), so this is a
--- client-reachable event. The server has already validated that the item was
--- consumed via ox's usingItem state machine, but the delta itself arrives from
--- the client, so it is treated as hostile:
---   only three keys are accepted, the delta is clamped, and calls are rate
---   limited per player. setMetadata then clamps the result to 0-100.
---
--- Nothing here touches money, items, jobs, or permissions, so the worst a
--- spoofed call achieves is refilling the caller's own hunger bar.
+-- ox_inventory fires 'ox_inventory:usedItem' on the server (server.lua, a plain
+-- TriggerEvent, not a net event) only after the item was really consumed and the
+-- client's report matched the slot the server recorded. The effect comes from
+-- Config.ItemStatus, so the client sends nothing and a cancelled use changes nothing.
+-- ox deletes an item's `client` table on the server, which is why this is not read
+-- from data/items.lua; a test keeps the two in step.
 -- ---------------------------------------------------------------------------
 
-local STATUS_KEYS = { hunger = true, thirst = true, stress = true }
-local MAX_STATUS_DELTA = 50
-local STATUS_COOLDOWN = 500
-local STATUS_BUDGET = 100
-local STATUS_WINDOW = 60000
-
-local lastStatusCall = {}
-local statusSpent = {}
-
-RegisterNetEvent('som:server:adjustStatus', function(key, delta)
-    local source = source
-
-    if not STATUS_KEYS[key] then return end
-
-    local value = tonumber(delta)
-    if not value or value ~= value then return end
-
-    local now = GetGameTimer()
-    if lastStatusCall[source] and now - lastStatusCall[source] < STATUS_COOLDOWN then return end
-    lastStatusCall[source] = now
-
-    if value > MAX_STATUS_DELTA then value = MAX_STATUS_DELTA end
-    if value < -MAX_STATUS_DELTA then value = -MAX_STATUS_DELTA end
-
-    -- The cooldown alone still allows +/-50 twice a second, enough to zero stress on demand.
-    local window = statusSpent[source]
-    if not window or now - window.at >= STATUS_WINDOW then
-        window = { at = now, total = 0 }
-        statusSpent[source] = window
-    end
-    local room = STATUS_BUDGET - window.total
-    if room <= 0 then return end
-    if math.abs(value) > room then value = value < 0 and -room or room end
-    window.total = window.total + math.abs(value)
-
+AddEventHandler('ox_inventory:usedItem', function(source, name)
     local player = Players.Get(source)
-    if not player then return end
+    local effect = type(name) == 'string' and Config.ItemStatus[name]
+    if not player or not effect then return end
 
-    player:setMetadata(key, (player.metadata[key] or 0) + value)
-end)
-
-AddEventHandler('playerDropped', function()
-    lastStatusCall[source] = nil
-    statusSpent[source] = nil
+    for key, points in pairs(effect) do
+        player:setMetadata(key, (player.metadata[key] or 0) + points)
+    end
 end)
 
 -- ---------------------------------------------------------------------------
