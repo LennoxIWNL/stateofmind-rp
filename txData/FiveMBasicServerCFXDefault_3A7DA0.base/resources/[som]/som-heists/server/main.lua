@@ -153,10 +153,12 @@ end
 ---Debit first, credit second, refund if the credit fails.
 ---@return number paid
 local function payClean(source, run, wanted)
-    if wanted < 1 or treasuryBusy then return 0 end
+    if wanted < 1 then return 0 end
+    -- Wait for the other crew's payout instead of paying this one nothing.
+    while treasuryBusy do Wait(50) end
     treasuryBusy = true
 
-    local debited, paid = 0, 0
+    local debited, paid, counted = 0, 0, false
     local ok, err = pcall(function()
         local cfg = Config.tiers[run.tier]
         local spent = tonumber(MySQL.scalar.await(
@@ -166,9 +168,11 @@ local function payClean(source, run, wanted)
         local amount = math.min(wanted, math.max(0, cfg.hourlyCleanCap - spent))
         if amount >= 1 and core:treasuryTransact(-amount, ('heist:%s'):format(run.site.id)) then
             debited = amount
+            -- The hourly cap reads clean_paid, so it is counted before the money moves.
+            MySQL.update.await('UPDATE som_heist_runs SET clean_paid = clean_paid + ? WHERE id = ?', { amount, run.id })
+            counted = true
             if core:addMoney(source, 'bank', amount, ('heist:%s'):format(run.site.id)) then
                 paid = amount
-                MySQL.update.await('UPDATE som_heist_runs SET clean_paid = clean_paid + ? WHERE id = ?', { paid, run.id })
             end
         end
     end)
@@ -176,7 +180,10 @@ local function payClean(source, run, wanted)
     -- The lock is always released, and a debit that never reached the player goes back.
     treasuryBusy = false
     if not ok then print(('[som-heists] clean payout failed: %s'):format(tostring(err))) end
-    if debited > 0 and paid == 0 then core:treasuryTransact(debited, ('heist:%s:refund'):format(run.site.id)) end
+    if debited > 0 and paid == 0 then
+        core:treasuryTransact(debited, ('heist:%s:refund'):format(run.site.id))
+        if counted then pcall(MySQL.update.await, 'UPDATE som_heist_runs SET clean_paid = clean_paid - ? WHERE id = ?', { debited, run.id }) end
+    end
     return paid
 end
 

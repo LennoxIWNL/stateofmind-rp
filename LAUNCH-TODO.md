@@ -320,3 +320,8 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Never run in a game: the theory menus, the school car appearing and the player being put in it, the checkpoint blip, officer options on a player (check, suspend, revoke, issue), and the ps-mdt licence revoke button turning into a revoke in `som_licenses` (it is assumed to write `metadata.licences.<type> = false` through som-compat).
 - [ ] A suspension that ends while the player stays online leaves `metadata.licenses` false until their next login; the table is correct at once, so a police check and the licence card are right and only the ox_inventory weapon gate lags.
 - [ ] Not built, on purpose: other licence classes, licence points, an automatic fine for driving unlicensed (officers use the existing "Driving without a licence" fine), a background check before a weapon licence, and a record of which officer suspended or revoked.
+## Money write follow-ups
+
+- [ ] Gang, business and treasury ledger writes undo the balance change if the ledger row cannot be written (two separate statements, not one transaction). Needs a live database check that a single `MySQL.transaction` with a `ROW_COUNT()` guard behaves the same before replacing it.
+- [ ] Heist clean cash payouts now wait for the previous payout instead of paying nothing; the wait loop is only provable in a live server with two crews looting together.
+- [ ] Buyer sales and heist clean payouts now record the payout before paying, so a database failure refuses the sale instead of paying without counting it against the hourly cap.
