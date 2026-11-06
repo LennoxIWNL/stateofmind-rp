@@ -36,6 +36,7 @@ M.db = {
     buyer = {},
     placements = {},
     trade = {},
+    shared = { accounts = { [7] = 100 }, frozen = {}, treasury = 500, updates = {}, ledger = {} },
     skills = {},
     newlife = {},
     chop = { log = {}, owned = {} },
@@ -489,6 +490,39 @@ local function placements(kind, query, params)
     return false
 end
 
+local function sharedAccounts(kind, query, params)
+    local S = M.db.shared
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    if kind == 'single' and has('SELECT b.id, b.account_id FROM som_businesses b WHERE b.name = ?') then
+        return true, params[1] == 'acme' and { id = 1, account_id = 7 } or nil
+    elseif kind == 'update' and has('UPDATE som_bank_accounts SET balance = balance + ? WHERE id = ? AND frozen = 0 AND balance + ? >= 0') and S.accounts[params[2]] then
+        S.updates[#S.updates + 1] = query
+        if S.frozen[params[2]] or S.accounts[params[2]] + params[1] < 0 then return true, 0 end
+        S.accounts[params[2]] = S.accounts[params[2]] + params[1]
+        return true, 1
+    elseif kind == 'update' and has('UPDATE som_bank_accounts SET balance = balance - ? WHERE id = ?') and S.accounts[params[2]] then
+        S.accounts[params[2]] = S.accounts[params[2]] - params[1]
+        return true, 1
+    elseif kind == 'update' and has('UPDATE som_treasury SET balance = balance - ? WHERE id = 1') then
+        S.treasury = S.treasury - params[1]
+        return true, 1
+    elseif kind == 'scalar' and has('SELECT frozen FROM som_bank_accounts WHERE id = ?') then
+        return true, S.frozen[params[1]] and 1 or 0
+    elseif kind == 'update' and has('UPDATE som_treasury SET balance = balance + ? WHERE id = 1 AND balance + ? >= 0') then
+        S.updates[#S.updates + 1] = query
+        if S.treasury + params[1] < 0 then return true, 0 end
+        S.treasury = S.treasury + params[1]
+        return true, 1
+    elseif kind == 'scalar' and has('SELECT balance FROM som_bank_accounts WHERE id = ?') then
+        return true, S.accounts[params[1]]
+    elseif kind == 'insert' and has('INSERT INTO som_transactions') and (has('business_id)') or has('FROM som_treasury WHERE id = 1')) then
+        if S.ledgerFails then error('simulated ledger failure') end
+        S.ledger[#S.ledger + 1] = { sql = query, params = params }
+        return true, #S.ledger
+    end
+    return false
+end
+
 local function moneyRows(kind, query, params)
     if kind == 'scalar' and query:find('SELECT 1 FROM som_character_money WHERE citizenid = ?', 1, true) then
         return true, params[1] == 'OFFLINE1' and 1 or nil
@@ -591,6 +625,7 @@ local function buyer(kind, query, params)
         for _, r in ipairs(B) do if r.buyer == params[1] and r.ts > now() - 3600 then sum = sum + r.amount end end
         return true, sum
     elseif kind == 'insert' and query:find('INSERT INTO som_buyer_payouts', 1, true) then
+        if M.payoutThrows then error('simulated payout record failure') end
         B[#B + 1] = { buyer = params[1], amount = params[2], ts = now() }
         return true, #B
     end
@@ -809,6 +844,7 @@ end
 
 function M.single(query, params)
     params = params or {}
+    do local handled, value = sharedAccounts('single', query, params); if handled then return value end end
     do local handled, value = social('single', query, params); if handled then return value end end
     do local handled, value = city('single', query, params); if handled then return value end end
     do local handled, value = heist('single', query, params); if handled then return value end end
@@ -885,6 +921,7 @@ end
 
 function M.scalar(query, params)
     params = params or {}
+    do local handled, value = sharedAccounts('scalar', query, params); if handled then return value end end
     do local handled, value = social('scalar', query, params); if handled then return value end end
     do local handled, value = city('scalar', query, params); if handled then return value end end
     do local handled, value = heist('scalar', query, params); if handled then return value end end
@@ -993,6 +1030,7 @@ end
 
 function M.update(query, params)
     params = params or {}
+    do local handled, value = sharedAccounts('update', query, params); if handled then return value end end
     do local handled, value = social('update', query, params); if handled then return value end end
     do local handled, value = city('update', query, params); if handled then return value end end
     do local handled, value = heist('update', query, params); if handled then return value end end
@@ -1342,6 +1380,7 @@ end
 
 function M.insert(query, params)
     params = params or {}
+    do local handled, value = sharedAccounts('insert', query, params); if handled then return value end end
     do local handled, value = social('insert', query, params); if handled then return value end end
     do local handled, value = city('insert', query, params); if handled then return value end end
     do local handled, value = heist('insert', query, params); if handled then return value end end
@@ -1677,7 +1716,11 @@ _G.MySQL = {
     query  = { await = function(q, p) return M.query(q, p) end },
     -- Records each transaction so a test can check what would reach the database.
     transaction = { await = function(queries)
-        if M.failTransaction then error('simulated database failure') end
+        local failNext = M.failNext
+        M.failNext = false
+        if M.duringTransaction then local f = M.duringTransaction; M.duringTransaction = nil; f() end
+        if M.failTransaction == 'throw' then error('simulated database failure') end
+        if M.failTransaction or failNext then return false end
         M.transactions[#M.transactions + 1] = queries
         return true
     end },

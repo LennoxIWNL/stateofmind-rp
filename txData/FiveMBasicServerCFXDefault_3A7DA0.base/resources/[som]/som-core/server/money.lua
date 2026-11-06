@@ -82,7 +82,7 @@ local function transact(player, account, delta, reason, opts)
     -- lands on the same total, while writing "the balance I computed" would let the
     -- older one win and bring money back.
     local ok, err = pcall(function()
-        MySQL.transaction.await({
+        local done = MySQL.transaction.await({
             {
                 query = ('UPDATE som_character_money SET `%s` = `%s` + ? WHERE citizenid = ?'):format(account, account),
                 values = { delta, player.citizenid },
@@ -100,11 +100,13 @@ local function transact(player, account, delta, reason, opts)
                 },
             },
         })
+        if not done then error('transaction failed') end
     end)
 
     if not ok then
         -- Roll the in-memory balance back so state and database stay agreed.
-        player.money[account] = balance - delta
+        -- Undo only this change: another one may have landed in memory while this save was waiting.
+        player.money[account] = player.money[account] - delta
         print(('[som-core] transaction failed for %s: %s'):format(player.citizenid, err))
         return false, 'database error'
     end
@@ -441,34 +443,38 @@ function Money.BusinessTransact(businessName, amount, reason)
     if type(reason) ~= 'string' or reason == '' then return false, 'reason required' end
 
     local business = MySQL.single.await(
-        'SELECT b.id, b.account_id, a.balance FROM som_businesses b '
-        .. 'LEFT JOIN som_bank_accounts a ON a.id = b.account_id WHERE b.name = ?',
+        'SELECT b.id, b.account_id FROM som_businesses b WHERE b.name = ?',
         { businessName }
     )
     if not business or not business.account_id then return false, 'business has no account' end
 
-    local balance = business.balance + delta
-    if balance < 0 then return false, 'insufficient business funds' end
+    -- One conditional add: two payments cannot both pass a balance check, and an older
+    -- write cannot overwrite a newer one.
+    local changed = MySQL.update.await(
+        'UPDATE som_bank_accounts SET balance = balance + ? WHERE id = ? AND frozen = 0 AND balance + ? >= 0',
+        { delta, business.account_id, delta })
+    if (changed or 0) < 1 then
+        local frozen = MySQL.scalar.await('SELECT frozen FROM som_bank_accounts WHERE id = ?', { business.account_id })
+        return false, frozen == 1 and 'account frozen' or 'insufficient business funds'
+    end
 
-    MySQL.transaction.await({
-        {
-            query = 'UPDATE som_bank_accounts SET balance = ? WHERE id = ?',
-            values = { balance, business.account_id },
-        },
-        {
-            query = [[
-                INSERT INTO som_transactions
-                    (citizenid, account, amount, balance, direction, flow, reason, resource, business_id)
-                VALUES (NULL, 'bank', ?, ?, ?, ?, ?, ?, ?)
-            ]],
-            values = {
-                math.abs(delta), balance,
-                delta > 0 and 'credit' or 'debit',
-                delta > 0 and 'faucet' or 'sink',
-                reason, callerResource(), business.id,
-            },
-        },
+    local balance = MySQL.scalar.await('SELECT balance FROM som_bank_accounts WHERE id = ?', { business.account_id }) or 0
+    local ok, id = pcall(MySQL.insert.await, [[
+        INSERT INTO som_transactions
+            (citizenid, account, amount, balance, direction, flow, reason, resource, business_id)
+        VALUES (NULL, 'bank', ?, ?, ?, ?, ?, ?, ?)
+    ]], {
+        math.abs(delta), balance,
+        delta > 0 and 'credit' or 'debit',
+        delta > 0 and 'faucet' or 'sink',
+        reason, callerResource(), business.id,
     })
+    if not ok or not id or id < 1 then
+        -- No ledger row means no money moved: put the balance back.
+        MySQL.update.await('UPDATE som_bank_accounts SET balance = balance - ? WHERE id = ?', { delta, business.account_id })
+        print(('[som-core] business ledger write failed for %s: %s'):format(businessName, tostring(id)))
+        return false, 'database error'
+    end
 
     return true
 end
@@ -560,20 +566,27 @@ function Money.TreasuryTransact(delta, reason)
         return false, 'invalid amount'
     end
 
-    local balance = Money.GetTreasury() + value
-    if balance < 0 then return false, 'insufficient treasury funds' end
+    local changed = MySQL.update.await(
+        'UPDATE som_treasury SET balance = balance + ? WHERE id = 1 AND balance + ? >= 0',
+        { value, value })
+    if (changed or 0) < 1 then return false, 'insufficient treasury funds' end
 
-    MySQL.update.await('UPDATE som_treasury SET balance = ? WHERE id = 1', { balance })
-    MySQL.insert.await([[
+    local ok, id = pcall(MySQL.insert.await, [[
         INSERT INTO som_transactions
             (citizenid, account, amount, balance, direction, flow, reason, resource)
-        VALUES (NULL, 'bank', ?, ?, ?, ?, ?, ?)
+        VALUES (NULL, 'bank', ?, (SELECT balance FROM som_treasury WHERE id = 1), ?, ?, ?, ?)
     ]], {
-        math.abs(value), balance,
+        math.abs(value),
         value > 0 and 'credit' or 'debit',
         value > 0 and 'sink' or 'faucet',
         reason or 'treasury', callerResource(),
     })
+    if not ok or not id or id < 1 then
+        -- No ledger row means no money moved: put the balance back.
+        MySQL.update.await('UPDATE som_treasury SET balance = balance - ? WHERE id = 1', { value })
+        print(('[som-core] treasury ledger write failed: %s'):format(tostring(id)))
+        return false, 'database error'
+    end
 
     return true
 end

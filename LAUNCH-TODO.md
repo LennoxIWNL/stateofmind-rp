@@ -304,3 +304,7 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Not verified live: the player target option, the CPR animation (`mini@cpr@char_a@cpr_str`), the `som:downed` state read on the medic's client, the bill arriving on the patient's phone.
 - [ ] Place the EMS supply locker (`Config.locker` in `som-ems`, ships disabled): it issues a free `firstaid` kit from the department (`firstaid = 0` in `Config.Armoury.departmentIssue`), up to 3 carried. Medics are `whitelisted`. No heal or bandage treatment, stretcher or hospital check-in in this version.
 - [ ] Paychecks, MDT incident delete and status changes got server-side guards (a failed pay step no longer stops everyone's pay and returns the business money, repeat MDT deletes for one incident are ignored, client status changes are capped at 100 per minute). Never run in a game: an hourly paycheck with a real database error, and the 100 per minute status budget against real eating, drinking and stress items (untuned).
+
+## Money writes
+
+- [ ] Business and city treasury balances are now changed with one conditional add, and a failed player money save is noticed and rolled back. Only the mock suite and the dev MariaDB have run them. In game: a shop sale, a seizure and a heist payout at the same moment, then check `som_transactions` against the balances. Whether oxmysql returns `false` (not an error) for a failed transaction is assumed from how it is documented, not run.
