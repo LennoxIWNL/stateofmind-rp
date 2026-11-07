@@ -479,3 +479,12 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Luxury (`realtor_only`) properties can now be bought outright, but only through an agent. The plain buy still refuses them.
 - [ ] An accepted viewing lets the buyer and the agent through that property's door for the window, with no key. Never run in a game: the three new door menu entries, both dialogs, walking in together, and the buyer's bank dropping.
 - [ ] Left out on purpose: a listings board and asking price changes, resales of player-owned homes, seller payouts, a sales tax, agent ratings, a phone app, and any change to the mortgage path or leases. The agent sale always pays from the buyer's bank, never cash or other accounts.
+## Weazel News (som-news)
+
+- [ ] Existing databases: import `setup.sql`. It adds the tables `som_news_stories` and `som_news_payouts`, a `BUS-WEAZEL` bank account (balance 0) and the `weazel` business row (all `IF NOT EXISTS` or `INSERT IGNORE`, safe to re-run).
+- [ ] The newsroom ships closed: `Config.enabled = false` in `som-news/shared/config.lua`. Until it is true nobody can publish and nothing is paid. Flip it after the in-game pass.
+- [ ] The `news` job is whitelisted and off duty by default. Hire reporters (`/setjob`-equivalent for whitelisted jobs) and have them clock in with the normal duty toggle. The job wage is drawn from the empty `weazel` account, so wages pay nothing until the business is funded; story pay comes from the city treasury instead.
+- [ ] Untuned numbers in `Config`: $150 per story, $600 per reporter per hour, $3000 per hour for the whole network, 60 character minimum body, 120 s between stories and 600 s between breaking alerts from one reporter (and one breaking alert per 300 s across all reporters, `breakingNetworkGapSeconds`). Only stories pay; breaking alerts never do. The treasury starts at 0, so nothing pays until fines and taxes have filled it.
+- [ ] A reporter writes a story in one phone prompt as `Headline | story text` (the host view takes a single line). Brief the newsroom, or add a multi field prompt to the phone host view later.
+- [ ] Staff remove a story with `/removestory <id>` (needs `som.mod`). Pay already given is not taken back.
+- [ ] Never run in a game: the phone app view and prompts, the breaking banner reaching every online phone, and the new SQL has only run against the mock until it is run on MariaDB (`TIMESTAMPDIFF`, `INSERT ... SELECT ... FROM DUAL WHERE NOT EXISTS`).

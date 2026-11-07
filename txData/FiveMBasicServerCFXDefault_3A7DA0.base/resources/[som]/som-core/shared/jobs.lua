@@ -246,4 +246,19 @@ Jobs = {
             [2] = { name = 'Depot Manager', payment = 400, isboss = true },
         },
     },
+
+    -- Weazel News. Whitelisted and off duty by default: only an on duty reporter can publish, and
+    -- each story pays from the city treasury under a cap (som-news), not from the wage below.
+    news = {
+        label = 'Weazel News',
+        business = 'weazel',
+        whitelisted = true,
+        defaultDuty = false,
+        offDutyPay = false,
+        grades = {
+            [0] = { name = 'Reporter', payment = 150 },
+            [1] = { name = 'Anchor', payment = 200 },
+            [2] = { name = 'Editor', payment = 250, isboss = true },
+        },
+    },
 }

@@ -40,6 +40,7 @@ M.db = {
     trade = {},
     ins = { on = false, vehicles = {}, policies = {}, claims = {}, flagged = {}, bolo = {}, wanted = {}, sold = {} },
     loans = {},
+    news = { stories = {}, payouts = {} },
     leases = {},
     shopsDb = { shops = {}, stock = {}, staff = {}, takings = 0, balance = 0 },
     shared = { accounts = { [7] = 100 }, frozen = {}, treasury = 500, updates = {}, ledger = {} },
@@ -674,6 +675,55 @@ local function insDb(kind, query, params)
         local p = v and pol(v.id)
         if not p then return true, nil end
         return true, { expires = p.paid_until, covered = (p.status == 'active' and p.paid_until > now() and p.citizenid == v.citizenid and not D.sold[v.id]) and 1 or 0 }
+local function newsDb(kind, query, params)
+    local N = M.db.news
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    local function hour(cid)
+        local sum = 0
+        for _, p in ipairs(N.payouts) do
+            if p.ts > now() - 3600 and (cid == nil or p.citizenid == cid) then sum = sum + p.amount end
+        end
+        return sum
+    end
+
+    if kind == 'scalar' and has('FROM som_news_payouts WHERE created_at >') then return true, hour(nil)
+    elseif kind == 'scalar' and has('FROM som_news_payouts WHERE citizenid = ? AND created_at >') then return true, hour(params[1])
+    elseif kind == 'insert' and has('INSERT INTO som_news_payouts (citizenid, amount)') then
+        N.payouts[#N.payouts + 1] = { id = #N.payouts + 1, citizenid = params[1], amount = params[2], ts = now() }
+        return true, #N.payouts
+    elseif kind == 'update' and has('DELETE FROM som_news_payouts WHERE id = ?') then
+        for i, p in ipairs(N.payouts) do if p.id == params[1] then table.remove(N.payouts, i); return true, 1 end end
+        return true, 0
+    elseif kind == 'single' and has('SELECT headline, body FROM som_news_stories WHERE citizenid = ? ORDER BY id DESC LIMIT 1') then
+        for i = #N.stories, 1, -1 do
+            if N.stories[i].citizenid == params[1] then return true, { headline = N.stories[i].headline, body = N.stories[i].body } end
+        end
+        return true, nil
+    elseif kind == 'insert' and has('INSERT INTO som_news_stories (citizenid, author, kind, headline, body)') then
+        for _, x in ipairs(N.stories) do
+            if x.citizenid == params[6] and x.kind == params[7] and x.ts > now() - params[8] then return true, 0 end
+            if x.kind == 'breaking' and params[9] == 'breaking' and x.ts > now() - params[10] then return true, 0 end
+        end
+        N.stories[#N.stories + 1] = { id = #N.stories + 1, citizenid = params[1], author = params[2], kind = params[3],
+            headline = params[4], body = params[5], status = 'live', paid = 0, ts = now() }
+        return true, #N.stories
+    elseif kind == 'update' and has('UPDATE som_news_stories SET paid = ? WHERE id = ?') then
+        N.stories[params[2]].paid = params[1]
+        return true, 1
+    elseif kind == 'update' and has("UPDATE som_news_stories SET status = 'removed' WHERE id = ? AND status = 'live'") then
+        local x = N.stories[params[1]]
+        if not x or x.status ~= 'live' then return true, 0 end
+        x.status = 'removed'
+        return true, 1
+    elseif kind == 'query' and has("FROM som_news_stories WHERE status = 'live' ORDER BY id DESC LIMIT ?") then
+        local out = {}
+        for i = #N.stories, 1, -1 do
+            local x = N.stories[i]
+            if x.status == 'live' and #out < params[1] then
+                out[#out + 1] = { id = x.id, author = x.author, kind = x.kind, headline = x.headline, body = x.body, age = (now() - x.ts) // 60 }
+            end
+        end
+        return true, out
     end
     return false
 end
@@ -1675,6 +1725,7 @@ end
 function M.single(query, params)
     params = params or {}
     do local handled, value = insDb('single', query, params); if handled then return value end end
+    do local handled, value = newsDb('single', query, params); if handled then return value end end
     do local handled, value = loansDb('single', query, params); if handled then return value end end
     do local handled, value = courtService('single', query, params); if handled then return value end end
     do local handled, value = leases('single', query, params); if handled then return value end end
@@ -1761,6 +1812,7 @@ end
 function M.scalar(query, params)
     params = params or {}
     do local handled, value = insDb('scalar', query, params); if handled then return value end end
+    do local handled, value = newsDb('scalar', query, params); if handled then return value end end
     do local handled, value = loansDb('scalar', query, params); if handled then return value end end
     do local handled, value = courtService('scalar', query, params); if handled then return value end end
     do local handled, value = leases('scalar', query, params); if handled then return value end end
@@ -1882,6 +1934,7 @@ end
 function M.update(query, params)
     params = params or {}
     do local handled, value = insDb('update', query, params); if handled then return value end end
+    do local handled, value = newsDb('update', query, params); if handled then return value end end
     do local handled, value = loansDb('update', query, params); if handled then return value end end
     do local handled, value = courtService('update', query, params); if handled then return value end end
     do local handled, value = leases('update', query, params); if handled then return value end end
@@ -2243,6 +2296,7 @@ end
 function M.insert(query, params)
     params = params or {}
     do local handled, value = insDb('insert', query, params); if handled then return value end end
+    do local handled, value = newsDb('insert', query, params); if handled then return value end end
     do local handled, value = loansDb('insert', query, params); if handled then return value end end
     do local handled, value = courtService('insert', query, params); if handled then return value end end
     do local handled, value = leases('insert', query, params); if handled then return value end end
@@ -2423,6 +2477,7 @@ function M.query(query, params)
     if query:find('FROM som_businesses b', 1, true) then return M.db.businessRows or {} end
     params = params or {}
     do local handled, value = insDb('query', query, params); if handled then return value end end
+    do local handled, value = newsDb('query', query, params); if handled then return value end end
     do local handled, value = loansDb('query', query, params); if handled then return value end end
     do local handled, value = leases('query', query, params); if handled then return value end end
     do local handled, value = armoury('query', query, params); if handled then return value end end
