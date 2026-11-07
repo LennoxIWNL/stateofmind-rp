@@ -87,7 +87,8 @@ local function claim(player)
 
     local paidOk, paid = pcall(core.addMoney, core, player.source, 'bank', Config.payment, 'welcome:settling-in', { counterparty = 'treasury', flow = 'transfer' })
     if not (paidOk and paid) then
-        pcall(core.treasuryTransact, core, Config.payment, 'welcome:settling-in:undo')
+        local undone, back = pcall(core.treasuryTransact, core, Config.payment, 'welcome:settling-in:undo')
+        if not (undone and back) then print(('[som-welcome] treasury refund of %d failed for %s'):format(Config.payment, player.citizenid)) end
         release()
         return done(false, 'the payment could not be made, try again')
     end
