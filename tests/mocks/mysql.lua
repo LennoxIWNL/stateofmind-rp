@@ -48,6 +48,7 @@ M.db = {
     chop = { log = {}, owned = {} },
     licences = { rows = {}, attempts = {} },
     taxi = { earned = {} },
+    welcome = { claims = {}, jobs = {}, homes = {} },
     carsales = { vehicles = {}, flagged = {}, stolen = {}, sales = {} },
     lab = {},
     plants = {},
@@ -1167,6 +1168,62 @@ local function carsales(kind, query, params)
     return false
 end
 
+local function welcome(kind, query, params)
+    local W = M.db.welcome
+    if kind == 'update' and query:find('INSERT INTO som_welcome_jobs', 1, true) then
+        local r = W.jobs[params[1]]
+        if not r then W.jobs[params[1]] = { job = params[2], minutes = 0 } else
+            if r.job ~= params[2] then r.minutes = 0 end
+            r.job = params[2]
+        end
+        return true, 1
+    elseif kind == 'update' and query:find('UPDATE som_welcome_jobs SET minutes = minutes + 1 WHERE citizenid IN (', 1, true) then
+        local n = 0
+        for _, cid in ipairs(params) do
+            if W.jobs[cid] then W.jobs[cid].minutes = W.jobs[cid].minutes + 1; n = n + 1 end
+        end
+        return true, n
+    elseif kind == 'scalar' and query:find('AND job = ? AND minutes >= ?', 1, true) then
+        local r = W.jobs[params[1]]
+        return true, (r and r.job == params[2] and r.minutes >= params[3]) and 1 or nil
+    elseif kind == 'scalar' and query:find("FROM som_property_owners WHERE citizenid = ? AND role IN ('owner', 'tenant')", 1, true) then
+        return true, W.homes[params[1]] and 1 or nil
+    elseif kind == 'scalar' and query:find("AND type = 'driver' AND revoked = 0", 1, true) then
+        local r = M.db.licences.rows[params[1] .. ':driver']
+        return true, (r and r.revoked == 0 and (r.suspendedUntil == nil or r.suspendedUntil <= now())) and 1 or nil
+    elseif kind == 'scalar' and query:find('SELECT 1 FROM som_welcome_claims WHERE citizenid = ? OR license = ?', 1, true) then
+        if W.hideClaimRead then return true, nil end
+        for cid, c in pairs(W.claims) do
+            if cid == params[1] or c.license == params[2] then return true, 1 end
+        end
+        return true, nil
+    elseif kind == 'update' and query:find('INSERT INTO som_welcome_claims', 1, true) then
+        if W.claims[params[1]] then error('Duplicate entry for key PRIMARY') end
+        for _, c in pairs(W.claims) do if c.license == params[2] then error('Duplicate entry for key uniq_license') end end
+        local month, day = 0, 0
+        for _, c in pairs(W.claims) do
+            if c.ts > now() - 30 * 86400 then month = month + c.amount end
+            if c.ts > now() - 86400 then day = day + c.amount end
+        end
+        if month + params[4] > params[5] or day + params[6] > params[7] then return true, 0 end
+        W.claims[params[1]] = { license = params[2], amount = params[3], ts = now() }
+        return true, 1
+    elseif kind == 'update' and query:find('DELETE FROM som_welcome_claims WHERE citizenid = ?', 1, true) then
+        local had = W.claims[params[1]] ~= nil
+        W.claims[params[1]] = nil
+        return true, had and 1 or 0
+    elseif kind == 'update' and query:find('UPDATE som_welcome_jobs SET centre_at = NOW()', 1, true) then
+        local r = W.jobs[params[1]]
+        if r and (r.centre_at == nil or r.centre_at < now() - params[2] * 60) then r.centre_at = now(); return true, 1 end
+        return true, 0
+    elseif kind == 'update' and query:find('UPDATE som_welcome_jobs SET centre_at = NULL', 1, true) then
+        local r = W.jobs[params[1]]
+        if r then r.centre_at = nil end
+        return true, r and 1 or 0
+    end
+    return false
+end
+
 local function taxi(kind, query, params)
     if kind == 'scalar' and query:find("reason = 'taxi:commission'", 1, true) then
         return true, M.db.taxi.earned[params[1]] or 0
@@ -1724,6 +1781,7 @@ function M.scalar(query, params)
     do local handled, value = chop('scalar', query, params); if handled then return value end end
     do local handled, value = licences('scalar', query, params); if handled then return value end end
     do local handled, value = taxi('scalar', query, params); if handled then return value end end
+    do local handled, value = welcome('scalar', query, params); if handled then return value end end
     do local handled, value = skills('scalar', query, params); if handled then return value end end
     do local handled, value = trade('scalar', query, params); if handled then return value end end
     do local handled, value = moneyRows('scalar', query, params); if handled then return value end end
@@ -1829,6 +1887,7 @@ function M.update(query, params)
     do local handled, value = leases('update', query, params); if handled then return value end end
     do local handled, value = shopsDb('update', query, params); if handled then return value end end
     do local handled, value = dmv('update', query, params); if handled then return value end end
+    do local handled, value = welcome('update', query, params); if handled then return value end end
     do local handled, value = carsales('update', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('update', query, params); if handled then return value end end
     do local handled, value = licences('update', query, params); if handled then return value end end

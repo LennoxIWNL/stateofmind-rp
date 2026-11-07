@@ -1980,4 +1980,31 @@ CREATE TABLE IF NOT EXISTS `som_insurance_claims` (
   PRIMARY KEY (`id`),
   KEY `idx_vehicle` (`vehicle_id`, `created_at`),
   KEY `idx_citizen` (`citizenid`, `created_at`)
+-- ===========================================================================
+--  7p. NEW PLAYER ONBOARDING (som-welcome)
+--
+--  The settling-in payment: one row per character AND per licence (the primary
+--  key and the unique licence key are the once only rule, so alts on one
+--  licence get nothing extra), and the rows from the last 30 days and 24 hours
+--  are the global caps. The jobs table remembers which job a character holds
+--  and how many minutes they have spent online holding it, and when they last
+--  used the job centre. No foreign keys: both are records.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_welcome_claims` (
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `license`    VARCHAR(64) NOT NULL,
+  `amount`     BIGINT NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`citizenid`),
+  UNIQUE KEY `uniq_license` (`license`),
+  KEY `idx_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_welcome_jobs` (
+  `citizenid` VARCHAR(16) NOT NULL,
+  `job`       VARCHAR(32) NOT NULL,
+  `minutes`   INT UNSIGNED NOT NULL DEFAULT 0,
+  `centre_at` TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (`citizenid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

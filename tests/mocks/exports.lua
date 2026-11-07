@@ -116,6 +116,12 @@ function core:removeMoney(source, account, amount, reason)
     Mocks.bank[source] = Mocks.bank[source] - amount
     return true
 end
+function core:setJob(source, job, grade)
+    local p = Mocks.players[source]
+    if not p or not (Mocks.jobs or {})[job] then return false, 'unknown job' end
+    p.job = { name = job, grade = grade, onduty = Mocks.jobs[job].defaultDuty ~= false }
+    return true
+end
 function core:setDuty(source, onduty)
     local p = Mocks.players[source]
     if not p or type(onduty) ~= 'boolean' then return false, 'duty must be a boolean' end
