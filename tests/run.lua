@@ -7146,5 +7146,233 @@ end
 
 
 
+-- som-outdoors: mining
+----------------------------------------------------------------------
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua', 'server/buyer.lua', 'server/mining.lua' })
+    local M = env.Config.mining
+    Mocks.players = { [1] = { citizenid = 'MI1' }, [2] = { citizenid = 'MI2' }, [3] = { citizenid = 'MI3' } }
+    Mocks.inv = { [1] = {}, [2] = {}, [3] = {} }
+    Mocks.invFull = {}
+    Mocks.clock = 1000000
+    FakePeds = { [1] = vec3(0, 0, 0), [2] = vec3(0, 0, 0), [3] = vec3(500, 0, 0) }
+    local cb = RegisteredCallbacks
+    local slot = 2000
+    local function give(src, name, n) slot = slot + 1; Mocks.inv[src][slot] = { name = name, count = n or 1, slot = slot } end
+    local function count(src, name) local n = 0; for _, it in pairs(Mocks.inv[src]) do if it.name == name then n = n + (it.count or 1) end end; return n end
+    local function begin(src, key) return cb['som-outdoors:server:mineBegin'](src, key) end
+    local function finish(src, wait)
+        Mocks.clock = Mocks.clock + (wait or 8000)
+        return cb['som-outdoors:server:mineFinish'](src)
+    end
+
+    check(#cb['som-outdoors:server:mineNodes'](1) == 0 and begin(1, 'copper_1:1').error == 'there is nothing to mine here', 'mining: a site with no placed nodes offers nothing')
+    local site = M.sites[1]
+    site.nodes, site.min, site.max = { vec3(0, 0, 0), vec3(50, 0, 0) }, 2, 2
+    check(#cb['som-outdoors:server:mineNodes'](1) == 2, 'mining: placed nodes are listed')
+
+    check(begin(1, 5).error == 'there is nothing to mine here' and begin(1, 'copper_1:9').error == 'there is nothing to mine here' and begin(1, 'nope:1').error == 'there is nothing to mine here', 'mining: a bad or unknown node key is refused')
+    check(begin(1, 'copper_1:1').error == 'you need a pickaxe', 'mining: a pickaxe is required')
+    give(1, 'pickaxe'); give(2, 'pickaxe'); give(3, 'pickaxe')
+    check(begin(3, 'copper_1:1').error == 'you are too far from the vein', 'mining: the distance is read from the server ped')
+    check(cb['som-outdoors:server:mineFinish'](1).error == 'you have not started', 'mining: finishing without starting yields nothing')
+
+    local b = begin(1, 'copper_1:1')
+    check(b.success and b.seconds == 8, 'mining: a swing starts next to a vein')
+    check(begin(2, 'copper_1:1').error == 'someone else is working that vein', 'mining: one vein, one striker at a time')
+    check(finish(1, 1000).error == 'you were too quick' and count(1, 'copperore') == 0, 'mining: an early finish yields nothing')
+    check(begin(2, 'copper_1:1').success == true, 'mining: a refused swing frees the vein')
+    cb['som-outdoors:server:mineFinish'](2)
+    begin(1, 'copper_1:1')
+    FakePeds[2] = vec3(0, 0, 0)
+    check(finish(1, 70000).error == 'you were too quick', 'mining: a stale finish yields nothing')
+
+    FakePeds[2] = vec3(500, 0, 0)
+    begin(1, 'copper_1:1')
+    FakePeds[1] = vec3(60, 0, 0)
+    check(finish(1).error == 'you are too far from the vein' and count(1, 'copperore') == 0, 'mining: walking away cancels the strike')
+    FakePeds[1] = vec3(0, 0, 0)
+
+    begin(1, 'copper_1:1')
+    local r = finish(1)
+    check(r.success and r.item == 'copperore' and r.count == 2 and count(1, 'copperore') == 2, 'mining: a full swing yields ore, rolled on the server')
+    check(begin(1, 'copper_1:1').error == 'this vein is spent for now', 'mining: a struck vein rests')
+    Mocks.clock = Mocks.clock + 601000
+    check(begin(1, 'copper_1:1').success == true, 'mining: the vein is ready again after its rest')
+    cb['som-outdoors:server:mineFinish'](1)
+
+    site.min, site.max = 1, 3
+    local seen = {}
+    for i = 1, 40 do
+        Mocks.clock = Mocks.clock + 700000
+        M.hourlyStrikes = 1000
+        FakePeds[1] = vec3(50, 0, 0)
+        begin(1, 'copper_1:2')
+        local got = finish(1)
+        FakePeds[1] = vec3(0, 0, 0)
+        if got.count then seen[got.count] = true end
+    end
+    check(seen[1] and seen[2] and seen[3] and not seen[0] and not seen[4], 'mining: the yield is rolled on the server within the range')
+end
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua', 'server/buyer.lua', 'server/mining.lua' })
+    local M = env.Config.mining
+    Mocks.players = { [1] = { citizenid = 'MA1' }, [2] = { citizenid = 'MA2' }, [3] = { citizenid = 'MA3' }, [4] = { citizenid = 'MA1' } }
+    Mocks.inv = { [1] = {}, [2] = {}, [3] = {}, [4] = {} }
+    Mocks.invFull = {}
+    Mocks.clock = 1000000
+    FakePeds = { [1] = vec3(0, 0, 0), [2] = vec3(2, 0, 0), [3] = vec3(4, 0, 0), [4] = vec3(1, 0, 0) }
+    local cb = RegisteredCallbacks
+    local slot = 2100
+    local function give(src, name, n) slot = slot + 1; Mocks.inv[src][slot] = { name = name, count = n or 1, slot = slot } end
+    local function count(src, name) local n = 0; for _, it in pairs(Mocks.inv[src]) do if it.name == name then n = n + (it.count or 1) end end; return n end
+    local function strike(src, key)
+        local b = cb['som-outdoors:server:mineBegin'](src, key)
+        Mocks.clock = Mocks.clock + 9000
+        return b, cb['som-outdoors:server:mineFinish'](src)
+    end
+    local site = M.sites[1]
+    site.nodes, site.min, site.max = { vec3(0, 0, 0), vec3(0, 0, 0), vec3(0, 0, 0), vec3(0, 0, 0), vec3(0, 0, 0) }, 2, 2
+    give(1, 'pickaxe')
+
+    local _, r = strike(1, 'copper_1:1')
+    check(r.count == 2, 'mining: nobody around, no bonus')
+    cb['som-outdoors:server:mineBegin'](1, 'copper_1:3')
+    cb['som-outdoors:server:mineBegin'](1, 'copper_1:4')
+    give(2, 'pickaxe')
+    check(cb['som-outdoors:server:mineBegin'](2, 'copper_1:3').success == true, 'mining: starting a second vein frees the first one')
+    cb['som-outdoors:server:mineFinish'](2)
+    Mocks.inv[2] = {}
+    give(2, 'pickaxe')
+    _, r = strike(1, 'copper_1:2')
+    check(r.count == 3, 'mining: a friend with a pickaxe close by adds one ore')
+    give(3, 'pickaxe')
+    _, r = strike(1, 'copper_1:3')
+    check(r.count == 4, 'mining: two friends add two ore')
+    FakePeds[3] = vec3(40, 0, 0)
+    _, r = strike(1, 'copper_1:4')
+    check(r.count == 3, 'mining: a friend too far away adds nothing (server position)')
+    Mocks.inv[2] = {}
+    FakePeds[3] = vec3(4, 0, 0)
+    _, r = strike(1, 'copper_1:5')
+    check(r.count == 3, 'mining: a friend without a pickaxe adds nothing')
+
+    M.hourlyStrikes = 3
+    Mocks.clock = Mocks.clock + 700000
+    local b = cb['som-outdoors:server:mineBegin'](1, 'copper_1:1')
+    check(b.error == 'you have mined enough for this hour', 'mining: the hourly strike cap holds (and a twin account of the same character is not a friend)')
+
+    M.hourlyStrikes = 40
+    Mocks.invFull[3] = true
+    FakePeds[3] = vec3(0, 0, 0)
+    give(3, 'pickaxe')
+    Mocks.invFull[3] = nil
+    Mocks.clock = Mocks.clock + 9000
+    cb['som-outdoors:server:mineBegin'](3, 'copper_1:2')
+    Mocks.invFull[3] = true
+    Mocks.clock = Mocks.clock + 9000
+    local full = cb['som-outdoors:server:mineFinish'](3)
+    Mocks.invFull[3] = nil
+    check(full.error == 'you cannot carry it' and cb['som-outdoors:server:mineBegin'](3, 'copper_1:2').success == true, 'mining: a bag too full gives the vein back')
+
+    _G.GetCurrentResourceName = function() return 'som-outdoors' end
+    Handlers['onResourceStop']('som-outdoors')
+    check(cb['som-outdoors:server:mineFinish'](3).error == 'you have not started', 'mining: stopping the resource clears the state')
+end
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua', 'server/buyer.lua', 'server/mining.lua' })
+    local S = env.Config.mining.smelter
+    Mocks.players = { [1] = { citizenid = 'SM1' } }
+    Mocks.inv = { [1] = {} }
+    Mocks.invFull = {}
+    Mocks.clock = 1000000
+    FakePeds = { [1] = vec3(0, 0, 0) }
+    local cb = RegisteredCallbacks
+    local slot = 2200
+    local function give(name, n) slot = slot + 1; Mocks.inv[1][slot] = { name = name, count = n or 1, slot = slot } end
+    local function count(name) local n = 0; for _, it in pairs(Mocks.inv[1]) do if it.name == name then n = n + (it.count or 1) end end; return n end
+    local function begin(id) return cb['som-outdoors:server:smeltBegin'](1, id) end
+    local function finish(wait)
+        Mocks.clock = Mocks.clock + (wait or 10000)
+        return cb['som-outdoors:server:smeltFinish'](1)
+    end
+
+    check(cb['som-outdoors:server:smelterInfo'](1) == nil and begin('copper').error == 'there is no smelter here', 'smelter: ships disabled')
+    S.enabled, S.coords = true, vec3(0, 0, 0)
+    check(#cb['som-outdoors:server:smelterInfo'](1).recipes == 4, 'smelter: the recipes are offered')
+    check(begin('lead').error == 'there is no smelter here' and begin(5).error == 'there is no smelter here', 'smelter: an unknown recipe is refused')
+    check(begin('copper').error == 'you do not have enough ore', 'smelter: the ore is required')
+    give('copperore', 3)
+    FakePeds[1] = vec3(90, 0, 0)
+    check(begin('copper').error == 'you are too far from the smelter', 'smelter: the distance is checked')
+    FakePeds[1] = vec3(0, 0, 0)
+    check(begin('copper').success == true and finish(1000).error == 'you were too quick' and count('copperore') == 3, 'smelter: an early finish takes nothing')
+    begin('copper')
+    check(finish().success == true and count('copperore') == 0 and count('copper') == 2, 'smelter: three copper ore become two copper')
+
+    give('goldore', 4)
+    begin('gold')
+    check(finish().success == true and count('goldore') == 0 and count('goldingot') == 1, 'smelter: four gold ore become one gold ingot')
+
+    give('silverore', 4)
+    begin('silver')
+    local realAdd = exports.ox_inventory.AddItem
+    function exports.ox_inventory:AddItem(inv, name, n, meta)
+        if name == 'silveringot' then return false end
+        return realAdd(self, inv, name, n, meta)
+    end
+    local blocked = finish()
+    exports.ox_inventory.AddItem = realAdd
+    check(blocked.error == 'you cannot carry it' and count('silverore') == 4 and count('silveringot') == 0, 'smelter: when the metal cannot be added the ore comes back')
+
+    begin('silver')
+    Mocks.inv[1] = {}
+    check(finish().error == 'you do not have enough ore', 'smelter: ore spent between start and finish makes it fail with nothing created')
+    check(count('silveringot') == 0 and cb['som-outdoors:server:smeltFinish'](1).error == 'you have not started', 'smelter: a run finishes once')
+end
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua', 'server/buyer.lua', 'server/mining.lua' })
+    local B = env.Config.buyers.quarry
+    Mocks.players = { [1] = { citizenid = 'QB1' } }
+    Mocks.inv = { [1] = {} }
+    Mocks.invFull = {}
+    Mocks.clock = 1000000
+    mysql.fakeNow = 5000000
+    FakePeds = { [1] = vec3(0, 0, 0) }
+    local cb = RegisteredCallbacks
+    local slot = 3000
+    local function give(name, n) slot = slot + 1; Mocks.inv[1][slot] = { name = name, count = n, slot = slot } end
+    local function count(name) local n = 0; for _, it in pairs(Mocks.inv[1]) do if it.name == name then n = n + (it.count or 1) end end; return n end
+
+    check(B.enabled == false and B.coords == nil and cb['som-outdoors:server:sell'](1, 'quarry').error == 'nobody is buying', 'quarry: the buyer ships disabled')
+
+    local P = loader.loadResource(REPO .. 'som-core', { 'server/placements.lua' }).SomPlacements
+    local fresh = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua' }).Config
+    check(P.ApplyOne(fresh, 'mining.sites.copper_1.nodes+', vec3(1, 2, 3)) and #fresh.mining.sites[1].nodes == 1, 'place: a mining node is placed on a named site')
+    check(P.ApplyOne(fresh, 'mining.smelter.coords', vec3(4, 5, 6)) and fresh.mining.smelter.enabled == true, 'place: the smelter is placed')
+    check(P.ApplyOne(fresh, 'buyers.quarry.coords', vec3(7, 8, 9)) and fresh.buyers.quarry.enabled == true, 'place: the quarry buyer is placed')
+    B.enabled, B.coords = true, vec3(0, 0, 0)
+    Mocks.treasury = 100000
+    give('copperore', 5); give('goldore', 2)
+    check(cb['som-outdoors:server:sell'](1, 'quarry').error == 'you have nothing they want', 'quarry: raw ore is not bought, only refined metal')
+    give('copper', 4); give('goldingot', 1)
+    local paid0 = Mocks.paid or 0
+    local s = cb['som-outdoors:server:sell'](1, 'quarry')
+    check(s.success and s.paid == 4 * 30 + 120 and (Mocks.paid or 0) == paid0 + 240 and Mocks.treasury == 100000 - 240, 'quarry: metal is paid from the treasury under the shared path')
+    check(count('copperore') == 5 and count('copper') == 0, 'quarry: only the bought metal leaves the bag')
+    give('copper', 400)
+    mysql.db.buyer = {}
+    B.hourlyCap = 100
+    local c = cb['som-outdoors:server:sell'](1, 'quarry')
+    check(c.success and c.paid <= 100, 'quarry: the hourly cap applies')
+end
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)

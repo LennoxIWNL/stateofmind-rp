@@ -44,6 +44,38 @@ local function chop(drop)
     end
 end
 
+local function mine(key)
+    local begun = lib.callback.await('som-outdoors:server:mineBegin', false, key)
+    if not begun or not begun.success then return say(begun) end
+
+    local ok = lib.progressBar({
+        duration = begun.seconds * 1000, label = 'Mining', canCancel = true,
+        disable = { move = true, combat = true },
+        anim = { dict = 'melee@large_wpn@streamed_core', clip = 'ground_attack_on_spot' },
+    })
+    -- A cancelled swing still calls finish: the server refuses it as too quick and frees the vein.
+    local result = lib.callback.await('som-outdoors:server:mineFinish', false)
+    if not ok then return end
+    if result and result.success then
+        TriggerEvent('som:client:notify', 'You broke off some ore', 'success')
+    else
+        say(result)
+    end
+end
+
+local function smelt(id)
+    local begun = lib.callback.await('som-outdoors:server:smeltBegin', false, id)
+    if not begun or not begun.success then return say(begun) end
+
+    if not lib.progressBar({ duration = begun.seconds * 1000, label = 'Smelting', canCancel = true, disable = { move = true, combat = true } }) then return end
+    local result = lib.callback.await('som-outdoors:server:smeltFinish', false)
+    if result and result.success then
+        TriggerEvent('som:client:notify', 'The metal is ready', 'success')
+    else
+        say(result)
+    end
+end
+
 local function clear()
     for _, id in ipairs(zones) do exports['som-interact']:removeZone(id) end
     zones = {}
@@ -65,6 +97,27 @@ local function build()
             coords = vec3(d.coords.x, d.coords.y, d.coords.z),
             radius = d.distance,
             options = { { name = 'som_chop_start', label = 'Chop the vehicle', icon = 'fa-solid fa-car-burst', distance = d.distance, onSelect = function() chop(d) end } },
+        })
+    end
+    for _, n in ipairs(lib.callback.await('som-outdoors:server:mineNodes', false) or {}) do
+        zones[#zones + 1] = exports['som-interact']:addSphereZone({
+            name = 'som_mine_' .. n.key,
+            coords = vec3(n.coords.x, n.coords.y, n.coords.z),
+            radius = 1.5,
+            options = { { name = 'som_mine_strike', label = 'Mine: ' .. n.label, icon = 'fa-solid fa-hammer', distance = 2.0, onSelect = function() mine(n.key) end } },
+        })
+    end
+    local smelter = lib.callback.await('som-outdoors:server:smelterInfo', false)
+    if smelter then
+        local options = {}
+        for _, r in ipairs(smelter.recipes) do
+            options[#options + 1] = { name = 'som_smelt_' .. r.id, label = r.label, icon = 'fa-solid fa-fire-flame-simple', distance = smelter.distance, onSelect = function() smelt(r.id) end }
+        end
+        zones[#zones + 1] = exports['som-interact']:addSphereZone({
+            name = 'som_smelter',
+            coords = vec3(smelter.coords.x, smelter.coords.y, smelter.coords.z),
+            radius = smelter.distance,
+            options = options,
         })
     end
     for _, b in ipairs(lib.callback.await('som-outdoors:server:buyers', false) or {}) do
