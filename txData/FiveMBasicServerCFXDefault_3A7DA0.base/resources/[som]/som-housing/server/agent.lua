@@ -190,10 +190,12 @@ lib.callback.register('som-housing:server:agentSellAnswer', function(source, acc
 
     -- Paid out of the agency's account, and only if that debit worked.
     local commission = math.floor(price * Config.Agent.commission)
-    if commission > 0 then
+    -- The server id may have been recycled during the yields above, so pay the character, not the id.
+    local payee = core:getPlayerByCitizenId(offer.agent)
+    if commission > 0 and payee then
         if core:businessTransact(Config.Finance.business, -commission, ('commission:%s'):format(agent.citizenid)) then
-            core:addMoney(offer.agentSource, 'bank', commission, ('property-commission:%s'):format(property.slug))
-            TriggerClientEvent('som:client:notify', offer.agentSource, ('%s sold. Your commission is $%d.'):format(property.label, commission), 'success')
+            core:addMoney(payee.source, 'bank', commission, ('property-commission:%s'):format(property.slug))
+            TriggerClientEvent('som:client:notify', payee.source, ('%s sold. Your commission is $%d.'):format(property.label, commission), 'success')
         else
             commission = 0
         end

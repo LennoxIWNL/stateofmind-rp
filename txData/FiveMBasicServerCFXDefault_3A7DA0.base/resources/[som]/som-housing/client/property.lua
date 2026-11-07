@@ -195,7 +195,7 @@ end
 --- job, duty, grade, that both people are at the door and that the buyer accepted the viewing first.
 ---@param slug string
 ---@param step string 'agentShow' or 'agentSell'
-local function agentStep(slug, step)
+local function agentStep(slug, callback)
     local nearby = lib.callback.await('som-housing:server:nearbyBuyers', false)
 
     if not nearby or not nearby.success or #nearby.players == 0 then
@@ -207,12 +207,12 @@ local function agentStep(slug, step)
         people[i] = { value = person.source, label = person.name }
     end
 
-    local answer = lib.inputDialog(step == 'agentShow' and 'Show this property' or 'Sell outright', {
+    local answer = lib.inputDialog(callback == 'som-housing:server:agentShow' and 'Show this property' or 'Sell outright', {
         { type = 'select', label = 'Buyer', options = people, required = true },
     })
     if not answer or not answer[1] then return end
 
-    local res = lib.callback.await('som-housing:server:' .. step, false, { slug = slug, buyer = answer[1] })
+    local res = lib.callback.await(callback, false, { slug = slug, buyer = answer[1] })
     TriggerEvent('som:client:notify', res and res.success and 'Offer sent' or (res and res.error or 'Could not do that'), res and res.success and 'success' or 'error')
 end
 
@@ -345,7 +345,7 @@ CreateThread(function()
                     canInteract = function()
                         return core:hasJob(Config.Finance.job, nil, true)
                     end,
-                    onSelect = function() agentStep(property.slug, 'agentShow') end,
+                    onSelect = function() agentStep(property.slug, 'som-housing:server:agentShow') end,
                 },
                 {
                     name = ('property:%s:sell'):format(property.slug),
@@ -355,7 +355,7 @@ CreateThread(function()
                     canInteract = function()
                         return core:hasJob(Config.Finance.job, nil, true)
                     end,
-                    onSelect = function() agentStep(property.slug, 'agentSell') end,
+                    onSelect = function() agentStep(property.slug, 'som-housing:server:agentSell') end,
                 },
                 {
                     name = ('property:%s:lease'):format(property.slug),
