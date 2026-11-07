@@ -6175,6 +6175,40 @@ do
 
     do
         local env, _, restore = boostScene()
+        local unlock, deliver = RegisteredCallbacks['som-boosting:server:unlock'], RegisteredCallbacks['som-boosting:server:deliver']
+        local pay, said = Mocks.commands.boostpay, nil
+        local realT = _G.TriggerClientEvent
+        _G.TriggerClientEvent = function(name, target, text) if name == 'som:client:notify' then said = text end end
+        begin('C')
+        local row, car = mysql.db.boost.runs[1], Spawned[#Spawned]
+        FakePeds[car] = vec3(10, 0, 0); Vehicles[car].model = row.model
+        openCar(unlock)
+        row.status, row.paid = 'done', 0   -- the server went down after the claim, before the mint
+        Mocks.minted = {}
+        pay(2, { run = 1, target = 1 })
+        check(said == 'You do not have permission to do that' and #Mocks.minted == 0, 'boost: only an admin can pay a stuck run')
+        Mocks.admins[2] = true
+        pay(2, { run = 1, target = 1 })
+        check(said == 'That run is not stuck' and #Mocks.minted == 0, 'boost: a run unlocked a moment ago is not stuck yet')
+        mysql.fakeNow = mysql.fakeNow + 301
+        pay(2, { run = 99, target = 1 })
+        check(said:find('No such run') and #Mocks.minted == 0, 'boost: an unknown run is refused')
+        Mocks.mintFails = true
+        pay(2, { run = 1, target = 1 })
+        check(row.paid == 0 and row.status == 'unpaid' and #Mocks.minted == 0, 'boost: a failed mint leaves the run unpaid and ready to retry')
+        Mocks.mintFails = false
+        pay(2, { run = 1, target = 1 })
+        check(row.paid == row.face and row.status == 'done' and #Mocks.minted == 1 and #Mocks.minted[1].worths == 4 and Mocks.minted[1].src == 1, 'boost: an admin pays the stuck run to the chosen player')
+        pay(2, { run = 1, target = 1 })
+        check(said == 'That run is not stuck' and #Mocks.minted == 1, 'boost: a run is never paid twice')
+        Mocks.admins[2] = nil
+        _G.TriggerClientEvent = realT
+        FakePeds[car] = nil
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
         setmetatable(mysql.db.boost.ownedPlates, { __index = function() return true end })
         check(begin('C').success == false and mysql.db.boost.runs[1] == nil, 'boost: a plate that a player vehicle holds is never used')
         restore()

@@ -319,6 +319,41 @@ lib.callback.register('som-boosting:server:deliver', function(source, netId)
     return done(true)
 end)
 
+lib.addCommand('boostpay', {
+    help = 'Pay a boosting run that crashed before its bills were minted, once, to one player',
+    params = { { name = 'run', type = 'number' }, { name = 'target', type = 'playerId' } },
+}, function(source, args)
+    local function say(text)
+        if source ~= 0 then TriggerClientEvent('som:client:notify', source, text, 'inform') else print('[som-boosting] ' .. text) end
+    end
+    if source ~= 0 and not core:hasPermission(source, 'som.admin') then return say('You do not have permission to do that') end
+
+    local id = math.floor(args.run)
+    local row = MySQL.single.await('SELECT class, face FROM som_boost_runs WHERE id = ?', { id })
+    local cfg = row and Config.classes[row.class]
+    if not cfg or cfg.bills.count * cfg.bills.worth ~= tonumber(row.face) then return say('No such run, or its class pay has changed') end
+    if not core:getPlayer(args.target) then return say('That player is not loaded') end
+
+    -- paid goes from 0 to face in one statement, so two staff cannot both pay it. The wait
+    -- after the unlock keeps this off a delivery that is still being paid.
+    local claimed = MySQL.update.await([[
+        UPDATE som_boost_runs SET paid = face, status = 'done'
+        WHERE id = ? AND paid = 0 AND status IN ('done', 'unpaid') AND unlocked_at <= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+    ]], { id })
+    if claimed ~= 1 then return say('That run is not stuck') end
+
+    local worths = {}
+    for i = 1, cfg.bills.count do worths[i] = cfg.bills.worth end
+    local ok, uids = pcall(function() return exports['som-launder']:mintBills(args.target, worths, ('boost:%s'):format(row.class)) end)
+    if not (ok and uids) then
+        MySQL.update.await("UPDATE som_boost_runs SET paid = 0, status = 'unpaid' WHERE id = ? AND paid = face", { id })
+        return say('Could not mint the bills, nothing was paid')
+    end
+
+    log(('boost run %d paid by hand to %s'):format(id, tostring(args.target)))
+    say(('Paid run %d'):format(id))
+end)
+
 -- ---------------------------------------------------------------------------
 -- Upkeep
 -- ---------------------------------------------------------------------------

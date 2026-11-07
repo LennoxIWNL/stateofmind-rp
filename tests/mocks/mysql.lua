@@ -378,6 +378,8 @@ local function boost(kind, query, params)
             D.runs[id] = { id = id, class = class, pickup = pickup, group = group, plate = plate, model = model, face = face, paid = 0, status = 'active', ts = now() }
             return true, id
         end
+    elseif kind == 'single' then
+        if has('SELECT class, face FROM som_boost_runs WHERE id = ?') then return true, D.runs[params[1]] end
     elseif kind == 'scalar' then
         if has('SELECT 1 FROM som_vehicles WHERE plate = ? LIMIT 1') then return true, D.ownedPlates[params[1]] and 1 or nil end
     elseif kind == 'update' then
@@ -390,6 +392,16 @@ local function boost(kind, query, params)
         if has("UPDATE som_boost_runs SET status = 'done'") then
             r = D.runs[params[1]]
             if r and r.status == 'active' and r.unlocked and r.unlocked <= now() - params[2] then r.status = 'done'; return true, 1 end
+            return true, 0
+        end
+        if has("UPDATE som_boost_runs SET paid = face, status = 'done'") then
+            r = D.runs[params[1]]
+            if r and r.paid == 0 and (r.status == 'done' or r.status == 'unpaid') and r.unlocked and r.unlocked <= now() - 300 then r.paid, r.status = r.face, 'done'; return true, 1 end
+            return true, 0
+        end
+        if has("UPDATE som_boost_runs SET paid = 0, status = 'unpaid' WHERE id = ? AND paid = face") then
+            r = D.runs[params[1]]
+            if r and r.paid == r.face then r.paid, r.status = 0, 'unpaid'; return true, 1 end
             return true, 0
         end
         if has('UPDATE som_boost_runs SET paid = ?, status = ? WHERE id = ?') then
@@ -1565,6 +1577,7 @@ function M.single(query, params)
     do local handled, value = sharedAccounts('single', query, params); if handled then return value end end
     do local handled, value = social('single', query, params); if handled then return value end end
     do local handled, value = city('single', query, params); if handled then return value end end
+    do local handled, value = boost('single', query, params); if handled then return value end end
     do local handled, value = heist('single', query, params); if handled then return value end end
     do local handled, value = turf('single', query, params); if handled then return value end end
     do local handled, value = trade('single', query, params); if handled then return value end end
