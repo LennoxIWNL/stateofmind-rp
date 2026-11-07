@@ -13,4 +13,12 @@ Config = {
     -- Resources whose content can be placed in game (see som-core/server/placements.lua).
     placeable = { ['som-turf'] = true, ['som-outdoors'] = true, ['som-heists'] = true, ['som-mechanic'] = true, ['som-launder'] = true, ['som-shops'] = true, ['som-fuel'] = true, ['som-ems'] = true, ['som-dmv'] = true },
     placeableList = { 'som-turf', 'som-outdoors', 'som-heists', 'som-mechanic', 'som-launder', 'som-shops', 'som-fuel', 'som-ems', 'som-dmv' },
+
+    -- A disconnect during a scene is logged for staff to judge; nothing is punished.
+    combatLog = {
+        callRadius = 150.0, callWindow = 180, policeRadius = 40.0,
+        cooldown = 300,     -- one row per character per this many seconds
+        repeatCount = 3,    -- rows in 24 hours that mark a repeat
+        listMax = 10,
+    },
 }

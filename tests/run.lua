@@ -7276,5 +7276,155 @@ end
 
 
 
+-- som-staff: combat log watch
+----------------------------------------------------------------------
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-staff', { 'shared/config.lua', 'server/combatlog.lua' })
+    local C = env.Config.combatLog
+    local threads, posted, said = {}, {}, {}
+    local realThread, realHttp, realT = _G.CreateThread, _G.PerformHttpRequest, _G.TriggerClientEvent
+    _G.CreateThread = function(fn) threads[#threads + 1] = fn end
+    _G.PerformHttpRequest = function(url, _, _, body) posted[#posted + 1] = { url = url, body = body } end
+    _G.TriggerClientEvent = function(name, target, text) if name == 'som:client:notify' then said[target] = text end end
+    local calls = {}
+    local gen = 0
+    local function scene(overrides)
+        gen = gen + 1
+        threads, posted = {}, {}
+        Mocks.players = {
+            [1] = { citizenid = 'CL' .. gen, job = { name = 'unemployed' }, position = { x = 100.0, y = 100.0, z = 30.0 } },
+            [2] = { citizenid = 'COP' .. gen, job = { name = 'police', onduty = true } },
+        }
+        Mocks.downed, Mocks.admins, Mocks.convars = {}, { [3] = true }, { som_combatlog_webhook = '' }
+        Mocks.exported = { getCalls = function() return calls end }
+        FakePeds = { [1] = vec3(100, 100, 30), [2] = vec3(500, 500, 30) }
+        calls = {}
+        for k, v in pairs(overrides or {}) do Mocks[k] = v end
+        return 'CL' .. gen
+    end
+    local function drop(cid, reason)
+        _G.source = 1
+        Handlers['playerDropped'](reason)
+        Handlers['som:server:playerUnloaded'](1, cid)
+        -- Newest first: the reason cleanup thread sleeps a second in the real server.
+        for i = #threads, 1, -1 do threads[i]() end
+        threads = {}
+    end
+    local function rows() local out = {}; for _, r in ipairs(mysql.db.staff.audit) do if r.action == 'combatlog' then out[#out + 1] = r end end; return out end
+    local function crime(kind, age, x, status) return { alertType = kind, status = status or 'open', createdAt = os.time() - (age or 10), coords = { x = x or 120.0, y = 100.0, z = 30.0 } } end
+    mysql.db.staff.audit = {}
+
+    local cid = scene()
+    drop(cid, 'Exiting')
+    check(#rows() == 0, 'combat log: a clean disconnect logs nothing')
+
+    cid = scene()
+    Mocks.downed[cid] = true
+    drop(cid, 'Exiting')
+    local r = rows()[1]
+    check(r and r.staff == 'system' and r.target == cid and r.detail:find('^downed | ') and r.detail:find('Exiting', 1, true), 'combat log: leaving while down logs the signal and the reason')
+
+    cid = scene()
+    Mocks.players[1].metadata = { cuffed = true }
+    local before = #rows()
+    drop(cid, 'x')
+    check(#rows() == before + 1 and rows()[#rows()].detail:find('^cuffed'), 'combat log: leaving while cuffed logs')
+
+    cid = scene()
+    calls = { crime('shotsFired') }
+    drop(cid, 'x')
+    check(#rows() == before + 1, 'combat log: a crime call alone logs nothing')
+
+    cid = scene()
+    FakePeds[2] = vec3(110, 100, 30)
+    drop(cid, 'x')
+    check(#rows() == before + 1, 'combat log: a police officer alone logs nothing')
+
+    cid = scene()
+    FakePeds[2] = vec3(110, 100, 30)
+    calls = { crime('shotsFired') }
+    drop(cid, 'x')
+    check(#rows() == before + 2 and rows()[#rows()].detail:find('crime-call,police-near', 1, true), 'combat log: a crime call and police together log')
+
+    for _, case in ipairs({
+        { 'an old call', crime('shotsFired', 600) },
+        { 'a closed call', crime('shotsFired', 10, 120.0, 'closed') },
+        { 'a far call', crime('shotsFired', 10, 900.0) },
+        { 'a call that is not a crime', crime('personDown') },
+    }) do
+        cid = scene()
+        FakePeds[2] = vec3(110, 100, 30)
+        calls = { case[2] }
+        drop(cid, 'x')
+        check(#rows() == before + 2, 'combat log: ' .. case[1] .. ' does not count')
+    end
+    cid = scene()
+    FakePeds[1] = nil
+    FakePeds[2] = vec3(110, 100, 30)
+    calls = { crime('shotsFired') }
+    drop(cid, 'x')
+    check(#rows() == before + 2, 'combat log: the soft signals are not used when the saved position may be stale')
+    cid = scene()
+    FakePeds[1] = nil
+    Mocks.downed[cid] = true
+    drop(cid, 'x')
+    check(#rows() == before + 3 and rows()[#rows()].detail:find('saved', 1, true), 'combat log: a hard signal still logs and the row says the position is saved')
+    before = before + 1
+
+    cid = scene()
+    FakePeds[2] = vec3(300, 100, 30)
+    calls = { crime('shotsFired') }
+    drop(cid, 'x')
+    check(#rows() == before + 2, 'combat log: police out of range does not count')
+
+    cid = scene()
+    Mocks.downed[cid] = true
+    local n = #rows()
+    drop(cid, 'a')
+    Mocks.players[1] = { citizenid = cid, job = { name = 'unemployed' }, position = { x = 1.0, y = 1.0, z = 1.0 } }
+    drop(cid, 'b')
+    check(#rows() == n + 1, 'combat log: one row per character inside the cooldown')
+
+    cid = scene()
+    Mocks.downed[cid] = true
+    drop(cid, 'ok\1\2' .. string.rep('x', 300))
+    local d = rows()[#rows()].detail
+    check(#d <= 200 and not d:find('[%c]'), 'combat log: reason text is cleaned and cut')
+
+    cid = scene()
+    Mocks.downed[cid] = true
+    drop(cid, 'Exiting')
+    check(#posted == 0, 'combat log: no webhook is posted when the convar is blank')
+    cid = scene()
+    Mocks.convars.som_combatlog_webhook = 'https://example.invalid/hook'
+    Mocks.downed[cid] = true
+    drop(cid, 'secret reason')
+    local body = posted[1] and posted[1].body or ''
+    check(#posted == 1 and body:find(cid, 1, true) and body:find('downed', 1, true) and body:find('100,100,30', 1, true) and not body:find('secret reason', 1, true), 'combat log: the webhook carries only the citizenid, the signals and the position')
+
+    cid = scene()
+    Mocks.convars.som_combatlog_webhook = 'https://example.invalid/hook'
+    Mocks.downed[cid] = true
+    for i = 1, 2 do mysql.db.staff.audit[#mysql.db.staff.audit + 1] = { staff = 'system', action = 'combatlog', target = cid } end
+    drop(cid, 'x')
+    check(posted[1] and posted[1].body:find('repeat x3', 1, true), 'combat log: a third row in a day is marked repeat')
+
+    cid = scene()
+    said = {}
+    local out = {}
+    local realPrint = print
+    _G.print = function(...) out[#out + 1] = table.concat({ ... }, ' ') end
+    Mocks.commands.combatlogs(1, {})
+    check(#out == 0 and said[1] == nil, 'combat log: a player cannot list the logs')
+    Mocks.commands.combatlogs(3, { hours = 9999 })
+    _G.print = realPrint
+    check(#out >= 1 and said[3] and said[3]:find('168 hours', 1, true), 'combat log: staff list the logs, hours are capped')
+
+    _G.CreateThread, _G.PerformHttpRequest, _G.TriggerClientEvent = realThread, realHttp, realT
+    _G.source = nil
+    Mocks.convars = {}
+end
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)

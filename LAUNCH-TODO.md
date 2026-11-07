@@ -441,3 +441,10 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] The treasury floor is checked under the loan lock, but other treasury spending (department budgets, heist and buyer payouts) can still lower it at the same moment; the floor is a guard, not a reservation.
 - [ ] Not verified in a live server: the Bank loans phone app, a real week passing, collection from a defaulted borrower in game.
 - [ ] Left out on purpose: business loans and loans to shops, interest that changes over time, credit scores, co-signers, seizing property on default, an early payoff rebate, a bank branch.
+
+## Combat log watch (som-staff)
+
+- [ ] A character leaving while downed, cuffed, or near both an open crime call and an on-duty officer is written to `som_staff_audit` (action `combatlog`, signals, position, reason text). Staff list them with `/combatlogs [hours]` (needs `som.mod`; the rows print to the server console). Nothing punishes anyone; staff judge each one, a crash looks the same as a quit.
+- [ ] Optional: create a Discord channel and set `som_combatlog_webhook` in `server.cfg`. The post carries only the citizenid, the signals and the position. No setup.sql change.
+- [ ] Not verified live: that the player's ped still exists at the drop (the row says `live` or `saved`; `saved` means the position is from the last save and soft signals may be wrong), that the disconnect reason arrives, and the radii and windows against real play.
+- [ ] Left out on purpose: automatic punishment, kicking on reconnect, crash detection, voice or chat analysis.

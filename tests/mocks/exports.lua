@@ -220,6 +220,10 @@ function dispatch:alert(source, alertType, extra)
     return 1
 end
 
+function dispatch:getCalls()
+    return Mocks.exported.getCalls and Mocks.exported.getCalls() or {}
+end
+
 local medical = {}
 function medical:isDowned(ref) return Mocks.downed[ref] == true end
 function medical:getDownInfo(ref)
