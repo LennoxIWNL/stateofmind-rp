@@ -1,6 +1,6 @@
 Config = {
     job = 'firefighter',
-    business = 'ems',               -- the firefighters are paid from the medical services account
+    business = 'fire',              -- its own account, funded from the treasury for payouts
     tool = 'WEAPON_FIREEXTINGUISHER',
     trucks = { 'firetruk' },        -- spraying from the seat of one of these also counts
 

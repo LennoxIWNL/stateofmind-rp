@@ -7276,6 +7276,29 @@ end
 
 
 
+-- som-fire: job, business and dispatch response
+----------------------------------------------------------------------
+do
+    local coreEnv = loader.loadResource(REPO .. 'som-core', { 'shared/config.lua', 'shared/tiers.lua', 'shared/jobs.lua', 'shared/gangs.lua' })
+    local J = coreEnv.Jobs.firefighter
+    check(J and J.business == 'fire' and J.business ~= coreEnv.Jobs.ambulance.business, 'fire: the firefighters have their own business, not the ambulance one')
+    local boss = false
+    for _, g in pairs(J.grades) do if g.isboss then boss = true end end
+    check(not boss, 'fire: no grade can void fines as a boss')
+
+    local env = dispScene()
+    Mocks.players[36] = person('FF1', 'firefighter', true, 1)
+    Mocks.players[37] = person('FF2', 'firefighter', false, 1)
+    local id = Mocks.exported.alert(nil, 'structureFire', { coords = vec3(5, 5, 30), message = 'Fire reported' })
+    local call = allCalls()[id]
+    local attach = RegisteredCallbacks['som-dispatch:server:attach']
+    local close = RegisteredCallbacks['som-dispatch:server:close']
+    check(call and call.services.firefighter and call.services.ambulance and call.services.police, 'fire: the call goes to firefighters, ambulance and police')
+    check(attach(37, id).success == false, 'fire: an off duty firefighter cannot attach')
+    check(attach(36, id).success == true and #call.units == 1, 'fire: a firefighter on duty can attach to a fire call')
+    check(close(36, id).success == true and call.services.firefighter.status == 'closed' and call.status ~= 'closed', 'fire: a firefighter closes their own service and leaves the others open')
+end
+
 -- som-fire
 ----------------------------------------------------------------------
 do
@@ -7299,7 +7322,7 @@ do
         }
         Mocks.inv = { [1] = { [1] = { name = 'WEAPON_FIREEXTINGUISHER', count = 1, slot = 1 } }, [2] = { [1] = { name = 'WEAPON_FIREEXTINGUISHER', count = 1, slot = 1 } }, [3] = { [1] = { name = 'WEAPON_FIREEXTINGUISHER', count = 1, slot = 1 } } }
         Mocks.downed, Mocks.credits, Mocks.paid = {}, {}, 0
-        Mocks.bizBalance, Mocks.business, Mocks.treasury = { ems = 0 }, {}, 100000
+        Mocks.bizBalance, Mocks.business, Mocks.treasury = { fire = 0 }, {}, 100000
         Mocks.fundFails, Mocks.addMoneyFails, Mocks.businessTransactFails = false, false, false
         Mocks.clock = Mocks.clock + 1000000
         FakePeds = { [1] = vec3(0, 0, 0), [2] = vec3(1, 0, 0), [3] = vec3(2, 0, 0) }
@@ -7373,10 +7396,10 @@ do
     reset()
     id = Fire.Start(vec3(1, 0, 0))
     pid = points(id)[1].id
-    Mocks.bizBalance.ems = 0
+    Mocks.bizBalance.fire = 0
     r = puttOut(1, id, pid)
     check(r.out == true and #points(id) == 0 and Mocks.paid == C.pay.perPoint, 'fire: ten ticks put a flame out and an on duty firefighter is paid')
-    check(Mocks.treasury == 100000 - C.pay.perPoint and Mocks.bizBalance.ems == 0, 'fire: the pay came from the treasury through the account')
+    check(Mocks.treasury == 100000 - C.pay.perPoint and Mocks.bizBalance.fire == 0, 'fire: the pay came from the treasury through the account')
 
     reset()
     id = Fire.Start(vec3(1, 0, 0))
@@ -7391,6 +7414,20 @@ do
     Mocks.addMoneyFails = true
     puttOut(1, id, pid)
     check(Mocks.paid == 0 and Mocks.lastTransact and Mocks.lastTransact.amount == C.pay.perPoint, 'fire: a failed credit puts the money back in the account')
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    pid = points(id)[1].id
+    Mocks.addMoneyFails = true
+    Mocks.businessThrowAt = Mocks.calls.businessTransact + 2
+    local lines, realPrint = {}, print
+    _G.print = function(...) lines[#lines + 1] = table.concat({ ... }, ' ') end
+    puttOut(1, id, pid)
+    _G.print = realPrint
+    Mocks.businessThrowAt = nil
+    local loud = false
+    for _, l in ipairs(lines) do if l:find('MONEY LOST', 1, true) then loud = true end end
+    check(Mocks.paid == 0 and loud, 'fire: a debit that cannot be given back is logged loudly')
 
     reset()
     id = Fire.Start(vec3(1, 0, 0))

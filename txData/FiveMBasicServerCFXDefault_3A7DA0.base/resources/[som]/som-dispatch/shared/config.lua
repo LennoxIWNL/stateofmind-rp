@@ -277,4 +277,5 @@ Config.AutomaticWeapons = {
 Config.RespondingJobs = {
     police = true,
     ambulance = true,
+    firefighter = true,
 }

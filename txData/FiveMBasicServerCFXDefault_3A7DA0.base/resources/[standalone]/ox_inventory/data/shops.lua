@@ -11,7 +11,6 @@ return {
 			{ name = 'fishbait', price = 15 },
 			{ name = 'fishingrod', price = 120 },
 			{ name = 'empty_weed_bag', price = 5 },
-			{ name = 'WEAPON_FIREEXTINGUISHER', price = 200 },
 		}, locations = {
 			vec3(25.7, -1347.3, 29.49),
 			vec3(-3038.71, 585.9, 7.9),

@@ -89,7 +89,7 @@ Jobs = {
     firefighter = {
         label = 'San Andreas Fire Department',
         type = 'ems',
-        business = 'ems',
+        business = 'fire',
         whitelisted = true,
         defaultDuty = false,
         offDutyPay = false,
@@ -99,7 +99,7 @@ Jobs = {
             [1] = { name = 'Firefighter', payment = 1700 },
             [2] = { name = 'Engineer', payment = 2200 },
             [3] = { name = 'Captain', payment = 2900 },
-            [4] = { name = 'Fire Chief', payment = 3800, isboss = true },
+            [4] = { name = 'Fire Chief', payment = 3800 },
         },
     },
 

@@ -138,7 +138,10 @@ local function pay(source, citizenid, amount)
         paidLog[citizenid][#paidLog[citizenid] + 1] = { t = os.time(), amount = amount }
         return amount
     end
-    pcall(function() return core:businessTransact(C.business, amount, 'fire-pay:undo') end)
+    local undone, restored = pcall(function() return core:businessTransact(C.business, amount, 'fire-pay:undo') end)
+    if not (undone and restored) then
+        print(('[som-fire] MONEY LOST: %d was taken from the %s account for %s and could not be given back'):format(amount, C.business, citizenid))
+    end
     return 0
 end
 
