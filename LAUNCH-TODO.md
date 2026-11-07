@@ -441,3 +441,12 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] The treasury floor is checked under the loan lock, but other treasury spending (department budgets, heist and buyer payouts) can still lower it at the same moment; the floor is a guard, not a reservation.
 - [ ] Not verified in a live server: the Bank loans phone app, a real week passing, collection from a defaulted borrower in game.
 - [ ] Left out on purpose: business loans and loans to shops, interest that changes over time, credit scores, co-signers, seizing property on default, an early payoff rebate, a bank branch.
+
+## Estate agent sales (som-housing)
+
+- [ ] No schema change and no new convar. The realtor job is whitelisted, so staff must hire agents before anyone can use it.
+- [ ] Untuned first guesses in `Config.Agent` (`som-housing/shared/config.lua`): 3 percent commission of the price, `approveGrade = 1` (Senior Agent and above close luxury sales; any on duty agent can show a property and sell ordinary ones), 60 second offers, and a 10 minute window after an accepted viewing.
+- [ ] Money: the buyer's bank goes to the Dynasty 8 business account (`Config.Finance.business`) at the full price, and the commission is paid out of that account, only after its debit works. Dynasty 8 keeps the rest, and nothing taxes it. Decide whether the agency should hand part of that to the treasury. The older mortgage commission path is unchanged.
+- [ ] Luxury (`realtor_only`) properties can now be bought outright, but only through an agent. The plain buy still refuses them.
+- [ ] An accepted viewing lets the buyer and the agent through that property's door for the window, with no key. Never run in a game: the three new door menu entries, both dialogs, walking in together, and the buyer's bank dropping.
+- [ ] Left out on purpose: a listings board and asking price changes, resales of player-owned homes, seller payouts, a sales tax, agent ratings, a phone app, and any change to the mortgage path or leases. The agent sale always pays from the buyer's bank, never cash or other accounts.

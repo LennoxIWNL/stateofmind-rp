@@ -41,6 +41,8 @@ server_scripts {
     'server/finance.lua',
     -- Leases read Properties and Ownership, so after both.
     'server/lease.lua',
+    -- Agent sales read Properties and Ownership; interior.lua asks Agent.IsViewing at the door.
+    'server/agent.lua',
     -- raid before interior: entering consults Raid.CanEnter for a forced door.
     'server/raid.lua',
     'server/interior.lua',
