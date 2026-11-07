@@ -6,7 +6,8 @@ local core = exports['som-core']
 
 local episodes, calls, lastCall, nextEpisode = {}, {}, {}, 0
 
----Fails closed: if the jail cannot be asked, nobody is called.
+---No jail resource running means nobody is jailed, so the call goes ahead. If som-jail is
+---running but cannot be asked, this fails closed and nobody is called.
 local function jailed(citizenid)
     if GetResourceState('som-jail') ~= 'started' then return false end
     local ok, row = pcall(function() return exports['som-jail']:activeFor(citizenid) end)
@@ -16,13 +17,17 @@ end
 ---Raises the call for one down event if it still applies.
 ---@return number|nil callId
 function Medical.RaiseCall(source, citizenid, episode)
+    if not Config.EmsCall.enabled then return nil end
     if episodes[citizenid] ~= episode or not Medical.IsDowned(citizenid) then return nil end
 
     local player = core:getPlayer(source)
     if not player or player.citizenid ~= citizenid then return nil end
 
     local at = os.time()
-    if lastCall[citizenid] and at - lastCall[citizenid] < Config.EmsCall.cooldownSeconds then return nil end
+    for id, t in pairs(lastCall) do
+        if at - t >= Config.EmsCall.cooldownSeconds then lastCall[id] = nil end
+    end
+    if lastCall[citizenid] then return nil end
     if jailed(citizenid) then return nil end
 
     local ped = GetPlayerPed(source)
@@ -34,7 +39,7 @@ function Medical.RaiseCall(source, citizenid, episode)
 end
 
 AddEventHandler('som:server:playerDowned', function(source, citizenid)
-    if type(citizenid) ~= 'string' then return end
+    if not Config.EmsCall.enabled or type(citizenid) ~= 'string' then return end
 
     nextEpisode = nextEpisode + 1
     local episode = nextEpisode

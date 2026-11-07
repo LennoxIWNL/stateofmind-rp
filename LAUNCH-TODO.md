@@ -445,6 +445,7 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 ## EMS response (som-medical, som-dispatch)
 
 - [ ] Nothing to place. A player still down after 30 seconds raises a "Person down" call to on-duty ambulance staff (`Config.EmsCall` in `som-medical/shared/config.lua`), once per character every 120 seconds. Nobody is called for a character with a serving sentence or remand row; if `som-jail` cannot be asked, nobody is called. A player cuffed but not yet booked is still called.
+- [ ] Kill switch: set `Config.EmsCall.enabled = false` in `som-medical/shared/config.lua` to stop new person-down calls. The call is priority 2, so it does not page units on a declared major incident.
 - [ ] Each downed player gets their own call (the alert is not merged), so a crash with several patients shows several calls. The call closes when the player is revived, respawns or leaves the server.
 - [ ] Not verified live: the 30 second delay, the blip (sprite 61), that revive, respawn and hospital admission all fire `playerRevived` on a real server, and the call showing as closed on a real MDT.
 - [ ] Not done: closing the fire call when a fire is put out (needs `feature/fire-department` merged first: call `exports['som-dispatch']:resolve(callId)` from `som-fire`).

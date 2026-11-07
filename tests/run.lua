@@ -7286,6 +7286,8 @@ do
     check(Mocks.exported.resolve(blast.id, 'done') == true and blast.status == 'closed' and blast.services.ambulance.status == 'closed' and blast.services.police.status == 'closed', 'resolve: closes every service of a call with no player')
     check(blast.services.police.disposition == 'done', 'resolve: keeps the disposition')
     check(Mocks.exported.resolve(blast.id) == false and Mocks.exported.resolve(9999) == false and Mocks.exported.resolve('x') == false, 'resolve: a closed or unknown call is a no-op')
+    local pid = Mocks.exported.alert(nil, 'personDown', { coords = vec3(1, 1, 30) })
+    check(allCalls()[pid].priority == 2 and allCalls()[pid].services.ambulance and not allCalls()[pid].services.police, 'person down: routine priority, so it does not page units on a major incident, and ambulance only')
     local reachable = false
     for name in pairs(RegisteredCallbacks) do if name:find('resolve') then reachable = true end end
     for name in pairs(Handlers) do if tostring(name):find('resolve') then reachable = true end end
@@ -7384,6 +7386,37 @@ do
     run()
     Handlers['som:server:playerRevived'](1, cidA, nil)
     check(Mocks.resolved[2] and Mocks.resolved[2].disposition == 'patient no longer down', 'person down: respawning at the hospital closes the call')
+
+    reset()
+    E.enabled = false
+    run = down(1)
+    if run then run() end
+    check(Mocks.calls.dispatchAlert == 0, 'person down: the kill switch stops new calls')
+    E.enabled = true
+    env.Medical.Revive(1)
+    run = down(1)
+    E.enabled = false
+    run()
+    check(Mocks.calls.dispatchAlert == 0, 'person down: the kill switch also stops a call already waiting out its delay')
+    E.enabled = true
+    env.Medical.Revive(1)
+
+    reset()
+    run = down(1)
+    run()
+    local lastCall
+    for i = 1, 20 do
+        local name, value = debug.getupvalue(env.Medical.RaiseCall, i)
+        if name == 'lastCall' then lastCall = value end
+    end
+    check(lastCall and lastCall[cidA], 'person down: a character in the cooldown is remembered')
+    lastCall[cidA] = os.time() - 1000
+    env.Medical.Revive(1)
+    E.cooldownSeconds = 120
+    run = down(1)
+    run()
+    check(Mocks.calls.dispatchAlert == 2 and lastCall[cidA] >= os.time() - 1, 'person down: entries older than the cooldown are pruned and the character can be called again')
+    env.Medical.Revive(1)
 
     _G.CreateThread = realThread
     Mocks.exported = realExported
