@@ -18,6 +18,11 @@ local function done(ok, err, extra)
     return out
 end
 
+-- som-carsales overwrites purchase_price with the negotiated price, so a car that has been sold between
+-- players has no trustworthy recorded value. Such a car is never insured or paid out on (a car sold
+-- back to its first owner included).
+local SOLD = 'EXISTS (SELECT 1 FROM som_vehicle_sales s WHERE s.vehicle_id = v.id)'
+
 local function normalise(plate)
     return (tostring(plate or ''):upper():gsub('%s+', ''))
 end
@@ -66,9 +71,10 @@ end
 
 local function insure(player, vehicleId)
     local row = MySQL.single.await(
-        'SELECT id, purchase_price FROM som_vehicles WHERE id = ? AND citizenid = ? AND owner_group IS NULL AND group_restricted = 0',
+        'SELECT v.id, v.purchase_price, ' .. SOLD .. ' AS sold FROM som_vehicles v WHERE v.id = ? AND v.citizenid = ? AND v.owner_group IS NULL AND v.group_restricted = 0',
         { vehicleId, player.citizenid })
     if not row then return done(false, 'that is not your vehicle') end
+    if row.sold == 1 or row.sold == true then return done(false, 'a vehicle that has been sold between players cannot be insured') end
     if (tonumber(row.purchase_price) or 0) < Config.minValue then return done(false, 'this vehicle cannot be insured') end
 
     local premium = Insurance.Prices(row.purchase_price).premium
@@ -122,14 +128,14 @@ end
 function Insurance.Sweep(citizenid)
     local due = MySQL.query.await([[
         SELECT i.vehicle_id, i.citizenid, UNIX_TIMESTAMP(i.paid_until) AS due, UNIX_TIMESTAMP(i.covered_from) AS from_at,
-               (i.paid_until <= NOW()) AS lapsed, v.citizenid AS holder, v.purchase_price AS price
+               (i.paid_until <= NOW()) AS lapsed, v.citizenid AS holder, v.purchase_price AS price, ]] .. SOLD .. [[ AS sold
         FROM som_vehicle_insurance i LEFT JOIN som_vehicles v ON v.id = i.vehicle_id
         WHERE i.status = 'active' AND i.paid_until <= DATE_ADD(NOW(), INTERVAL ? HOUR) AND i.citizenid LIKE ?
     ]], { Config.renewAheadHours, citizenid or '%' }) or {}
 
     for _, policy in ipairs(due) do
         -- Sold, or gone: the policy ends and nothing more is charged.
-        if policy.holder ~= policy.citizenid or (tonumber(policy.price) or 0) < Config.minValue then
+        if policy.holder ~= policy.citizenid or policy.sold == 1 or policy.sold == true or (tonumber(policy.price) or 0) < Config.minValue then
             MySQL.update.await("UPDATE som_vehicle_insurance SET status = 'cancelled' WHERE vehicle_id = ? AND status = 'active'", { policy.vehicle_id })
         else
             local owner = core:getPlayerByCitizenId(policy.citizenid)
@@ -192,13 +198,14 @@ local function claim(player, vehicleId)
         SELECT v.id, v.plate, v.state, v.purchase_price, UNIX_TIMESTAMP(v.taken_at) AS taken,
                (v.taken_at IS NOT NULL AND v.taken_at <= DATE_SUB(NOW(), INTERVAL ? MINUTE)) AS out_long,
                (i.status = 'active' AND i.paid_until > NOW() AND i.covered_from <= DATE_SUB(NOW(), INTERVAL ? DAY)
-                AND i.citizenid = v.citizenid AND v.taken_at >= i.covered_from) AS covered
+                AND i.citizenid = v.citizenid AND v.taken_at >= i.covered_from) AS covered, ]] .. SOLD .. [[ AS sold
         FROM som_vehicles v JOIN som_vehicle_insurance i ON i.vehicle_id = v.id
         WHERE v.id = ? AND v.citizenid = ? AND v.owner_group IS NULL AND v.group_restricted = 0
     ]], { Config.minOutMinutes, Config.waitingDays, vehicleId, player.citizenid })
 
     if not v then return done(false, 'that vehicle is not insured') end
     if v.state ~= 'out' then return done(false, 'only a vehicle that is out can be claimed') end
+    if v.sold == 1 or v.sold == true then return done(false, 'a vehicle that has been sold between players cannot be claimed') end
     if v.covered ~= 1 and v.covered ~= true then return done(false, 'this vehicle is not covered for this') end
     if v.out_long ~= 1 and v.out_long ~= true then return done(false, 'it has not been gone long enough') end
 
@@ -221,27 +228,32 @@ local function claim(player, vehicleId)
 
     local reason = 'insurance:claim:' .. id
     local undo = {}
+    -- Each undo returns whether it worked. A failed one stops the rest: the money it was meant to take back
+    -- is gone, and going on would credit someone for a debit that never happened.
     local function fail(text)
-        for i = #undo, 1, -1 do undo[i]() end
+        for i = #undo, 1, -1 do
+            if not undo[i]() then
+                print(('[som-insurance] claim %s could not be fully undone at step %d, settle it by hand'):format(id, i))
+                break
+            end
+        end
         MySQL.update.await("UPDATE som_insurance_claims SET status = 'cancelled' WHERE id = ?", { id })
         return done(false, text)
     end
 
     -- Excess in.
     if not core:removeMoney(player.source, 'bank', prices.excess, reason .. ':excess') then return fail('not enough in your bank for the excess') end
-    undo[#undo + 1] = function() core:addMoney(player.source, 'bank', prices.excess, reason .. ':excess_refund') end
+    undo[#undo + 1] = function() return core:addMoney(player.source, 'bank', prices.excess, reason .. ':excess_refund') end
 
     if not core:businessTransact(Config.business, prices.excess, reason .. ':excess') then return fail('the insurer could not take the excess') end
-    undo[#undo + 1] = function() core:businessTransact(Config.business, -prices.excess, reason .. ':excess_refund') end
+    undo[#undo + 1] = function() return core:businessTransact(Config.business, -prices.excess, reason .. ':excess_refund') end
 
     -- Insurer to treasury: refused if the insurer does not hold it.
     if not core:businessTransact(Config.business, -prices.cost, reason .. ':payout') then return fail('the insurer cannot pay out right now') end
-    undo[#undo + 1] = function() core:businessTransact(Config.business, prices.cost, reason .. ':payout_refund') end
+    undo[#undo + 1] = function() return core:businessTransact(Config.business, prices.cost, reason .. ':payout_refund') end
 
     if not core:taxToTreasury(prices.cost, reason .. ':replacement') then return fail('the payout fell through') end
-    undo[#undo + 1] = function()
-        if not core:treasuryTransact(-prices.cost, reason .. ':payout_refund') then print(('[som-insurance] claim %s: could not take the replacement cost back from the treasury'):format(id)) end
-    end
+    undo[#undo + 1] = function() return core:treasuryTransact(-prices.cost, reason .. ':payout_refund') end
 
     -- The car is back, only if it is still this person's and still out since the time that was checked.
     local restored = MySQL.update.await([[
@@ -266,20 +278,22 @@ function actions.view(_, _, player)
     for _, v in ipairs(MySQL.query.await([[
         SELECT v.id, v.plate, v.model, v.state, v.purchase_price,
                GREATEST(0, UNIX_TIMESTAMP(i.paid_until) - UNIX_TIMESTAMP(NOW())) AS secs,
-               (i.status = 'active' AND i.paid_until > NOW() AND i.citizenid = v.citizenid) AS covered
+               (i.status = 'active' AND i.paid_until > NOW() AND i.citizenid = v.citizenid) AS covered, ]] .. SOLD .. [[ AS sold
         FROM som_vehicles v LEFT JOIN som_vehicle_insurance i ON i.vehicle_id = v.id
         WHERE v.citizenid = ? AND v.owner_group IS NULL AND v.group_restricted = 0 ORDER BY v.model, v.plate LIMIT 30
     ]], { player.citizenid }) or {}) do
         local title = ('%s %s'):format(v.model, v.plate)
         local p = Insurance.Prices(v.purchase_price)
 
-        if v.covered == 1 or v.covered == true then
+        if v.sold == 1 or v.sold == true then
+            -- Not offered: its recorded value was replaced by a sale price.
+        elseif v.covered == 1 or v.covered == true then
             rows[#rows + 1] = { title = title, sub = ('Covered for %d more days, tap to cancel'):format(math.ceil(v.secs / 86400)), action = 'cancel', payload = { vehicle = v.id } }
             if v.state == 'out' then
                 rows[#rows + 1] = { title = ('Claim for %s'):format(v.plate), sub = ('If it is gone. Excess $%d'):format(p.excess), action = 'claim', payload = { vehicle = v.id } }
             end
         elseif (tonumber(v.purchase_price) or 0) >= Config.minValue then
-            rows[#rows + 1] = { title = title, sub = ('Not insured, $%d every %d days, tap to insure'):format(p.premium, Config.periodDays), action = 'insure', payload = { vehicle = v.id } }
+            rows[#rows + 1] = { title = title, sub = ('Not insured, $%d every %d days. Cover starts %d days after you pay, and again after a lapse. Tap to insure'):format(p.premium, Config.periodDays, Config.waitingDays), action = 'insure', payload = { vehicle = v.id } }
         end
     end
 
@@ -341,7 +355,7 @@ exports('insured', function(plate)
 
     local row = MySQL.single.await([[
         SELECT UNIX_TIMESTAMP(i.paid_until) AS expires,
-               (i.status = 'active' AND i.paid_until > NOW() AND i.citizenid = v.citizenid) AS covered
+               (i.status = 'active' AND i.paid_until > NOW() AND i.citizenid = v.citizenid AND NOT ]] .. SOLD .. [[) AS covered
         FROM som_vehicles v JOIN som_vehicle_insurance i ON i.vehicle_id = v.id
         WHERE REPLACE(UPPER(v.plate), ' ', '') = ?
     ]], { key })

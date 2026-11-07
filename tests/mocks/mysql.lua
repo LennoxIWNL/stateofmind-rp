@@ -38,7 +38,7 @@ M.db = {
     buyer = {},
     placements = {},
     trade = {},
-    ins = { on = false, vehicles = {}, policies = {}, claims = {}, flagged = {}, bolo = {}, wanted = {} },
+    ins = { on = false, vehicles = {}, policies = {}, claims = {}, flagged = {}, bolo = {}, wanted = {}, sold = {} },
     loans = {},
     leases = {},
     shopsDb = { shops = {}, stock = {}, staff = {}, takings = 0, balance = 0 },
@@ -585,9 +585,9 @@ local function insDb(kind, query, params)
         return p.status == 'active' and p.paid_until > now() and p.covered_from <= now() - waitDays * 86400 and p.citizenid == v.citizenid and v.taken and v.taken >= p.covered_from
     end
 
-    if kind == 'single' and has('SELECT id, purchase_price FROM som_vehicles WHERE id = ? AND citizenid = ?') then
+    if kind == 'single' and has('AS sold FROM som_vehicles v WHERE v.id = ? AND v.citizenid = ?') then
         local v = veh(params[1])
-        return true, mine(v, params[2]) and { id = v.id, purchase_price = v.price } or nil
+        return true, mine(v, params[2]) and { id = v.id, purchase_price = v.price, sold = D.sold[v.id] and 1 or 0 } or nil
     elseif kind == 'update' and has('INSERT IGNORE INTO som_vehicle_insurance') then
         if pol(params[1]) then return true, 0 end
         D.policies[#D.policies + 1] = { vehicle_id = params[1], citizenid = params[2], paid_until = now() + params[3] * 86400, covered_from = now(), status = 'active' }
@@ -631,7 +631,7 @@ local function insDb(kind, query, params)
         for _, p in ipairs(D.policies) do
             if p.status == 'active' and p.paid_until <= now() + params[1] * 3600 and (params[2] == '%' or p.citizenid == params[2]) then
                 local v = veh(p.vehicle_id)
-                out[#out + 1] = { vehicle_id = p.vehicle_id, citizenid = p.citizenid, due = p.paid_until, from_at = p.covered_from, lapsed = p.paid_until <= now() and 1 or 0, holder = v and v.citizenid, price = v and v.price }
+                out[#out + 1] = { vehicle_id = p.vehicle_id, citizenid = p.citizenid, due = p.paid_until, from_at = p.covered_from, lapsed = p.paid_until <= now() and 1 or 0, holder = v and v.citizenid, price = v and v.price, sold = D.sold[p.vehicle_id] and 1 or 0 }
             end
         end
         return true, out
@@ -639,7 +639,7 @@ local function insDb(kind, query, params)
         local v, p = veh(params[3]), pol(params[3])
         if not mine(v, params[4]) or not p then return true, nil end
         local outLong = v.taken ~= nil and v.taken <= now() - params[1] * 60
-        return true, { id = v.id, plate = v.plate, state = v.state, purchase_price = v.price, taken = v.taken, out_long = outLong and 1 or 0, covered = covered(p, v, params[2]) and 1 or 0 }
+        return true, { id = v.id, plate = v.plate, state = v.state, purchase_price = v.price, taken = v.taken, out_long = outLong and 1 or 0, covered = covered(p, v, params[2]) and 1 or 0, sold = D.sold[v.id] and 1 or 0 }
     elseif kind == 'single' and has('(SELECT COUNT(*) FROM som_police_plates WHERE') then
         local key = params[1]
         return true, { flagged = D.flagged[key] and 1 or 0, bolo = D.bolo[key] and 1 or 0, wanted = D.wanted[key] and 1 or 0 }
@@ -664,7 +664,7 @@ local function insDb(kind, query, params)
             if mine(v, params[1]) then
                 local p = pol(v.id)
                 local live = p and p.status == 'active' and p.paid_until > now() and p.citizenid == v.citizenid
-                out[#out + 1] = { id = v.id, plate = v.plate, model = v.model, state = v.state, purchase_price = v.price, secs = p and math.max(0, p.paid_until - now()) or 0, covered = live and 1 or 0 }
+                out[#out + 1] = { id = v.id, plate = v.plate, model = v.model, state = v.state, purchase_price = v.price, secs = p and math.max(0, p.paid_until - now()) or 0, covered = live and 1 or 0, sold = D.sold[v.id] and 1 or 0 }
             end
         end
         return true, out
@@ -672,7 +672,7 @@ local function insDb(kind, query, params)
         local v = byPlate(params[1])
         local p = v and pol(v.id)
         if not p then return true, nil end
-        return true, { expires = p.paid_until, covered = (p.status == 'active' and p.paid_until > now() and p.citizenid == v.citizenid) and 1 or 0 }
+        return true, { expires = p.paid_until, covered = (p.status == 'active' and p.paid_until > now() and p.citizenid == v.citizenid and not D.sold[v.id]) and 1 or 0 }
     end
     return false
 end

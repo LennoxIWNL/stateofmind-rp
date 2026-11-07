@@ -4968,6 +4968,16 @@ do
     v1.citizenid = 'OWN1'
     check(#app.handler(2, 'view', {}).view.sections[1].rows == 1, 'insurance: the new holder can insure the car themselves')
 
+    -- A car that was sold between players has a replaced price and is never insured
+    local resold = veh(20, { price = 1000 })
+    D.sold[20] = true
+    check(insureV(1, 20).error == 'a vehicle that has been sold between players cannot be insured' and policy(20) == nil, 'insurance: a car sold between players cannot be insured against its sale price')
+    local soldRows = app.handler(1, 'view', {}).view.sections[1].rows
+    local listed = false
+    for _, row in ipairs(soldRows) do if row.title:find('AB20', 1, true) then listed = true end end
+    check(not listed, 'insurance: a car sold between players is not offered for cover')
+    D.sold[20] = nil
+
     -- Claims
     local v3 = veh(3)
     Mocks.bank[1] = 50000
@@ -5017,6 +5027,32 @@ do
     check(claimV(1, 3).error ~= nil and Mocks.bank[1] == bank and insurer == base, 'insurance: a car sold during the claim undoes it')
     core.taxToTreasury = realTax
     v3.citizenid, v3.state = 'OWN1', 'out'
+
+    -- Sold and bought back: the old policy would cover the holder again, at the sale price
+    D.sold[3] = true
+    check(claimV(1, 3).error == 'a vehicle that has been sold between players cannot be claimed' and v3.state == 'out', 'insurance: a car that was ever sold between players cannot be claimed on')
+    D.sold[3] = nil
+
+    -- A failed take-back from the treasury stops the other refunds: nothing is credited for a debit that never happened
+    function core:taxToTreasury(amount, reason)
+        v3.state = 'impounded'
+        Mocks.treasury = 0
+        return true
+    end
+    local bankMid, insMid = Mocks.bank[1], insurer
+    local logged = {}
+    local realPrint = _G.print
+    _G.print = function(...) logged[#logged + 1] = table.concat({ ... }, ' ') end
+    local stuck = claimV(1, 3)
+    _G.print = realPrint
+    local prices = env.Insurance.Prices(v3.price)
+    check(stuck.error == 'the vehicle changed hands or was found, nothing was paid', 'insurance: the claim still fails when the treasury cannot give the payout back')
+    check(insurer == insMid + prices.excess - prices.cost and Mocks.bank[1] == bankMid - prices.excess, 'insurance: a failed take-back from the treasury stops the refunds instead of minting money')
+    check(logged[1] and logged[1]:find('settle it by hand', 1, true) and D.claims[#D.claims].status == 'cancelled', 'insurance: an undo that stopped is logged for staff and the claim is cancelled')
+    -- put the world back for the next scenes
+    core.taxToTreasury = realTax
+    v3.state = 'out'
+    Mocks.bank[1], insurer, Mocks.treasury = bankMid, insMid, 100000
 
     -- A good claim
     local tBefore2 = Mocks.treasury
