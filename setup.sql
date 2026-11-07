@@ -1543,6 +1543,16 @@ INSERT IGNORE INTO `som_businesses`
 VALUES
   ('fuelco', 'Fuel Station Sales', NULL, (SELECT id FROM som_bank_accounts WHERE account_no='BUS-FUEL'), 0.0000, 'sales', 'private', 1, 0.0800);
 
+-- Weazel News (som-news). Opens at zero: reporters are paid per story from the city treasury,
+-- never from a seeded float, so payroll from this account pays nothing until the owner funds it.
+INSERT IGNORE INTO `som_bank_accounts` (`account_no`, `label`, `type`, `balance`) VALUES
+  ('BUS-WEAZEL', 'Weazel News', 'business', 0);
+
+INSERT IGNORE INTO `som_businesses`
+  (`name`, `label`, `job`, `account_id`, `tax_rate`, `funding`, `category`, `active`, `treasury_cut`)
+VALUES
+  ('weazel', 'Weazel News', 'news', (SELECT id FROM som_bank_accounts WHERE account_no='BUS-WEAZEL'), 0.0000, 'sales', 'private', 1, 0.0800);
+
 -- Corrections for databases seeded before the funding model existed, where
 -- INSERT IGNORE above skipped the rows and left them on column defaults.
 UPDATE `som_businesses`
@@ -1951,4 +1961,31 @@ CREATE TABLE IF NOT EXISTS `som_loans` (
   PRIMARY KEY (`id`),
   KEY `idx_citizen` (`citizenid`, `status`),
   KEY `idx_due` (`status`, `next_due`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Weazel News (som-news). A story is public until staff remove it. Payouts are the hourly cap:
+-- the cap is the sum of the last hour, so a restart cannot reset it.
+CREATE TABLE IF NOT EXISTS `som_news_stories` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `author`     VARCHAR(64) NOT NULL,
+  `kind`       ENUM('story','breaking') NOT NULL DEFAULT 'story',
+  `headline`   VARCHAR(80) NOT NULL,
+  `body`       VARCHAR(500) NOT NULL,
+  `status`     ENUM('live','removed') NOT NULL DEFAULT 'live',
+  `paid`       BIGINT NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_status_id` (`status`, `id`),
+  KEY `idx_citizen_kind_time` (`citizenid`, `kind`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_news_payouts` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `amount`     BIGINT NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_time` (`created_at`),
+  KEY `idx_citizen_time` (`citizenid`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -7275,6 +7275,143 @@ do
 end
 
 
+-- ---------------------------------------------------------------------------
+-- Weazel News
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    resetMocks()
+    mysql.fakeNow = 2000000
+    mysql.db.news = { stories = {}, payouts = {} }
+    local env = loader.loadResource(REPO .. 'som-news', { 'shared/config.lua', 'server/main.lua' })
+    local core = exports['som-core']
+    local C = env.Config
+    local app = Mocks.apps.news
+
+    local function person(src, cid, job, onduty)
+        return { citizenid = cid, source = src, job = { name = job, onduty = onduty },
+            charinfo = { firstname = 'F' .. src, lastname = 'L' .. src } }
+    end
+    Mocks.players = {
+        [1] = person(1, 'REP1', 'news', true), [2] = person(2, 'CIT2', 'unemployed', true),
+        [3] = person(3, 'REP3', 'news', false), [4] = person(4, 'STAFF4', 'unemployed', true),
+        [5] = person(5, 'REP5', 'news', true),
+    }
+    Mocks.bank = { [1] = 0, [2] = 0, [3] = 0, [4] = 0, [5] = 0 }
+    Mocks.treasury = 10000
+    Mocks.admins = { [4] = true }
+    Mocks.addMoneyFails = false
+    local saved = { addMoney = core.addMoney, getPlayers = core.getPlayers }
+    function core:addMoney(source, _, amount)
+        if Mocks.addMoneyThrows then error('simulated crash') end
+        if Mocks.addMoneyFails then return false, 'refused' end
+        Mocks.bank[source] = (Mocks.bank[source] or 0) + amount
+        return true
+    end
+    function core:getPlayers() return { Mocks.players[1], Mocks.players[2], Mocks.players[3] } end
+    local pushed = {}
+    Mocks.exported.notifyApp = function(source, appId, text) pushed[#pushed + 1] = { source = source, app = appId, text = text } end
+
+    local BODY = 'A long enough account of what happened downtown this afternoon, with the details a reader wants.'
+    local function publish(src, kind, headline, body)
+        return app.handler(src, 'publish', { kind = kind, text = headline .. ' | ' .. (body or BODY), author = 'Spoofed' })
+    end
+    local function view(src) return app.handler(src, 'view', {}) end
+    local function titles(v)
+        local out = {}
+        for _, sec in ipairs(v.view.sections) do for _, r in ipairs(sec.rows) do out[#out + 1] = r.title end end
+        return out
+    end
+    local function has(list, x) for _, v in ipairs(list) do if v == x then return true end end return false end
+
+    check(app ~= nil and app.reads.view == true, 'news: the app registers with the phone and marks view as a read')
+    check(not publish(1, 'story', 'Bank robbery downtown').success and #mysql.db.news.stories == 0, 'news: nothing can be published while the newsroom ships closed')
+    check(view(1).view.buttons == nil, 'news: a reporter sees no publish buttons while it ships closed')
+
+    C.enabled = true
+    check(view(1).view.buttons ~= nil and view(2).view.buttons == nil and view(3).view.buttons == nil, 'news: only a reporter on duty is offered the publish buttons')
+    check(not publish(2, 'story', 'Bank robbery downtown').success, 'news: a citizen cannot publish')
+    check(not publish(3, 'story', 'Bank robbery downtown').success, 'news: a reporter off duty cannot publish')
+    check(not publish(99, 'story', 'Bank robbery downtown').success, 'news: an unloaded player cannot publish')
+    check(not publish(1, 'poll', 'Bank robbery downtown').success, 'news: an unknown kind is refused')
+    check(not publish(1, 'story', 'Short', BODY).success and not publish(1, 'story', 'A decent headline', 'too short').success, 'news: a short headline or a short body is refused')
+    check(not app.handler(1, 'publish', { kind = 'story', text = 12 }).success and not app.handler(1, 'nope', {}).success, 'news: bad text and unknown actions are refused')
+    check(#mysql.db.news.stories == 0 and Mocks.treasury == 10000, 'news: refused stories leave no row and cost nothing')
+
+    local r = publish(1, 'story', 'Bank robbery downtown')
+    check(r.success and r.paid == 150 and mysql.db.news.stories[1].author == 'F1 L1', 'news: the author comes from the character, not the request')
+    check(Mocks.bank[1] == 150 and Mocks.treasury == 9850, 'news: a story pays from the treasury with a matching debit')
+
+    check(not publish(1, 'story', 'Another one coming', BODY .. ' More.').success and #mysql.db.news.stories == 1, 'news: a second story inside the gap is refused')
+    mysql.fakeNow = mysql.fakeNow + 121
+    check(not publish(1, 'story', 'bank robbery DOWNTOWN', BODY:upper()).success, 'news: the same story again is refused whatever the case')
+    local n = 0
+    local function next_story()
+        n = n + 1
+        mysql.fakeNow = mysql.fakeNow + 121
+        return publish(1, 'story', 'Update number ' .. n .. ' from the scene', BODY .. ' ' .. n)
+    end
+    check(next_story().paid == 150 and next_story().paid == 150 and next_story().paid == 150, 'news: stories keep paying up to the reporter cap')
+    local capped = next_story()
+    check(capped.success and capped.paid == 0 and Mocks.bank[1] == 600 and Mocks.treasury == 9400, 'news: past the reporter hourly cap the story publishes unpaid')
+    mysql.fakeNow = mysql.fakeNow + 3600
+    check(next_story().paid == 150, 'news: the cap frees up after an hour')
+
+    C.pay.hourlyCap = 200
+    mysql.db.news.payouts = {}
+    check(publish(5, 'story', 'Rival paper scoop on the harbour').paid == 150, 'news: a second reporter is paid')
+    mysql.fakeNow = mysql.fakeNow + 121
+    local global = publish(5, 'story', 'Second harbour scoop of the day', BODY .. ' Again.')
+    check(global.paid == 50 and Mocks.bank[5] == 200, 'news: the network cap shortens the last payment')
+    mysql.fakeNow = mysql.fakeNow + 121
+    check(publish(5, 'story', 'Third harbour scoop of the day', BODY .. ' Third.').paid == 0, 'news: the network cap stops further pay')
+    C.pay.hourlyCap = 3000
+
+    local before = Mocks.bank[1]
+    mysql.fakeNow = mysql.fakeNow + 4000
+    Mocks.treasury = 0
+    local broke = next_story()
+    check(broke.success and broke.paid == 0 and Mocks.bank[1] == before and Mocks.treasury == 0, 'news: an empty treasury publishes the story and pays nothing')
+
+    Mocks.treasury = 1000
+    Mocks.addMoneyFails = true
+    local payoutsBefore = #mysql.db.news.payouts
+    local failed = next_story()
+    Mocks.addMoneyFails = false
+    check(failed.success and failed.paid == 0 and Mocks.treasury == 1000 and #mysql.db.news.payouts == payoutsBefore, 'news: a failed credit refunds the treasury and leaves no payout row')
+
+    Mocks.addMoneyThrows = true
+    local crashed = next_story()
+    Mocks.addMoneyThrows = false
+    check(crashed.success and crashed.paid == 0 and Mocks.treasury == 1000 and #mysql.db.news.payouts == payoutsBefore, 'news: a crash after the treasury debit refunds it and leaves no payout row')
+    check(not app.handler(1, 'publish', { kind = 'story', text = 'no bar here' }).success, 'news: text without a bar is refused')
+
+    mysql.fakeNow = mysql.fakeNow + 121
+    local treasury, bank = Mocks.treasury, Mocks.bank[1]
+    local b = publish(1, 'breaking', 'Shots fired at the pier')
+    check(b.success and b.paid == 0 and Mocks.treasury == treasury and Mocks.bank[1] == bank, 'news: a breaking alert is not paid')
+    check(#pushed == 3 and pushed[1].app == 'news' and pushed[1].text == 'Shots fired at the pier', 'news: a breaking alert is pushed to every online phone')
+    mysql.fakeNow = mysql.fakeNow + 121
+    check(not publish(1, 'breaking', 'Second alert so soon', BODY .. ' Soon.').success, 'news: breaking alerts have their own longer gap')
+
+    local feed = view(2)
+    check(feed.success and has(titles(feed), 'Shots fired at the pier') and feed.view.sections[1].title == 'Breaking' and feed.view.sections[1].rows[1].title == 'Shots fired at the pier',
+        'news: a citizen reads the feed with breaking news on top')
+
+    Mocks.commands.removestory(2, { id = 1 })
+    check(mysql.db.news.stories[1].status == 'live', 'news: a citizen cannot remove a story')
+    Mocks.commands.removestory(4, { id = 1 })
+    check(mysql.db.news.stories[1].status == 'removed' and not has(titles(view(2)), 'Bank robbery downtown'), 'news: staff remove a story and it leaves the feed')
+    Mocks.commands.removestory(4, { id = 1 })
+    check(#mysql.db.phoneAudit == 2 and mysql.db.phoneAudit[2].ok == 0, 'news: removals are audited, including a repeat that removed nothing')
+
+    core.addMoney, core.getPlayers = saved.addMoney, saved.getPlayers
+    Mocks.exported.notifyApp = nil
+    C.enabled = false
+end
+
+
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)
