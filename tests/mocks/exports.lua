@@ -223,7 +223,12 @@ function dispatch:alert(source, alertType, extra)
     Mocks.lastAlertType = alertType
     Mocks.lastAlertExtra = extra
     if Mocks.alertFails then return nil end
-    return 1
+    return Mocks.alertId or 1
+end
+function dispatch:resolve(id, disposition)
+    Mocks.resolved = Mocks.resolved or {}
+    Mocks.resolved[#Mocks.resolved + 1] = { id = id, disposition = disposition }
+    return true
 end
 
 local medical = {}
@@ -314,6 +319,10 @@ local registry = {
         return fn and function(_, ...) return fn(...) end or nil
     end }),
     ['som-launder'] = setmetatable({}, { __index = function(_, name)
+        local fn = Mocks.exported[name]
+        return fn and function(_, ...) return fn(...) end or nil
+    end }),
+    ['som-jail'] = setmetatable({}, { __index = function(_, name)
         local fn = Mocks.exported[name]
         return fn and function(_, ...) return fn(...) end or nil
     end }),

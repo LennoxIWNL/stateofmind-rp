@@ -768,6 +768,28 @@ function Dispatch.Close(source, callId)
     return { success = true }
 end
 
+---Closes every open service of a call with no player involved. Server only: it is
+---an export, never a net event or a callback, so a client cannot reach it.
+---@param callId any
+---@param disposition string|nil
+---@return boolean closed
+function Dispatch.Resolve(callId, disposition)
+    local call = openCall(callId)
+    if not call then return false end
+
+    local at = os.time()
+    for _, service in pairs(call.services) do
+        if service.status ~= 'closed' then
+            service.status, service.closedAt = 'closed', at
+            service.disposition = type(disposition) == 'string' and disposition:sub(1, 48) or nil
+        end
+    end
+    call.status, call.closedAt, call.major = 'closed', at, false
+    return true
+end
+
+exports('resolve', Dispatch.Resolve)
+
 ---Declares or stands down a major incident. Every on-duty responder hears it.
 ---@param source number
 ---@param callId any
