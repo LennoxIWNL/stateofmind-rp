@@ -120,6 +120,16 @@ Config.Finance = {
     repossessRefundRate = 0.35,
 }
 
+--- Estate agent sales. The price goes to Config.Finance.business and the commission comes out of it.
+Config.Agent = {
+    -- Lowest agent grade that may close a realtor_only sale. Anyone on duty can show a property.
+    approveGrade = 1,
+    commission = 0.03,
+    offerSeconds = 60,
+    -- How long an accepted viewing lets the buyer and the agent through the door and keeps the sale open.
+    saleWindowMinutes = 10,
+}
+
 -- ---------------------------------------------------------------------------
 -- Raids
 -- ---------------------------------------------------------------------------

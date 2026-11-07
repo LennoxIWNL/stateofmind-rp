@@ -7937,5 +7937,182 @@ do
     _G.CreateThread = realThread
 end
 
+-- ---------------------------------------------------------------------------
+-- Estate agent sales
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    resetMocks()
+    local env = loader.loadResource(REPO .. 'som-housing', {
+        'shared/shells.lua', 'shared/config.lua', 'server/properties.lua', 'server/ownership.lua', 'server/finance.lua', 'server/agent.lua',
+    })
+    local cb = RegisteredCallbacks
+    local A = env.Config.Agent
+    local now = 1000000
+    local realTime, realTrigger = os.time, _G.TriggerClientEvent
+    os.time = function() return now end
+    local sent = {}
+    _G.TriggerClientEvent = function(name, target, ...) sent[#sent + 1] = { name = name, target = target } end
+
+    local function person(src, cid, job) return { citizenid = cid, source = src, job = job, charinfo = { firstname = 'P' .. src, lastname = 'Q' .. src } } end
+    local function agentJob(grade, duty) return { name = 'realtor', onduty = duty ~= false, grade = grade } end
+    local function setup()
+        Mocks.players = { [10] = person(10, 'AGENT', agentJob(1)), [1] = person(1, 'BUYER1'), [2] = person(2, 'BUYER2'), [3] = person(3, 'FAR3') }
+        placePed(10, 0, 0, 0); placePed(1, 0, 0, 0); placePed(2, 0, 0, 0); placePed(3, 500, 0, 0)
+        Mocks.business, Mocks.credits = { dynasty8 = 0 }, {}
+        mysql.db.owners = {}
+        Mocks.payWithFails, Mocks.businessTransactFails = false, false
+        Mocks.calls.payWith, Mocks.calls.addMoney = 0, 0
+        A.commission = 0.03
+    end
+    local function show(p, buyer, from) return cb['som-housing:server:agentShow'](from or 10, { slug = p.slug, buyer = buyer }) end
+    local function viewed(p, buyer, from)
+        local r = show(p, buyer, from)
+        if not r.success then return r end
+        return cb['som-housing:server:agentViewAnswer'](buyer, true)
+    end
+    local function sell(p, buyer, from) return cb['som-housing:server:agentSell'](from or 10, { slug = p.slug, buyer = buyer }) end
+    local function accept(buyer) return cb['som-housing:server:agentSellAnswer'](buyer, true) end
+    local function full(p, buyer) local r = viewed(p, buyer); if not r.success then return r end; r = sell(p, buyer); if not r.success then return r end; return accept(buyer) end
+    local function forSale(p) return env.Properties.Claim(p.id) end
+
+    -- Who can show and sell
+    setup()
+    local lux = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    Mocks.players[10].job = agentJob(1, false)
+    check(show(lux, 1).error == 'only an estate agent on duty can do this', 'agent: an off duty agent cannot show a property')
+    Mocks.players[10].job = { name = 'taxi', onduty = true, grade = 1 }
+    check(show(lux, 1).error == 'only an estate agent on duty can do this', 'agent: only the realtor job can show a property')
+    Mocks.players[10].job = agentJob(1)
+    check(show(lux, 3).error == 'that buyer is not here' or show(lux, 3).error == 'both of you must be at the property', 'agent: a buyer across the map cannot be shown a property')
+    check(show(lux, 10).error == 'that buyer is not here', 'agent: an agent cannot sell to themselves')
+    check(show(lux, '1').error == 'that buyer is not here', 'agent: the buyer must be a whole number source')
+    check(sell(lux, 1).error == 'show them the property first', 'agent: a sale needs an accepted viewing first')
+    check(show(lux, 1).success, 'agent: a viewing is offered')
+    check(sell(lux, 1).error == 'show them the property first', 'agent: an offered but unanswered viewing is not enough')
+    check(not env.Agent.IsViewing('BUYER1', lux.id), 'agent: an unanswered viewing opens no door')
+    check(cb['som-housing:server:agentViewAnswer'](1, true).success, 'agent: the buyer accepts the viewing')
+    check(env.Agent.IsViewing('BUYER1', lux.id) and env.Agent.IsViewing('AGENT', lux.id) and not env.Agent.IsViewing('BUYER2', lux.id), 'agent: a viewing lets the buyer and the agent in, nobody else')
+    now = now + A.saleWindowMinutes * 60 + 1
+    check(not env.Agent.IsViewing('BUYER1', lux.id) and sell(lux, 1).error == 'show them the property first', 'agent: a viewing runs out')
+    now = 1000000
+
+    -- Grade gate: anyone shows, only the threshold closes the tier that needs an agent
+    setup()
+    Mocks.players[10].job = agentJob(A.approveGrade - 1)
+    check(viewed(lux, 1).success, 'agent: a junior agent can show a luxury property')
+    check(sell(lux, 1).error == 'a more senior agent has to close this one', 'agent: a junior agent cannot close a luxury sale')
+    local plain = seedProperty({ price = 50000 })
+    check(viewed(plain, 1).success and sell(plain, 1).success and accept(1).success, 'agent: a junior agent can close an ordinary sale')
+
+    -- A full luxury sale and where the money goes
+    setup()
+    local lux2 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    local plainBuy = cb['som-housing:server:buy'](1, { slug = lux2.slug, account = 'bank' })
+    check(plainBuy.error == 'this one is sold through an estate agent', 'agent: a luxury property still cannot be bought without an agent')
+    local r = full(lux2, 1)
+    check(r.success and env.Ownership.RoleOf('BUYER1', lux2.id) == 'owner', 'agent: the buyer owns the property after the sale')
+    check(Mocks.lastPay.amount == 100000 and Mocks.business.dynasty8 == 100000 - 3000, 'agent: the price goes into the agency account and the commission comes out of it')
+    check(Mocks.credits[#Mocks.credits].source == 10 and Mocks.credits[#Mocks.credits].amount == 3000, 'agent: the agent is paid 3 percent')
+    check(not forSale(lux2) and accept(1).error == 'that offer is gone', 'agent: a sale cannot be completed twice')
+
+    -- Two buyers, one property
+    setup()
+    local lux3 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    check(viewed(lux3, 1).success and viewed(lux3, 2).success, 'agent: two buyers can both be shown the property')
+    check(sell(lux3, 1).success and sell(lux3, 2).success, 'agent: both can be offered it')
+    check(accept(1).success, 'agent: the first buyer to answer gets it')
+    local paidBefore = Mocks.calls.payWith
+    check(accept(2).error == 'not for sale' and Mocks.calls.payWith == paidBefore, 'agent: the second buyer is refused before paying')
+    check(not env.Agent.IsViewing('BUYER2', lux3.id) and not env.Agent.IsViewing('AGENT', lux3.id), 'agent: a viewing no longer opens the door of a property somebody has bought')
+
+    -- Failures undo everything
+    setup()
+    local lux4 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    check(viewed(lux4, 1).success and sell(lux4, 1).success, 'agent: offer ready')
+    Mocks.payWithFails = true
+    check(not accept(1).success and forSale(lux4), 'agent: a buyer who cannot pay leaves the property for sale')
+    env.Properties.Release(lux4.id)
+    Mocks.payWithFails = false
+    check(viewed(lux4, 1).success and sell(lux4, 1).success, 'agent: offer again')
+    Mocks.businessTransactFails = true
+    local addBefore = Mocks.calls.addMoney
+    local fail = accept(1)
+    Mocks.businessTransactFails = false
+    check(not fail.success and Mocks.calls.addMoney == addBefore + 1 and Mocks.credits[#Mocks.credits].amount == 100000 and forSale(lux4), 'agent: an agency account that cannot take the price refunds the buyer')
+    env.Properties.Release(lux4.id)
+
+    -- Commission is only paid after the agency debit worked
+    setup()
+    A.commission = 1.5
+    local lux5 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    check(viewed(lux5, 1).success and sell(lux5, 1).success, 'agent: offer ready')
+    local res = accept(1)
+    check(res.success and #Mocks.credits == 0 and Mocks.business.dynasty8 == 100000, 'agent: no commission is minted when the agency debit is refused, the sale stands')
+    A.commission = 0.03
+
+    -- The agent leaving before the buyer answers
+    setup()
+    local lux6 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    check(viewed(lux6, 1).success and sell(lux6, 1).success, 'agent: offer ready')
+    Mocks.players[10].job = agentJob(1, false)
+    check(accept(1).error == 'the agent is no longer here' and forSale(lux6), 'agent: a sale is refused if the agent went off duty meanwhile')
+    env.Properties.Release(lux6.id)
+    setup()
+    check(viewed(lux6, 1).success and sell(lux6, 1).success, 'agent: offer ready again')
+    now = now + A.offerSeconds + 1
+    check(accept(1).error == 'that offer is gone', 'agent: a priced offer runs out')
+    now = 1000000
+
+    -- Declining ends it, and owner cap
+    setup()
+    local lux7 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    check(viewed(lux7, 1).success and sell(lux7, 1).success and cb['som-housing:server:agentSellAnswer'](1, false).success and forSale(lux7), 'agent: declining leaves the property for sale')
+    env.Properties.Release(lux7.id)
+    for i = 1, env.Config.Purchase.maxOwned do env.Ownership.Grant(seedProperty({}).id, 'BUYER2', 'owner') end
+    check(viewed(lux7, 2).success and sell(lux7, 2).success and accept(2).error:find('you already own'), 'agent: the owner cap applies to agent sales')
+
+    -- A second agent cannot wipe another agent's live offer
+    setup()
+    Mocks.players[11] = person(11, 'AGENT2', agentJob(1)); placePed(11, 0, 0, 0)
+    local lux8 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    local other = seedProperty({ price = 50000 })
+    check(viewed(lux8, 1).success, 'agent: first agent has an accepted viewing')
+    check(show(other, 1, 11).error == 'they are already talking to another agent', 'agent: a second agent cannot take over a buyer who is mid offer')
+    check(sell(lux8, 1).success and accept(1).success, 'agent: the first agent still closes the sale')
+    check(viewed(other, 2).success and show(other, 2, 11).error == 'they are already talking to another agent', 'agent: a second agent is refused while the first offer is live')
+    now = now + A.saleWindowMinutes * 60 + 1
+    check(show(other, 2, 11).success, 'agent: once the first offer ran out a second agent can show the buyer')
+
+    -- A commission that cannot be credited goes back to the agency
+    setup()
+    local lux9 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    check(viewed(lux9, 1).success and sell(lux9, 1).success, 'agent: offer ready')
+    Mocks.addMoneyFails = true
+    local logged = {}
+    local realPrint = _G.print
+    _G.print = function(...) logged[#logged + 1] = table.concat({ ... }, ' ') end
+    local res9 = accept(1)
+    _G.print = realPrint
+    Mocks.addMoneyFails = false
+    check(res9.success and #Mocks.credits == 0 and Mocks.business.dynasty8 == 100000, 'agent: a commission the agent could not receive goes back to the agency')
+
+    -- A refund that fails is logged for staff
+    setup()
+    local lux10 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    check(viewed(lux10, 1).success and sell(lux10, 1).success, 'agent: offer ready')
+    Mocks.addMoneyFails, Mocks.businessTransactFails = true, true
+    logged = {}
+    _G.print = function(...) logged[#logged + 1] = table.concat({ ... }, ' ') end
+    local res10 = accept(1)
+    _G.print = realPrint
+    Mocks.addMoneyFails, Mocks.businessTransactFails = false, false
+    check(not res10.success and logged[1] and logged[1]:find('refund $100000 by hand', 1, true) and forSale(lux10), 'agent: a failed buyer refund is logged for staff and the property goes back on sale')
+
+    os.time, _G.TriggerClientEvent = realTime, realTrigger
+end
+
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)
