@@ -7240,6 +7240,10 @@ do
 
     local _, r = strike(1, 'copper_1:1')
     check(r.count == 2, 'mining: nobody around, no bonus')
+    give(2, 'pickaxe')
+    check(cb['som-outdoors:server:mineBegin'](2, 'copper_1:01').success == false, 'mining: a zero padded key is not a second vein')
+    check(cb['som-outdoors:server:mineBegin'](2, 'copper_1:001').success == false, 'mining: a longer padded key is not a second vein')
+    Mocks.inv[2] = {}
     cb['som-outdoors:server:mineBegin'](1, 'copper_1:3')
     cb['som-outdoors:server:mineBegin'](1, 'copper_1:4')
     give(2, 'pickaxe')

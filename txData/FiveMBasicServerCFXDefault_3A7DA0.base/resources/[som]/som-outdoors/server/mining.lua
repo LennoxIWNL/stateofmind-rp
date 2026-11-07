@@ -63,6 +63,8 @@ lib.callback.register('som-outdoors:server:mineBegin', function(source, key)
 
     local site, coords = nodeByKey(key)
     if not site then return done(false, 'there is nothing to mine here') end
+    -- Aliases such as 'a:01' must not get their own vein state.
+    if key ~= ('%s:%d'):format(site.name, tonumber(key:match(':(%d+)$'))) then return done(false, 'there is nothing to mine here') end
     if not hasTool(source) then return done(false, 'you need a pickaxe') end
     if not near(source, coords, M.distance) then return done(false, 'you are too far from the vein') end
     if strikesLeft(player.citizenid) < 1 then return done(false, 'you have mined enough for this hour') end
