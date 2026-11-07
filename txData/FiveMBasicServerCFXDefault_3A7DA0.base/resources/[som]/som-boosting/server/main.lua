@@ -237,7 +237,7 @@ lib.callback.register('som-boosting:server:unlock', function(source, step)
     run.stage = 'deliver'
     SetVehicleDoorsLocked(run.entity, 1)
 
-    exports['som-dispatch']:alert(source, 'vehicleTheft', {
+    exports['som-dispatch']:alert(source, 'boostTheft', {
         coords = GetEntityCoords(run.entity), plate = run.plate, model = run.model,
         message = ('Vehicle theft: %s, plate %s'):format(run.model:upper(), run.plate),
     })
@@ -303,7 +303,7 @@ lib.callback.register('som-boosting:server:deliver', function(source, netId)
     end
 
     local ped = GetPlayerPed(source)
-    if ped == 0 or GetVehiclePedIsIn(ped, false) ~= entity then return done(false, 'you need to be driving it') end
+    if ped == 0 or GetPedInVehicleSeat(entity, -1) ~= ped then return done(false, 'you need to be driving it') end
     if #(GetEntityCoords(entity) - run.drop.coords) > Config.deliverDistance then return done(false, 'bring it to the drop-off') end
 
     -- The claim comes first, so two members handing it over cannot both be paid.

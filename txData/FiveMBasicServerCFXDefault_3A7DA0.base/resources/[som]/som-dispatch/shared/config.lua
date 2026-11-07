@@ -194,7 +194,7 @@ Config.Alerts = {
 
     -- Raised by som-boosting once, when a contract car is opened. NOT
     -- `reportable`: the server raises it with the car's own position.
-    vehicleTheft = {
+    boostTheft = {
         label = 'Vehicle Theft',
         code = '10-16',
         priority = 2,

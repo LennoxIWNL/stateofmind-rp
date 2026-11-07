@@ -5967,6 +5967,29 @@ do
     check(started == 1, 'mdt: repeated delete events for one incident start one check')
 end
 ----------------------------------------------------------------------
+-- som-dispatch alert table
+----------------------------------------------------------------------
+do
+    -- A repeated key in a table constructor is not an error in Lua: the later one silently wins.
+    local path = REPO .. 'som-dispatch/shared/config.lua'
+    local handle = assert(io.open(path, 'r'))
+    local text = handle:read('a')
+    handle:close()
+    local body = text:match('Config%.Alerts = {\n(.-)\n}\n')
+    local seen, dupes = {}, {}
+    for key in body:gmatch('\n    ([%w_]+) = {') do
+        if seen[key] then dupes[#dupes + 1] = key end
+        seen[key] = true
+    end
+    check(#dupes == 0, 'dispatch: no alert type is defined twice (' .. table.concat(dupes, ', ') .. ')')
+
+    local env = loader.loadResource(REPO .. 'som-dispatch', { 'shared/config.lua' })
+    local theft, boost = env.Config.Alerts.vehicleTheft, env.Config.Alerts.boostTheft
+    check(theft.reportable == true and theft.offset == 60.0 and theft.chance == 0.6, 'dispatch: the client detected vehicle theft alert is still reportable')
+    check(boost and not boost.reportable, 'dispatch: the boosting alert has its own type and cannot be reported by a client')
+end
+
+----------------------------------------------------------------------
 -- som-boosting
 ----------------------------------------------------------------------
 do
@@ -5977,7 +6000,7 @@ do
         -- Earlier scenes replace these natives and do not always put them back.
         _G.SetVehicleNumberPlateText = function(e, text) if Vehicles[e] then Vehicles[e].plate = text end end
         _G.SetVehicleDoorsLocked = function(e, state) if Vehicles[e] then Vehicles[e].locked = state end end
-        _G.GetVehiclePedIsIn = function(ped) return PedVehicle and PedVehicle[ped] or 0 end
+        _G.GetPedInVehicleSeat = function(e, seat) return seat == -1 and Vehicles[e] and Vehicles[e].driver or 0 end
         local env = loader.loadResource(REPO .. 'som-boosting', { 'shared/config.lua', 'server/main.lua' })
         Mocks.players[5] = { citizenid = 'P5', job = { name = 'police', onduty = true }, charinfo = { firstname = 'Po', lastname = 'Lice', phone = '555-0005' } }
         Mocks.minted, Mocks.mintFails = {}, false
@@ -6049,7 +6072,7 @@ do
         unlock(1, 'begin')
         Mocks.clock = Mocks.clock + 13000
         check(unlock(1, 'finish').success == true and Vehicles[car].locked == 1, 'boost: after the time the car opens')
-        check(Mocks.calls.dispatchAlert == 1 and Mocks.lastAlertType == 'vehicleTheft' and Mocks.lastAlertExtra.plate == row.plate and Mocks.lastAlertExtra.coords.x == 10,
+        check(Mocks.calls.dispatchAlert == 1 and Mocks.lastAlertType == 'boostTheft' and Mocks.lastAlertExtra.plate == row.plate and Mocks.lastAlertExtra.coords.x == 10,
             'boost: dispatch is told once, at the car')
         check(unlock(1, 'begin').error == 'there is nothing to open' and Mocks.calls.dispatchAlert == 1, 'boost: opening again raises no second call')
 
@@ -6066,7 +6089,9 @@ do
         check(deliver(1, car).error == 'that is not the car', 'boost: a changed model is refused')
         Vehicles[car].model = row.model
         check(deliver(1, car).error == 'you need to be driving it', 'boost: the sender must be in the car')
-        PedVehicle = { [1] = car }
+        Vehicles[car].driver = 2
+        check(deliver(1, car).error == 'you need to be driving it', 'boost: a passenger cannot hand the car over, only the driver')
+        Vehicles[car].driver = 1
         check(deliver(1, car).error == 'bring it to the drop-off', 'boost: the car must be at the drop-off')
         FakePeds[car] = vec3(500, 0, 0)
         check(deliver(1, car).error:find('give it a few minutes'), 'boost: a quick delivery is refused and the run stays open')
@@ -6104,7 +6129,7 @@ do
         local row, car = mysql.db.boost.runs[1], Spawned[#Spawned]
         FakePeds[car] = vec3(10, 0, 0); Vehicles[car].model = row.model
         check(openCar(unlock).success == true, 'boost: (setup) the car is opened')
-        FakePeds[car] = vec3(500, 0, 0); PedVehicle = { [1] = car }
+        FakePeds[car] = vec3(500, 0, 0); Vehicles[car].driver = 1
         FakePeds[1] = vec3(500, 0, 0); FakePeds[2] = vec3(520, 0, 0)
         mysql.fakeNow = mysql.fakeNow + 60
         check(deliver(1, car).success == true and #Mocks.minted == 2, 'boost: a crew member at the drop-off shares the pay')
@@ -6122,7 +6147,7 @@ do
         local row, car = mysql.db.boost.runs[1], Spawned[#Spawned]
         FakePeds[car] = vec3(10, 0, 0); Vehicles[car].model = row.model
         openCar(unlock)
-        FakePeds[car] = vec3(500, 0, 0); PedVehicle = { [1] = car }
+        FakePeds[car] = vec3(500, 0, 0); Vehicles[car].driver = 1
         FakePeds[1] = vec3(500, 0, 0); FakePeds[2] = vec3(5000, 0, 0)
         mysql.fakeNow = mysql.fakeNow + 60
         check(deliver(1, car).success == true and #Mocks.minted == 1 and #Mocks.minted[1].worths == 4, 'boost: a crew member far from the drop-off gets no share')
@@ -6137,7 +6162,7 @@ do
         local row, car = mysql.db.boost.runs[1], Spawned[#Spawned]
         FakePeds[car] = vec3(10, 0, 0); Vehicles[car].model = row.model
         openCar(unlock)
-        FakePeds[car] = vec3(500, 0, 0); PedVehicle = { [1] = car }
+        FakePeds[car] = vec3(500, 0, 0); Vehicles[car].driver = 1
         mysql.fakeNow = mysql.fakeNow + 60
         Mocks.mintFails = true
         check(deliver(1, car).success == true and row.status == 'unpaid' and row.paid == 0, 'boost: a mint that fails marks the run unpaid for staff')
@@ -6165,7 +6190,7 @@ do
         FakePeds[car] = vec3(10, 0, 0); Vehicles[car].model = row.model
         openCar(unlock)
         Handlers['som:server:playerUnloaded'](2, Mocks.players[2].citizenid)
-        FakePeds[car] = vec3(500, 0, 0); PedVehicle = { [1] = car }
+        FakePeds[car] = vec3(500, 0, 0); Vehicles[car].driver = 1
         FakePeds[1], FakePeds[2] = vec3(500, 0, 0), vec3(500, 0, 0)
         mysql.fakeNow = mysql.fakeNow + 60
         check(deliver(1, car).success == true and #Mocks.minted == 1 and #Mocks.minted[1].worths == 4, 'boost: a crew member who left the server is not paid and the others share the whole pay')
