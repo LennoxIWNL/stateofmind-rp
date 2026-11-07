@@ -441,3 +441,13 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] The treasury floor is checked under the loan lock, but other treasury spending (department budgets, heist and buyer payouts) can still lower it at the same moment; the floor is a guard, not a reservation.
 - [ ] Not verified in a live server: the Bank loans phone app, a real week passing, collection from a defaulted borrower in game.
 - [ ] Left out on purpose: business loans and loans to shops, interest that changes over time, credit scores, co-signers, seizing property on default, an early payoff rebate, a bank branch.
+
+## Fire department (som-fire)
+
+- [ ] Nothing starts a fire by itself. Staff use `/startfire` (needs `som.admin`) where they stand and `/stopfires` to clear. For fires without staff, fill `Config.ambient.locations` in `som-fire/shared/config.lua` with measured coordinates and set `enabled = true`.
+- [ ] The `firefighter` job (whitelisted, off duty by default) exists but nobody holds it. Hire the first Fire Chief by hand. Firefighters are paid from the `ems` account, which is topped up from the city treasury only for the shortfall of a payout, at most 4000 an hour for the whole server (`Config.pay.drawCapHourly`) and 1500 an hour per character. An empty treasury means nobody is paid.
+- [ ] Station and trucks are not set up. `som-garage` job entries need measured coordinates, so no `firetruk` was added: add a `type = 'job'` entry with `groups = { firefighter = 0 }` and a bay once the station is placed. Spraying from the seat of a `firetruk` is accepted by the server.
+- [ ] The fire extinguisher (`WEAPON_FIREEXTINGUISHER`) is sold in the general shops at 200. There is no equipment locker for firefighters yet.
+- [ ] The dispatch call for a fire is not closed when the fire is put out; it leaves the board with the normal call lifetime.
+- [ ] Spray counts, pay counts and treasury draws are held in memory and reset on restart.
+- [ ] Not verified live: flames drawing and clearing for every client (the natives themselves are confirmed), whether the game's own extinguisher stops the flame before the server count reaches zero, `IsPedShooting` and control 69 (vehicle attack) counting as spraying, the spread positions (they can land inside walls), the rescue move, and whether 10 second flames and 40 per flame feel right.

@@ -128,8 +128,19 @@ Config.Alerts = {
         priority = 1,
         chance = 1.0,
         cooldown = 20,
-        jobs = { 'police', 'ambulance' },
+        jobs = { 'police', 'ambulance', 'firefighter' },
         blip = { sprite = 280, colour = 5, scale = 1.0, duration = 600 },
+    },
+
+    -- Raised by som-fire when a fire starts. NOT `reportable`.
+    structureFire = {
+        label = 'Fire',
+        code = '10-70',
+        priority = 1,
+        chance = 1.0,
+        cooldown = 0,
+        jobs = { 'firefighter', 'ambulance', 'police' },
+        blip = { sprite = 436, colour = 1, scale = 1.0, duration = 600 },
     },
 
     -- Raised by som-turf on a street sale, at the seller's position, so most
