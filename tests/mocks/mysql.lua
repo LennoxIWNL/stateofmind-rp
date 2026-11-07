@@ -892,14 +892,15 @@ local function shopsDb(kind, query, params)
             local r = staffRow(params[2])
             if r then r.paid_at = params[1] end
             return true, 1
+        elseif has('INSERT IGNORE INTO som_shop_staff') then
+            -- som_shop_staff has no AUTO_INCREMENT, so a real insert reports insertId 0: callers must read affected rows.
+            if staffRow(params[1]) or staffCount(params[2]) >= params[5] then return true, 0 end
+            D.staff[#D.staff + 1] = { citizenid = params[1], shop = params[2], pay = params[3], paid_at = now() }
+            return true, 1
         end
     elseif kind == 'insert' then
         if has('INSERT IGNORE INTO som_shop_stock') then
             if not stockRow(params[1], params[2]) then D.stock[#D.stock + 1] = { shop = params[1], item = params[2], qty = 0, price = params[3] } end
-            return true, 1
-        elseif has('INSERT IGNORE INTO som_shop_staff') then
-            if staffRow(params[1]) or staffCount(params[2]) >= params[5] then return true, 0 end
-            D.staff[#D.staff + 1] = { citizenid = params[1], shop = params[2], pay = params[3], paid_at = now() }
             return true, 1
         end
     end
