@@ -7412,6 +7412,43 @@ do
     for i = 1, env.Config.Purchase.maxOwned do env.Ownership.Grant(seedProperty({}).id, 'BUYER2', 'owner') end
     check(viewed(lux7, 2).success and sell(lux7, 2).success and accept(2).error:find('you already own'), 'agent: the owner cap applies to agent sales')
 
+    -- A second agent cannot wipe another agent's live offer
+    setup()
+    Mocks.players[11] = person(11, 'AGENT2', agentJob(1)); placePed(11, 0, 0, 0)
+    local lux8 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    local other = seedProperty({ price = 50000 })
+    check(viewed(lux8, 1).success, 'agent: first agent has an accepted viewing')
+    check(show(other, 1, 11).error == 'they are already talking to another agent', 'agent: a second agent cannot take over a buyer who is mid offer')
+    check(sell(lux8, 1).success and accept(1).success, 'agent: the first agent still closes the sale')
+    check(viewed(other, 2).success and show(other, 2, 11).error == 'they are already talking to another agent', 'agent: a second agent is refused while the first offer is live')
+    now = now + A.saleWindowMinutes * 60 + 1
+    check(show(other, 2, 11).success, 'agent: once the first offer ran out a second agent can show the buyer')
+
+    -- A commission that cannot be credited goes back to the agency
+    setup()
+    local lux9 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    check(viewed(lux9, 1).success and sell(lux9, 1).success, 'agent: offer ready')
+    Mocks.addMoneyFails = true
+    local logged = {}
+    local realPrint = _G.print
+    _G.print = function(...) logged[#logged + 1] = table.concat({ ... }, ' ') end
+    local res9 = accept(1)
+    _G.print = realPrint
+    Mocks.addMoneyFails = false
+    check(res9.success and #Mocks.credits == 0 and Mocks.business.dynasty8 == 100000, 'agent: a commission the agent could not receive goes back to the agency')
+
+    -- A refund that fails is logged for staff
+    setup()
+    local lux10 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    check(viewed(lux10, 1).success and sell(lux10, 1).success, 'agent: offer ready')
+    Mocks.addMoneyFails, Mocks.businessTransactFails = true, true
+    logged = {}
+    _G.print = function(...) logged[#logged + 1] = table.concat({ ... }, ' ') end
+    local res10 = accept(1)
+    _G.print = realPrint
+    Mocks.addMoneyFails, Mocks.businessTransactFails = false, false
+    check(not res10.success and logged[1] and logged[1]:find('refund $100000 by hand', 1, true) and forSale(lux10), 'agent: a failed buyer refund is logged for staff and the property goes back on sale')
+
     os.time, _G.TriggerClientEvent = realTime, realTrigger
 end
 

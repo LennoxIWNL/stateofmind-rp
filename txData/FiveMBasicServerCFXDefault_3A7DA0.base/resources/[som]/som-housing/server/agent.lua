@@ -61,6 +61,13 @@ function Agent.IsViewing(citizenid, propertyId)
     return false
 end
 
+---Gives the buyer their money back. A refund that fails is logged for staff, never retried into a loop.
+local function refundBuyer(source, citizenid, price, slug)
+    if not core:addMoney(source, 'bank', price, 'property-refund') then
+        print(('[som-housing] agent sale of %s: could not refund %s, refund $%d by hand'):format(slug, citizenid, price))
+    end
+end
+
 ---Reads the agent, the property and the buyer shared by both agent steps. Returns the failure otherwise.
 local function resolveSale(source, data)
     if type(data) ~= 'table' then return nil, done(false, 'bad request') end
@@ -87,6 +94,12 @@ end
 lib.callback.register('som-housing:server:agentShow', function(source, data)
     local sale, failure = resolveSale(source, data)
     if not sale then return failure end
+
+    -- Another agent's live offer is not wiped by a second agent showing the same buyer something.
+    local live = offers[sale.buyer.citizenid]
+    if live and live.agent ~= sale.agent.citizenid and live.expires >= os.time() then
+        return done(false, 'they are already talking to another agent')
+    end
 
     offers[sale.buyer.citizenid] = {
         property = sale.property.id, agent = sale.agent.citizenid, agentSource = source,
@@ -172,7 +185,7 @@ lib.callback.register('som-housing:server:agentSellAnswer', function(source, acc
     end
 
     if not core:businessTransact(Config.Finance.business, price, reason) then
-        core:addMoney(source, 'bank', price, 'property-refund')
+        refundBuyer(source, buyer.citizenid, price, property.slug)
         Properties.Release(property.id)
         return done(false, 'could not register the sale')
     end
@@ -180,7 +193,7 @@ lib.callback.register('som-housing:server:agentSellAnswer', function(source, acc
     if not Ownership.Grant(property.id, buyer.citizenid, 'owner', agent.citizenid) then
         -- Only refunded from money the agency still holds; otherwise staff have to settle it by hand.
         if core:businessTransact(Config.Finance.business, -price, 'property-refund') then
-            core:addMoney(source, 'bank', price, 'property-refund')
+            refundBuyer(source, buyer.citizenid, price, property.slug)
         else
             print(('[som-housing] agent sale of %s failed after payment and the agency could not refund %s, refund $%d by hand'):format(property.slug, buyer.citizenid, price))
         end
@@ -194,10 +207,11 @@ lib.callback.register('som-housing:server:agentSellAnswer', function(source, acc
     local payee = core:getPlayerByCitizenId(offer.agent)
     if commission > 0 and payee then
         if core:businessTransact(Config.Finance.business, -commission, ('commission:%s'):format(agent.citizenid)) then
-            core:addMoney(payee.source, 'bank', commission, ('property-commission:%s'):format(property.slug))
-            TriggerClientEvent('som:client:notify', payee.source, ('%s sold. Your commission is $%d.'):format(property.label, commission), 'success')
-        else
-            commission = 0
+            if core:addMoney(payee.source, 'bank', commission, ('property-commission:%s'):format(property.slug)) then
+                TriggerClientEvent('som:client:notify', payee.source, ('%s sold. Your commission is $%d.'):format(property.label, commission), 'success')
+            elseif not core:businessTransact(Config.Finance.business, commission, ('commission:%s:refund'):format(agent.citizenid)) then
+                print(('[som-housing] agent sale of %s: commission $%d left the agency but %s was not paid, settle it by hand'):format(property.slug, commission, agent.citizenid))
+            end
         end
     end
 
