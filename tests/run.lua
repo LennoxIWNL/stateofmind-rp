@@ -7768,6 +7768,7 @@ do
     B.hourlyCap = 100
     local c = cb['som-outdoors:server:sell'](1, 'quarry')
     check(c.success and c.paid <= 100, 'quarry: the hourly cap applies')
+end
 
 do
     resetDb()
