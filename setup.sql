@@ -1977,7 +1977,8 @@ CREATE TABLE IF NOT EXISTS `som_news_stories` (
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_status_id` (`status`, `id`),
-  KEY `idx_citizen_kind_time` (`citizenid`, `kind`, `created_at`)
+  KEY `idx_citizen_kind_time` (`citizenid`, `kind`, `created_at`),
+  KEY `idx_kind_time` (`kind`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `som_news_payouts` (

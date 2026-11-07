@@ -592,6 +592,7 @@ local function newsDb(kind, query, params)
     elseif kind == 'insert' and has('INSERT INTO som_news_stories (citizenid, author, kind, headline, body)') then
         for _, x in ipairs(N.stories) do
             if x.citizenid == params[6] and x.kind == params[7] and x.ts > now() - params[8] then return true, 0 end
+            if x.kind == 'breaking' and params[9] == 'breaking' and x.ts > now() - params[10] then return true, 0 end
         end
         N.stories[#N.stories + 1] = { id = #N.stories + 1, citizenid = params[1], author = params[2], kind = params[3],
             headline = params[4], body = params[5], status = 'live', paid = 0, ts = now() }

@@ -7303,7 +7303,9 @@ do
     Mocks.admins = { [4] = true }
     Mocks.addMoneyFails = false
     local saved = { addMoney = core.addMoney, getPlayers = core.getPlayers }
-    function core:addMoney(source, _, amount)
+    local lastOpts
+    function core:addMoney(source, _, amount, _, opts)
+        lastOpts = opts
         if Mocks.addMoneyThrows then error('simulated crash') end
         if Mocks.addMoneyFails then return false, 'refused' end
         Mocks.bank[source] = (Mocks.bank[source] or 0) + amount
@@ -7342,6 +7344,8 @@ do
     local r = publish(1, 'story', 'Bank robbery downtown')
     check(r.success and r.paid == 150 and mysql.db.news.stories[1].author == 'F1 L1', 'news: the author comes from the character, not the request')
     check(Mocks.bank[1] == 150 and Mocks.treasury == 9850, 'news: a story pays from the treasury with a matching debit')
+    check(lastOpts and lastOpts.counterparty == 'treasury' and lastOpts.flow == 'transfer', 'news: the credit is a transfer from the treasury, so the economy watch does not count it as a second faucet')
+
 
     check(not publish(1, 'story', 'Another one coming', BODY .. ' More.').success and #mysql.db.news.stories == 1, 'news: a second story inside the gap is refused')
     mysql.fakeNow = mysql.fakeNow + 121
@@ -7405,6 +7409,33 @@ do
     check(mysql.db.news.stories[1].status == 'removed' and not has(titles(view(2)), 'Bank robbery downtown'), 'news: staff remove a story and it leaves the feed')
     Mocks.commands.removestory(4, { id = 1 })
     check(#mysql.db.phoneAudit == 2 and mysql.db.phoneAudit[2].ok == 0, 'news: removals are audited, including a repeat that removed nothing')
+
+    -- Multibyte text: cut on a character, measured in characters.
+    mysql.fakeNow = mysql.fakeNow + 4000
+    local accent = ('\195\169'):rep(100)
+    local wide = app.handler(5, 'publish', { kind = 'story', text = accent .. ' | ' .. ('\195\188'):rep(600) })
+    local last = mysql.db.news.stories[#mysql.db.news.stories]
+    check(wide.success and utf8.len(last.headline) == C.headline.max and utf8.len(last.body) <= C.body.max and utf8.len(last.body) > 400, 'news: long multibyte text is cut at the character limit and stored whole')
+    check(not app.handler(5, 'publish', { kind = 'story', text = ('\195\169'):rep(5) .. ' | ' .. BODY }).success, 'news: the headline minimum counts characters, not bytes')
+    mysql.fakeNow = mysql.fakeNow + 121
+    check(not app.handler(5, 'publish', { kind = 'story', text = 'A decent headline | ' .. ('\195\169'):rep(40) }).success, 'news: the story minimum counts characters, not bytes')
+    check(not app.handler(5, 'publish', { kind = 'story', text = 'A decent headline | ' .. BODY .. '\255\254' }).success, 'news: text that is not valid UTF-8 is refused')
+
+    -- Breaking alerts: one per network gap across all reporters.
+    mysql.fakeNow = mysql.fakeNow + 4000
+    check(publish(1, 'breaking', 'Fire at the docks tonight').success, 'news: a breaking alert goes out')
+    mysql.fakeNow = mysql.fakeNow + 60
+    check(not publish(5, 'breaking', 'Another alert from the rival paper', BODY .. ' Rival.').success, 'news: a second reporter cannot send a breaking alert inside the network gap')
+    check(publish(5, 'story', 'A plain story is not held back', BODY .. ' Plain.').success, 'news: the network gap holds back breaking alerts only')
+    mysql.fakeNow = mysql.fakeNow + C.breakingNetworkGapSeconds
+    check(publish(5, 'breaking', 'Another alert from the rival paper', BODY .. ' Rival.').success, 'news: another reporter can send one after the network gap')
+
+    -- /removestory takes a whole number.
+    local audits = #mysql.db.phoneAudit
+    Mocks.commands.removestory(4, { id = 1.5 })
+    check(#mysql.db.phoneAudit == audits and mysql.db.news.stories[2].status == 'live' and mysql.db.news.stories[1].status == 'removed', 'news: a story number that is not whole is refused before anything runs')
+    Mocks.commands.removestory(4, { id = 0 })
+    check(#mysql.db.phoneAudit == audits, 'news: story number zero is refused')
 
     core.addMoney, core.getPlayers = saved.addMoney, saved.getPlayers
     Mocks.exported.notifyApp = nil

@@ -21,7 +21,12 @@ local function clean(value, maxLength)
     local text = value:gsub('[<>]', ''):gsub('%c', ' '):gsub('%s+', ' '):gsub('^%s*(.-)%s*$', '%1')
     if text == '' then return nil end
 
-    return text:sub(1, maxLength)
+    if not utf8.len(text) then return nil end
+
+    -- Cut on a character, not a byte: half a multibyte character is not valid UTF-8 and the
+    -- strict mode insert would throw on it.
+    local cut = utf8.offset(text, maxLength + 1)
+    return cut and text:sub(1, cut - 1) or text
 end
 
 local function isReporter(player)
@@ -54,7 +59,7 @@ local function pay(source, player, storyId)
         state.payoutId = MySQL.insert.await(
             'INSERT INTO som_news_payouts (citizenid, amount) VALUES (?, ?)', { player.citizenid, amount })
 
-        if not core:addMoney(source, 'bank', amount, state.reason) then return end
+        if not core:addMoney(source, 'bank', amount, state.reason, { counterparty = 'treasury', flow = 'transfer' }) then return end
         state.paid = amount
         MySQL.update.await('UPDATE som_news_stories SET paid = ? WHERE id = ?', { amount, storyId })
     end)
@@ -124,8 +129,8 @@ function actions.publish(source, payload, player)
     local headline, body = (text or ''):match('^(.-)%s*|%s*(.+)$')
     if not headline then return done(false, 'write it as: headline | story') end
     headline, body = clean(headline, Config.headline.max), clean(body, Config.body.max)
-    if not headline or #headline < Config.headline.min then return done(false, 'the headline is too short') end
-    if not body or #body < Config.body.min then return done(false, 'a story needs more than that') end
+    if not headline or utf8.len(headline) < Config.headline.min then return done(false, 'the headline is too short') end
+    if not body or utf8.len(body) < Config.body.min then return done(false, 'a story needs more than that') end
 
     local last = MySQL.single.await(
         'SELECT headline, body FROM som_news_stories WHERE citizenid = ? ORDER BY id DESC LIMIT 1', { player.citizenid })
@@ -139,8 +144,10 @@ function actions.publish(source, payload, player)
         SELECT ?, ?, ?, ?, ? FROM DUAL
         WHERE NOT EXISTS (
             SELECT 1 FROM som_news_stories WHERE citizenid = ? AND kind = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND)
+        ) AND NOT EXISTS (
+            SELECT 1 FROM som_news_stories WHERE kind = 'breaking' AND ? = 'breaking' AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND)
         )
-    ]], { player.citizenid, author, kind, headline, body, player.citizenid, kind, Config.gapSeconds[kind] })
+    ]], { player.citizenid, author, kind, headline, body, player.citizenid, kind, Config.gapSeconds[kind], kind, Config.breakingNetworkGapSeconds })
     if not id or id < 1 then return done(false, 'slow down') end
 
     local paid = kind == 'story' and pay(source, player, id) or 0
@@ -177,11 +184,14 @@ lib.addCommand('removestory', {
 
     if source ~= 0 and not core:hasPermission(source, 'som.mod') then return say('You do not have permission to do that') end
 
-    local gone = MySQL.update.await("UPDATE som_news_stories SET status = 'removed' WHERE id = ? AND status = 'live'", { args.id })
+    local id = math.tointeger(args.id)
+    if not id or id < 1 then return say('Use the whole number of the story') end
+
+    local gone = MySQL.update.await("UPDATE som_news_stories SET status = 'removed' WHERE id = ? AND status = 'live'", { id })
 
     local staff = source ~= 0 and core:getPlayer(source) or nil
     MySQL.insert.await('INSERT INTO som_phone_audit (citizenid, app, action, ok) VALUES (?, ?, ?, ?)',
-        { staff and staff.citizenid or 'console', 'moderation', ('remove story %d'):format(args.id), gone == 1 and 1 or 0 })
+        { staff and staff.citizenid or 'console', 'moderation', ('remove story %d'):format(id), gone == 1 and 1 or 0 })
 
     say(gone == 1 and 'Removed' or 'Nothing to remove')
 end)

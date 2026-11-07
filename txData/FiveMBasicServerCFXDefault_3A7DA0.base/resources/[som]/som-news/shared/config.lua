@@ -11,6 +11,7 @@ Config = {
     body = { min = 60, max = 500 },
 
     gapSeconds = { story = 120, breaking = 600 },
+    breakingNetworkGapSeconds = 300,   -- one breaking alert in this time across all reporters together
 
     -- Only stories pay. The city treasury is the source; an empty treasury pays nothing.
     pay = {
