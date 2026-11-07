@@ -47,6 +47,7 @@ M.db = {
     chop = { log = {}, owned = {} },
     licences = { rows = {}, attempts = {} },
     taxi = { earned = {} },
+    welcome = { claims = {}, jobs = {}, homes = {} },
     carsales = { vehicles = {}, flagged = {}, stolen = {}, sales = {} },
     lab = {},
     plants = {},
@@ -1053,6 +1054,48 @@ local function carsales(kind, query, params)
     return false
 end
 
+local function welcome(kind, query, params)
+    local W = M.db.welcome
+    if kind == 'update' and query:find('INSERT INTO som_welcome_jobs', 1, true) then
+        local r = W.jobs[params[1]]
+        if not r then W.jobs[params[1]] = { job = params[2], since = now() } else
+            if r.job ~= params[2] then r.since = now() end
+            r.job = params[2]
+        end
+        return true, 1
+    elseif kind == 'scalar' and query:find('AND job = ? AND since <= DATE_SUB', 1, true) then
+        local r = W.jobs[params[1]]
+        return true, (r and r.job == params[2] and r.since <= now() - params[3] * 60) and 1 or nil
+    elseif kind == 'scalar' and query:find("FROM som_property_owners WHERE citizenid = ? AND role IN ('owner', 'tenant')", 1, true) then
+        return true, W.homes[params[1]] and 1 or nil
+    elseif kind == 'scalar' and query:find("AND type = 'driver' AND revoked = 0", 1, true) then
+        local r = M.db.licences.rows[params[1] .. ':driver']
+        return true, (r and r.revoked == 0 and (r.suspendedUntil == nil or r.suspendedUntil <= now())) and 1 or nil
+    elseif kind == 'scalar' and query:find('SELECT 1 FROM som_welcome_claims WHERE citizenid = ?', 1, true) then
+        return true, W.claims[params[1]] and 1 or nil
+    elseif kind == 'update' and query:find('INSERT INTO som_welcome_claims', 1, true) then
+        if W.claims[params[1]] then error('Duplicate entry for key PRIMARY') end
+        local sum = 0
+        for _, c in pairs(W.claims) do if c.ts > now() - 30 * 86400 then sum = sum + c.amount end end
+        if sum + params[3] > params[4] then return true, 0 end
+        W.claims[params[1]] = { amount = params[2], ts = now() }
+        return true, 1
+    elseif kind == 'update' and query:find('DELETE FROM som_welcome_claims WHERE citizenid = ?', 1, true) then
+        local had = W.claims[params[1]] ~= nil
+        W.claims[params[1]] = nil
+        return true, had and 1 or 0
+    elseif kind == 'update' and query:find('UPDATE som_welcome_jobs SET centre_at = NOW()', 1, true) then
+        local r = W.jobs[params[1]]
+        if r and (r.centre_at == nil or r.centre_at < now() - params[2] * 60) then r.centre_at = now(); return true, 1 end
+        return true, 0
+    elseif kind == 'update' and query:find('UPDATE som_welcome_jobs SET centre_at = NULL', 1, true) then
+        local r = W.jobs[params[1]]
+        if r then r.centre_at = nil end
+        return true, r and 1 or 0
+    end
+    return false
+end
+
 local function taxi(kind, query, params)
     if kind == 'scalar' and query:find("reason = 'taxi:commission'", 1, true) then
         return true, M.db.taxi.earned[params[1]] or 0
@@ -1608,6 +1651,7 @@ function M.scalar(query, params)
     do local handled, value = chop('scalar', query, params); if handled then return value end end
     do local handled, value = licences('scalar', query, params); if handled then return value end end
     do local handled, value = taxi('scalar', query, params); if handled then return value end end
+    do local handled, value = welcome('scalar', query, params); if handled then return value end end
     do local handled, value = skills('scalar', query, params); if handled then return value end end
     do local handled, value = trade('scalar', query, params); if handled then return value end end
     do local handled, value = moneyRows('scalar', query, params); if handled then return value end end
@@ -1712,6 +1756,7 @@ function M.update(query, params)
     do local handled, value = leases('update', query, params); if handled then return value end end
     do local handled, value = shopsDb('update', query, params); if handled then return value end end
     do local handled, value = dmv('update', query, params); if handled then return value end end
+    do local handled, value = welcome('update', query, params); if handled then return value end end
     do local handled, value = carsales('update', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('update', query, params); if handled then return value end end
     do local handled, value = licences('update', query, params); if handled then return value end end

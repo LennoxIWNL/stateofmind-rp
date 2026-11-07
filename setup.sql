@@ -1952,3 +1952,28 @@ CREATE TABLE IF NOT EXISTS `som_loans` (
   KEY `idx_citizen` (`citizenid`, `status`),
   KEY `idx_due` (`status`, `next_due`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
+--  7p. NEW PLAYER ONBOARDING (som-welcome)
+--
+--  The settling-in payment: one row per character (the primary key is the once
+--  only rule), and the rows from the last 30 days are the global monthly cap.
+--  The jobs table remembers which job a character holds and since when, and
+--  when they last used the job centre. No foreign keys: both are records.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_welcome_claims` (
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `amount`     BIGINT NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`citizenid`),
+  KEY `idx_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_welcome_jobs` (
+  `citizenid` VARCHAR(16) NOT NULL,
+  `job`       VARCHAR(32) NOT NULL,
+  `since`     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `centre_at` TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (`citizenid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

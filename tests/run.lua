@@ -62,6 +62,7 @@ local function resetDb()
     mysql.db.licences = { rows = {}, attempts = {} }
     mysql.db.staff = { reports = {}, audit = {} }
     mysql.db.taxi = { earned = {} }
+    mysql.db.welcome = { claims = {}, jobs = {}, homes = {} }
     mysql.db.dmv = { vehicles = {}, registration = {}, log = {}, mdt = {}, flagged = {}, bolo = {}, wanted = {} }
     mysql.db.carsales = { vehicles = {}, flagged = {}, stolen = {}, sales = {} }
     mysql.db.gangs = { chars = {}, log = {} }
@@ -7275,6 +7276,136 @@ do
 end
 
 
+
+
+do
+    resetDb()
+    local realThread, realJobs = _G.CreateThread, Mocks.jobs
+    _G.CreateThread = function() end
+    Mocks.jobs = {
+        unemployed = { whitelisted = false, defaultDuty = true }, taxi = { whitelisted = false, defaultDuty = true },
+        delivery = { whitelisted = false, defaultDuty = true }, police = { whitelisted = true, defaultDuty = false },
+        mechanic = { whitelisted = true, defaultDuty = true },
+    }
+    local env = loader.loadResource(REPO .. 'som-welcome', { 'shared/config.lua', 'server/main.lua' })
+    _G.CreateThread = realThread
+    local cb, C = RegisteredCallbacks, env.Config
+    local W = mysql.db.welcome
+    local app = Mocks.apps.welcome
+    local base = 1800000000
+
+    local function person(src, cid, job)
+        Mocks.players[src] = { source = src, citizenid = cid, job = { name = job or 'unemployed', grade = 0 }, charinfo = { firstname = cid, lastname = 'T' } }
+        FakePeds[src] = vec3(0, 0, 0)
+        Mocks.bank[src] = 0
+    end
+    local function rows(view)
+        local out = {}
+        for _, sec in ipairs(view.sections) do for _, r in ipairs(sec.rows) do out[#out + 1] = r end end
+        return out
+    end
+    local function claimable(src)
+        for _, r in ipairs(rows(app.handler(src, 'view').view)) do if r.action == 'claim' then return true end end
+        return false
+    end
+    local function ready(src, cid, job)
+        person(src, cid, job)
+        mysql.db.licences.rows[cid .. ':driver'] = { citizenid = cid, type = 'driver', revoked = 0 }
+        W.homes[cid] = true
+        Handlers['som:server:jobChanged'](src, cid, { name = job })
+    end
+
+    mysql.fakeNow = base
+    Mocks.treasury = 50000
+    person(1, 'W1')
+    Handlers['som:server:playerLoaded'](1, 'W1')
+
+    check(app.handler(1, 'view').view.sections[1].title == 'Welcome' and #app.handler(1, 'view').view.sections[1].rows == #C.guide, 'welcome: the app shows the guide')
+    check(not claimable(1) and app.handler(1, 'claim').error == 'finish every step first', 'welcome: nothing to claim with no steps done')
+    check(app.handler(1, 'nope').error == 'not available', 'welcome: an unknown action is refused')
+
+    -- Each step, on its own data.
+    mysql.db.licences.rows['W1:driver'] = { citizenid = 'W1', type = 'driver', revoked = 1 }
+    W.homes.W1 = true
+    Handlers['som:server:jobChanged'](1, 'W1', { name = 'taxi' }); Mocks.players[1].job.name = 'taxi'
+    check(not claimable(1), 'welcome: a revoked licence is not a licence')
+    mysql.db.licences.rows['W1:driver'] = { citizenid = 'W1', type = 'driver', revoked = 0, suspendedUntil = base + 86400 }
+    check(not claimable(1), 'welcome: a suspended licence is not a licence')
+    mysql.db.licences.rows['W1:driver'].suspendedUntil = nil
+    check(not claimable(1), 'welcome: a job just taken does not count yet')
+    mysql.fakeNow = base + (C.jobMinutes - 1) * 60
+    check(not claimable(1), 'welcome: nor one minute before the time')
+    Handlers['som:server:jobChanged'](1, 'W1', { name = 'delivery' }); Mocks.players[1].job.name = 'delivery'
+    mysql.fakeNow = base + (C.jobMinutes + 1) * 60
+    check(not claimable(1), 'welcome: changing job starts the clock again')
+    mysql.fakeNow = base + (2 * C.jobMinutes + 2) * 60
+    Handlers['som:server:jobChanged'](1, 'W1', { name = 'delivery' })
+    check(claimable(1), 'welcome: all three steps make the payment claimable, and a repeat job event does not reset the clock')
+    W.homes.W1 = nil
+    check(not claimable(1), 'welcome: no home, no payment')
+    W.homes.W1 = true
+    Mocks.players[1].job.name = 'unemployed'
+    check(not claimable(1), 'welcome: no job, no payment')
+    Mocks.players[1].job.name = 'delivery'
+
+    -- The claim.
+    local r = app.handler(1, 'claim')
+    check(r.success and r.paid == C.payment and Mocks.treasury == 50000 - C.payment and Mocks.lastPaid.amount == C.payment and Mocks.lastPaid.reason == 'welcome:settling-in',
+        'welcome: the payment comes out of the treasury and goes to the player')
+    check(W.claims.W1 and W.claims.W1.amount == C.payment, 'welcome: the claim is recorded')
+    check(app.handler(1, 'claim').error == 'you have already had it' and Mocks.treasury == 50000 - C.payment, 'welcome: it is paid once')
+    check(not claimable(1) and rows(app.handler(1, 'view').view)[#rows(app.handler(1, 'view').view)].title == 'Received', 'welcome: the app shows it was received')
+
+    -- The global monthly cap.
+    C.monthlyCap = C.payment + C.payment // 2
+    ready(2, 'W2', 'taxi'); mysql.fakeNow = mysql.fakeNow + 3600
+    check(app.handler(2, 'claim').error:find('any more settling%-in payments'), 'welcome: the monthly cap covers every character together')
+    check(W.claims.W2 == nil, 'welcome: a refused claim leaves no row')
+    mysql.fakeNow = mysql.fakeNow + 31 * 86400
+    check(app.handler(2, 'claim').success, 'welcome: the cap frees up after 30 days')
+    C.monthlyCap = 20000
+
+    -- Money failures put everything back.
+    ready(3, 'W3', 'taxi'); mysql.fakeNow = mysql.fakeNow + 3600
+    Mocks.treasury = 0
+    r = app.handler(3, 'claim')
+    check(not r.success and W.claims.W3 == nil and Mocks.treasury == 0, 'welcome: an empty treasury refuses the payment and frees the claim')
+    Mocks.treasury = 5000
+    Mocks.addMoneyFails = true
+    r = app.handler(3, 'claim')
+    Mocks.addMoneyFails = false
+    check(not r.success and W.claims.W3 == nil and Mocks.treasury == 5000, 'welcome: a failed credit returns the money to the treasury and frees the claim')
+    check(app.handler(3, 'claim').success and W.claims.W3, 'welcome: and the player can claim again afterwards')
+
+    -- Job centre.
+    person(10, 'J10')
+    Handlers['som:server:playerLoaded'](10, 'J10')
+    local jobs, setJob = cb['som-welcome:server:jobs'], cb['som-welcome:server:setJob']
+    check(cb['som-welcome:server:desk']() == nil and jobs(10).error == 'you are not at the counter', 'welcome: the job centre ships closed')
+    C.desk.enabled, C.desk.coords = true, vec3(0, 0, 0)
+    FakePeds[10] = vec3(50, 0, 0)
+    check(setJob(10, 'taxi').error == 'you are not at the counter', 'welcome: the desk needs you at it')
+    FakePeds[10] = vec3(0, 0, 0)
+    local list = jobs(10)
+    check(list.success and #list.jobs == 2 and list.jobs[1].name == 'taxi' and list.current == 'unemployed', 'welcome: the desk lists only the configured jobs')
+    check(setJob(10, 5).error == 'bad request', 'welcome: the job must be a name')
+    check(setJob(10, 'police').error == 'the job centre cannot place you there' and setJob(10, 'mechanic').error == 'the job centre cannot place you there', 'welcome: a whitelisted job is never handed out')
+    check(setJob(10, 'madeup').error == 'the job centre cannot place you there', 'welcome: the client cannot invent a job')
+    check(setJob(10, 'unemployed').error == 'you already have that', 'welcome: you cannot take the job you have')
+    r = setJob(10, 'taxi')
+    check(r.success and Mocks.players[10].job.name == 'taxi' and Mocks.players[10].job.grade == 0 and Mocks.players[10].job.onduty == true, 'welcome: the desk gives the job at grade 0')
+    check(setJob(10, 'delivery').error:find('once every'), 'welcome: job changes at the desk are spaced out')
+    mysql.fakeNow = mysql.fakeNow + (C.desk.cooldownMinutes + 1) * 60
+    check(setJob(10, 'unemployed').success and Mocks.players[10].job.name == 'unemployed', 'welcome: an open job can be left at the desk')
+    person(11, 'J11', 'police')
+    Handlers['som:server:playerLoaded'](11, 'J11')
+    check(setJob(11, 'taxi').error == 'you cannot leave that job here', 'welcome: a whitelisted job cannot be left through the desk')
+    person(12, 'J12')
+    Mocks.jobs.taxi = nil
+    check(setJob(12, 'taxi').error == 'the job centre cannot place you there', 'welcome: a job the framework does not have is refused')
+    Mocks.jobs = realJobs
+    _G.CreateThread = realThread
+end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)
