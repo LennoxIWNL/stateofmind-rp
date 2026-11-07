@@ -63,6 +63,24 @@ Config.Balance = {
 }
 
 -- ---------------------------------------------------------------------------
+-- Watch: hourly checks and a daily digest of som_transactions, posted to the
+-- Discord webhook in the `som_economy_webhook` convar (empty means console only).
+-- Read only. Alerts and digests carry citizenids, amounts and reasons, nothing else.
+-- The limits are first guesses; tune them against the real ledger (LAUNCH-TODO.md).
+-- ---------------------------------------------------------------------------
+
+Config.Watch = {
+    checkMinutes = 60,
+    digestHours = 24,
+    top = 8,                          -- sources listed per flow in the digest
+    citizenFaucetLimit = 50000,       -- one character's faucet income in a check window
+    citizenTransferInLimit = 100000,  -- one character's incoming transfers in a check window
+    singleRowLimit = 250000,          -- one faucet ledger row
+    treasuryFloor = 0,                -- alert below this; 0 turns it off
+    alertCooldownMinutes = 120,       -- the same alert about the same character, at most this often
+}
+
+-- ---------------------------------------------------------------------------
 -- Tax
 --
 -- Collected from business revenue into the treasury, never from a player's

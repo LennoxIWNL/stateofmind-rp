@@ -136,7 +136,8 @@ CREATE TABLE IF NOT EXISTS `som_transactions` (
   KEY `idx_citizen_time` (`citizenid`, `created_at`),
   KEY `idx_flow_time` (`flow`, `created_at`),
   KEY `idx_reason` (`reason`),
-  KEY `idx_resource` (`resource`)
+  KEY `idx_resource` (`resource`),
+  KEY `idx_time` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Personal, business, gang and offshore accounts share one table.

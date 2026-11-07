@@ -441,3 +441,12 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] The treasury floor is checked under the loan lock, but other treasury spending (department budgets, heist and buyer payouts) can still lower it at the same moment; the floor is a guard, not a reservation.
 - [ ] Not verified in a live server: the Bank loans phone app, a real week passing, collection from a defaulted borrower in game.
 - [ ] Left out on purpose: business loans and loans to shops, interest that changes over time, credit scores, co-signers, seizing property on default, an early payoff rebate, a bank branch.
+## Economy watch (som-economy)
+
+- [ ] Set `set som_economy_webhook "<discord webhook url>"` in the real `server.cfg` (never in a tracked file). Without it the alerts and the digest only print to the server console. Decide who watches that channel.
+- [ ] Existing databases: add the time index the watch queries need, `ALTER TABLE som_transactions ADD KEY idx_time (created_at);` (fresh databases get it from `setup.sql`). Run on the dev MariaDB: the ALTER, all five watch queries and the plan (it picks `idx_flow_time` or `idx_time`) behave. On a big live ledger the ALTER takes a moment; run it off peak.
+- [ ] Every limit in `Config.Watch` is a first guess: $50000 faucet income and $100000 incoming transfers for one character in an hour, $250000 for one faucet payment, an alert for the same character at most every 120 minutes, the digest every 24 hours. `treasuryFloor` is 0 (off) because the treasury starts empty; set it once the treasury has money. Tune all of these after the first week against the real ledger.
+- [ ] What staff see is only citizenids, amounts and reason prefixes (the part of a ledger reason before the first colon). The sink to faucet ratio is judged in the digest (24 hours), not hourly, because one quiet hour is not a trend. The console line from `reportBalance` is unchanged.
+- [ ] Caveat in the numbers: money paid out of the treasury is a treasury debit (counted as a faucet) and the player credit that follows has its own flow, so some payouts show up in both. Read the faucet list as "where money came from", not as an exact sum.
+- [ ] `/economyreport [hours]` (needs `som.admin`, 1 to 168 hours, default 24) posts the same digest on demand. It is a separate command from `/economy`.
+- [ ] Never run in a game: a real HTTP post to Discord (the mock only checks the request is made with the convar URL) and the hourly loop after a real hour. No automatic action is taken on an alert; a human decides.

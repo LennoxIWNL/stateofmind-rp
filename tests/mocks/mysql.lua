@@ -39,6 +39,7 @@ M.db = {
     placements = {},
     trade = {},
     loans = {},
+    ledger = {},
     leases = {},
     shopsDb = { shops = {}, stock = {}, staff = {}, takings = 0, balance = 0 },
     shared = { accounts = { [7] = 100 }, frozen = {}, treasury = 500, updates = {}, ledger = {} },
@@ -560,6 +561,63 @@ local function placements(kind, query, params)
     elseif kind == 'insert' and has('INSERT INTO som_placements') then
         P[#P + 1] = { resource = params[1], path = params[2], kind = params[3], value = params[4], by = params[5] }
         return true, #P
+    end
+    return false
+end
+
+local function economyWatch(kind, query, params)
+    local L = M.db.ledger
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    local function prefix(reason) return reason:match('^[^:]*') end
+    local function inWindow(row, minutes) return row.ts >= now() - minutes * 60 end
+
+    if kind == 'query' and has('SELECT flow, COALESCE(SUM(amount), 0) AS total FROM som_transactions') then
+        local sums = {}
+        for _, r in ipairs(L) do
+            if inWindow(r, params[1]) and (r.flow == 'faucet' or r.flow == 'sink') then sums[r.flow] = (sums[r.flow] or 0) + r.amount end
+        end
+        local out = {}
+        for flow, total in pairs(sums) do out[#out + 1] = { flow = flow, total = tostring(total) } end
+        return true, out
+    elseif kind == 'query' and has("SELECT SUBSTRING_INDEX(reason, ':', 1) AS reason, COALESCE(SUM(amount), 0) AS total") then
+        local sums = {}
+        for _, r in ipairs(L) do
+            if inWindow(r, params[1]) and r.flow == params[2] then sums[prefix(r.reason)] = (sums[prefix(r.reason)] or 0) + r.amount end
+        end
+        local out = {}
+        for reason, total in pairs(sums) do out[#out + 1] = { reason = reason, total = tostring(total) } end
+        table.sort(out, function(a, b) return tonumber(a.total) > tonumber(b.total) end)
+        while #out > params[3] do table.remove(out) end
+        return true, out
+    elseif kind == 'query' and has('SELECT citizenid, COALESCE(SUM(amount), 0) AS total FROM som_transactions') then
+        local sums = {}
+        for _, r in ipairs(L) do
+            if inWindow(r, params[1]) and r.citizenid and r.flow == params[2] and r.direction == 'credit' then
+                sums[r.citizenid] = (sums[r.citizenid] or 0) + r.amount
+            end
+        end
+        local out = {}
+        for cid, total in pairs(sums) do
+            if total >= params[3] then out[#out + 1] = { citizenid = cid, total = tostring(total) } end
+        end
+        table.sort(out, function(a, b) return tonumber(a.total) > tonumber(b.total) end)
+        while #out > params[4] do table.remove(out) end
+        return true, out
+    elseif kind == 'single' and has("SELECT SUBSTRING_INDEX(reason, ':', 1) AS reason FROM som_transactions WHERE citizenid = ?") then
+        local sums, best = {}, nil
+        for _, r in ipairs(L) do
+            if r.citizenid == params[1] and r.flow == params[2] and r.direction == 'credit' and inWindow(r, params[3]) then
+                sums[prefix(r.reason)] = (sums[prefix(r.reason)] or 0) + r.amount
+                if not best or sums[prefix(r.reason)] > sums[best] then best = prefix(r.reason) end
+            end
+        end
+        return true, best and { reason = best } or nil
+    elseif kind == 'single' and has('SELECT citizenid, amount, reason FROM som_transactions WHERE created_at') then
+        local best
+        for _, r in ipairs(L) do
+            if inWindow(r, params[1]) and r.flow == 'faucet' and r.amount >= params[2] and (not best or r.amount > best.amount) then best = r end
+        end
+        return true, best and { citizenid = best.citizenid, amount = tostring(best.amount), reason = best.reason } or nil
     end
     return false
 end
@@ -1503,6 +1561,7 @@ end
 
 function M.single(query, params)
     params = params or {}
+    do local handled, value = economyWatch('single', query, params); if handled then return value end end
     do local handled, value = loansDb('single', query, params); if handled then return value end end
     do local handled, value = courtService('single', query, params); if handled then return value end end
     do local handled, value = leases('single', query, params); if handled then return value end end
@@ -2245,6 +2304,7 @@ function M.query(query, params)
     do local handled, value = courtService('query', query, params); if handled then return value end end
     if query:find('FROM som_businesses b', 1, true) then return M.db.businessRows or {} end
     params = params or {}
+    do local handled, value = economyWatch('query', query, params); if handled then return value end end
     do local handled, value = loansDb('query', query, params); if handled then return value end end
     do local handled, value = leases('query', query, params); if handled then return value end end
     do local handled, value = armoury('query', query, params); if handled then return value end end
