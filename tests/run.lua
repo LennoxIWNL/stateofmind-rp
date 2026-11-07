@@ -5350,6 +5350,15 @@ do
     env.Config.hireExpireSeconds = -1
     check(hire(2, 15).success and cb['som-shops:server:answerHire'](2, true).error == 'that offer is gone', 'shops: an old offer cannot be accepted')
     env.Config.hireExpireSeconds = 60
+    -- A shop that fills up between the offer and the answer refuses the hire and writes no row.
+    do
+        local shopId, before = D.staff[1].shop, #D.staff
+        check(hire(2, 15).success, 'shops: a full shop is only found out when the offer is answered')
+        for i = 1, env.Config.maxStaff - before do D.staff[#D.staff + 1] = { citizenid = 'FILL' .. i, shop = shopId, pay = 1, paid_at = 0 } end
+        local rows = #D.staff
+        check(cb['som-shops:server:answerHire'](2, true).error == 'the job is no longer open' and #D.staff == rows and not D.staff[rows + 1], 'shops: accepting a job in a shop that filled up is refused')
+        for i = #D.staff, before + 1, -1 do table.remove(D.staff, i) end
+    end
     check(cb['som-shops:server:setPay'](2, 'alta', 'STF3', 10).error == 'bad request' or cb['som-shops:server:setPay'](2, 'alta', 'STF3', 10).error == 'not available', 'shops: only the owner changes pay')
     check(cb['som-shops:server:setPay'](1, 'alta', 'STF3', 9999).error == 'bad request' and cb['som-shops:server:setPay'](1, 'alta', 'STF3', 30).success and D.staff[1].pay == 30, 'shops: the pay cap holds and the owner can change pay')
 
