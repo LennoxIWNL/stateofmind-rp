@@ -8430,5 +8430,221 @@ do
     Mocks.alertId = nil
 end
 
+-- som-fire: job, business and dispatch response
+----------------------------------------------------------------------
+do
+    local coreEnv = loader.loadResource(REPO .. 'som-core', { 'shared/config.lua', 'shared/tiers.lua', 'shared/jobs.lua', 'shared/gangs.lua' })
+    local J = coreEnv.Jobs.firefighter
+    check(J and J.business == 'fire' and J.business ~= coreEnv.Jobs.ambulance.business, 'fire: the firefighters have their own business, not the ambulance one')
+    local boss = false
+    for _, g in pairs(J.grades) do if g.isboss then boss = true end end
+    check(not boss, 'fire: no grade can void fines as a boss')
+
+    local env = dispScene()
+    Mocks.players[36] = person('FF1', 'firefighter', true, 1)
+    Mocks.players[37] = person('FF2', 'firefighter', false, 1)
+    local id = Mocks.exported.alert(nil, 'structureFire', { coords = vec3(5, 5, 30), message = 'Fire reported' })
+    local call = allCalls()[id]
+    local attach = RegisteredCallbacks['som-dispatch:server:attach']
+    local close = RegisteredCallbacks['som-dispatch:server:close']
+    check(call and call.services.firefighter and call.services.ambulance and call.services.police, 'fire: the call goes to firefighters, ambulance and police')
+    check(attach(37, id).success == false, 'fire: an off duty firefighter cannot attach')
+    check(attach(36, id).success == true and #call.units == 1, 'fire: a firefighter on duty can attach to a fire call')
+    check(close(36, id).success == true and call.services.firefighter.status == 'closed' and call.status ~= 'closed', 'fire: a firefighter closes their own service and leaves the others open')
+end
+
+-- som-fire
+----------------------------------------------------------------------
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-fire', { 'shared/config.lua', 'server/main.lua' })
+    local C, Fire = env.Config, env.Fire
+    local cb = RegisteredCallbacks
+    local events = {}
+    local saved = { GetVehiclePedIsIn = _G.GetVehiclePedIsIn, GetEntityModel = _G.GetEntityModel, GetCurrentResourceName = _G.GetCurrentResourceName }
+    _G.GetVehiclePedIsIn = function(ped) return PedVehicle[ped] or 0 end
+    _G.GetEntityModel = function(e) return joaat(Vehicles[e].model) end
+    _G.GetCurrentResourceName = function() return 'som-fire' end
+    _G.TriggerClientEvent = function(name, target, ...) events[#events + 1] = { name = name, target = target, args = { ... } } end
+    local function last(name) for i = #events, 1, -1 do if events[i].name == name then return events[i] end end end
+    local function reset()
+        Handlers['onResourceStop']('som-fire')
+        Mocks.players = {
+            [1] = { citizenid = 'FF1', job = { name = 'firefighter', onduty = true } },
+            [2] = { citizenid = 'FF2', job = { name = 'firefighter', onduty = true } },
+            [3] = { citizenid = 'CV3', job = { name = 'unemployed' } },
+        }
+        Mocks.inv = { [1] = { [1] = { name = 'WEAPON_FIREEXTINGUISHER', count = 1, slot = 1 } }, [2] = { [1] = { name = 'WEAPON_FIREEXTINGUISHER', count = 1, slot = 1 } }, [3] = { [1] = { name = 'WEAPON_FIREEXTINGUISHER', count = 1, slot = 1 } } }
+        Mocks.downed, Mocks.credits, Mocks.paid = {}, {}, 0
+        Mocks.bizBalance, Mocks.business, Mocks.treasury = { fire = 0 }, {}, 100000
+        Mocks.fundFails, Mocks.addMoneyFails, Mocks.businessTransactFails = false, false, false
+        Mocks.clock = Mocks.clock + 1000000
+        FakePeds = { [1] = vec3(0, 0, 0), [2] = vec3(1, 0, 0), [3] = vec3(2, 0, 0) }
+        PedVehicle = {}
+        Vehicles = {}
+        events = {}
+    end
+    local function spray(src, inc, point, advance)
+        Mocks.clock = Mocks.clock + (advance or 1000)
+        return cb['som-fire:server:douse'](src, inc, point)
+    end
+    local function puttOut(src, inc, point)
+        local r
+        for _ = 1, 10 do r = spray(src, inc, point) end
+        return r
+    end
+    local function points(id) local out = {}; for _, inc in ipairs(cb['som-fire:server:state'](1)) do if inc.id == id then out = inc.points end end; return out end
+
+    reset()
+    local before = Mocks.calls.dispatchAlert
+    local id = Fire.Start(vec3(10, 0, 0))
+    check(id and Mocks.calls.dispatchAlert == before + 1 and Mocks.lastAlertType == 'structureFire', 'fire: a fire raises a structure fire call')
+    check(#points(id) == 1 and last('som-fire:client:sync'), 'fire: clients are told where it burns')
+
+    for i = 1, 2 do Fire.Start(vec3(10 * i, 50, 0)) end
+    check(Fire.Start(vec3(0, 99, 0)) == nil, 'fire: no more than the incident cap burn at once')
+
+    Mocks.clock = Mocks.clock + C.spreadSeconds * 1000 + 1
+    Fire.Tick()
+    check(#points(id) == 2, 'fire: a fire left alone spreads')
+    for _ = 1, 10 do Mocks.clock = Mocks.clock + C.spreadSeconds * 1000 + 1; Fire.Tick() end
+    check(#points(id) == C.maxPoints, 'fire: spread stops at the flame cap')
+    Mocks.clock = Mocks.clock + C.lifetime * 1000 + 1
+    Fire.Tick()
+    check(#points(id) == 0 and Mocks.paid == 0, 'fire: an unfought fire burns out and nobody is paid')
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    local pid = points(id)[1].id
+    check(cb['som-fire:server:douse'](1, 'x', pid).error == 'that fire is out' and cb['som-fire:server:douse'](1, id, 99).error == 'that fire is out' and cb['som-fire:server:douse'](1, id, 1.5).error == 'that fire is out', 'fire: a bad incident or point is refused')
+    Mocks.inv[1] = {}
+    check(spray(1, id, pid).error == 'you need an extinguisher', 'fire: spraying needs an extinguisher')
+    PedVehicle[1] = 800
+    Vehicles[800] = { model = 'firetruk', seats = {} }
+    check(spray(1, id, pid).success, 'fire: a fire truck seat counts as a tool')
+    PedVehicle[1] = nil
+    FakePeds[1] = vec3(50, 0, 0)
+    Mocks.inv[1] = { [1] = { name = 'WEAPON_FIREEXTINGUISHER', count = 1, slot = 1 } }
+    check(spray(1, id, pid).error == 'you are too far from the fire', 'fire: the distance is read from the server ped')
+    FakePeds[1] = vec3(0, 0, 0)
+    spray(1, id, pid)
+    check(spray(1, id, pid, 100).error == 'too fast', 'fire: spray ticks are rate limited')
+    Mocks.downed[1] = true
+    check(spray(1, id, pid).error == 'you cannot do that now', 'fire: a downed player cannot spray')
+    Mocks.downed[1] = nil
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    pid = points(id)[1].id
+    local r = spray(1, id, pid)
+    check(r.success and r.out == false and #points(id) == 1, 'fire: one tick does not put a flame out')
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    for _ = 1, 3 do Mocks.clock = Mocks.clock + C.spreadSeconds * 1000 + 1; Fire.Tick() end
+    local grown = #points(id)
+    puttOut(1, id, points(id)[1].id)
+    Fire.Tick()
+    check(grown == 4 and #points(id) == 3, 'fire: putting a flame out does not make the fire regrow at once')
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    pid = points(id)[1].id
+    Mocks.bizBalance.fire = 0
+    r = puttOut(1, id, pid)
+    check(r.out == true and #points(id) == 0 and Mocks.paid == C.pay.perPoint, 'fire: ten ticks put a flame out and an on duty firefighter is paid')
+    check(Mocks.treasury == 100000 - C.pay.perPoint and Mocks.bizBalance.fire == 0, 'fire: the pay came from the treasury through the account')
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    pid = points(id)[1].id
+    Mocks.treasury = 0
+    puttOut(1, id, pid)
+    check(Mocks.paid == 0 and Mocks.treasury == 0, 'fire: an empty account and treasury pay nothing')
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    pid = points(id)[1].id
+    Mocks.addMoneyFails = true
+    puttOut(1, id, pid)
+    check(Mocks.paid == 0 and Mocks.lastTransact and Mocks.lastTransact.amount == C.pay.perPoint, 'fire: a failed credit puts the money back in the account')
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    pid = points(id)[1].id
+    Mocks.addMoneyFails = true
+    Mocks.businessThrowAt = Mocks.calls.businessTransact + 2
+    local lines, realPrint = {}, print
+    _G.print = function(...) lines[#lines + 1] = table.concat({ ... }, ' ') end
+    puttOut(1, id, pid)
+    _G.print = realPrint
+    Mocks.businessThrowAt = nil
+    local loud = false
+    for _, l in ipairs(lines) do if l:find('MONEY LOST', 1, true) then loud = true end end
+    check(Mocks.paid == 0 and loud, 'fire: a debit that cannot be given back is logged loudly')
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    pid = points(id)[1].id
+    for _ = 1, 10 do spray(3, id, pid) end
+    check(#points(id) == 0 and Mocks.paid == 0, 'fire: a civilian can put a fire out but is not paid')
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    pid = points(id)[1].id
+    for _ = 1, 5 do spray(1, id, pid); spray(2, id, pid, 100) end
+    check(#points(id) == 0 and Mocks.paid == C.pay.perPoint and #Mocks.credits == 2 and Mocks.credits[1].amount == C.pay.perPoint // 2, 'fire: a crew splits the pay for a flame')
+
+    reset()
+    C.pay.hourlyCap = 50
+    for i = 1, 3 do
+        local fid = Fire.Start(vec3(i * 100, 0, 0))
+        FakePeds[1] = vec3(i * 100, 0, 0)
+        puttOut(1, fid, points(fid)[1].id)
+    end
+    check(Mocks.paid == 50, 'fire: the hourly pay cap holds')
+    C.pay.hourlyCap = 1500
+
+    reset()
+    C.pay.drawCapHourly = 10
+    id = Fire.Start(vec3(1, 0, 0))
+    puttOut(1, id, points(id)[1].id)
+    check(Mocks.paid == 0 and Mocks.treasury == 100000, 'fire: the treasury top up is capped per hour')
+    C.pay.drawCapHourly = 4000
+
+    reset()
+    Fire.Start(vec3(0, 0, 0))
+    Mocks.downed[3] = true
+    FakePeds[3] = vec3(2, 0, 0)
+    check(cb['som-fire:server:rescueBegin'](3, 3).error == 'you are not on duty as a firefighter', 'rescue: only an on duty firefighter can pull someone clear')
+    check(cb['som-fire:server:rescueBegin'](1, 1).error == 'nobody here needs to be pulled out' and cb['som-fire:server:rescueBegin'](1, 'x').error == 'nobody here needs to be pulled out', 'rescue: a bad target is refused')
+    Mocks.downed[3] = nil
+    check(cb['som-fire:server:rescueBegin'](1, 3).error == 'nobody here needs to be pulled out', 'rescue: the patient must be down')
+    Mocks.downed[3] = true
+    FakePeds[3] = vec3(40, 0, 0)
+    check(cb['som-fire:server:rescueBegin'](1, 3).error == 'nobody here needs to be pulled out', 'rescue: out of reach is refused')
+    FakePeds[3] = vec3(2, 0, 0)
+    check(cb['som-fire:server:rescueBegin'](1, 3).success, 'rescue: starts next to a downed player in the fire')
+    Mocks.clock = Mocks.clock + 1000
+    check(cb['som-fire:server:rescueFinish'](1, 3).error == 'the rescue was not finished', 'rescue: an early finish moves nobody')
+    cb['som-fire:server:rescueBegin'](1, 3)
+    Mocks.clock = Mocks.clock + 6000
+    events = {}
+    check(cb['som-fire:server:rescueFinish'](1, 3).success, 'rescue: a full pull succeeds')
+    local mv = last('som-fire:client:moveTo')
+    check(mv and mv.target == 3 and mv.args[1] > 2 + C.rescue.clear - 1, 'rescue: the patient is moved away from the flame by the server')
+    FakePeds[3] = vec3(80, 0, 0)
+    FakePeds[1] = vec3(80, 0, 0)
+    cb['som-fire:server:rescueBegin'](1, 3)
+    check(cb['som-fire:server:rescueBegin'](1, 3).error == 'nobody here needs to be pulled out', 'rescue: nobody is pulled when no fire is near')
+
+    reset()
+    Fire.Start(vec3(1, 0, 0))
+    Handlers['onResourceStop']('som-fire')
+    check(#cb['som-fire:server:state'](1) == 0, 'fire: stopping the resource clears the fires')
+    _G.TriggerClientEvent = function() end
+    for k, v in pairs(saved) do _G[k] = v end
+end
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)

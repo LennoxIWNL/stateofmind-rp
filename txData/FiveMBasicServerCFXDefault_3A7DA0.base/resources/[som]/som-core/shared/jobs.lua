@@ -86,6 +86,23 @@ Jobs = {
         },
     },
 
+    firefighter = {
+        label = 'San Andreas Fire Department',
+        type = 'ems',
+        business = 'fire',
+        whitelisted = true,
+        defaultDuty = false,
+        offDutyPay = false,
+        radio = 2,
+        grades = {
+            [0] = { name = 'Probationary Firefighter', payment = 1200 },
+            [1] = { name = 'Firefighter', payment = 1700 },
+            [2] = { name = 'Engineer', payment = 2200 },
+            [3] = { name = 'Captain', payment = 2900 },
+            [4] = { name = 'Fire Chief', payment = 3800 },
+        },
+    },
+
     -- Radio dispatch. Hears every call, and assigns, closes and declares major
     -- incidents through som-dispatch. Paid by the department it works for.
     dispatcher = {
