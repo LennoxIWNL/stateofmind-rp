@@ -46,6 +46,7 @@ local function resetDb()
     mysql.db.phoneAudit = {}
     mysql.db.notes = {}
     mysql.db.heist = { dongles = {}, runs = {} }
+    mysql.db.boost = { runs = {}, ownedPlates = {} }
     mysql.db.turf = { zones = {}, events = {}, market = {} }
     mysql.db.whitelist = {}
     mysql.db.bans = {}
@@ -6227,6 +6228,317 @@ do
     _G.CreateThread = realCreate
     check(started == 1, 'mdt: repeated delete events for one incident start one check')
 end
+----------------------------------------------------------------------
+-- som-dispatch alert table
+----------------------------------------------------------------------
+do
+    -- A repeated key in a table constructor is not an error in Lua: the later one silently wins.
+    local path = REPO .. 'som-dispatch/shared/config.lua'
+    local handle = assert(io.open(path, 'r'))
+    local text = handle:read('a')
+    handle:close()
+    local body = text:match('Config%.Alerts = {\n(.-)\n}\n')
+    local seen, dupes = {}, {}
+    for key in body:gmatch('\n    ([%w_]+) = {') do
+        if seen[key] then dupes[#dupes + 1] = key end
+        seen[key] = true
+    end
+    check(#dupes == 0, 'dispatch: no alert type is defined twice (' .. table.concat(dupes, ', ') .. ')')
+
+    local env = loader.loadResource(REPO .. 'som-dispatch', { 'shared/config.lua' })
+    local theft, boost = env.Config.Alerts.vehicleTheft, env.Config.Alerts.boostTheft
+    check(theft.reportable == true and theft.offset == 60.0 and theft.chance == 0.6, 'dispatch: the client detected vehicle theft alert is still reportable')
+    check(boost and not boost.reportable, 'dispatch: the boosting alert has its own type and cannot be reported by a client')
+end
+
+----------------------------------------------------------------------
+-- som-boosting
+----------------------------------------------------------------------
+do
+    local function boostScene(open)
+        boardScene()
+        mysql.fakeNow = 1800000000
+        _G.CreateVehicle = _G.MockCreateVehicle
+        -- Earlier scenes replace these natives and do not always put them back.
+        _G.SetVehicleNumberPlateText = function(e, text) if Vehicles[e] then Vehicles[e].plate = text end end
+        _G.SetVehicleDoorsLocked = function(e, state) if Vehicles[e] then Vehicles[e].locked = state end end
+        _G.GetPedInVehicleSeat = function(e, seat) return seat == -1 and Vehicles[e] and Vehicles[e].driver or 0 end
+        local env = loader.loadResource(REPO .. 'som-boosting', { 'shared/config.lua', 'server/main.lua' })
+        Mocks.players[5] = { citizenid = 'P5', job = { name = 'police', onduty = true }, charinfo = { firstname = 'Po', lastname = 'Lice', phone = '555-0005' } }
+        Mocks.minted, Mocks.mintFails = {}, false
+        Mocks.exported.mintBills = function(src, worths, tag)
+            if Mocks.mintFails then return nil, 'could not carry the bills' end
+            Mocks.minted[#Mocks.minted + 1] = { src = src, worths = worths, tag = tag }
+            return { 'x' }
+        end
+        if open ~= false then
+            env.Config.pickups[1].enabled, env.Config.pickups[1].coords = true, vec3(0, 0, 0)
+            env.Config.dropoffs[1].enabled, env.Config.dropoffs[1].coords = true, vec3(500, 0, 0)
+        end
+        local seen = {}
+        local real = _G.TriggerClientEvent
+        _G.TriggerClientEvent = function(name, target, payload)
+            if name == 'som-boosting:client:contract' then seen[#seen + 1] = { target = target, data = payload } end
+        end
+        return env, seen, function() _G.TriggerClientEvent = real; _G.PedVehicle = nil end
+    end
+
+    local function begin(class, size)
+        crew(size or 1)
+        j(1, 'queue', { provider = 'boost_' .. class }); boardEnv.JobBoard.Draw('boost_' .. class)
+        return j(1, 'accept')
+    end
+
+    -- Opens the car for player 1, standing next to it.
+    local function openCar(unlock, car)
+        FakePeds[1] = vec3(10, 1, 0)
+        unlock(1, 'begin')
+        Mocks.clock = Mocks.clock + 13000
+        return unlock(1, 'finish')
+    end
+
+    do
+        local env, _, restore = boostScene(false)
+        crew(1)
+        check(j(1, 'queue', { provider = 'boost_C' }).error == 'no places are open yet', 'boost: every place ships closed, so nothing can start')
+        env.Config.pickups[1].enabled, env.Config.pickups[1].coords = true, vec3(0, 0, 0)
+        env.Config.dropoffs[1].enabled, env.Config.dropoffs[1].coords = true, vec3(500, 0, 0)
+        local a = j(1, 'queue', { provider = 'boost_A' })
+        check(a.success ~= true, 'boost: class A ships off')
+        Mocks.players[5] = nil
+        check(j(1, 'queue', { provider = 'boost_C' }).error == 'the city is too quiet for this', 'boost: no police on duty means no contract')
+        restore()
+    end
+
+    do
+        local env, seen, restore = boostScene()
+        local unlock, deliver = RegisteredCallbacks['som-boosting:server:unlock'], RegisteredCallbacks['som-boosting:server:deliver']
+        local treasury0, paid0 = Mocks.treasury, Mocks.calls.addMoney
+        local started = begin('C')
+        check(started.success == true, 'boost: a crew with police on duty starts a contract')
+
+        local row, car = mysql.db.boost.runs[1], Spawned[#Spawned]
+        check(row.status == 'active' and row.class == 'C' and row.face == 1000 and row.plate:match('^BST%d%d%d%d%d$'), 'boost: the run is recorded with its plate and reserved face value')
+        check(Vehicles[car].plate == row.plate and Vehicles[car].locked == 2, 'boost: the car is spawned with the server plate and locked')
+        check(#seen == 1 and seen[1].data.plate == row.plate and seen[1].data.netId == car and seen[1].data.model == row.model:upper(), 'boost: the crew is told the model and plate')
+        FakePeds[car] = vec3(10, 0, 0)
+        Vehicles[car].model = row.model
+
+        check(unlock(1, 'nope').error == 'bad request' and unlock(1, 5).error == 'bad request', 'boost: the unlock step must be begin or finish')
+        check(unlock(9, 'begin').error == 'there is nothing to open', 'boost: outsiders cannot unlock')
+        FakePeds[1] = vec3(500, 0, 0)
+        check(unlock(1, 'begin').error == 'you are not at the car', 'boost: the unlock needs you at the car')
+        FakePeds[1] = vec3(10, 1, 0)
+        check(unlock(1, 'finish').error == 'you were too quick', 'boost: finishing without starting is refused')
+        check(unlock(1, 'begin').success == true and unlock(1, 'finish').error == 'you were too quick', 'boost: the unlock takes the minimum time')
+        unlock(1, 'begin')
+        Mocks.clock = Mocks.clock + 13000
+        check(unlock(1, 'finish').success == true and Vehicles[car].locked == 1, 'boost: after the time the car opens')
+        check(Mocks.calls.dispatchAlert == 1 and Mocks.lastAlertType == 'boostTheft' and Mocks.lastAlertExtra.plate == row.plate and Mocks.lastAlertExtra.coords.x == 10,
+            'boost: dispatch is told once, at the car')
+        check(unlock(1, 'begin').error == 'there is nothing to open' and Mocks.calls.dispatchAlert == 1, 'boost: opening again raises no second call')
+
+        -- The delivery is for that exact car, driven by the sender, at the drop-off.
+        check(deliver(1, 'x').error == 'bad request' and deliver(1, 1.5).error == 'bad request', 'boost: the delivery needs an integer net id')
+        check(deliver(9, car).error == 'there is nothing to hand over', 'boost: outsiders cannot deliver')
+        Vehicles[9999] = { plate = row.plate, model = row.model }
+        check(deliver(1, 9999).error == 'that is not the car', 'boost: another car with the same plate and model is not the run car')
+        Vehicles[9999] = nil
+        Vehicles[car].plate = 'ZZZ999'
+        check(deliver(1, car).error == 'that is not the car', 'boost: a changed plate is refused')
+        Vehicles[car].plate = row.plate
+        Vehicles[car].model = 'adder'
+        check(deliver(1, car).error == 'that is not the car', 'boost: a changed model is refused')
+        Vehicles[car].model = row.model
+        check(deliver(1, car).error == 'you need to be driving it', 'boost: the sender must be in the car')
+        Vehicles[car].driver = 2
+        check(deliver(1, car).error == 'you need to be driving it', 'boost: a passenger cannot hand the car over, only the driver')
+        Vehicles[car].driver = 1
+        check(deliver(1, car).error == 'bring it to the drop-off', 'boost: the car must be at the drop-off')
+        FakePeds[car] = vec3(500, 0, 0)
+        check(deliver(1, car).error:find('give it a few minutes'), 'boost: a quick delivery is refused and the run stays open')
+        check(row.status == 'active' and #Mocks.minted == 0, 'boost: nothing is paid for it')
+        mysql.fakeNow = mysql.fakeNow + 60
+
+        local before = Mocks.calls.addMoney
+        check(deliver(1, car).success == true and row.status == 'done' and row.paid == 1000 and row.claimed == mysql.fakeNow, 'boost: the delivery is claimed and recorded')
+        check(#Mocks.minted == 1 and Mocks.minted[1].src == 1 and #Mocks.minted[1].worths == 4 and Mocks.minted[1].worths[1] == 250 and Mocks.minted[1].tag == 'boost:C', 'boost: the pay is marked bills through the launder ledger')
+        check(Mocks.treasury == treasury0 and Mocks.calls.addMoney == before, 'boost: the treasury is not touched and no cash is paid')
+        check(Deleted[#Deleted] == car and Mocks.exported.getGroup(1).busy == nil, 'boost: the car is removed and the group freed')
+        check(deliver(1, car).error == 'there is nothing to hand over' and #Mocks.minted == 1, 'boost: a second delivery pays nothing')
+
+        -- The hourly cap, counted from the face values of started runs.
+        env.Config.pickups[2].enabled, env.Config.pickups[2].coords = true, vec3(0, 0, 0)
+        env.Config.classes.C.hourlyCap = 1500
+        check(begin('C').success == false and mysql.db.boost.runs[2] == nil, 'boost: the hourly cap refuses a contract that would overshoot it')
+        env.Config.classes.C.hourlyCap = 2500
+        j(1, 'queue', { provider = 'boost_C' }); boardEnv.JobBoard.Draw('boost_C')
+        check(j(1, 'accept').success == true and mysql.db.boost.runs[2].pickup == 'pickup_2', 'boost: under the cap the other pickup is used, the first is cooling down')
+
+        -- Losing the car ends the run.
+        local car2 = Spawned[#Spawned]
+        Vehicles[car2] = nil
+        env.Boosting.Sweep()
+        check(mysql.db.boost.runs[2].status == 'failed' and Mocks.exported.getGroup(1).busy == nil, 'boost: a destroyed car fails the run and frees the group')
+        FakePeds[car] = nil
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        local unlock, deliver = RegisteredCallbacks['som-boosting:server:unlock'], RegisteredCallbacks['som-boosting:server:deliver']
+        check(begin('C', 2).success == true, 'boost: (setup) a crew of two starts')
+        local row, car = mysql.db.boost.runs[1], Spawned[#Spawned]
+        FakePeds[car] = vec3(10, 0, 0); Vehicles[car].model = row.model
+        check(openCar(unlock).success == true, 'boost: (setup) the car is opened')
+        FakePeds[car] = vec3(500, 0, 0); Vehicles[car].driver = 1
+        FakePeds[1] = vec3(500, 0, 0); FakePeds[2] = vec3(520, 0, 0)
+        mysql.fakeNow = mysql.fakeNow + 60
+        check(deliver(1, car).success == true and #Mocks.minted == 2, 'boost: a crew member at the drop-off shares the pay')
+        local total = 0
+        for _, m in ipairs(Mocks.minted) do total = total + #m.worths end
+        check(total == 4 and #Mocks.minted[1].worths == 2 and #Mocks.minted[2].worths == 2, 'boost: the bills are dealt out, not multiplied by the crew')
+        FakePeds[car], FakePeds[2] = nil, nil
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        local unlock, deliver = RegisteredCallbacks['som-boosting:server:unlock'], RegisteredCallbacks['som-boosting:server:deliver']
+        begin('C', 2)
+        local row, car = mysql.db.boost.runs[1], Spawned[#Spawned]
+        FakePeds[car] = vec3(10, 0, 0); Vehicles[car].model = row.model
+        openCar(unlock)
+        FakePeds[car] = vec3(500, 0, 0); Vehicles[car].driver = 1
+        FakePeds[1] = vec3(500, 0, 0); FakePeds[2] = vec3(5000, 0, 0)
+        mysql.fakeNow = mysql.fakeNow + 60
+        check(deliver(1, car).success == true and #Mocks.minted == 1 and #Mocks.minted[1].worths == 4, 'boost: a crew member far from the drop-off gets no share')
+        FakePeds[car], FakePeds[2] = nil, nil
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        local unlock, deliver = RegisteredCallbacks['som-boosting:server:unlock'], RegisteredCallbacks['som-boosting:server:deliver']
+        begin('C')
+        local row, car = mysql.db.boost.runs[1], Spawned[#Spawned]
+        FakePeds[car] = vec3(10, 0, 0); Vehicles[car].model = row.model
+        openCar(unlock)
+        FakePeds[car] = vec3(500, 0, 0); Vehicles[car].driver = 1
+        mysql.fakeNow = mysql.fakeNow + 60
+        Mocks.mintFails = true
+        check(deliver(1, car).success == true and row.status == 'unpaid' and row.paid == 0, 'boost: a mint that fails marks the run unpaid for staff')
+        Mocks.mintFails = false
+        check(deliver(1, car).error == 'there is nothing to hand over' and #Mocks.minted == 0, 'boost: and it is never paid a second time')
+        FakePeds[car] = nil
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        env.Config.minutes = -1
+        check(begin('C').success == true, 'boost: (setup) a contract that is already out of time')
+        local car = Spawned[#Spawned]
+        env.Boosting.Sweep()
+        check(mysql.db.boost.runs[1].status == 'failed' and Deleted[#Deleted] == car and Mocks.exported.getGroup(1).busy == nil, 'boost: a contract that runs out of time fails, removes the car and frees the group')
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        local unlock, deliver = RegisteredCallbacks['som-boosting:server:unlock'], RegisteredCallbacks['som-boosting:server:deliver']
+        begin('C', 2)
+        local row, car = mysql.db.boost.runs[1], Spawned[#Spawned]
+        FakePeds[car] = vec3(10, 0, 0); Vehicles[car].model = row.model
+        openCar(unlock)
+        Handlers['som:server:playerUnloaded'](2, Mocks.players[2].citizenid)
+        FakePeds[car] = vec3(500, 0, 0); Vehicles[car].driver = 1
+        FakePeds[1], FakePeds[2] = vec3(500, 0, 0), vec3(500, 0, 0)
+        mysql.fakeNow = mysql.fakeNow + 60
+        check(deliver(1, car).success == true and #Mocks.minted == 1 and #Mocks.minted[1].worths == 4, 'boost: a crew member who left the server is not paid and the others share the whole pay')
+        FakePeds[car], FakePeds[2] = nil, nil
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        local unlock, deliver = RegisteredCallbacks['som-boosting:server:unlock'], RegisteredCallbacks['som-boosting:server:deliver']
+        local pay, said = Mocks.commands.boostpay, nil
+        local realT = _G.TriggerClientEvent
+        _G.TriggerClientEvent = function(name, target, text) if name == 'som:client:notify' then said = text end end
+        begin('C')
+        local row, car = mysql.db.boost.runs[1], Spawned[#Spawned]
+        FakePeds[car] = vec3(10, 0, 0); Vehicles[car].model = row.model
+        openCar(unlock)
+        row.status, row.paid, row.claimed = 'done', 0, mysql.fakeNow   -- the server went down after the claim, before the mint
+        Mocks.minted = {}
+        pay(2, { run = 1, target = 1 })
+        check(said == 'You do not have permission to do that' and #Mocks.minted == 0, 'boost: only an admin can pay a stuck run')
+        Mocks.admins[2] = true
+        pay(2, { run = 1, target = 1 })
+        check(said == 'That run is not stuck' and #Mocks.minted == 0, 'boost: a run unlocked a moment ago is not stuck yet')
+        mysql.fakeNow = mysql.fakeNow + 301
+        pay(2, { run = 99, target = 1 })
+        check(said:find('No such run') and #Mocks.minted == 0, 'boost: an unknown run is refused')
+        Mocks.mintFails = true
+        pay(2, { run = 1, target = 1 })
+        check(row.paid == 0 and row.status == 'unpaid' and #Mocks.minted == 0, 'boost: a failed mint leaves the run unpaid and ready to retry')
+        Mocks.mintFails = false
+        pay(2, { run = 1, target = 1 })
+        check(row.paid == row.face and row.status == 'done' and #Mocks.minted == 1 and #Mocks.minted[1].worths == 4 and Mocks.minted[1].src == 1, 'boost: an admin pays the stuck run to the chosen player')
+        pay(2, { run = 1, target = 1 })
+        check(said:find('nothing is owed') and #Mocks.minted == 1, 'boost: a run is never paid twice')
+
+        -- A share that could not be minted leaves a part paid: the command pays what is still owed.
+        row.status, row.paid = 'unpaid', 500
+        Mocks.mintFails = true
+        pay(2, { run = 1, target = 1 })
+        check(row.paid == 500 and row.status == 'unpaid' and #Mocks.minted == 1, 'boost: a failed catch-up mint leaves the part paid as it was')
+        Mocks.mintFails = false
+        pay(2, { run = 1, target = 1 })
+        check(row.paid == row.face and #Mocks.minted == 2 and #Mocks.minted[2].worths == 2 and Mocks.minted[2].worths[1] == 250, 'boost: the command pays only what is still owed')
+        pay(2, { run = 1, target = 1 })
+        check(#Mocks.minted == 2, 'boost: and not again')
+        row.status, row.paid, row.claimed = 'unpaid', 500, mysql.fakeNow
+        pay(2, { run = 1, target = 1 })
+        check(said == 'That run is not stuck' and #Mocks.minted == 2, 'boost: a delivery claimed a moment ago is not paid by hand while it may still be minting')
+        Mocks.admins[2] = nil
+        _G.TriggerClientEvent = realT
+        FakePeds[car] = nil
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        local real = math.random
+        math.random = function(a, b) if b then return 7 elseif a then return 1 end return 0.5 end
+        mysql.db.boost.runs[1] = { id = 1, class = 'C', pickup = 'other', plate = 'BST00007', status = 'active', face = 0, paid = 0, ts = mysql.fakeNow }
+        local ok = begin('C').success
+        math.random = real
+        check(ok == false and mysql.db.boost.runs[2] == nil, 'boost: a plate that a running contract holds is never used')
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        check(begin('C').success == true, 'boost: (setup) a contract is running')
+        local D = mysql.db.boost
+        D.runs[2] = { id = 2, class = 'C', pickup = 'lost', plate = 'BST11111', status = 'active', face = 1000, paid = 0, ts = mysql.fakeNow - 120 }
+        D.runs[3] = { id = 3, class = 'C', pickup = 'young', plate = 'BST22222', status = 'active', face = 1000, paid = 0, ts = mysql.fakeNow }
+        env.Boosting.Sweep()
+        check(D.runs[2].status == 'failed', 'boost: an active row the server no longer keeps is failed, freeing its pickup and cap')
+        check(D.runs[3].status == 'active' and D.runs[1].status == 'active', 'boost: a new row and a running contract are left alone')
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        setmetatable(mysql.db.boost.ownedPlates, { __index = function() return true end })
+        check(begin('C').success == false and mysql.db.boost.runs[1] == nil, 'boost: a plate that a player vehicle holds is never used')
+        restore()
+    end
+end
+
 
 -- som-trucking
 ----------------------------------------------------------------------

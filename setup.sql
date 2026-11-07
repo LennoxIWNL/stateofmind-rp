@@ -2000,8 +2000,7 @@ CREATE TABLE IF NOT EXISTS `som_insurance_claims` (
 --  are the global caps. The jobs table remembers which job a character holds
 --  and how many minutes they have spent online holding it, and when they last
 --  used the job centre. No foreign keys: both are records.
--- ===========================================================================
-
+-- ====================================================================
 CREATE TABLE IF NOT EXISTS `som_welcome_claims` (
   `citizenid`  VARCHAR(16) NOT NULL,
   `license`    VARCHAR(64) NOT NULL,
@@ -2045,4 +2044,30 @@ CREATE TABLE IF NOT EXISTS `som_news_payouts` (
   PRIMARY KEY (`id`),
   KEY `idx_time` (`created_at`),
   KEY `idx_citizen_time` (`citizenid`, `created_at`)
+=======
+-- ===========================================================================
+--  7q. VEHICLE CONTRACTS (som-boosting)
+--
+--  One row per contract. `face` is the marked-bill value reserved against the
+--  class's hourly cap when the contract starts (failed contracts stop counting),
+--  `paid` is what was minted, `claimed_at` is when the delivery was claimed. 'unpaid' means a share
+--  could not be minted and `/boostpay` can pay the rest. No foreign keys: it is a record.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_boost_runs` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `class`       ENUM('C','B','A') NOT NULL,
+  `pickup`      VARCHAR(32) NOT NULL,
+  `group_id`    INT UNSIGNED NOT NULL,
+  `plate`       VARCHAR(12) NOT NULL,
+  `model`       VARCHAR(32) NOT NULL,
+  `status`      ENUM('active','done','failed','unpaid') NOT NULL DEFAULT 'active',
+  `face`        BIGINT NOT NULL DEFAULT 0,
+  `paid`        BIGINT NOT NULL DEFAULT 0,
+  `unlocked_at` TIMESTAMP NULL DEFAULT NULL,
+  `claimed_at`  TIMESTAMP NULL DEFAULT NULL,
+  `created_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_pickup` (`pickup`, `created_at`),
+  KEY `idx_class` (`class`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
