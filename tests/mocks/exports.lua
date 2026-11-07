@@ -320,6 +320,14 @@ local registry = {
     ['som-economy'] = economy,
     ['som-phone'] = phone,
     ['som-dispatch'] = dispatch,
+    ['som-police'] = setmetatable({}, { __index = function(_, name)
+        local fn = Mocks.exported[name]
+        return fn and function(_, ...) return fn(...) end or nil
+    end }),
+    ['som-tow'] = setmetatable({}, { __index = function(_, name)
+        local fn = Mocks.exported[name]
+        return fn and function(_, ...) return fn(...) end or nil
+    end }),
     ['som-dmv'] = { registration = function(_, plate) return Mocks.registrationOf and Mocks.registrationOf[plate] end },
 }
 

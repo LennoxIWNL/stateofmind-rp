@@ -39,6 +39,7 @@ M.db = {
     placements = {},
     trade = {},
     loans = {},
+    tow = { on = false, tickets = {}, impounds = {}, vehicles = {} },
     leases = {},
     shopsDb = { shops = {}, stock = {}, staff = {}, takings = 0, balance = 0 },
     shared = { accounts = { [7] = 100 }, frozen = {}, treasury = 500, updates = {}, ledger = {} },
@@ -560,6 +561,104 @@ local function placements(kind, query, params)
     elseif kind == 'insert' and has('INSERT INTO som_placements') then
         P[#P + 1] = { resource = params[1], path = params[2], kind = params[3], value = params[4], by = params[5] }
         return true, #P
+    end
+    return false
+end
+
+local function towDb(kind, query, params)
+    local D = M.db.tow
+    if not D.on then return false end
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    local function ticket(id) for _, t in ipairs(D.tickets) do if t.id == id then return t end end end
+    local function now() return M.fakeNow end
+
+    if kind == 'insert' and has('INSERT INTO som_tow_tickets (plate, reason, requested_by, x, y, z)') then
+        for _, t in ipairs(D.tickets) do
+            if t.plate == params[7] and (t.state == 'open' or t.state == 'claimed') then return true, 0 end
+        end
+        local t = { id = #D.tickets + 1, plate = params[1], reason = params[2], requested_by = params[3], x = params[4], y = params[5], z = params[6], state = 'open', paid = 0, created_at = now() }
+        D.tickets[#D.tickets + 1] = t
+        return true, t.id
+    elseif kind == 'scalar' and has("SELECT 1 FROM som_tow_tickets WHERE plate = ? AND state IN ('open', 'claimed') LIMIT 1") then
+        for _, t in ipairs(D.tickets) do if t.plate == params[1] and (t.state == 'open' or t.state == 'claimed') then return true, 1 end end
+        return true, nil
+    elseif kind == 'update' and has("UPDATE som_tow_tickets SET state = 'cancelled' WHERE plate = ? AND state IN ('open', 'claimed')") then
+        local n = 0
+        for _, t in ipairs(D.tickets) do if t.plate == params[1] and (t.state == 'open' or t.state == 'claimed') then t.state = 'cancelled'; n = n + 1 end end
+        return true, n
+    elseif kind == 'single' and has('SELECT * FROM som_tow_tickets WHERE id = ?') then
+        local t = ticket(params[1])
+        if not t then return true, nil end
+        local copy = {}
+        for k, v in pairs(t) do copy[k] = v end
+        return true, copy
+    elseif kind == 'scalar' and has("SELECT COUNT(*) FROM som_tow_tickets WHERE state = 'claimed' AND driver = ?") then
+        local n = 0
+        for _, t in ipairs(D.tickets) do if t.state == 'claimed' and t.driver == params[1] then n = n + 1 end end
+        return true, n
+    elseif kind == 'scalar' and has("SELECT COUNT(*) FROM som_tow_tickets WHERE driver = ? AND state = 'done'") then
+        local n = 0
+        for _, t in ipairs(D.tickets) do if t.state == 'done' and t.driver == params[1] and t.done_at > now() - 3600 then n = n + 1 end end
+        return true, n
+    elseif kind == 'update' and has("SET state = 'claimed', driver = ?, claimed_at = NOW() WHERE id = ? AND state = 'open'") then
+        local t = ticket(params[2])
+        if not t or t.state ~= 'open' then return true, 0 end
+        t.state, t.driver, t.claimed_at = 'claimed', params[1], now()
+        return true, 1
+    elseif kind == 'update' and has("SET state = 'done', done_at = NOW() WHERE id = ? AND state = 'claimed' AND driver = ?") then
+        local t = ticket(params[1])
+        if not t or t.state ~= 'claimed' or t.driver ~= params[2] then return true, 0 end
+        t.state, t.done_at = 'done', now()
+        return true, 1
+    elseif kind == 'update' and has("SET state = 'claimed', done_at = NULL WHERE id = ? AND state = 'done' AND driver = ?") then
+        local t = ticket(params[1])
+        if not t or t.state ~= 'done' or t.driver ~= params[2] then return true, 0 end
+        t.state, t.done_at = 'claimed', nil
+        return true, 1
+    elseif kind == 'update' and has('UPDATE som_tow_tickets SET paid = ? WHERE id = ?') then
+        ticket(params[2]).paid = params[1]
+        return true, 1
+    elseif kind == 'update' and has("SET state = 'open', driver = NULL, claimed_at = NULL WHERE state = 'claimed' AND claimed_at < DATE_SUB(NOW(), INTERVAL ? MINUTE)") then
+        local n = 0
+        for _, t in ipairs(D.tickets) do
+            if t.state == 'claimed' and t.claimed_at < now() - params[1] * 60 then t.state, t.driver, t.claimed_at = 'open', nil, nil; n = n + 1 end
+        end
+        return true, n
+    elseif kind == 'update' and has("SET state = 'cancelled' WHERE id = ? AND state = 'open'") then
+        local t = ticket(params[1])
+        if not t or t.state ~= 'open' then return true, 0 end
+        t.state = 'cancelled'
+        return true, 1
+    elseif kind == 'update' and has("SET state = 'open' WHERE id = ? AND state = 'cancelled'") then
+        local t = ticket(params[1])
+        if t and t.state == 'cancelled' then t.state = 'open' end
+        return true, 1
+    elseif kind == 'query' and has("FROM som_tow_tickets WHERE state = 'open' AND created_at < DATE_SUB(NOW(), INTERVAL ? MINUTE)") then
+        local out = {}
+        for _, t in ipairs(D.tickets) do
+            if t.state == 'open' and t.created_at < now() - params[1] * 60 then out[#out + 1] = { id = t.id, plate = t.plate, reason = t.reason, requested_by = t.requested_by } end
+        end
+        return true, out
+    elseif kind == 'query' and has("FROM som_tow_tickets WHERE state = 'claimed' AND driver = ? ORDER BY id") then
+        local out = {}
+        for _, t in ipairs(D.tickets) do if t.state == 'claimed' and t.driver == params[1] then out[#out + 1] = { id = t.id, plate = t.plate, reason = t.reason, driver = t.driver } end end
+        return true, out
+    elseif kind == 'query' and has("FROM som_tow_tickets WHERE state = 'open' ORDER BY id LIMIT 20") then
+        local out = {}
+        for _, t in ipairs(D.tickets) do if t.state == 'open' then out[#out + 1] = { id = t.id, plate = t.plate, reason = t.reason, age = math.floor((now() - t.created_at) / 60) } end end
+        return true, out
+    elseif kind == 'scalar' and has('SELECT 1 FROM som_vehicles WHERE plate = ?') then
+        for _, v in ipairs(D.vehicles) do if v.plate == params[1] then return true, 1 end end
+        return true, nil
+    elseif kind == 'single' and has('SELECT id, citizenid FROM som_vehicles WHERE plate = ?') then
+        for _, v in ipairs(D.vehicles) do if v.plate == params[1] then return true, { id = v.id, citizenid = v.citizenid } end end
+        return true, nil
+    elseif kind == 'update' and has('UPDATE som_vehicles SET state = ?, garage = ? WHERE id = ?') then
+        for _, v in ipairs(D.vehicles) do if v.id == params[3] then v.state, v.garage = params[1], params[2] end end
+        return true, 1
+    elseif kind == 'insert' and has('INSERT INTO som_police_impound (plate, citizenid, officer_cid, reason, fee)') then
+        D.impounds[#D.impounds + 1] = { plate = params[1], citizenid = params[2], officer_cid = params[3], reason = params[4], fee = params[5] }
+        return true, #D.impounds
     end
     return false
 end
@@ -1503,6 +1602,7 @@ end
 
 function M.single(query, params)
     params = params or {}
+    do local handled, value = towDb('single', query, params); if handled then return value end end
     do local handled, value = loansDb('single', query, params); if handled then return value end end
     do local handled, value = courtService('single', query, params); if handled then return value end end
     do local handled, value = leases('single', query, params); if handled then return value end end
@@ -1588,6 +1688,7 @@ end
 
 function M.scalar(query, params)
     params = params or {}
+    do local handled, value = towDb('scalar', query, params); if handled then return value end end
     do local handled, value = loansDb('scalar', query, params); if handled then return value end end
     do local handled, value = courtService('scalar', query, params); if handled then return value end end
     do local handled, value = leases('scalar', query, params); if handled then return value end end
@@ -1707,6 +1808,7 @@ end
 
 function M.update(query, params)
     params = params or {}
+    do local handled, value = towDb('update', query, params); if handled then return value end end
     do local handled, value = loansDb('update', query, params); if handled then return value end end
     do local handled, value = courtService('update', query, params); if handled then return value end end
     do local handled, value = leases('update', query, params); if handled then return value end end
@@ -2066,6 +2168,7 @@ end
 
 function M.insert(query, params)
     params = params or {}
+    do local handled, value = towDb('insert', query, params); if handled then return value end end
     do local handled, value = loansDb('insert', query, params); if handled then return value end end
     do local handled, value = courtService('insert', query, params); if handled then return value end end
     do local handled, value = leases('insert', query, params); if handled then return value end end
@@ -2245,6 +2348,7 @@ function M.query(query, params)
     do local handled, value = courtService('query', query, params); if handled then return value end end
     if query:find('FROM som_businesses b', 1, true) then return M.db.businessRows or {} end
     params = params or {}
+    do local handled, value = towDb('query', query, params); if handled then return value end end
     do local handled, value = loansDb('query', query, params); if handled then return value end end
     do local handled, value = leases('query', query, params); if handled then return value end end
     do local handled, value = armoury('query', query, params); if handled then return value end end

@@ -166,6 +166,18 @@ Jobs = {
         },
     },
 
+    -- Tow driver. No business and no salary on purpose: the only income is the per tow fee som-tow pays from
+    -- the department, so standing on duty earns nothing. Not whitelisted; staff can make it so.
+    tow = {
+        label = 'Tow Driver',
+        whitelisted = false,
+        defaultDuty = false,
+        offDutyPay = false,
+        grades = {
+            [0] = { name = 'Driver', payment = 0 },
+        },
+    },
+
     -- Template civilian jobs. Copy either one to add a new civilian job: no
     -- new resource is needed, only a new entry here plus locations in som-jobs
     -- once Phase 5 lands.

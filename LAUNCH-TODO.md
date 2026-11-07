@@ -441,3 +441,15 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] The treasury floor is checked under the loan lock, but other treasury spending (department budgets, heist and buyer payouts) can still lower it at the same moment; the floor is a guard, not a reservation.
 - [ ] Not verified in a live server: the Bank loans phone app, a real week passing, collection from a defaulted borrower in game.
 - [ ] Left out on purpose: business loans and loans to shops, interest that changes over time, credit scores, co-signers, seizing property on default, an early payoff rebate, a bank branch.
+
+## Tow tickets (som-tow)
+
+- [ ] Existing databases: import the new table `som_tow_tickets` (`setup.sql`, `CREATE TABLE IF NOT EXISTS`). Until then the sweep prints "som_tow_tickets is missing" and officers always get the instant impound.
+- [ ] A new job `tow` exists (`som-core/shared/jobs.lua`): not whitelisted, no salary, no business, one grade, `defaultDuty = false`. Tow drivers earn only the per tow fee. Staff set it with the usual job command; decide whether to whitelist it. It does not clash with `som-towtruck`, which sets `jobName = "none"` and never reads a framework job.
+- [ ] Officers get "Ask for a tow truck" and "Impound now" in the impound menu. With no tow driver on duty, or if the ticket cannot be raised, "Ask" impounds at once. "Impound now" closes any open ticket for that plate.
+- [ ] Untuned first guesses in `som-tow/shared/config.lua`: $400 per tow paid by `lspd` (`Config.payer`), at most 6 paid tows an hour per driver, 20 minutes before an untaken ticket becomes an instant impound, 10 minutes before a ticket taken and not delivered goes back on the board, at most 2 tickets held per driver. The driver also needs to be within 40 m of the car at delivery.
+- [ ] Only a player's car is paid for (a row in `som_vehicles`); a street car is towed and impounded but pays nothing, so the fee cannot be farmed from the department account. The owner still pays the usual release fee to `lspd`.
+- [ ] `Config.yard` in `som-tow/shared/config.lua` must stay the same place as `Config.Stations.mrpd.impound.coords` in `som-police`; the delivery is accepted when the car is within 40 m of it. Delivery only checks that the car with that plate is at the lot and the driver is with it, it does not check the car was actually towed.
+- [ ] If the server stops between closing a ticket and recording the impound, the ticket stays done and the car is not impounded; the console shows nothing. Rare, found by looking for done tickets whose plate is not in `som_police_impound`.
+- [ ] Never run in a game: the new impound menu, the phone app, the waypoint to the car, a car arriving at the lot on a flatbed, and `GetAllVehicles` seeing the towed car. `som-towtruck` (the paid NPC job) is untouched and not linked.
+- [ ] Left out on purpose: civilian tow requests, abandoned vehicle reports, private tows, driver ranks, a second lot, auctions, insurance links, and linking the NPC `som-towtruck` jobs.
