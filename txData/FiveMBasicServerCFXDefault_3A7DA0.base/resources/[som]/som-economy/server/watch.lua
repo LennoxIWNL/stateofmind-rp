@@ -21,9 +21,9 @@ local function post(text)
         { ['Content-Type'] = 'application/json' })
 end
 
----Reasons are composed by our own resources; this keeps a stray mention or control character out anyway.
+---Reasons are composed by our own resources; this keeps a stray mention, control character or line break out anyway.
 local function plain(value)
-    return (tostring(value or ''):gsub('[^%w%s%p]', ''):gsub('[@<>\96]', ''):sub(1, 64))
+    return (tostring(value or ''):gsub('[^%w%s%p]', ''):gsub('[@<>\96]', ''):gsub('%s+', ' '):sub(1, 64))
 end
 
 local function totals(minutes)

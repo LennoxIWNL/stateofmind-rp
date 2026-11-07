@@ -7319,6 +7319,7 @@ do
     check(env.Watch.Check() == 1, 'watch: it can be raised again after the cooldown')
 
     row('BIG1', 300000, 'faucet', '@everyone payout')
+    row('LINE1', 56000, 'faucet', 'x\n[som-economy] ALERT fake line\r\ny')
     row('TICK1', 55000, 'faucet', 'a\96b\96:x')
     row('TRADER1', 150000, 'transfer', 'trade:sale:77')
     row(nil, 400000, 'faucet', 'budget:sanitation')
@@ -7327,9 +7328,10 @@ do
     local sent = env.Watch.Check()
     local all = ''
     for _, p in ipairs(posts) do all = all .. p.body end
-    check(sent == 5 and all:find('TRADER1', 1, true) and all:find('transfers', 1, true) and all:find('one faucet payment of 400000 to treasury', 1, true),
+    check(sent == 6 and all:find('TRADER1', 1, true) and all:find('transfers', 1, true) and all:find('one faucet payment of 400000 to treasury', 1, true),
         'watch: incoming transfers and a single huge faucet row are flagged, a treasury row is named as the treasury')
     check(not all:find('@', 1, true) and not all:find('\96', 1, true), 'watch: mentions and backticks are stripped from what goes to Discord')
+    check(not all:find('[\r\n]') and all:find('x [som-economy] ALERT fake line y', 1, true), 'watch: a line break in a reason cannot start a fake line')
 
     C.Watch.treasuryFloor = 200000
     posts = {}
