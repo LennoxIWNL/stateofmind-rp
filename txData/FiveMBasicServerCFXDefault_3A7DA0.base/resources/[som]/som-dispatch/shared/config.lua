@@ -141,6 +141,8 @@ Config.Alerts = {
         cooldown = 0,
         jobs = { 'ambulance' },
         blip = { sprite = 61, colour = 1, scale = 1.0, duration = 600 },
+    },
+
     -- Raised by som-fire when a fire starts. NOT `reportable`.
     structureFire = {
         label = 'Fire',

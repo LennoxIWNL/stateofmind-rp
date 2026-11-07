@@ -675,6 +675,10 @@ local function insDb(kind, query, params)
         local p = v and pol(v.id)
         if not p then return true, nil end
         return true, { expires = p.paid_until, covered = (p.status == 'active' and p.paid_until > now() and p.citizenid == v.citizenid and not D.sold[v.id]) and 1 or 0 }
+    end
+    return false
+end
+
 local function newsDb(kind, query, params)
     local N = M.db.news
     local function has(text) return query:find(text, 1, true) ~= nil end
