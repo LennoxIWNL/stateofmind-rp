@@ -441,3 +441,11 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] The treasury floor is checked under the loan lock, but other treasury spending (department budgets, heist and buyer payouts) can still lower it at the same moment; the floor is a guard, not a reservation.
 - [ ] Not verified in a live server: the Bank loans phone app, a real week passing, collection from a defaulted borrower in game.
 - [ ] Left out on purpose: business loans and loans to shops, interest that changes over time, credit scores, co-signers, seizing property on default, an early payoff rebate, a bank branch.
+
+## Mining (som-outdoors)
+
+- [ ] Nothing is placed yet, so mining is off. Stand where each thing goes and use `/place som-outdoors <path>`, then `restart som-outdoors`: `mining.sites.copper_1.nodes+` (once per vein; also `iron_1`, `silver_1`, `gold_1`), `mining.smelter.coords`, `buyers.quarry.coords`.
+- [ ] The pickaxe is now sold in the general shops at 150 (`ox_inventory/data/shops.lua`). Ore, ingots and the pickaxe already had items and icons; nothing new was added. The pickaxe weighs 1000 and ore 1000 each, so a bag fills quickly: check the carry weight.
+- [ ] The quarry buyer pays from the treasury like fishing: it starts at 0, so nobody is paid until the treasury holds money, and the buyer cap is 6000 an hour for the whole server. It buys only refined metal (copper 30, iron 24, silver ingot 70, gold ingot 120), never raw ore. Per character ceiling at 40 strikes an hour and 2 ore a strike (3 with the nearby-friend bonus, 4 at most): copper about 1,600 (3,200 with friends), iron about 1,300, silver about 1,400 and gold about 2,400 an hour, before the 6000 server cap. All untuned.
+- [ ] The hourly strike count is held in memory and resets on restart. A vein rests 10 minutes after a strike, and the rest also resets on restart.
+- [ ] Not verified live: the swing animation (`melee@large_wpn@streamed_core` / `ground_attack_on_spot`), the interaction zones, whether 8 second swings and 10 minute rests feel right, a real crew of two or three.
