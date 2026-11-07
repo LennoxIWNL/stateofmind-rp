@@ -361,6 +361,59 @@ local function city(kind, query, params)
     return false
 end
 
+local function boost(kind, query, params)
+    local D = M.db.boost
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    if kind == 'insert' then
+        if has('INSERT INTO som_boost_runs') then
+            local class, pickup, group, plate, model, face = params[1], params[2], params[3], params[4], params[5], params[6]
+            local cooldown, cap = params[8], params[11]
+            local sum = 0
+            for _, r in ipairs(D.runs) do
+                if not r.deleted and r.pickup == pickup and (r.status == 'active' or r.ts > now() - cooldown * 60) then return true, 0 end
+                if not r.deleted and r.class == params[9] and r.status ~= 'failed' and r.ts > now() - 3600 then sum = sum + r.face end
+            end
+            if sum + params[10] > cap then return true, 0 end
+            local id = #D.runs + 1
+            D.runs[id] = { id = id, class = class, pickup = pickup, group = group, plate = plate, model = model, face = face, paid = 0, status = 'active', ts = now() }
+            return true, id
+        end
+    elseif kind == 'scalar' then
+        if has('SELECT 1 FROM som_vehicles WHERE plate = ? LIMIT 1') then return true, D.ownedPlates[params[1]] and 1 or nil end
+    elseif kind == 'update' then
+        local r = params and D.runs[params[#params]]
+        if has("UPDATE som_boost_runs SET unlocked_at = NOW() WHERE id = ? AND status = 'active' AND unlocked_at IS NULL") then
+            r = D.runs[params[1]]
+            if r and r.status == 'active' and not r.unlocked then r.unlocked = now(); return true, 1 end
+            return true, 0
+        end
+        if has("UPDATE som_boost_runs SET status = 'done'") then
+            r = D.runs[params[1]]
+            if r and r.status == 'active' and r.unlocked and r.unlocked <= now() - params[2] then r.status = 'done'; return true, 1 end
+            return true, 0
+        end
+        if has('UPDATE som_boost_runs SET paid = ?, status = ? WHERE id = ?') then
+            r = D.runs[params[3]]
+            if r and r.status == 'done' then r.paid, r.status = params[1], params[2]; return true, 1 end
+            return true, 0
+        end
+        if has("UPDATE som_boost_runs SET status = ? WHERE id = ? AND status = 'active'") then
+            r = D.runs[params[2]]
+            if r and r.status == 'active' then r.status = params[1]; return true, 1 end
+            return true, 0
+        end
+        if has("UPDATE som_boost_runs SET status = 'failed' WHERE status = 'active'") then
+            for _, row in ipairs(D.runs) do if row.status == 'active' then row.status = 'failed' end end
+            return true, 1
+        end
+        if has('DELETE FROM som_boost_runs WHERE id = ?') then
+            if D.runs[params[1]] then D.runs[params[1]].deleted = true end
+            return true, 1
+        end
+    end
+    return false
+end
+
 local function heist(kind, query, params)
     local H = M.db.heist
     local function has(text) return query:find(text, 1, true) ~= nil end
@@ -1587,6 +1640,7 @@ function M.single(query, params)
 end
 
 function M.scalar(query, params)
+    do local handled, value = boost('scalar', query, params); if handled then return value end end
     params = params or {}
     do local handled, value = loansDb('scalar', query, params); if handled then return value end end
     do local handled, value = courtService('scalar', query, params); if handled then return value end end
@@ -1717,6 +1771,7 @@ function M.update(query, params)
     do local handled, value = licences('update', query, params); if handled then return value end end
     do local handled, value = social('update', query, params); if handled then return value end end
     do local handled, value = city('update', query, params); if handled then return value end end
+    do local handled, value = boost('update', query, params); if handled then return value end end
     do local handled, value = heist('update', query, params); if handled then return value end end
     do local handled, value = buyer('update', query, params); if handled then return value end end
     do local handled, value = turf('update', query, params); if handled then return value end end
@@ -2075,6 +2130,7 @@ function M.insert(query, params)
     do local handled, value = sharedAccounts('insert', query, params); if handled then return value end end
     do local handled, value = social('insert', query, params); if handled then return value end end
     do local handled, value = city('insert', query, params); if handled then return value end end
+    do local handled, value = boost('insert', query, params); if handled then return value end end
     do local handled, value = heist('insert', query, params); if handled then return value end end
     do local handled, value = turf('insert', query, params); if handled then return value end end
     do local handled, value = bans('insert', query, params); if handled then return value end end

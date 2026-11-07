@@ -441,3 +441,13 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] The treasury floor is checked under the loan lock, but other treasury spending (department budgets, heist and buyer payouts) can still lower it at the same moment; the floor is a guard, not a reservation.
 - [ ] Not verified in a live server: the Bank loans phone app, a real week passing, collection from a defaulted borrower in game.
 - [ ] Left out on purpose: business loans and loans to shops, interest that changes over time, credit scores, co-signers, seizing property on default, an early payoff rebate, a bank branch.
+
+## Vehicle contracts (som-boosting)
+
+- [ ] Existing databases: import `som_boost_runs` (`setup.sql` section 7q). Not run on a real MariaDB yet: the claim insert with its two subqueries (pickup cooldown and hourly face cap) and the delivery claim need a run on a scratch database.
+- [ ] Everything ships closed. Stand at each pickup and drop-off and run `/place som-boosting pickups.pickup_1.coords` (and `dropoffs.dropoff_1.coords`), then `restart som-boosting`. Pickups also take a `heading` in `shared/config.lua` (placing stores a position only).
+- [ ] Class C and B are enabled, class A is present and off (`enabled = false`) until tuned. Models, bill counts, worths, police minimums and hourly caps are all untuned. The model names are GTA vehicle names and were not checked against the streamed vehicle list.
+- [ ] Pay is marked bills only, minted by `som-launder`. The mint creates a ledger row and an item, no balance; the faucet is the wash payout in `som-launder`, which the existing wash cut, daily cap and hourly budget throttle. Boosting adds to what enters the wash, so read the sink/faucet report after the first week.
+- [ ] A status of `unpaid` in `som_boost_runs` means a crew member could not carry their share; the run is not retried.
+- [ ] Left out on purpose: a tracker or tracker removal, a contract marketplace, any heat or reputation, guards, a link to the chop shop.
+- [ ] Never run in a game: the spawn, the lock (`SetVehicleDoorsLocked`), the plate set on a server-created vehicle, the blips, the unlock bar, the hand-over at the drop-off, and the dispatch call on a real police client.

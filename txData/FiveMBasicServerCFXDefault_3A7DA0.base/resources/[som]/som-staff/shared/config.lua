@@ -11,6 +11,6 @@ Config = {
     listMax = 30,
 
     -- Resources whose content can be placed in game (see som-core/server/placements.lua).
-    placeable = { ['som-turf'] = true, ['som-outdoors'] = true, ['som-heists'] = true, ['som-mechanic'] = true, ['som-launder'] = true, ['som-shops'] = true, ['som-fuel'] = true, ['som-ems'] = true, ['som-dmv'] = true },
-    placeableList = { 'som-turf', 'som-outdoors', 'som-heists', 'som-mechanic', 'som-launder', 'som-shops', 'som-fuel', 'som-ems', 'som-dmv' },
+    placeable = { ['som-turf'] = true, ['som-outdoors'] = true, ['som-heists'] = true, ['som-mechanic'] = true, ['som-launder'] = true, ['som-shops'] = true, ['som-fuel'] = true, ['som-ems'] = true, ['som-dmv'] = true, ['som-boosting'] = true },
+    placeableList = { 'som-turf', 'som-outdoors', 'som-heists', 'som-mechanic', 'som-launder', 'som-shops', 'som-fuel', 'som-ems', 'som-dmv', 'som-boosting' },
 }

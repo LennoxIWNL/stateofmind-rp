@@ -192,6 +192,18 @@ Config.Alerts = {
         blip = { sprite = 161, colour = 1, scale = 1.2, duration = 600 },
     },
 
+    -- Raised by som-boosting once, when a contract car is opened. NOT
+    -- `reportable`: the server raises it with the car's own position.
+    vehicleTheft = {
+        label = 'Vehicle Theft',
+        code = '10-16',
+        priority = 2,
+        chance = 1.0,
+        cooldown = 30,
+        jobs = { 'police' },
+        blip = { sprite = 225, colour = 1, scale = 1.0, duration = 600 },
+    },
+
     -- Raised by som-jail's yard-radius check, not by detection. NOT
     -- `reportable` for the same reason emergencyCall isn't: it has its own
     -- trigger with its own validation.

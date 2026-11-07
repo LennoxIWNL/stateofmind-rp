@@ -111,6 +111,9 @@ _G.CreateVehicle = function(hash)
     return id
 end
 _G.MockCreateVehicle = _G.CreateVehicle
+_G.NetworkGetNetworkIdFromEntity = function(e) return e end
+_G.SetVehicleNumberPlateText = function(e, text) if _G.Vehicles[e] then _G.Vehicles[e].plate = text end end
+_G.SetVehicleDoorsLocked = function(e, state) if _G.Vehicles[e] then _G.Vehicles[e].locked = state end end
 _G.DeleteEntity = function(e) _G.Deleted[#_G.Deleted + 1] = e; _G.Vehicles[e] = nil end
 
 _G.Dropped = {}

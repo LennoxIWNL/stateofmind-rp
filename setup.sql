@@ -1952,3 +1952,29 @@ CREATE TABLE IF NOT EXISTS `som_loans` (
   KEY `idx_citizen` (`citizenid`, `status`),
   KEY `idx_due` (`status`, `next_due`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
+--  7q. VEHICLE CONTRACTS (som-boosting)
+--
+--  One row per contract. `face` is the marked-bill value reserved against the
+--  class's hourly cap when the contract starts (failed contracts stop counting),
+--  `paid` is what was minted. 'unpaid' means a share could not be minted and
+--  staff should look at it. No foreign keys: it is a record.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_boost_runs` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `class`       ENUM('C','B','A') NOT NULL,
+  `pickup`      VARCHAR(32) NOT NULL,
+  `group_id`    INT UNSIGNED NOT NULL,
+  `plate`       VARCHAR(12) NOT NULL,
+  `model`       VARCHAR(32) NOT NULL,
+  `status`      ENUM('active','done','failed','unpaid') NOT NULL DEFAULT 'active',
+  `face`        BIGINT NOT NULL DEFAULT 0,
+  `paid`        BIGINT NOT NULL DEFAULT 0,
+  `unlocked_at` TIMESTAMP NULL DEFAULT NULL,
+  `created_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_pickup` (`pickup`, `created_at`),
+  KEY `idx_class` (`class`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
