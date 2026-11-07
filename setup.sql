@@ -1958,8 +1958,8 @@ CREATE TABLE IF NOT EXISTS `som_loans` (
 --
 --  One row per contract. `face` is the marked-bill value reserved against the
 --  class's hourly cap when the contract starts (failed contracts stop counting),
---  `paid` is what was minted. 'unpaid' means a share could not be minted and
---  staff should look at it. No foreign keys: it is a record.
+--  `paid` is what was minted, `claimed_at` is when the delivery was claimed. 'unpaid' means a share
+--  could not be minted and `/boostpay` can pay the rest. No foreign keys: it is a record.
 -- ===========================================================================
 
 CREATE TABLE IF NOT EXISTS `som_boost_runs` (
@@ -1973,6 +1973,7 @@ CREATE TABLE IF NOT EXISTS `som_boost_runs` (
   `face`        BIGINT NOT NULL DEFAULT 0,
   `paid`        BIGINT NOT NULL DEFAULT 0,
   `unlocked_at` TIMESTAMP NULL DEFAULT NULL,
+  `claimed_at`  TIMESTAMP NULL DEFAULT NULL,
   `created_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_pickup` (`pickup`, `created_at`),

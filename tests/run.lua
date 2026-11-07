@@ -6074,7 +6074,7 @@ do
         mysql.fakeNow = mysql.fakeNow + 60
 
         local before = Mocks.calls.addMoney
-        check(deliver(1, car).success == true and row.status == 'done' and row.paid == 1000, 'boost: the delivery is claimed and recorded')
+        check(deliver(1, car).success == true and row.status == 'done' and row.paid == 1000 and row.claimed == mysql.fakeNow, 'boost: the delivery is claimed and recorded')
         check(#Mocks.minted == 1 and Mocks.minted[1].src == 1 and #Mocks.minted[1].worths == 4 and Mocks.minted[1].worths[1] == 250 and Mocks.minted[1].tag == 'boost:C', 'boost: the pay is marked bills through the launder ledger')
         check(Mocks.treasury == treasury0 and Mocks.calls.addMoney == before, 'boost: the treasury is not touched and no cash is paid')
         check(Deleted[#Deleted] == car and Mocks.exported.getGroup(1).busy == nil, 'boost: the car is removed and the group freed')
@@ -6183,7 +6183,7 @@ do
         local row, car = mysql.db.boost.runs[1], Spawned[#Spawned]
         FakePeds[car] = vec3(10, 0, 0); Vehicles[car].model = row.model
         openCar(unlock)
-        row.status, row.paid = 'done', 0   -- the server went down after the claim, before the mint
+        row.status, row.paid, row.claimed = 'done', 0, mysql.fakeNow   -- the server went down after the claim, before the mint
         Mocks.minted = {}
         pay(2, { run = 1, target = 1 })
         check(said == 'You do not have permission to do that' and #Mocks.minted == 0, 'boost: only an admin can pay a stuck run')
@@ -6200,10 +6200,47 @@ do
         pay(2, { run = 1, target = 1 })
         check(row.paid == row.face and row.status == 'done' and #Mocks.minted == 1 and #Mocks.minted[1].worths == 4 and Mocks.minted[1].src == 1, 'boost: an admin pays the stuck run to the chosen player')
         pay(2, { run = 1, target = 1 })
-        check(said == 'That run is not stuck' and #Mocks.minted == 1, 'boost: a run is never paid twice')
+        check(said:find('nothing is owed') and #Mocks.minted == 1, 'boost: a run is never paid twice')
+
+        -- A share that could not be minted leaves a part paid: the command pays what is still owed.
+        row.status, row.paid = 'unpaid', 500
+        Mocks.mintFails = true
+        pay(2, { run = 1, target = 1 })
+        check(row.paid == 500 and row.status == 'unpaid' and #Mocks.minted == 1, 'boost: a failed catch-up mint leaves the part paid as it was')
+        Mocks.mintFails = false
+        pay(2, { run = 1, target = 1 })
+        check(row.paid == row.face and #Mocks.minted == 2 and #Mocks.minted[2].worths == 2 and Mocks.minted[2].worths[1] == 250, 'boost: the command pays only what is still owed')
+        pay(2, { run = 1, target = 1 })
+        check(#Mocks.minted == 2, 'boost: and not again')
+        row.status, row.paid, row.claimed = 'unpaid', 500, mysql.fakeNow
+        pay(2, { run = 1, target = 1 })
+        check(said == 'That run is not stuck' and #Mocks.minted == 2, 'boost: a delivery claimed a moment ago is not paid by hand while it may still be minting')
         Mocks.admins[2] = nil
         _G.TriggerClientEvent = realT
         FakePeds[car] = nil
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        local real = math.random
+        math.random = function(a, b) if b then return 7 elseif a then return 1 end return 0.5 end
+        mysql.db.boost.runs[1] = { id = 1, class = 'C', pickup = 'other', plate = 'BST00007', status = 'active', face = 0, paid = 0, ts = mysql.fakeNow }
+        local ok = begin('C').success
+        math.random = real
+        check(ok == false and mysql.db.boost.runs[2] == nil, 'boost: a plate that a running contract holds is never used')
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        check(begin('C').success == true, 'boost: (setup) a contract is running')
+        local D = mysql.db.boost
+        D.runs[2] = { id = 2, class = 'C', pickup = 'lost', plate = 'BST11111', status = 'active', face = 1000, paid = 0, ts = mysql.fakeNow - 120 }
+        D.runs[3] = { id = 3, class = 'C', pickup = 'young', plate = 'BST22222', status = 'active', face = 1000, paid = 0, ts = mysql.fakeNow }
+        env.Boosting.Sweep()
+        check(D.runs[2].status == 'failed', 'boost: an active row the server no longer keeps is failed, freeing its pickup and cap')
+        check(D.runs[3].status == 'active' and D.runs[1].status == 'active', 'boost: a new row and a running contract are left alone')
         restore()
     end
 

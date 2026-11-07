@@ -53,11 +53,14 @@ local function spawn(model, at, heading)
     return DoesEntityExist(entity) and entity or nil
 end
 
----A plate no player vehicle holds.
+---A plate no player vehicle and no running contract holds.
 local function freePlate()
     for _ = 1, 5 do
         local plate = ('BST%05d'):format(math.random(0, 99999))
-        if not MySQL.scalar.await('SELECT 1 FROM som_vehicles WHERE plate = ? LIMIT 1', { plate }) then return plate end
+        if not MySQL.scalar.await('SELECT 1 FROM som_vehicles WHERE plate = ? LIMIT 1', { plate })
+            and not MySQL.scalar.await("SELECT 1 FROM som_boost_runs WHERE plate = ? AND status = 'active' LIMIT 1", { plate }) then
+            return plate
+        end
     end
 end
 
@@ -305,7 +308,7 @@ lib.callback.register('som-boosting:server:deliver', function(source, netId)
 
     -- The claim comes first, so two members handing it over cannot both be paid.
     local claimed = MySQL.update.await([[
-        UPDATE som_boost_runs SET status = 'done'
+        UPDATE som_boost_runs SET status = 'done', claimed_at = NOW()
         WHERE id = ? AND status = 'active' AND unlocked_at IS NOT NULL AND unlocked_at <= DATE_SUB(NOW(), INTERVAL ? SECOND)
     ]], { run.id, Config.deliverAfterSeconds })
     if claimed ~= 1 then return done(false, 'give it a few minutes before you hand it over') end
@@ -320,7 +323,7 @@ lib.callback.register('som-boosting:server:deliver', function(source, netId)
 end)
 
 lib.addCommand('boostpay', {
-    help = 'Pay a boosting run that crashed before its bills were minted, once, to one player',
+    help = 'Pay what is still owed on a boosting run (a crash or a share that could not be minted) to one player',
     params = { { name = 'run', type = 'number' }, { name = 'target', type = 'playerId' } },
 }, function(source, args)
     local function say(text)
@@ -329,24 +332,29 @@ lib.addCommand('boostpay', {
     if source ~= 0 and not core:hasPermission(source, 'som.admin') then return say('You do not have permission to do that') end
 
     local id = math.floor(args.run)
-    local row = MySQL.single.await('SELECT class, face FROM som_boost_runs WHERE id = ?', { id })
+    local row = MySQL.single.await('SELECT class, face, paid FROM som_boost_runs WHERE id = ?', { id })
     local cfg = row and Config.classes[row.class]
-    if not cfg or cfg.bills.count * cfg.bills.worth ~= tonumber(row.face) then return say('No such run, or its class pay has changed') end
+    local paid = row and tonumber(row.paid)
+    local owed = row and tonumber(row.face) - paid
+    if not cfg or owed < 1 or owed % cfg.bills.worth ~= 0 or owed / cfg.bills.worth > cfg.bills.count then
+        return say('No such run, nothing is owed on it, or its class pay has changed')
+    end
     if not core:getPlayer(args.target) then return say('That player is not loaded') end
 
-    -- paid goes from 0 to face in one statement, so two staff cannot both pay it. The wait
-    -- after the unlock keeps this off a delivery that is still being paid.
+    -- paid goes from the value just read up to face in one statement, so two staff cannot both pay the
+    -- rest. The wait after the delivery claim keeps this off a delivery that is still being paid.
     local claimed = MySQL.update.await([[
         UPDATE som_boost_runs SET paid = face, status = 'done'
-        WHERE id = ? AND paid = 0 AND status IN ('done', 'unpaid') AND unlocked_at <= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
-    ]], { id })
+        WHERE id = ? AND paid = ? AND paid < face AND status IN ('done', 'unpaid')
+          AND claimed_at <= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+    ]], { id, paid })
     if claimed ~= 1 then return say('That run is not stuck') end
 
     local worths = {}
-    for i = 1, cfg.bills.count do worths[i] = cfg.bills.worth end
+    for i = 1, math.floor(owed / cfg.bills.worth) do worths[i] = cfg.bills.worth end
     local ok, uids = pcall(function() return exports['som-launder']:mintBills(args.target, worths, ('boost:%s'):format(row.class)) end)
     if not (ok and uids) then
-        MySQL.update.await("UPDATE som_boost_runs SET paid = 0, status = 'unpaid' WHERE id = ? AND paid = face", { id })
+        MySQL.update.await("UPDATE som_boost_runs SET paid = ?, status = 'unpaid' WHERE id = ? AND paid = face", { paid, id })
         return say('Could not mint the bills, nothing was paid')
     end
 
@@ -370,6 +378,14 @@ function Boosting.Sweep()
     for groupId, run in pairs(runs) do
         if run.expires <= os.time() or not DoesEntityExist(run.entity) then close(groupId, 'failed') end
     end
+
+    -- A row left active by an error between the claim and the run being kept would hold its pickup and its
+    -- share of the hourly cap until a restart. The minute gives a contract that is still spawning time to be kept.
+    local ids = {}
+    for _, run in pairs(runs) do ids[#ids + 1] = run.id end
+    MySQL.update.await(
+        "UPDATE som_boost_runs SET status = 'failed' WHERE status = 'active' AND created_at < DATE_SUB(NOW(), INTERVAL 1 MINUTE) AND id NOT IN (0"
+            .. (', ?'):rep(#ids) .. ')', ids)
 end
 
 -- A restart ends every run, so none may keep a pickup claimed as active.

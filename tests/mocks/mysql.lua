@@ -379,9 +379,13 @@ local function boost(kind, query, params)
             return true, id
         end
     elseif kind == 'single' then
-        if has('SELECT class, face FROM som_boost_runs WHERE id = ?') then return true, D.runs[params[1]] end
+        if has('SELECT class, face, paid FROM som_boost_runs WHERE id = ?') then return true, D.runs[params[1]] end
     elseif kind == 'scalar' then
         if has('SELECT 1 FROM som_vehicles WHERE plate = ? LIMIT 1') then return true, D.ownedPlates[params[1]] and 1 or nil end
+        if has("SELECT 1 FROM som_boost_runs WHERE plate = ? AND status = 'active' LIMIT 1") then
+            for _, r in ipairs(D.runs) do if r.plate == params[1] and r.status == 'active' and not r.deleted then return true, 1 end end
+            return true, nil
+        end
     elseif kind == 'update' then
         local r = params and D.runs[params[#params]]
         if has("UPDATE som_boost_runs SET unlocked_at = NOW() WHERE id = ? AND status = 'active' AND unlocked_at IS NULL") then
@@ -391,17 +395,17 @@ local function boost(kind, query, params)
         end
         if has("UPDATE som_boost_runs SET status = 'done'") then
             r = D.runs[params[1]]
-            if r and r.status == 'active' and r.unlocked and r.unlocked <= now() - params[2] then r.status = 'done'; return true, 1 end
+            if r and r.status == 'active' and r.unlocked and r.unlocked <= now() - params[2] then r.status, r.claimed = 'done', now(); return true, 1 end
             return true, 0
         end
         if has("UPDATE som_boost_runs SET paid = face, status = 'done'") then
             r = D.runs[params[1]]
-            if r and r.paid == 0 and (r.status == 'done' or r.status == 'unpaid') and r.unlocked and r.unlocked <= now() - 300 then r.paid, r.status = r.face, 'done'; return true, 1 end
+            if r and r.paid == params[2] and r.paid < r.face and (r.status == 'done' or r.status == 'unpaid') and r.claimed and r.claimed <= now() - 300 then r.paid, r.status = r.face, 'done'; return true, 1 end
             return true, 0
         end
-        if has("UPDATE som_boost_runs SET paid = 0, status = 'unpaid' WHERE id = ? AND paid = face") then
-            r = D.runs[params[1]]
-            if r and r.paid == r.face then r.paid, r.status = 0, 'unpaid'; return true, 1 end
+        if has("UPDATE som_boost_runs SET paid = ?, status = 'unpaid' WHERE id = ? AND paid = face") then
+            r = D.runs[params[2]]
+            if r and r.paid == r.face then r.paid, r.status = params[1], 'unpaid'; return true, 1 end
             return true, 0
         end
         if has('UPDATE som_boost_runs SET paid = ?, status = ? WHERE id = ?') then
@@ -413,6 +417,14 @@ local function boost(kind, query, params)
             r = D.runs[params[2]]
             if r and r.status == 'active' then r.status = params[1]; return true, 1 end
             return true, 0
+        end
+        if has("UPDATE som_boost_runs SET status = 'failed' WHERE status = 'active' AND created_at") then
+            local keep = {}
+            for _, id in ipairs(params) do keep[id] = true end
+            for _, row in ipairs(D.runs) do
+                if row.status == 'active' and row.ts < now() - 60 and not keep[row.id] then row.status = 'failed' end
+            end
+            return true, 1
         end
         if has("UPDATE som_boost_runs SET status = 'failed' WHERE status = 'active'") then
             for _, row in ipairs(D.runs) do if row.status == 'active' then row.status = 'failed' end end
