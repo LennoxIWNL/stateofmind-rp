@@ -1952,3 +1952,32 @@ CREATE TABLE IF NOT EXISTS `som_loans` (
   KEY `idx_citizen` (`citizenid`, `status`),
   KEY `idx_due` (`status`, `next_due`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Vehicle insurance (som-insurance). One policy per vehicle id, so a plate change (som-dmv) never
+-- orphans it, and a policy only counts while its citizenid is still the vehicle's holder (a sale, som-carsales,
+-- ends it). Cover is derived from paid_until and covered_from in the database, never from a counter.
+CREATE TABLE IF NOT EXISTS `som_vehicle_insurance` (
+  `vehicle_id`   INT UNSIGNED NOT NULL,
+  `citizenid`    VARCHAR(16) NOT NULL,
+  `paid_until`   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `covered_from` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `status`       ENUM('active','cancelled') NOT NULL DEFAULT 'active',
+  PRIMARY KEY (`vehicle_id`),
+  KEY `idx_citizen` (`citizenid`, `status`),
+  KEY `idx_due` (`status`, `paid_until`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- One row per claim. The limits per vehicle and per owner are counted from created_at in the
+-- claiming INSERT itself.
+CREATE TABLE IF NOT EXISTS `som_insurance_claims` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `vehicle_id` INT UNSIGNED NOT NULL,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `cost`       BIGINT NOT NULL,
+  `excess`     BIGINT NOT NULL,
+  `status`     ENUM('pending','paid','cancelled') NOT NULL DEFAULT 'pending',
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_vehicle` (`vehicle_id`, `created_at`),
+  KEY `idx_citizen` (`citizenid`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

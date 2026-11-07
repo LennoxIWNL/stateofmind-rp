@@ -4847,6 +4847,258 @@ do
 end
 
 -- ---------------------------------------------------------------------------
+-- Vehicle insurance
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    resetMocks()
+    mysql.fakeNow = 1000000
+    local D = mysql.db.ins
+    D.on = true
+    D.vehicles, D.policies, D.claims, D.flagged, D.bolo, D.wanted = {}, {}, {}, {}, {}, {}
+    local env = loader.loadResource(REPO .. 'som-insurance', { 'shared/config.lua', 'server/insurance.lua' })
+    local core = exports['som-core']
+    local C = env.Config
+    local app = Mocks.apps.insurance
+    local DAY = 86400
+
+    local function person(src, cid) return { citizenid = cid, source = src, charinfo = { firstname = 'P' .. src, lastname = 'Q' .. src } } end
+    Mocks.players = { [1] = person(1, 'OWN1'), [2] = person(2, 'OTH2'), [3] = person(3, 'STAFF3') }
+    Mocks.bank = { [1] = 50000, [2] = 50000, [3] = 0 }
+    Mocks.treasury = 100000
+    Mocks.admins = { [3] = true }
+    Mocks.taxFails, Mocks.addMoneyFails, Mocks.bizFails = false, false, false
+
+    local insurer = 0
+    local saved = { addMoney = core.addMoney, businessTransact = core.businessTransact, taxToTreasury = core.taxToTreasury, gav = _G.GetAllVehicles, plate = _G.GetVehicleNumberPlateText, eng = _G.GetVehicleEngineHealth }
+    function core:addMoney(source, _, amount)
+        if Mocks.addMoneyFails then return false, 'refused' end
+        Mocks.bank[source] = (Mocks.bank[source] or 0) + amount
+        return true
+    end
+    function core:businessTransact(name, amount)
+        if name ~= 'insurer' or Mocks.bizFails or insurer + amount < 0 then return false, 'refused' end
+        insurer = insurer + amount
+        return true
+    end
+    local world = {}
+    _G.GetAllVehicles = function() local out = {} for i = 1, #world do out[i] = i end return out end
+    _G.GetVehicleNumberPlateText = function(e) return world[e].plate end
+    _G.GetVehicleEngineHealth = function(e) return world[e].engine end
+    local notes = {}
+    local realT = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, ...) notes[#notes + 1] = { name = name, target = target, args = { ... } } end
+
+    local function veh(id, fields)
+        local v = { id = id, citizenid = 'OWN1', plate = 'AB' .. id .. ' 123', model = 'sultan', price = 20000, state = 'garaged' }
+        for k, x in pairs(fields or {}) do v[k] = x end
+        D.vehicles[#D.vehicles + 1] = v
+        return v
+    end
+    local function policy(id) for _, p in ipairs(D.policies) do if p.vehicle_id == id then return p end end end
+    local function insureV(src, id) return app.handler(src, 'insure', { vehicle = id }) end
+    local function claimV(src, id) return app.handler(src, 'claim', { vehicle = id }) end
+    local function advance(days) mysql.fakeNow = mysql.fakeNow + days * DAY end
+    local function goOut(v, minutes) v.state, v.taken = 'out', mysql.fakeNow - (minutes or 20) * 60 end
+    local function fund(n) insurer = insurer + n end
+
+    -- Buying cover
+    local v1 = veh(1)
+    local group = veh(9, { group = 'lspd' })
+    local cheap = veh(8, { price = 500 })
+    local theirs = veh(7, { citizenid = 'OTH2' })
+    check(#app.handler(1, 'view', {}).view.sections[1].rows == 1, 'insurance: the phone lists only your own insurable cars')
+    check(insureV(1, 7).error == 'that is not your vehicle' and insureV(1, 9).error == 'that is not your vehicle', 'insurance: you cannot insure someone else\'s car or a pool car')
+    check(insureV(1, 8).error == 'this vehicle cannot be insured' and policy(8) == nil, 'insurance: a car with no real recorded value cannot be insured')
+    check(insureV(1, '1').error == 'bad request' and insureV(1, 0).error == 'bad request', 'insurance: the vehicle must be a whole number')
+
+    local bought = insureV(1, 1)
+    local p1 = policy(1)
+    check(bought.success and p1.status == 'active' and p1.paid_until == mysql.fakeNow + 7 * DAY and Mocks.bank[1] == 49800 and insurer == 200, 'insurance: the first premium is a share of the price and goes to the insurer')
+    check(insureV(1, 1).error == 'this vehicle is already insured', 'insurance: a car already covered is not insured twice')
+
+    local v2 = veh(2)
+    Mocks.bank[1] = 0
+    check(insureV(1, 2).error == 'not enough in your bank' and policy(2).status == 'cancelled', 'insurance: without the premium there is no policy')
+    Mocks.bank[1] = 50000
+    Mocks.bizFails = true
+    check(insureV(1, 2).success == false and Mocks.bank[1] == 50000 and policy(2).status == 'cancelled', 'insurance: a premium the insurer cannot take is refunded')
+    Mocks.bizFails = false
+    check(insureV(1, 2).success and policy(2).status == 'active', 'insurance: a cancelled policy can be taken out again')
+    check(app.handler(1, 'cancel', { vehicle = 2 }).success and policy(2).status == 'cancelled' and app.handler(1, 'cancel', { vehicle = 2 }).error == 'that vehicle is not insured', 'insurance: cover can be cancelled')
+
+    -- Renewal
+    Mocks.bank[1] = 50000
+    insurer = 200
+    advance(7 - 0.25)
+    local fromBefore = p1.covered_from
+    env.Insurance.Sweep()
+    check(p1.paid_until == fromBefore + 14 * DAY and Mocks.bank[1] == 49800 and insurer == 400 and p1.covered_from == fromBefore, 'insurance: a policy is renewed before it ends without a new waiting period')
+    env.Insurance.Sweep()
+    check(Mocks.bank[1] == 49800, 'insurance: a period is never charged twice')
+
+    advance(7)
+    Mocks.bank[1] = 0
+    env.Insurance.Sweep()
+    local lapsedAt = p1.paid_until
+    check(Mocks.bank[1] == 0 and p1.status == 'active' and insurer == 400, 'insurance: an owner who cannot pay is not charged')
+    advance(1)
+    check(p1.paid_until < mysql.fakeNow, 'insurance: the policy has lapsed by time alone')
+    goOut(v1, 30)
+    check(claimV(1, 1).error == 'this vehicle is not covered for this', 'insurance: a lapsed policy covers nothing')
+    Mocks.bank[1] = 50000
+    env.Insurance.Sweep('OWN1')
+    check(p1.paid_until == mysql.fakeNow + 7 * DAY and p1.covered_from == mysql.fakeNow and Mocks.bank[1] == 49800, 'insurance: paying after a lapse starts cover again with a new waiting period')
+    check(claimV(1, 1).error == 'this vehicle is not covered for this', 'insurance: a car out before the new cover began is not covered')
+
+    -- Sold, and a plate change
+    v1.state, v1.taken = 'garaged', nil
+    local ex = Mocks.exported.insured
+    check(ex('ab1 123').insured == true and ex('AB1123').expires == p1.paid_until, 'insurance: police tools can read whether a plate is insured')
+    v1.plate = 'NEW 999'
+    check(ex('NEW999').insured == true and ex('AB1 123').insured == false, 'insurance: a plate change does not orphan the policy')
+    v1.plate = 'AB1 123'
+    v1.citizenid = 'OTH2'
+    check(ex('AB1 123').insured == false, 'insurance: a policy does not cover the person a car was sold to')
+    advance(7 - 0.25)
+    local before = Mocks.bank[1]
+    env.Insurance.Sweep()
+    check(p1.status == 'cancelled' and Mocks.bank[1] == before, 'insurance: a sold car ends its policy and is not charged again')
+    v1.citizenid = 'OWN1'
+    check(#app.handler(2, 'view', {}).view.sections[1].rows == 1, 'insurance: the new holder can insure the car themselves')
+
+    -- A car that was sold between players has a replaced price and is never insured
+    local resold = veh(20, { price = 1000 })
+    D.sold[20] = true
+    check(insureV(1, 20).error == 'a vehicle that has been sold between players cannot be insured' and policy(20) == nil, 'insurance: a car sold between players cannot be insured against its sale price')
+    local soldRows = app.handler(1, 'view', {}).view.sections[1].rows
+    local listed = false
+    for _, row in ipairs(soldRows) do if row.title:find('AB20', 1, true) then listed = true end end
+    check(not listed, 'insurance: a car sold between players is not offered for cover')
+    D.sold[20] = nil
+
+    -- Claims
+    local v3 = veh(3)
+    Mocks.bank[1] = 50000
+    insureV(1, 3)
+    advance(3)
+    local claimedBefore = #D.claims
+    check(claimV(1, 3).error == 'only a vehicle that is out can be claimed', 'insurance: a car in the garage cannot be claimed')
+    goOut(v3, 10)
+    check(claimV(1, 3).error == 'it has not been gone long enough', 'insurance: a car must have been out long enough by the database clock')
+    goOut(v3, 30)
+    D.flagged['AB3123'] = true
+    check(claimV(1, 3).error == 'this vehicle cannot be claimed right now', 'insurance: a flagged plate cannot be claimed')
+    D.flagged['AB3123'] = nil
+    D.bolo['AB3123'] = true
+    check(claimV(1, 3).error == 'this vehicle cannot be claimed right now', 'insurance: a BOLO plate cannot be claimed')
+    D.bolo['AB3123'] = nil
+    D.wanted['AB3123'] = true
+    check(claimV(1, 3).error == 'this vehicle cannot be claimed right now', 'insurance: a wanted vehicle cannot be claimed')
+    D.wanted['AB3123'] = nil
+    world[1] = { plate = 'ab3 123', engine = 900 }
+    check(claimV(1, 3).error == 'this vehicle is still out there', 'insurance: a car that still exists anywhere cannot be claimed')
+    world[1].engine = 0
+    check(claimV(1, 3).error == 'this vehicle is still out there', 'insurance: a wreck still blocks a claim by default')
+    C.wreckBlocksClaim = false
+    check(claimV(1, 3).error == 'the insurer cannot pay out right now', 'insurance: with wrecks counted as gone the claim goes on to the payout')
+    C.wreckBlocksClaim = true
+    world[1] = nil
+    check(#D.claims > claimedBefore and D.claims[#D.claims].status == 'cancelled', 'insurance: a claim that failed is cancelled')
+
+    -- The insurer cannot pay more than it holds
+    insurer = 1000
+    local bank, treasury = Mocks.bank[1], Mocks.treasury
+    check(claimV(1, 3).error == 'the insurer cannot pay out right now' and Mocks.bank[1] == bank and Mocks.treasury == treasury and insurer == 1000 and v3.state == 'out', 'insurance: if the insurer cannot pay, nothing moves and the car stays out')
+
+    -- Failures after the money moved are undone
+    fund(20000)
+    local base = insurer
+    Mocks.taxFails = true
+    check(claimV(1, 3).error == 'the payout fell through' and Mocks.bank[1] == bank and insurer == base and v3.state == 'out', 'insurance: a payout that cannot reach the treasury is undone')
+    Mocks.taxFails = false
+    local realTax = core.taxToTreasury
+    function core:taxToTreasury(amount, reason) v3.state = 'impounded'; return realTax(core, amount, reason) end
+    local tBefore = Mocks.treasury
+    check(claimV(1, 3).error == 'the vehicle changed hands or was found, nothing was paid' and Mocks.bank[1] == bank and insurer == base and Mocks.treasury == tBefore, 'insurance: a car found or impounded meanwhile undoes the payment, the excess and the treasury credit')
+    function core:taxToTreasury(amount, reason) v3.citizenid = 'OTH2'; return realTax(core, amount, reason) end
+    v3.state = 'out'
+    check(claimV(1, 3).error ~= nil and Mocks.bank[1] == bank and insurer == base, 'insurance: a car sold during the claim undoes it')
+    core.taxToTreasury = realTax
+    v3.citizenid, v3.state = 'OWN1', 'out'
+
+    -- Sold and bought back: the old policy would cover the holder again, at the sale price
+    D.sold[3] = true
+    check(claimV(1, 3).error == 'a vehicle that has been sold between players cannot be claimed' and v3.state == 'out', 'insurance: a car that was ever sold between players cannot be claimed on')
+    D.sold[3] = nil
+
+    -- A failed take-back from the treasury stops the other refunds: nothing is credited for a debit that never happened
+    function core:taxToTreasury(amount, reason)
+        v3.state = 'impounded'
+        Mocks.treasury = 0
+        return true
+    end
+    local bankMid, insMid = Mocks.bank[1], insurer
+    local logged = {}
+    local realPrint = _G.print
+    _G.print = function(...) logged[#logged + 1] = table.concat({ ... }, ' ') end
+    local stuck = claimV(1, 3)
+    _G.print = realPrint
+    local prices = env.Insurance.Prices(v3.price)
+    check(stuck.error == 'the vehicle changed hands or was found, nothing was paid', 'insurance: the claim still fails when the treasury cannot give the payout back')
+    check(insurer == insMid + prices.excess - prices.cost and Mocks.bank[1] == bankMid - prices.excess, 'insurance: a failed take-back from the treasury stops the refunds instead of minting money')
+    check(logged[1] and logged[1]:find('settle it by hand', 1, true) and D.claims[#D.claims].status == 'cancelled', 'insurance: an undo that stopped is logged for staff and the claim is cancelled')
+    -- put the world back for the next scenes
+    core.taxToTreasury = realTax
+    v3.state = 'out'
+    Mocks.bank[1], insurer, Mocks.treasury = bankMid, insMid, 100000
+
+    -- A good claim
+    local tBefore2 = Mocks.treasury
+    local ok = claimV(1, 3)
+    check(ok.success and v3.state == 'garaged' and v3.repaired and v3.taken == nil, 'insurance: a claim puts the car back in the garage repaired')
+    check(Mocks.bank[1] == bank - 2000 and insurer == base + 2000 - 16000 and Mocks.treasury == tBefore2 + 16000, 'insurance: the excess goes to the insurer and the replacement cost from the insurer to the treasury')
+    check(D.claims[#D.claims].status == 'paid', 'insurance: the claim is recorded as paid')
+
+    -- Limits
+    goOut(v3, 30)
+    check(claimV(1, 3).error == 'you have claimed too often recently', 'insurance: one claim per car in the window')
+    local v4, v5 = veh(4), veh(5)
+    insureV(1, 4); insureV(1, 5)
+    advance(3)
+    fund(40000)
+    goOut(v4, 30); goOut(v5, 30)
+    check(claimV(1, 4).success, 'insurance: a second car can be claimed')
+    check(claimV(1, 5).error == 'you have claimed too often recently', 'insurance: two claims per owner in the window')
+    advance(31)
+    check(claimV(1, 3).error == 'this vehicle is not covered for this', 'insurance: a lapsed policy is still not covered after the window')
+
+    -- Staff funding
+    local fundCmd = Mocks.commands.insurerfund
+    local ins0, tre0 = insurer, Mocks.treasury
+    fundCmd(2, { amount = 500 })
+    check(insurer == ins0 and Mocks.treasury == tre0, 'insurance: a player cannot fund the insurer')
+    fundCmd(3, { amount = 500 })
+    check(insurer == ins0 + 500 and Mocks.treasury == tre0 - 500, 'insurance: staff can move treasury money to the insurer')
+    fundCmd(3, { amount = 999999 }); fundCmd(3, { amount = '5' }); fundCmd(3, { amount = 0 })
+    check(insurer == ins0 + 500 and Mocks.treasury == tre0 - 500, 'insurance: a bad amount moves nothing')
+    Mocks.bizFails = true
+    fundCmd(3, { amount = 100 })
+    Mocks.bizFails = false
+    check(Mocks.treasury == tre0 - 500, 'insurance: a failed credit to the insurer gives the treasury its money back')
+    Mocks.treasury = 50
+    fundCmd(0, { amount = 100 })
+    check(insurer == ins0 + 500 and Mocks.treasury == 50, 'insurance: the treasury cannot be overdrawn')
+
+    core.addMoney, core.businessTransact, core.taxToTreasury = saved.addMoney, saved.businessTransact, saved.taxToTreasury
+    _G.GetAllVehicles, _G.GetVehicleNumberPlateText, _G.GetVehicleEngineHealth = saved.gav, saved.plate, saved.eng
+    _G.TriggerClientEvent = realT
+    D.on = false
+    mysql.fakeNow = nil
+end
+
+-- ---------------------------------------------------------------------------
 -- Phone loans
 -- ---------------------------------------------------------------------------
 
