@@ -7289,13 +7289,21 @@ do
     }
     local env = loader.loadResource(REPO .. 'som-welcome', { 'shared/config.lua', 'server/main.lua' })
     _G.CreateThread = realThread
+    local coreMock = exports['som-core']
+    local realPlayers = coreMock.getPlayers
+    function coreMock:getPlayers()
+        local out = {}
+        for _, p in pairs(Mocks.players) do out[#out + 1] = p end
+        return out
+    end
+    local function minutes(n) for _ = 1, n do env.Welcome.Tick() end end
     local cb, C = RegisteredCallbacks, env.Config
     local W = mysql.db.welcome
     local app = Mocks.apps.welcome
     local base = 1800000000
 
-    local function person(src, cid, job)
-        Mocks.players[src] = { source = src, citizenid = cid, job = { name = job or 'unemployed', grade = 0 }, charinfo = { firstname = cid, lastname = 'T' } }
+    local function person(src, cid, job, license)
+        Mocks.players[src] = { source = src, citizenid = cid, license = license or ('license:' .. cid), job = { name = job or 'unemployed', grade = 0 }, charinfo = { firstname = cid, lastname = 'T' } }
         FakePeds[src] = vec3(0, 0, 0)
         Mocks.bank[src] = 0
     end
@@ -7308,11 +7316,12 @@ do
         for _, r in ipairs(rows(app.handler(src, 'view').view)) do if r.action == 'claim' then return true end end
         return false
     end
-    local function ready(src, cid, job)
-        person(src, cid, job)
+    local function ready(src, cid, job, license)
+        person(src, cid, job, license)
         mysql.db.licences.rows[cid .. ':driver'] = { citizenid = cid, type = 'driver', revoked = 0 }
         W.homes[cid] = true
         Handlers['som:server:jobChanged'](src, cid, { name = job })
+        minutes(C.jobMinutes)
     end
 
     mysql.fakeNow = base
@@ -7333,12 +7342,19 @@ do
     check(not claimable(1), 'welcome: a suspended licence is not a licence')
     mysql.db.licences.rows['W1:driver'].suspendedUntil = nil
     check(not claimable(1), 'welcome: a job just taken does not count yet')
-    mysql.fakeNow = base + (C.jobMinutes - 1) * 60
+    mysql.fakeNow = base + 100 * C.jobMinutes * 60
+    check(not claimable(1), 'welcome: wall clock time alone does not count, only minutes spent in the city')
+    minutes(C.jobMinutes - 1)
     check(not claimable(1), 'welcome: nor one minute before the time')
     Handlers['som:server:jobChanged'](1, 'W1', { name = 'delivery' }); Mocks.players[1].job.name = 'delivery'
-    mysql.fakeNow = base + (C.jobMinutes + 1) * 60
+    minutes(2)
     check(not claimable(1), 'welcome: changing job starts the clock again')
-    mysql.fakeNow = base + (2 * C.jobMinutes + 2) * 60
+    local away = Mocks.players[1]
+    Mocks.players[1] = nil
+    minutes(C.jobMinutes)
+    Mocks.players[1] = away
+    check(not claimable(1), 'welcome: time while logged out does not count')
+    minutes(C.jobMinutes - 2)
     Handlers['som:server:jobChanged'](1, 'W1', { name = 'delivery' })
     check(claimable(1), 'welcome: all three steps make the payment claimable, and a repeat job event does not reset the clock')
     W.homes.W1 = nil
@@ -7354,6 +7370,21 @@ do
         'welcome: the payment comes out of the treasury and goes to the player')
     check(W.claims.W1 and W.claims.W1.amount == C.payment, 'welcome: the claim is recorded')
     check(app.handler(1, 'claim').error == 'you have already had it' and Mocks.treasury == 50000 - C.payment, 'welcome: it is paid once')
+
+    -- One player, one payment: an alt on the same licence gets nothing, even when both
+    -- claims read "not yet claimed" before either insert (a true concurrent double claim).
+    ready(7, 'W7', 'taxi', 'license:W1')
+    check(app.handler(7, 'claim').error == 'you have already had it' and W.claims.W7 == nil and Mocks.treasury == 50000 - C.payment, 'welcome: another character on the same licence cannot claim')
+    W.hideClaimRead = true
+    check(app.handler(7, 'claim').error == 'you have already had it' and W.claims.W7 == nil and Mocks.treasury == 50000 - C.payment, 'welcome: a racing alt loses at the unique licence key and nothing is paid')
+    check(app.handler(1, 'claim').error == 'you have already had it' and Mocks.treasury == 50000 - C.payment, 'welcome: a racing second claim by the same character loses at the primary key')
+    W.hideClaimRead = nil
+    Mocks.players[8] = { source = 8, citizenid = 'W8N', job = { name = 'taxi', grade = 0 }, charinfo = { firstname = 'W8N', lastname = 'T' } }
+    mysql.db.licences.rows['W8N:driver'] = { citizenid = 'W8N', type = 'driver', revoked = 0 }
+    W.homes.W8N = true
+    Handlers['som:server:jobChanged'](8, 'W8N', { name = 'taxi' }); minutes(C.jobMinutes)
+    check(app.handler(8, 'claim').error == 'not available' and W.claims.W8N == nil, 'welcome: a player with no licence identifier cannot claim')
+    Mocks.players[8], Mocks.players[7] = nil, nil
     check(not claimable(1) and rows(app.handler(1, 'view').view)[#rows(app.handler(1, 'view').view)].title == 'Received', 'welcome: the app shows it was received')
 
     -- The global monthly cap.
@@ -7376,6 +7407,13 @@ do
     Mocks.addMoneyFails = false
     check(not r.success and W.claims.W3 == nil and Mocks.treasury == 5000, 'welcome: a failed credit returns the money to the treasury and frees the claim')
     check(app.handler(3, 'claim').success and W.claims.W3, 'welcome: and the player can claim again afterwards')
+
+    -- The daily cap: the month cannot be drained in one go.
+    ready(4, 'W4', 'taxi'); mysql.fakeNow = mysql.fakeNow + 60
+    check(W.claims.W3.amount + W.claims.W2.amount == C.dailyCap, 'welcome: two payments have used the day')
+    check(app.handler(4, 'claim').error:find('any more settling%-in payments') and W.claims.W4 == nil, 'welcome: the daily cap refuses a third payment the same day')
+    mysql.fakeNow = mysql.fakeNow + 86400 + 120
+    check(app.handler(4, 'claim').success, 'welcome: it is paid the next day')
 
     -- Job centre.
     person(10, 'J10')
@@ -7404,6 +7442,7 @@ do
     Mocks.jobs.taxi = nil
     check(setJob(12, 'taxi').error == 'the job centre cannot place you there', 'welcome: a job the framework does not have is refused')
     Mocks.jobs = realJobs
+    coreMock.getPlayers = realPlayers
     _G.CreateThread = realThread
 end
 

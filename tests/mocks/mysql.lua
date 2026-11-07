@@ -1058,27 +1058,41 @@ local function welcome(kind, query, params)
     local W = M.db.welcome
     if kind == 'update' and query:find('INSERT INTO som_welcome_jobs', 1, true) then
         local r = W.jobs[params[1]]
-        if not r then W.jobs[params[1]] = { job = params[2], since = now() } else
-            if r.job ~= params[2] then r.since = now() end
+        if not r then W.jobs[params[1]] = { job = params[2], minutes = 0 } else
+            if r.job ~= params[2] then r.minutes = 0 end
             r.job = params[2]
         end
         return true, 1
-    elseif kind == 'scalar' and query:find('AND job = ? AND since <= DATE_SUB', 1, true) then
+    elseif kind == 'update' and query:find('UPDATE som_welcome_jobs SET minutes = minutes + 1 WHERE citizenid IN (', 1, true) then
+        local n = 0
+        for _, cid in ipairs(params) do
+            if W.jobs[cid] then W.jobs[cid].minutes = W.jobs[cid].minutes + 1; n = n + 1 end
+        end
+        return true, n
+    elseif kind == 'scalar' and query:find('AND job = ? AND minutes >= ?', 1, true) then
         local r = W.jobs[params[1]]
-        return true, (r and r.job == params[2] and r.since <= now() - params[3] * 60) and 1 or nil
+        return true, (r and r.job == params[2] and r.minutes >= params[3]) and 1 or nil
     elseif kind == 'scalar' and query:find("FROM som_property_owners WHERE citizenid = ? AND role IN ('owner', 'tenant')", 1, true) then
         return true, W.homes[params[1]] and 1 or nil
     elseif kind == 'scalar' and query:find("AND type = 'driver' AND revoked = 0", 1, true) then
         local r = M.db.licences.rows[params[1] .. ':driver']
         return true, (r and r.revoked == 0 and (r.suspendedUntil == nil or r.suspendedUntil <= now())) and 1 or nil
-    elseif kind == 'scalar' and query:find('SELECT 1 FROM som_welcome_claims WHERE citizenid = ?', 1, true) then
-        return true, W.claims[params[1]] and 1 or nil
+    elseif kind == 'scalar' and query:find('SELECT 1 FROM som_welcome_claims WHERE citizenid = ? OR license = ?', 1, true) then
+        if W.hideClaimRead then return true, nil end
+        for cid, c in pairs(W.claims) do
+            if cid == params[1] or c.license == params[2] then return true, 1 end
+        end
+        return true, nil
     elseif kind == 'update' and query:find('INSERT INTO som_welcome_claims', 1, true) then
         if W.claims[params[1]] then error('Duplicate entry for key PRIMARY') end
-        local sum = 0
-        for _, c in pairs(W.claims) do if c.ts > now() - 30 * 86400 then sum = sum + c.amount end end
-        if sum + params[3] > params[4] then return true, 0 end
-        W.claims[params[1]] = { amount = params[2], ts = now() }
+        for _, c in pairs(W.claims) do if c.license == params[2] then error('Duplicate entry for key uniq_license') end end
+        local month, day = 0, 0
+        for _, c in pairs(W.claims) do
+            if c.ts > now() - 30 * 86400 then month = month + c.amount end
+            if c.ts > now() - 86400 then day = day + c.amount end
+        end
+        if month + params[4] > params[5] or day + params[6] > params[7] then return true, 0 end
+        W.claims[params[1]] = { license = params[2], amount = params[3], ts = now() }
         return true, 1
     elseif kind == 'update' and query:find('DELETE FROM som_welcome_claims WHERE citizenid = ?', 1, true) then
         local had = W.claims[params[1]] ~= nil

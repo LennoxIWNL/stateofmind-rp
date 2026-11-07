@@ -1,11 +1,14 @@
 Config = {
-    -- The settling-in payment: once per character, paid from the city treasury
-    -- only after every step is done, and capped across all characters.
+    -- The settling-in payment: once per player (their licence, so alts get nothing
+    -- extra), paid from the city treasury only after every step is done, and capped
+    -- across everyone.
     payment = 1000,
-    monthlyCap = 20000,     -- total paid out in any 30 days, all characters together
+    monthlyCap = 20000,     -- total paid out in any 30 days, all players together
+    dailyCap = 2000,        -- and in any 24 hours, so one day cannot use up the month
 
-    -- A job counts for the step only after being held this long, so changing
-    -- jobs back and forth at the desk cannot satisfy it.
+    -- A job counts for the step only after being held this many minutes while the
+    -- character is in the city, so changing jobs back and forth at the desk, or
+    -- sitting logged out, cannot satisfy it. Standing AFK in the city still counts.
     jobMinutes = 30,
 
     -- Ships closed. Staff set the desk with `/place som-welcome desk.coords`.
