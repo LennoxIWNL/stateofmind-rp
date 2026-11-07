@@ -441,3 +441,13 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] The treasury floor is checked under the loan lock, but other treasury spending (department budgets, heist and buyer payouts) can still lower it at the same moment; the floor is a guard, not a reservation.
 - [ ] Not verified in a live server: the Bank loans phone app, a real week passing, collection from a defaulted borrower in game.
 - [ ] Left out on purpose: business loans and loans to shops, interest that changes over time, credit scores, co-signers, seizing property on default, an early payoff rebate, a bank branch.
+
+## Vehicle insurance (som-insurance)
+
+- [ ] Existing databases: import the two new tables `som_vehicle_insurance` and `som_insurance_claims` (`setup.sql`, `CREATE TABLE IF NOT EXISTS`). Until then the sweep prints "som_vehicle_insurance is missing" and does nothing.
+- [ ] The insurer business account (`BUS-INSURER`) starts at 0, so no claim can pay out until premiums arrive. Staff can seed it on purpose with `/insurerfund <amount>` (needs `som.admin`, treasury to insurer, ledgered, capped by `Config.fundMax`). Decide whether to seed it before launch.
+- [ ] Untuned first guesses in `som-insurance/shared/config.lua`: 7 day period, premium 1 percent of the recorded purchase price (min $25), excess 10 percent (min $250), replacement 80 percent, 2 day waiting period, car out 15 minutes, $1000 minimum value, one claim per car and two per owner in 30 days. Cars with no recorded `purchase_price` (spawned by staff) cannot be insured.
+- [ ] A claim needs no entity with the plate anywhere in the world, wrecks included (`Config.wreckBlocksClaim = true`). A wreck left on the road blocks the claim until it despawns; set it to false to treat engine health zero as gone.
+- [ ] Premiums are only collected while the owner is online (login plus a 30 minute sweep). An owner offline past the end date is lapsed, and paying again restarts the waiting period. Selling a car ends its policy.
+- [ ] Not verified in a live server: the Insurance phone app rows, `GetAllVehicles` plate matching, what the garage shows after a restore, a real week passing. The SQL ran on MariaDB only as a syntax smoke test, not through the full flow.
+- [ ] Left out on purpose: weekly vs monthly choice, risk scoring, theft or damage claims that are not "gone", pool or group cars, partial payouts, an MDT screen line (`exports['som-insurance']:insured(plate)` exists for it), treasury auto top-up, refunds on cancel.

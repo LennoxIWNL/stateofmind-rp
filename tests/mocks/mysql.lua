@@ -38,6 +38,7 @@ M.db = {
     buyer = {},
     placements = {},
     trade = {},
+    ins = { on = false, vehicles = {}, policies = {}, claims = {}, flagged = {}, bolo = {}, wanted = {} },
     loans = {},
     leases = {},
     shopsDb = { shops = {}, stock = {}, staff = {}, takings = 0, balance = 0 },
@@ -560,6 +561,118 @@ local function placements(kind, query, params)
     elseif kind == 'insert' and has('INSERT INTO som_placements') then
         P[#P + 1] = { resource = params[1], path = params[2], kind = params[3], value = params[4], by = params[5] }
         return true, #P
+    end
+    return false
+end
+
+local function insDb(kind, query, params)
+    local D = M.db.ins
+    if not D.on then return false end
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    local function veh(id) for _, v in ipairs(D.vehicles) do if v.id == id then return v end end end
+    local function pol(id) for _, p in ipairs(D.policies) do if p.vehicle_id == id then return p end end end
+    local function byPlate(key) for _, v in ipairs(D.vehicles) do if v.plate:upper():gsub('%s+', '') == key then return v end end end
+    local function mine(v, cid) return v and v.citizenid == cid and not v.group end
+    local function count(list, key, plate) local n = 0 for _, x in ipairs(list) do if x == key then n = n + 1 end end return n end
+    local function claimsCount(field, value, days)
+        local n = 0
+        for _, c in ipairs(D.claims) do
+            if c[field] == value and c.status ~= 'cancelled' and c.at > now() - days * 86400 then n = n + 1 end
+        end
+        return n
+    end
+    local function covered(p, v, waitDays)
+        return p.status == 'active' and p.paid_until > now() and p.covered_from <= now() - waitDays * 86400 and p.citizenid == v.citizenid and v.taken and v.taken >= p.covered_from
+    end
+
+    if kind == 'single' and has('SELECT id, purchase_price FROM som_vehicles WHERE id = ? AND citizenid = ?') then
+        local v = veh(params[1])
+        return true, mine(v, params[2]) and { id = v.id, purchase_price = v.price } or nil
+    elseif kind == 'update' and has('INSERT IGNORE INTO som_vehicle_insurance') then
+        if pol(params[1]) then return true, 0 end
+        D.policies[#D.policies + 1] = { vehicle_id = params[1], citizenid = params[2], paid_until = now() + params[3] * 86400, covered_from = now(), status = 'active' }
+        return true, 1
+    elseif kind == 'update' and has("UPDATE som_vehicle_insurance SET citizenid = ?, status = 'active'") then
+        local p = pol(params[3])
+        if not p or not (p.status == 'cancelled' or p.paid_until <= now() or p.citizenid ~= params[4]) then return true, 0 end
+        p.citizenid, p.status, p.paid_until, p.covered_from = params[1], 'active', now() + params[2] * 86400, now()
+        return true, 1
+    elseif kind == 'update' and has("UPDATE som_vehicle_insurance SET status = 'cancelled', paid_until = NOW() WHERE vehicle_id = ? AND citizenid = ?") then
+        local p = pol(params[1])
+        if not p or p.citizenid ~= params[2] then return true, 0 end
+        p.status, p.paid_until = 'cancelled', now()
+        return true, 1
+    elseif kind == 'update' and has("UPDATE som_vehicle_insurance SET status = 'cancelled' WHERE vehicle_id = ? AND citizenid = ? AND status = 'active'") then
+        local p = pol(params[1])
+        if not p or p.citizenid ~= params[2] or p.status ~= 'active' then return true, 0 end
+        p.status = 'cancelled'
+        return true, 1
+    elseif kind == 'update' and has("UPDATE som_vehicle_insurance SET status = 'cancelled' WHERE vehicle_id = ? AND status = 'active'") then
+        local p = pol(params[1])
+        if not p or p.status ~= 'active' then return true, 0 end
+        p.status = 'cancelled'
+        return true, 1
+    elseif kind == 'update' and has('UPDATE som_vehicle_insurance SET paid_until = DATE_ADD(NOW(), INTERVAL ? DAY), covered_from = NOW()') then
+        local p = pol(params[2])
+        if not p or p.status ~= 'active' or p.paid_until ~= params[3] or p.paid_until > now() then return true, 0 end
+        p.paid_until, p.covered_from = now() + params[1] * 86400, now()
+        return true, 1
+    elseif kind == 'update' and has('UPDATE som_vehicle_insurance SET paid_until = DATE_ADD(paid_until, INTERVAL ? DAY)') then
+        local p = pol(params[2])
+        if not p or p.status ~= 'active' or p.paid_until ~= params[3] or p.paid_until <= now() then return true, 0 end
+        p.paid_until = p.paid_until + params[1] * 86400
+        return true, 1
+    elseif kind == 'update' and has('UPDATE som_vehicle_insurance SET paid_until = FROM_UNIXTIME(?), covered_from = FROM_UNIXTIME(?) WHERE vehicle_id = ?') then
+        local p = pol(params[3])
+        if p and p.status == 'active' then p.paid_until, p.covered_from = params[1], params[2] end
+        return true, 1
+    elseif kind == 'query' and has('SELECT i.vehicle_id, i.citizenid, UNIX_TIMESTAMP(i.paid_until) AS due') then
+        local out = {}
+        for _, p in ipairs(D.policies) do
+            if p.status == 'active' and p.paid_until <= now() + params[1] * 3600 and (params[2] == '%' or p.citizenid == params[2]) then
+                local v = veh(p.vehicle_id)
+                out[#out + 1] = { vehicle_id = p.vehicle_id, citizenid = p.citizenid, due = p.paid_until, from_at = p.covered_from, lapsed = p.paid_until <= now() and 1 or 0, holder = v and v.citizenid, price = v and v.price }
+            end
+        end
+        return true, out
+    elseif kind == 'single' and has('SELECT v.id, v.plate, v.state, v.purchase_price, UNIX_TIMESTAMP(v.taken_at) AS taken,') then
+        local v, p = veh(params[3]), pol(params[3])
+        if not mine(v, params[4]) or not p then return true, nil end
+        local outLong = v.taken ~= nil and v.taken <= now() - params[1] * 60
+        return true, { id = v.id, plate = v.plate, state = v.state, purchase_price = v.price, taken = v.taken, out_long = outLong and 1 or 0, covered = covered(p, v, params[2]) and 1 or 0 }
+    elseif kind == 'single' and has('(SELECT COUNT(*) FROM som_police_plates WHERE') then
+        local key = params[1]
+        return true, { flagged = D.flagged[key] and 1 or 0, bolo = D.bolo[key] and 1 or 0, wanted = D.wanted[key] and 1 or 0 }
+    elseif kind == 'insert' and has('INSERT INTO som_insurance_claims (vehicle_id, citizenid, cost, excess)') then
+        if claimsCount('vehicle_id', params[5], params[6]) >= params[7] or claimsCount('citizenid', params[8], params[9]) >= params[10] then return true, 0 end
+        D.claims[#D.claims + 1] = { id = #D.claims + 1, vehicle_id = params[1], citizenid = params[2], cost = params[3], excess = params[4], status = 'pending', at = now() }
+        return true, #D.claims
+    elseif kind == 'update' and has("UPDATE som_insurance_claims SET status = 'cancelled' WHERE id = ?") then
+        D.claims[params[1]].status = 'cancelled'
+        return true, 1
+    elseif kind == 'update' and has("UPDATE som_insurance_claims SET status = 'paid' WHERE id = ?") then
+        D.claims[params[1]].status = 'paid'
+        return true, 1
+    elseif kind == 'update' and has("UPDATE som_vehicles SET state = 'garaged', assigned_to = NULL, taken_at = NULL, body = 1000, engine = 1000, fuel = 100") then
+        local v = veh(params[1])
+        if not mine(v, params[2]) or v.state ~= 'out' or v.taken ~= params[3] then return true, 0 end
+        v.state, v.taken, v.repaired = 'garaged', nil, true
+        return true, 1
+    elseif kind == 'query' and has('SELECT v.id, v.plate, v.model, v.state, v.purchase_price,') then
+        local out = {}
+        for _, v in ipairs(D.vehicles) do
+            if mine(v, params[1]) then
+                local p = pol(v.id)
+                local live = p and p.status == 'active' and p.paid_until > now() and p.citizenid == v.citizenid
+                out[#out + 1] = { id = v.id, plate = v.plate, model = v.model, state = v.state, purchase_price = v.price, secs = p and math.max(0, p.paid_until - now()) or 0, covered = live and 1 or 0 }
+            end
+        end
+        return true, out
+    elseif kind == 'single' and has('SELECT UNIX_TIMESTAMP(i.paid_until) AS expires,') then
+        local v = byPlate(params[1])
+        local p = v and pol(v.id)
+        if not p then return true, nil end
+        return true, { expires = p.paid_until, covered = (p.status == 'active' and p.paid_until > now() and p.citizenid == v.citizenid) and 1 or 0 }
     end
     return false
 end
@@ -1503,6 +1616,7 @@ end
 
 function M.single(query, params)
     params = params or {}
+    do local handled, value = insDb('single', query, params); if handled then return value end end
     do local handled, value = loansDb('single', query, params); if handled then return value end end
     do local handled, value = courtService('single', query, params); if handled then return value end end
     do local handled, value = leases('single', query, params); if handled then return value end end
@@ -1588,6 +1702,7 @@ end
 
 function M.scalar(query, params)
     params = params or {}
+    do local handled, value = insDb('scalar', query, params); if handled then return value end end
     do local handled, value = loansDb('scalar', query, params); if handled then return value end end
     do local handled, value = courtService('scalar', query, params); if handled then return value end end
     do local handled, value = leases('scalar', query, params); if handled then return value end end
@@ -1707,6 +1822,7 @@ end
 
 function M.update(query, params)
     params = params or {}
+    do local handled, value = insDb('update', query, params); if handled then return value end end
     do local handled, value = loansDb('update', query, params); if handled then return value end end
     do local handled, value = courtService('update', query, params); if handled then return value end end
     do local handled, value = leases('update', query, params); if handled then return value end end
@@ -2066,6 +2182,7 @@ end
 
 function M.insert(query, params)
     params = params or {}
+    do local handled, value = insDb('insert', query, params); if handled then return value end end
     do local handled, value = loansDb('insert', query, params); if handled then return value end end
     do local handled, value = courtService('insert', query, params); if handled then return value end end
     do local handled, value = leases('insert', query, params); if handled then return value end end
@@ -2245,6 +2362,7 @@ function M.query(query, params)
     do local handled, value = courtService('query', query, params); if handled then return value end end
     if query:find('FROM som_businesses b', 1, true) then return M.db.businessRows or {} end
     params = params or {}
+    do local handled, value = insDb('query', query, params); if handled then return value end end
     do local handled, value = loansDb('query', query, params); if handled then return value end end
     do local handled, value = leases('query', query, params); if handled then return value end end
     do local handled, value = armoury('query', query, params); if handled then return value end end
