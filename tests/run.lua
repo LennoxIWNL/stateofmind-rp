@@ -7276,5 +7276,119 @@ end
 
 
 
+-- som-dispatch resolve and the automatic person down call
+----------------------------------------------------------------------
+do
+    dispScene()
+    report(22, 'explosion')
+    local blast
+    for _, c in pairs(allCalls()) do if c.alertType == 'explosion' then blast = c end end
+    check(Mocks.exported.resolve(blast.id, 'done') == true and blast.status == 'closed' and blast.services.ambulance.status == 'closed' and blast.services.police.status == 'closed', 'resolve: closes every service of a call with no player')
+    check(blast.services.police.disposition == 'done', 'resolve: keeps the disposition')
+    check(Mocks.exported.resolve(blast.id) == false and Mocks.exported.resolve(9999) == false and Mocks.exported.resolve('x') == false, 'resolve: a closed or unknown call is a no-op')
+    local reachable = false
+    for name in pairs(RegisteredCallbacks) do if name:find('resolve') then reachable = true end end
+    for name in pairs(Handlers) do if tostring(name):find('resolve') then reachable = true end end
+    check(not reachable, 'resolve: no callback or event reaches it, so a client cannot close a call')
+end
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-medical', { 'shared/config.lua', 'server/main.lua', 'server/call.lua' })
+    local E = env.Config.EmsCall
+    Player = Player or function() return { state = { set = function() end } } end
+    local threads = {}
+    local realThread = _G.CreateThread
+    _G.CreateThread = function(fn) threads[#threads + 1] = fn end
+    local realExported = Mocks.exported
+    local gen, cidA, cidB = 0
+    local function reset()
+        gen = gen + 1
+        cidA, cidB = 'PDA' .. gen, 'PDB' .. gen
+        Mocks.players = { [1] = { citizenid = cidA, job = { name = 'unemployed' } }, [2] = { citizenid = cidB, job = { name = 'unemployed' } } }
+        Mocks.exported = { activeFor = function() return nil end }
+        Mocks.calls.dispatchAlert, Mocks.lastAlertType, Mocks.lastAlertExtra, Mocks.resolved, Mocks.alertId = 0, nil, nil, {}, nil
+        FakePeds = { [1] = vec3(10, 20, 30), [2] = vec3(0, 0, 0) }
+        E.cooldownSeconds = 120
+        threads = {}
+    end
+    local function down(src, cause)
+        threads = {}
+        env.Medical.Down(src, cause)
+        return threads[#threads]
+    end
+    reset()
+    env.Medical.Revive(1)
+    env.Medical.Revive(2)
+
+    local run = down(1, 'bled\nout')
+    check(Mocks.calls.dispatchAlert == 0, 'person down: nothing is raised the moment a player goes down')
+    run()
+    check(Mocks.calls.dispatchAlert == 1 and Mocks.lastAlertType == 'personDown', 'person down: a player still down after the delay raises a call')
+    local c = Mocks.lastAlertExtra.coords
+    check(c.x == 10 and c.y == 20 and c.z == 30 and Mocks.lastAlertExtra.message == 'Person down', 'person down: the position is the server ped and the text carries nothing the client sent')
+    Mocks.alertId = 7
+    Mocks.exported = realExported
+    Mocks.exported = { activeFor = function() return nil end }
+    env.Medical.Revive(1)
+    check(Mocks.resolved[1] and Mocks.resolved[1].id == 1, 'person down: being revived closes the call')
+
+    reset()
+    run = down(1)
+    env.Medical.Revive(1)
+    run()
+    check(Mocks.calls.dispatchAlert == 0, 'person down: someone helped up before the delay raises nothing')
+
+    reset()
+    run = down(1)
+    Mocks.players[1] = { citizenid = 'OTHER', job = { name = 'unemployed' } }
+    run()
+    check(Mocks.calls.dispatchAlert == 0, 'person down: a recycled server id raises nothing')
+    Mocks.players[1] = { citizenid = cidA, job = { name = 'unemployed' } }
+    env.Medical.Revive(1)
+
+    reset()
+    Mocks.exported.activeFor = function(cid) return { id = 1, status = 'serving' } end
+    run = down(1)
+    run()
+    check(Mocks.calls.dispatchAlert == 0, 'person down: nobody is called for a player serving a sentence or remand')
+    env.Medical.Revive(1)
+    Mocks.exported.activeFor = function() error('database down') end
+    run = down(1)
+    run()
+    check(Mocks.calls.dispatchAlert == 0, 'person down: if the jail cannot be asked nobody is called')
+    env.Medical.Revive(1)
+
+    reset()
+    run = down(1)
+    run()
+    env.Medical.Revive(1)
+    for _ = 1, 5 do
+        run = down(1)
+        run()
+        env.Medical.Revive(1)
+    end
+    check(Mocks.calls.dispatchAlert == 1, 'person down: going down again and again raises one call inside the cooldown')
+    E.cooldownSeconds = 0
+    run = down(1)
+    run()
+    check(Mocks.calls.dispatchAlert == 2, 'person down: a new call is possible once the cooldown has passed')
+
+    reset()
+    Mocks.alertId = 3
+    run = down(2)
+    run()
+    Handlers['som:server:playerUnloaded'](2, cidB)
+    check(Mocks.resolved[1] and Mocks.resolved[1].id == 3, 'person down: leaving the server closes the call')
+    run = down(1)
+    run()
+    Handlers['som:server:playerRevived'](1, cidA, nil)
+    check(Mocks.resolved[2] and Mocks.resolved[2].disposition == 'patient no longer down', 'person down: respawning at the hospital closes the call')
+
+    _G.CreateThread = realThread
+    Mocks.exported = realExported
+    Mocks.alertId = nil
+end
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)

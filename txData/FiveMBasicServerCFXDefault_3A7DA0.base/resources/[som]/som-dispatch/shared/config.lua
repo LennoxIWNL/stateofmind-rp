@@ -132,6 +132,17 @@ Config.Alerts = {
         blip = { sprite = 280, colour = 5, scale = 1.0, duration = 600 },
     },
 
+    -- Raised by som-medical when a player stays down. NOT `reportable`.
+    personDown = {
+        label = 'Person Down',
+        code = '10-52',
+        priority = 1,
+        chance = 1.0,
+        cooldown = 0,
+        jobs = { 'ambulance' },
+        blip = { sprite = 61, colour = 1, scale = 1.0, duration = 600 },
+    },
+
     -- Raised by som-turf on a street sale, at the seller's position, so most
     -- sales go unseen. NOT `reportable`.
     drugDeal = {
