@@ -16,6 +16,12 @@ Config = {
             label = 'Quarry buyer', enabled = false, coords = nil, distance = 3.0, hourlyCap = 6000,
             prices = { copper = 30, iron = 24, silveringot = 70, goldingot = 120 },
         },
+        -- Stolen goods. `market = true`: the price is som-economy's market quote
+        -- (so it saturates), the amounts in `prices` are unused.
+        fence = {
+            label = 'Fence', enabled = false, coords = nil, distance = 3.0, hourlyCap = 3000, market = true,
+            prices = { goldchain = true, silverchain = true, gold_ring = true, silver_ring = true, diamond_ring = true, rolex = true, laptop = true, tablet = true },
+        },
         hunt = {
             label = 'Game buyer', enabled = false, coords = nil, distance = 3.0, hourlyCap = 6000,
             prices = { venison = 60, deer_pelt = 120, antlers = 150 },

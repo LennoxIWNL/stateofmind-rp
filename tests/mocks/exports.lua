@@ -187,6 +187,16 @@ function economy:businessSpend(name, amount, reason)
     end
     return true
 end
+function economy:quoteMarketSale(item, quantity)
+    local unit = (Mocks.marketPrice or {})[item]
+    if not unit then return 0, 0 end
+    return unit * quantity, unit
+end
+function economy:saturateMarket(item, quantity)
+    Mocks.saturated = Mocks.saturated or {}
+    Mocks.saturated[#Mocks.saturated + 1] = { item = item, quantity = quantity }
+    return true
+end
 function economy:getBusinessBalance(name) return (Mocks.bizBalance or {})[name] or 0 end
 function economy:fundFromTreasury(name, amount)
     Mocks.calls.fund = (Mocks.calls.fund or 0) + 1
@@ -315,6 +325,10 @@ local registry = {
         return fn and function(_, ...) return fn(...) end or nil
     end }),
     ['som-hack'] = setmetatable({}, { __index = function(_, name)
+        local fn = Mocks.exported[name]
+        return fn and function(_, ...) return fn(...) end or nil
+    end }),
+    ['som-housing'] = setmetatable({}, { __index = function(_, name)
         local fn = Mocks.exported[name]
         return fn and function(_, ...) return fn(...) end or nil
     end }),

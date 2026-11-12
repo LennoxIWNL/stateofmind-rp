@@ -112,7 +112,13 @@ Config.MarketItems = {
     { 'meth_bag',        'Bag of Meth',         'drugs',     180,   0.0055,     0.035 },
     { 'oxy_bottle',      'Oxy Bottle',          'drugs',      70,   0.0040,     0.045 },
 
-    { 'gold_chain',      'Gold Chain',          'stolen',    180,   0.0050,     0.040 },
+    { 'goldchain',       'Gold Chain',          'stolen',    180,   0.0050,     0.040 },
+    { 'silverchain',     'Silver Chain',        'stolen',     70,   0.0050,     0.040 },
+    { 'gold_ring',       'Gold Ring',           'stolen',    110,   0.0050,     0.040 },
+    { 'silver_ring',     'Silver Ring',         'stolen',     45,   0.0050,     0.040 },
+    { 'diamond_ring',    'Diamond Ring',        'stolen',    320,   0.0060,     0.035 },
+    { 'laptop',          'Laptop',              'stolen',    150,   0.0050,     0.040 },
+    { 'tablet',          'Tablet',              'stolen',     90,   0.0050,     0.040 },
     { 'rolex',           'Rolex',               'stolen',    400,   0.0060,     0.035 },
     { 'stolen_parts',    'Stolen Parts',        'stolen',    120,   0.0045,     0.045 },
 

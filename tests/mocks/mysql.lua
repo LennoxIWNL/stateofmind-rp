@@ -441,6 +441,63 @@ local function boost(kind, query, params)
     return false
 end
 
+local function market(kind, query, params)
+    local K = M.db.market
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    if kind == 'insert' and has('INSERT IGNORE INTO som_market') then
+        K.rows[#K.rows + 1] = { item = params[1], label = params[2], category = params[3], base_price = params[4], current_price = params[5],
+            min_price = params[6], max_price = params[7], saturation = params[8], recovery = params[9], volume_sold = 0 }
+        return true, 1
+    elseif kind == 'query' and has('SELECT * FROM som_market') then
+        return true, K.rows
+    elseif kind == 'update' and has('UPDATE som_market SET current_price = ?, volume_sold = volume_sold + ? WHERE item = ?') then
+        for _, r in ipairs(K.rows) do
+            if r.item == params[3] then K.saved = (K.saved or 0) + 1; K.lastSaved = { price = params[1], volume = params[2] }; return true, 1 end
+        end
+        return true, 0
+    elseif kind == 'insert' and has('INSERT INTO som_market_sales') then
+        K.sales[#K.sales + 1] = { item = params[1], quantity = params[3], gross = params[5] }
+        return true, #K.sales
+    end
+    return false
+end
+
+local function burglary(kind, query, params)
+    local B = M.db.burglary
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    if kind == 'insert' and has('INSERT INTO som_burglary_runs') then
+        local house, tier, group, _, cooldown, failCooldown = params[1], params[2], params[3], params[4], params[5], params[6]
+        for _, r in ipairs(B.runs) do
+            if r.house == house and (r.status == 'active' or r.ts > now() - cooldown * 60 or (r.status == 'failed' and r.ts > now() - failCooldown * 60)) then return true, 0 end
+        end
+        local id = #B.runs + 1
+        B.runs[id] = { id = id, house = house, tier = tier, group = group, status = 'active', ts = now() }
+        return true, id
+    elseif kind == 'scalar' and has('SELECT 1 FROM som_burglary_loot WHERE run_id = ? AND spot = ?') then
+        return true, B.loot[params[1] .. ':' .. params[2]] and 1 or nil
+    elseif kind == 'update' then
+        if has('INSERT IGNORE INTO som_burglary_loot') then
+            local key = params[1] .. ':' .. params[2]
+            if B.loot[key] then return true, 0 end
+            B.loot[key] = params[3]
+            return true, 1
+        elseif has('DELETE FROM som_burglary_loot WHERE run_id = ? AND spot = ?') then
+            local key = params[1] .. ':' .. params[2]
+            local had = B.loot[key] ~= nil
+            B.loot[key] = nil
+            return true, had and 1 or 0
+        elseif has("UPDATE som_burglary_runs SET status = ? WHERE id = ? AND status = 'active'") then
+            local r = B.runs[params[2]]
+            if r and r.status == 'active' then r.status = params[1]; return true, 1 end
+            return true, 0
+        elseif has("UPDATE som_burglary_runs SET status = 'failed' WHERE status = 'active'") then
+            for _, r in ipairs(B.runs) do if r.status == 'active' then r.status = 'failed' end end
+            return true, 1
+        end
+    end
+    return false
+end
+
 local function heist(kind, query, params)
     local H = M.db.heist
     local function has(text) return query:find(text, 1, true) ~= nil end
@@ -1817,6 +1874,7 @@ function M.single(query, params)
     do local handled, value = social('single', query, params); if handled then return value end end
     do local handled, value = city('single', query, params); if handled then return value end end
     do local handled, value = boost('single', query, params); if handled then return value end end
+    do local handled, value = burglary('single', query, params); if handled then return value end end
     do local handled, value = heist('single', query, params); if handled then return value end end
     do local handled, value = turf('single', query, params); if handled then return value end end
     do local handled, value = trade('single', query, params); if handled then return value end end
@@ -1907,6 +1965,7 @@ function M.scalar(query, params)
     do local handled, value = sharedAccounts('scalar', query, params); if handled then return value end end
     do local handled, value = social('scalar', query, params); if handled then return value end end
     do local handled, value = city('scalar', query, params); if handled then return value end end
+    do local handled, value = burglary('scalar', query, params); if handled then return value end end
     do local handled, value = heist('scalar', query, params); if handled then return value end end
     do local handled, value = turf('scalar', query, params); if handled then return value end end
     do local handled, value = gangs('scalar', query, params); if handled then return value end end
@@ -2030,6 +2089,8 @@ function M.update(query, params)
     do local handled, value = social('update', query, params); if handled then return value end end
     do local handled, value = city('update', query, params); if handled then return value end end
     do local handled, value = boost('update', query, params); if handled then return value end end
+    do local handled, value = market('update', query, params); if handled then return value end end
+    do local handled, value = burglary('update', query, params); if handled then return value end end
     do local handled, value = heist('update', query, params); if handled then return value end end
     do local handled, value = buyer('update', query, params); if handled then return value end end
     do local handled, value = turf('update', query, params); if handled then return value end end
@@ -2391,6 +2452,8 @@ function M.insert(query, params)
     do local handled, value = social('insert', query, params); if handled then return value end end
     do local handled, value = city('insert', query, params); if handled then return value end end
     do local handled, value = boost('insert', query, params); if handled then return value end end
+    do local handled, value = market('insert', query, params); if handled then return value end end
+    do local handled, value = burglary('insert', query, params); if handled then return value end end
     do local handled, value = heist('insert', query, params); if handled then return value end end
     do local handled, value = turf('insert', query, params); if handled then return value end end
     do local handled, value = bans('insert', query, params); if handled then return value end end
@@ -2571,6 +2634,8 @@ function M.query(query, params)
     do local handled, value = social('query', query, params); if handled then return value end end
     do local handled, value = licences('query', query, params); if handled then return value end end
     do local handled, value = city('query', query, params); if handled then return value end end
+    do local handled, value = market('query', query, params); if handled then return value end end
+    do local handled, value = burglary('query', query, params); if handled then return value end end
     do local handled, value = heist('query', query, params); if handled then return value end end
     do local handled, value = turf('query', query, params); if handled then return value end end
     do local handled, value = staff('query', query, params); if handled then return value end end

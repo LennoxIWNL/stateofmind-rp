@@ -2077,3 +2077,31 @@ CREATE TABLE IF NOT EXISTS `som_boost_runs` (
   KEY `idx_pickup` (`pickup`, `created_at`),
   KEY `idx_class` (`class`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
+--  7r. HOUSE BURGLARY (som-burglary)
+--
+--  One row per burglary. The insert is the claim on a house and its cooldown
+--  (a failed run keeps the house shut longer). `som_burglary_loot` holds one row
+--  per searched spot: its primary key is the lock, so a spot is taken once.
+--  No foreign keys: they are records.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_burglary_runs` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `house`      VARCHAR(32) NOT NULL,
+  `tier`       ENUM('low','high') NOT NULL,
+  `group_id`   INT UNSIGNED NOT NULL,
+  `status`     ENUM('active','done','failed') NOT NULL DEFAULT 'active',
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_house` (`house`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_burglary_loot` (
+  `run_id`     INT UNSIGNED NOT NULL,
+  `spot`       TINYINT UNSIGNED NOT NULL,
+  `citizenid`  VARCHAR(50) NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`run_id`, `spot`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
