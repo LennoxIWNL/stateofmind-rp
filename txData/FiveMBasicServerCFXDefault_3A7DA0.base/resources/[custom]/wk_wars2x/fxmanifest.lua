@@ -56,6 +56,9 @@ files {
 ui_page "nui/radar.html"
 
 -- Run the server scripts
+-- SOM: FIRST, so the radar sync relays only pass between nearby police. Put this line back after an
+-- upgrade. See som-compat/server/guard.lua.
+server_script "@som-compat/server/guard.lua"
 server_script "sv_version_check.lua"
 server_script "sv_exports.lua"
 server_script "sv_sync.lua"

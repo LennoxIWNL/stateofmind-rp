@@ -44,6 +44,9 @@ client_scripts {
 }
 
 server_scripts {
+    -- SOM: FIRST, so ox_doorlock:setState refuses a client chosen lockpick flag on a door that is not
+    -- lockpickable. Put this line back after an upgrade. See som-compat/server/guard.lua.
+    '@som-compat/server/guard.lua',
     '@oxmysql/lib/MySQL.lua',
     'server/main.lua',
 }

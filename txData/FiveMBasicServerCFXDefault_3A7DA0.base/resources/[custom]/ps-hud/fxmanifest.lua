@@ -17,6 +17,8 @@ shared_scripts {
 }
 
 client_script 'client.lua'
+-- SOM: FIRST, so the stress events are bounded. Put this line back after an upgrade. See som-compat/server/guard.lua.
+server_script '@som-compat/server/guard.lua'
 server_script 'server.lua'
 lua54 'yes'
 use_fxv2_oal 'yes'

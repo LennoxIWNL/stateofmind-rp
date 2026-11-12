@@ -42,6 +42,8 @@ end
 _G.ResetHandlers = function() handlerLists = {}; _G.Handlers = {}; _G.PendingTimeouts = {} end
 _G.RegisteredEvents = {}
 _G.RegisterNetEvent = function(name, fn) if fn then _G.RegisteredEvents[name] = fn end end
+_G.RegisterServerEvent = _G.RegisterNetEvent
+_G.IsDuplicityVersion = function() return true end
 _G.GetGameTimer = function() return (_G.Mocks and _G.Mocks.clock) or 0 end
 _G.TriggerEvent = function(name, ...) local h = _G.Handlers[name]; if h then h(...) end end
 _G.TriggerClientEvent = function(name, source, ...) end
