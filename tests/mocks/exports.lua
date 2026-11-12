@@ -162,6 +162,7 @@ end
 function core:hasPermission(source, ace)
     return Mocks.admins[source] == true
 end
+function core:getGameHour() return Mocks.gameHour end
 function core:hasPerk(source, perk) return Mocks.perks[source] ~= nil and Mocks.perks[source][perk] or false end
 function core:getJobs() return Mocks.jobs end
 function core:paymentOptions(source) return {} end

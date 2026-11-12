@@ -186,6 +186,10 @@ Config.World = {
     refreshInterval = 5000,
 }
 
+-- The game clock the server owns (server/clock.lua). One game day passes in `dayMinutes` real minutes
+-- (48 is the vanilla speed); `startHour` is the game hour at the real time 00:00 UTC.
+Config.Clock = { dayMinutes = 48, startHour = 0 }
+
 -- ACE groups, checked with IsPlayerAceAllowed. Never a client-sent flag.
 Config.Permissions = {
     god = 'som.god',

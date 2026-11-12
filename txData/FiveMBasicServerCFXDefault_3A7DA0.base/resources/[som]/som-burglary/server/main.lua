@@ -40,6 +40,7 @@ local function isNight()
 
     local hour = n.hour and n.hour()
     if not hour then return false end
+    if n.from <= n.to then return hour >= n.from and hour < n.to end
     return hour >= n.from or hour < n.to
 end
 

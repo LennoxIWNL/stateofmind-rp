@@ -10,10 +10,9 @@ Config = {
     bucketBase = 40000,
     void = { origin = vec3(1000.0, 3000.0, -500.0), spacing = 150.0 },
 
-    -- The server has no game clock (the hour only exists on clients), so night
-    -- only works once something sets `hour` to a function returning the game
-    -- hour. Enabled with no such function, nobody can start a burglary.
-    night = { enabled = false, from = 22, to = 5, hour = nil },
+    -- Night is the game hour from som-core's server clock. `from` to `to` may wrap midnight.
+    -- Enabled is safe to ship: nothing starts until a house is placed.
+    night = { enabled = true, from = 22, to = 5, hour = function() return exports['som-core']:getGameHour() end },
 
     -- Noise is counted by the server: a failed pick, each search, and running
     -- inside (server sampled speed in m/s). Every rise rolls once for a

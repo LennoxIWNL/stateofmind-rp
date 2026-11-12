@@ -9900,6 +9900,7 @@ local function burgScene(open)
     Mocks.players[5] = { citizenid = 'P5', job = { name = 'police', onduty = true }, charinfo = { firstname = 'Po', lastname = 'Lice', phone = '555-0005' } }
     Mocks.inv = { [1] = {}, [2] = {} }
     Mocks.clock = 1000000
+    Mocks.gameHour = 23
     Mocks.calls.dispatchAlert = 0
     Mocks.hackResult = true
     Mocks.hacks = {}
@@ -9977,7 +9978,8 @@ do
     giveBurg(1, 'advancedlockpick')
     check(high.canStart(burgInfo(2)) == true, 'burglary: the advanced pick starts a high end burglary')
 
-    env.Config.night.enabled = true
+    local serverHour = env.Config.night.hour
+    Mocks.gameHour = nil
     check(select(2, low.canStart(burgInfo(1))) == 'wait for dark', 'burglary: night only with no game clock set means nobody starts')
     env.Config.night.hour = function() return 12 end
     check(select(2, low.canStart(burgInfo(1))) == 'wait for dark', 'burglary: daytime refuses')
@@ -9986,6 +9988,19 @@ do
     check(low.canStart(burgInfo(1)) == true, 'burglary: night allows it')
     env.Config.night.hour = function() return 3 end
     check(low.canStart(burgInfo(1)) == true, 'burglary: the window wraps past midnight')
+
+    env.Config.night.hour = serverHour
+    for _, case in ipairs({ { 21, false }, { 22, true }, { 23, true }, { 0, true }, { 4, true }, { 5, false }, { 12, false } }) do
+        Mocks.gameHour = case[1]
+        check((low.canStart(burgInfo(1)) == true) == case[2], ('burglary: the server game hour %d %s the 22 to 5 window'):format(case[1], case[2] and 'is inside' or 'is outside'))
+    end
+    env.Config.night.from, env.Config.night.to = 1, 5
+    Mocks.gameHour = 12
+    check(low.canStart(burgInfo(1)) ~= true, 'burglary: a window that does not wrap refuses the afternoon')
+    Mocks.gameHour = 3
+    check(low.canStart(burgInfo(1)) == true, 'burglary: and allows its own hours')
+    env.Config.night.from, env.Config.night.to = 22, 5
+    Mocks.gameHour = nil
 
     Mocks.players[5], Mocks.players[6] = nil, nil
     check(low.start(burgInfo(1)) == false, 'burglary: starting needs police on duty')
@@ -10711,6 +10726,127 @@ do
     end
 
     _G.json = realJson
+end
+
+
+-- ---------------------------------------------------------------------------
+-- som-core: the server game clock
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    resetMocks()
+    local realTime, realGlobal, realAce = os.time, _G.GlobalState, _G.IsPlayerAceAllowed
+    local now = 0
+    os.time = function() return now end
+    _G.GlobalState = {}
+    local said, realT = {}, _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, text) if name == 'som:client:notify' then said[target] = text end end
+    local staff = {}
+    _G.IsPlayerAceAllowed = function(src, ace) return staff[tonumber(src)] == ace or staff[tonumber(src)] == 'som.god' end
+    Mocks.identifiers = {}
+    local files = { 'shared/config.lua', 'shared/clock.lua', 'server/permissions.lua', 'server/clock.lua' }
+    local env = loader.loadResource(REPO .. 'som-core', files)
+    local S, state = env.SomClock, _G.GlobalState.somClock
+
+    local function at(epoch, s) local h, m = S.Time(epoch, s) return h * 60 + m end
+    local day = { dayMinutes = 48, offset = 0 }
+    check(at(0, day) == 0 and at(1440, day) == 12 * 60 and at(2879, day) == 23 * 60 + 59 and at(2880, day) == 0, 'clock: 48 real minutes are one game day and the hour rolls over at the boundary')
+    check(at(86400 * 3 + 1440, day) == 12 * 60, 'clock: the same real time of day gives the same game time on any date')
+    check(at(720, { dayMinutes = 24, offset = 0 }) == 12 * 60 and at(1440, { dayMinutes = 24, offset = 0 }) == 0, 'clock: a faster rate shortens the day')
+    check(at(0, { dayMinutes = 48, offset = 6 * 3600 }) == 6 * 60 and at(1440, { dayMinutes = 48, offset = 6 * 3600 }) == 18 * 60, 'clock: an offset shifts the hour')
+    check(at(12345, { dayMinutes = 48, offset = 0, frozen = 3 * 3600 }) == 3 * 60, 'clock: a frozen clock does not move')
+    local h, m, sec = S.Time(61, day)
+    check(h == 0 and m == 30 and sec == 30 and math.type(h) == 'integer' and math.type(sec) == 'integer', 'clock: whole numbers come back, including the seconds')
+
+    local core = Mocks.exported
+    check(type(state) == 'table' and state.dayMinutes == 48 and state.frozen == nil, 'clock: the rate and offset are published once for the clients')
+    now = 1440
+    local gh, gm = core.getGameTime()
+    check(gh == 12 and gm == 0 and core.getGameHour() == 12, 'clock: the server can ask the game hour at any moment')
+    now = 1440 + 120
+    check(core.getGameHour() == 13 and select(2, core.getGameTime()) == 0, 'clock: it follows os.time with no state kept')
+
+    local cmd = Mocks.commands
+    now = 0
+    cmd.settime(7, { hour = 5 })
+    check(core.getGameHour() == 0 and said[7] == 'You do not have permission to do that', 'clock: a player cannot set the time')
+    staff[7] = 'som.mod'
+    cmd.settime(7, { hour = 5 })
+    check(core.getGameHour() == 0, 'clock: a moderator cannot set the time either')
+    staff[7] = 'som.admin'
+    cmd.settime(7, { hour = 23, minute = 30 })
+    gh, gm = core.getGameTime()
+    check(gh == 23 and gm == 30 and _G.GlobalState.somClock.offset == (23 * 3600 + 1800) % 86400, 'clock: an admin sets the time and it is published')
+    now = 30
+    check(core.getGameTime() == 23 and select(2, core.getGameTime()) == 45, 'clock: after a set the clock keeps running from there')
+    for _, bad in ipairs({ {}, { hour = 24 }, { hour = -1 }, { hour = 1.5 }, { hour = 1, minute = 60 }, { hour = 'x' } }) do
+        cmd.settime(7, bad)
+    end
+    check(core.getGameHour() == 23 and select(2, core.getGameTime()) == 45, 'clock: bad hours and minutes change nothing')
+
+    cmd.freezetime(7, { minute = 10 })
+    check(_G.GlobalState.somClock.frozen == nil, 'clock: a minute without an hour is refused')
+    cmd.freezetime(7, {})
+    check(_G.GlobalState.somClock.frozen == 23 * 3600 + 45 * 60, 'clock: freeze holds the current time')
+    now = 5000
+    check(core.getGameHour() == 23 and select(2, core.getGameTime()) == 45, 'clock: a frozen clock stays put')
+    cmd.freezetime(7, {})
+    check(_G.GlobalState.somClock.frozen == nil and core.getGameHour() == 23 and select(2, core.getGameTime()) == 45, 'clock: unfreezing carries on from the held time')
+    cmd.freezetime(7, { hour = 4, minute = 15 })
+    check(_G.GlobalState.somClock.frozen == 4 * 3600 + 15 * 60 and core.getGameHour() == 4, 'clock: freeze can name a time')
+    cmd.settime(7, { hour = 9 })
+    check(_G.GlobalState.somClock.frozen == 9 * 3600 and core.getGameHour() == 9, 'clock: setting while frozen keeps it frozen at the new time')
+    staff[7] = nil
+    cmd.freezetime(7, {})
+    check(_G.GlobalState.somClock.frozen == 9 * 3600, 'clock: a player cannot unfreeze it')
+    local readOnly = Mocks.commands.gametime
+    staff[7] = 'som.mod'
+    readOnly(7, {})
+    check(said[7] == 'Game time 09:00 (frozen)', 'clock: a moderator can read the time')
+
+    Mocks.convars = { som_clock_freeze = '03:15' }
+    now = 777
+    local frozenEnv = loader.loadResource(REPO .. 'som-core', files)
+    check(_G.GlobalState.somClock.frozen == 3 * 3600 + 15 * 60 and Mocks.exported.getGameHour() == 3, 'clock: the som_clock_freeze convar freezes the clock at boot')
+    Mocks.convars = { som_clock_freeze = 'noon' }
+    local realPrint = _G.print
+    local warned = false
+    _G.print = function(text) if tostring(text):find('is not HH:MM', 1, true) then warned = true end end
+    loader.loadResource(REPO .. 'som-core', files)
+    _G.print = realPrint
+    check(warned and _G.GlobalState.somClock.frozen == nil, 'clock: a bad convar is reported and the clock runs')
+    Mocks.convars = {}
+    _ = frozenEnv
+
+    -- The client side: it waits for the character, then applies the server's state with the confirmed natives
+    local applied, bagHandler, loadedHandler = {}, nil, nil
+    local realNative = { time = _G.GetCloudTimeAsInt, bag = _G.AddStateBagChangeHandler, ev = _G.AddEventHandler, o1 = _G.NetworkOverrideClockTime, o2 = _G.NetworkOverrideClockMillisecondsPerGameMinute }
+    _G.GetCloudTimeAsInt = function() return 1440 end
+    _G.NetworkOverrideClockTime = function(h, m, s) applied[#applied + 1] = { h, m, s } end
+    _G.NetworkOverrideClockMillisecondsPerGameMinute = function(ms) applied.rate = ms end
+    _G.AddStateBagChangeHandler = function(key, filter, fn) if key == 'somClock' and filter == 'global' then bagHandler = fn end end
+    _G.AddEventHandler = function(name, fn) if name == 'som:client:onPlayerLoaded' then loadedHandler = fn end end
+    local loaded = false
+    local coreObj = exports['som-core']
+    local realLoaded = coreObj.isPlayerLoaded
+    function coreObj:isPlayerLoaded() return loaded end
+    loader.loadResource(REPO .. 'som-core', { 'shared/clock.lua', 'client/clock.lua' })
+    bagHandler('global', 'somClock', { dayMinutes = 48, offset = 0 })
+    check(#applied == 0, 'clock: the client leaves the clock alone until the character has loaded')
+    loaded = true
+    bagHandler('global', 'somClock', { dayMinutes = 48, offset = 0 })
+    check(#applied == 1 and applied[1][1] == 12 and applied[1][2] == 0 and applied.rate == 2000, 'clock: the client applies the hour and the engine rate from the state')
+    bagHandler('global', 'somClock', { dayMinutes = 24, offset = 0, frozen = 5 * 3600 })
+    check(applied[2][1] == 5 and applied.rate == 99999999, 'clock: a frozen state is applied with the frozen rate')
+    _G.GlobalState.somClock = { dayMinutes = 48, offset = 0 }
+    loadedHandler()
+    check(#applied == 3 and applied[3][1] == 12, 'clock: it also applies when the character loads')
+    coreObj.isPlayerLoaded = realLoaded
+    _G.GetCloudTimeAsInt, _G.AddStateBagChangeHandler, _G.AddEventHandler = realNative.time, realNative.bag, realNative.ev
+    _G.NetworkOverrideClockTime, _G.NetworkOverrideClockMillisecondsPerGameMinute = realNative.o1, realNative.o2
+
+    os.time, _G.GlobalState, _G.IsPlayerAceAllowed, _G.TriggerClientEvent = realTime, realGlobal, realAce, realT
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))
