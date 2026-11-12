@@ -93,6 +93,7 @@ Each of these has a webhook field in the listed file — create a channel and pa
 | #log-evidence      | `set som_evidence_webhook` in `server.cfg`      | Evidence collected, stored, analysed, linked |
 | #log-court         | `set som_court_webhook` in `server.cfg`         | Cases filed, rulings, warrants |
 | #log-jail          | `set som_jail_webhook` in `server.cfg`          | Bookings, releases and escapes |
+| #log-combatlog     | `set som_combatlog_webhook` in `server.cfg`     | A character leaving while downed, cuffed or in a crime scene: citizenid, signals, position |
 
 ---
 

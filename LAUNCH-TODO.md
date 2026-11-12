@@ -514,3 +514,9 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] A run left `done` with `paid = 0` means the server stopped before minting; `unpaid` with a part `paid` means a crew share could not be carried. Staff with `som.admin` run `/boostpay <run> <player id>`, five minutes after the delivery was claimed (`claimed_at`), to pay what is still owed on it (face minus paid) to one player, once. The player chosen must be able to carry the bills.
 - [ ] Left out on purpose: a tracker or tracker removal, a contract marketplace, any heat or reputation, guards, a link to the chop shop.
 - [ ] Never run in a game: the spawn, the lock (`SetVehicleDoorsLocked`), the plate set on a server-created vehicle, the blips, the unlock bar, the hand-over at the drop-off, and the dispatch call on a real police client.
+## Combat log watch (som-staff)
+
+- [ ] A character leaving while downed, cuffed, or near both an open crime call and an on-duty officer is written to `som_staff_audit` (action `combatlog`, signals, position, reason text). Staff list them with `/combatlogs [hours]` (needs `som.mod`; the rows print to the server console). Nothing punishes anyone; staff judge each one, a crash looks the same as a quit.
+- [ ] Optional: create a Discord channel and set `som_combatlog_webhook` in `server.cfg`. The post carries only the citizenid, the signals and the position. No setup.sql change.
+- [ ] Not verified live: that the player's ped still exists at the drop (the row says `live` or `saved`; `saved` means the position is from the last save and soft signals may be wrong), that the disconnect reason arrives, and the radii and windows against real play.
+- [ ] Left out on purpose: automatic punishment, kicking on reconnect, crash detection, voice or chat analysis.

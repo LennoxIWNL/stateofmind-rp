@@ -1559,8 +1559,16 @@ local function staff(kind, query, params)
         S.reports[id] = { id = id, citizenid = params[1], name = params[2], message = params[3], status = 'open' }
         return true, id
     elseif kind == 'insert' and has('INSERT INTO som_staff_audit') then
-        S.audit[#S.audit + 1] = { staff = params[1], action = params[2], target = params[3] }
+        S.audit[#S.audit + 1] = { staff = params[1], action = params[2], target = params[3], detail = params[4], created_at = 'now' }
         return true, #S.audit
+    elseif kind == 'scalar' and has("FROM som_staff_audit WHERE action = 'combatlog' AND target = ?") then
+        local n = 0
+        for _, r in ipairs(S.audit) do if r.action == 'combatlog' and r.target == params[1] then n = n + 1 end end
+        return true, n
+    elseif kind == 'query' and has("FROM som_staff_audit WHERE action = 'combatlog'") then
+        local out = {}
+        for i = #S.audit, 1, -1 do if S.audit[i].action == 'combatlog' then out[#out + 1] = S.audit[i] end end
+        return true, out
     elseif kind == 'query' and has('FROM som_staff_audit ORDER BY id DESC') then
         local out = {}
         for i = #S.audit, 1, -1 do out[#out + 1] = S.audit[i] end
@@ -1899,6 +1907,7 @@ function M.scalar(query, params)
     do local handled, value = loansDb('scalar', query, params); if handled then return value end end
     do local handled, value = courtService('scalar', query, params); if handled then return value end end
     do local handled, value = leases('scalar', query, params); if handled then return value end end
+    do local handled, value = staff('scalar', query, params); if handled then return value end end
     if query:find('FROM som_transactions WHERE citizenid IS NULL AND reason = ?', 1, true) then
         return _G.Mocks.budgetDrawn or 0
     end
