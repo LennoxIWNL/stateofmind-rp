@@ -48,6 +48,7 @@ local function resetDb()
     mysql.db.heist = { dongles = {}, runs = {} }
     mysql.db.burglary = { runs = {}, loot = {} }
     mysql.db.market = { rows = {}, sales = {} }
+    mysql.db.charrows = { rows = {}, money = {}, ledger = {} }
     mysql.db.boost = { runs = {}, ownedPlates = {} }
     mysql.db.racing = { dongles = {}, aliases = {}, tracks = {}, races = {}, entries = {}, times = {} }
     mysql.db.turf = { zones = {}, events = {}, market = {} }
@@ -1160,6 +1161,10 @@ do
     check(ev('store', 1, 'mrpd', id).success == false, 'store: away from the locker is refused')
     atLocker(env, 1)
 
+    Mocks.removeFails = true
+    check(ev('store', 1, 'mrpd', id).success == false and mysql.db.evidence[1].status == 'collected' and mysql.db.evidence[1].holder_cid == 'OFFICER',
+        'store: when the bag cannot be taken the evidence stays with the officer')
+    Mocks.removeFails = false
     check(ev('store', 1, 'mrpd', id).success == true and mysql.db.evidence[1].status == 'stored', 'store: an officer locks evidence up')
     check(bagsFor(1, id) == 0 and mysql.db.evidence[1].holder_cid == nil, 'store: the bag leaves the inventory')
 
@@ -1756,6 +1761,34 @@ do
         'collect: the order pays once, in clean cash')
     check(collect(1, 'laundromat', r.orderId).success == false and Mocks.paid == r.payout, 'collect: a second collect pays nothing')
     check(mysql.db.bills[uids[1]].status == 'washed', 'collect: the bills end washed')
+end
+
+do
+    local env = wScene()
+    local cap = env.Config.Wash.dailyCap
+    local a = env.Ledger.Mint(1, { 3000, 3000 }, 'store')
+    local b = env.Ledger.Mint(1, { 3000, 3000 }, 'store')
+    env.Config.Wash.dailyCap = 6000
+    local deposit = wl('deposit')
+    -- A second deposit lands between the first one's cap read and its insert.
+    mysql.afterDayRead = function() deposit(1, 'laundromat', { b[1], b[2] }) end
+    local first = deposit(1, 'laundromat', { a[1], a[2] })
+    local washed = 0
+    for _, o in ipairs(mysql.db.orders) do if o.status ~= 'cancelled' then washed = washed + o.face end end
+    check(washed <= 6000, 'deposit: two deposits in flight together cannot pass the daily cap')
+    check(first.success == false and mysql.db.bills[a[1]].status == 'issued' and countOf(1, 'markedbills') == 2, 'deposit: the one that lost keeps its bills')
+    env.Config.Wash.dailyCap = cap
+
+    local c = env.Ledger.Mint(1, { 2000, 2000 }, 'store')
+    local d = env.Ledger.Mint(1, { 2000, 2000 }, 'store')
+    env.Config.Wash.hourlyBudget = 4000
+    mysql.db.orders = {}
+    local before = 0
+    mysql.afterDayRead = function() deposit(1, 'laundromat', { d[1], d[2] }) end
+    local second = deposit(1, 'laundromat', { c[1], c[2] })
+    local hourFace = 0
+    for i = before + 1, #mysql.db.orders do hourFace = hourFace + mysql.db.orders[i].face end
+    check(second.success == false and hourFace == 4000, 'deposit: two deposits in flight together cannot pass the hourly budget either')
 end
 
 do
@@ -4392,6 +4425,53 @@ do
 end
 
 -- ---------------------------------------------------------------------------
+-- Character creation money tap and deletion as an escape
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-core', { 'shared/config.lua', 'server/characters.lua' })
+    env.Entitlements = { GetSlots = function() return 2 end }
+    env.Players = { GetByCitizenId = function() return nil end }
+    Mocks.identifiers = { [1] = { 'license:aaa' } }
+    local create, delete = RegisteredCallbacks['som:server:createCharacter'], RegisteredCallbacks['som:server:deleteCharacter']
+    local data = { slot = 1, firstname = 'Ann', lastname = 'Test', dob = '1990-05-05', gender = 0, backstory = string.rep('a', 120) }
+    local C = mysql.db.charrows
+    local limit = env.Config.Characters.fundedLimit
+
+    for i = 1, limit do
+        local r = create(1, data)
+        local cid = r.citizenid
+        check(r.success and C.money[cid].cash == 500 and C.money[cid].bank == 5000, ('character: creation %d of the licence is funded'):format(i))
+        check(delete(1, cid).success == true, 'character: an unencumbered character can be deleted')
+    end
+    local late = create(1, data)
+    check(late.success and C.money[late.citizenid].cash == 0 and C.money[late.citizenid].bank == 0, 'character: past the limit deleting and recreating mints no money')
+    check(#C.ledger == limit and C.rows[#C.rows].welcomed == true, 'character: no ledger rows and no welcome gift past the limit')
+    check(C.rows[1].welcomed == false, 'character: a funded character still gets its welcome gift')
+
+    local cid = late.citizenid
+    for _, why in ipairs({ 'is serving a sentence', 'owes community service', 'has a loan to repay', 'has a mortgage to repay', 'has unpaid fines', 'holds a property', 'owns a shop', 'is restrained or downed' }) do
+        C.blocked = why
+        local r = delete(1, cid)
+        check(r.success == false and r.error:find(why, 1, true) and not C.rows[#C.rows].deleted, 'character: delete is refused when it ' .. why)
+    end
+    C.blocked = nil
+    check(delete(1, cid).success == true and C.rows[#C.rows].deleted == true, 'character: delete works once nothing is outstanding')
+    check(delete(1, 'ZZ99999999').error == 'character not found', 'character: a missing character is not found')
+
+    local select = RegisteredCallbacks['som:server:selectCharacter']
+    env.Players.Get = function() return { citizenid = 'LOADED' } end
+    check(select(1, 'AB12345678').error == 'a character is already loaded', 'character: a loaded player cannot select a second character')
+    env.Players.Get = function() return nil end
+    local inner
+    mysql.afterCharRead = function() inner = select(1, 'CD12345678') end
+    select(1, 'AB12345678')
+    check(inner and inner.error == 'a character is already loaded', 'character: two selects in flight cannot both load')
+    check(select(1, 'AB12345678').error == 'character not found', 'character: the guard is released afterwards')
+end
+
+-- ---------------------------------------------------------------------------
 -- Bans, kick and freeze
 -- ---------------------------------------------------------------------------
 
@@ -4627,6 +4707,23 @@ do
     check(env.Craft.Check(1, 'repairkit') == true and env.Craft.Check(1, 'advancedlockpick') == false, 'craft: level 2 opens repair kits but not advanced lockpicks')
     Mocks.levels.crafting = 5
     check(env.Craft.Check(1, 'advancedlockpick') == true, 'craft: level 5 opens advanced lockpicks')
+end
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-inventory', { 'server/main.lua' })
+    Mocks.players = { [1] = { citizenid = 'T1', job = { name = 'unemployed' } } }
+    Mocks.inv = { [1] = { [3] = { name = 'sprunk', count = 2, slot = 3 }, [4] = { name = 'lockpick', count = 1, slot = 4 } } }
+    Mocks.drops, Mocks.clock = {}, 1000000
+    FakePeds[1] = vec3(0, 0, 0)
+    local throw = RegisteredEvents['som-inventory:server:throw']
+    _G.source = 1
+    throw({ slot = 3, x = 3.0, y = 0.0, z = 0.0, model = joaat('adder') })
+    check(#Mocks.drops == 1 and Mocks.drops[1].model == joaat('prop_ld_can_01'), 'throw: a listed item lands as its own prop, whatever model the client sent')
+    Mocks.clock = Mocks.clock + 5000
+    throw({ slot = 4, x = 3.0, y = 0.0, z = 0.0, model = joaat('adder') })
+    check(#Mocks.drops == 2 and Mocks.drops[2].model == joaat('prop_paper_bag_01') and Mocks.drops[2].model ~= joaat('adder'), 'throw: any other item lands as the default bag, never the client model')
+    _G.source = nil
 end
 
 -- ---------------------------------------------------------------------------
@@ -5900,9 +5997,70 @@ do
     _G.CreateThread = function() started = started + 1 end
     loader.loadResource(REPO .. 'som-police', { 'shared/config.lua', 'server/main.lua', 'server/incidents.lua' })
     started = 0
+    _G.source = 7
     for _ = 1, 100 do RegisteredEvents['mdt:server:deleteIncidents'](7) end
     _G.CreateThread = realCreate
+    _G.source = nil
     check(started == 1, 'mdt: repeated delete events for one incident start one check')
+end
+
+do
+    resetDb()
+    local realCreate = _G.CreateThread
+    local started = 0
+    _G.CreateThread = function() started = started + 1 end
+    loader.loadResource(REPO .. 'som-police', { 'shared/config.lua', 'server/main.lua', 'server/incidents.lua' })
+    started = 0
+    Mocks.clock = 5000000
+    _G.source = 7
+    for id = 1, 40 do RegisteredEvents['mdt:server:deleteIncidents'](id) end
+    check(started == 1, 'mdt: one player cannot start a check for every incident id')
+    Mocks.clock = Mocks.clock + 3000
+    RegisteredEvents['mdt:server:deleteIncidents'](41)
+    _G.CreateThread = realCreate
+    check(started == 2, 'mdt: the same player can delete again after the gap')
+    _G.source = nil
+end
+
+do
+    resetDb()
+    local reads = 0
+    Mocks.players = setmetatable({}, { __index = function() reads = reads + 1 end })
+    loader.loadResource(REPO .. 'som-appearance', { 'shared/config.lua', 'server/wardrobe.lua' })
+    Mocks.clock = 6000000
+    _G.source = 3
+    local wardrobe = RegisteredEvents['som-appearance:server:wardrobe']
+    for _ = 1, 50 do wardrobe({ action = 'removeAll' }) end
+    check(reads == 1, 'wardrobe: a flood of changes is handled once per gap, not once per event')
+    Mocks.clock = Mocks.clock + 300
+    wardrobe({ action = 'removeAll' })
+    check(reads == 2, 'wardrobe: a change after the gap is handled')
+    _G.source = nil
+    Mocks.players = {}
+end
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-appearance', { 'shared/config.lua', 'server/main.lua' })
+    local save = RegisteredCallbacks['som-appearance:server:save']
+    local big = { blob = string.rep('x', 30000) }
+    check(save(1, { scope = 'creator', appearance = big }).error == 'invalid request', 'appearance: an oversized table is refused before anything is read or saved')
+    check(save(1, { scope = 'creator', appearance = 'x' }).error == 'invalid request', 'appearance: a non table is refused')
+end
+
+do
+    resetDb()
+    Mocks.players = { [4] = { citizenid = 'R4' } }
+    Mocks.setMetadataCalls = 0
+    loader.loadResource(REPO .. 'som-radial', { 'config.lua', 'server/main.lua' })
+    Mocks.clock = 7000000
+    _G.source = 4
+    local up = RegisteredEvents['som-radial:server:handsUp']
+    for _ = 1, 50 do up(true) end
+    check((Mocks.setMetadataCalls or 0) == 1, 'handsUp: repeating the same state is applied once')
+    up(false); up(true)
+    check(Mocks.setMetadataCalls == 3 and Mocks.players[4].metadata.handsup == true, 'handsUp: a quick lower and raise is never lost')
+    _G.source = nil
 end
 
 
@@ -6238,8 +6396,10 @@ do
     _G.CreateThread = function() started = started + 1 end
     loader.loadResource(REPO .. 'som-police', { 'shared/config.lua', 'server/main.lua', 'server/incidents.lua' })
     started = 0
+    _G.source = 7
     for _ = 1, 100 do RegisteredEvents['mdt:server:deleteIncidents'](7) end
     _G.CreateThread = realCreate
+    _G.source = nil
     check(started == 1, 'mdt: repeated delete events for one incident start one check')
 end
 ----------------------------------------------------------------------

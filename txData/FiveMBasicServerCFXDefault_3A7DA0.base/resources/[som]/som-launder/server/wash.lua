@@ -80,10 +80,18 @@ lib.callback.register('som-launder:server:deposit', function(source, key, uids)
     local payout = math.floor(face * (1 - Config.Wash.cut) * factor)
     if payout < 1 then return fail('that is not worth washing') end
 
+    -- The reads above only give the friendly message and the price. The caps are
+    -- enforced by this one insert, so deposits in flight together cannot all pass.
     local orderId = MySQL.insert.await([[
         INSERT INTO som_launder_orders (citizenid, front, face, payout, ready_at)
-        VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE))
-    ]], { player.citizenid, key, face, payout, Config.Wash.delayMinutes })
+        SELECT ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE) FROM DUAL
+        WHERE (SELECT COALESCE(SUM(face), 0) FROM som_launder_orders
+               WHERE citizenid = ? AND status <> 'cancelled' AND created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)) + ? <= ?
+          AND (SELECT COALESCE(SUM(face), 0) FROM som_launder_orders
+               WHERE status <> 'cancelled' AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)) < ?
+    ]], { player.citizenid, key, face, payout, Config.Wash.delayMinutes,
+        player.citizenid, face, Config.Wash.dailyCap, Config.Wash.hourlyBudget })
+    if not orderId or orderId < 1 then return fail('you have washed enough for now') end
 
     local claimed, taken = {}, {}
 

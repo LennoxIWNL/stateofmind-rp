@@ -116,5 +116,7 @@ RegisterNetEvent('som-radial:server:handsUp', function(state)
     local player = exports['som-core']:getPlayer(source)
     if not player then return end
 
+    -- Only a real change is applied, so repeating the same state costs nothing and a quick up and down is never lost.
+    if exports['som-core']:getMetadata(source, 'handsup') == state then return end
     exports['som-core']:setMetadata(source, 'handsup', state)
 end)

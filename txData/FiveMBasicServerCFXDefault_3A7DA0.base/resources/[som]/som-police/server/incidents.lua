@@ -179,10 +179,19 @@ exports('incidentRolesFor', Police.IncidentRolesFor)
 -- registered and simply never fired, which is the failure mode AUDIT 21.2
 -- describes: a handler on the wrong name does not error, it just never runs.
 local deleting = {}
+local lastDelete = {}
+
+AddEventHandler('playerDropped', function() lastDelete[source] = nil end)
 
 RegisterNetEvent('mdt:server:deleteIncidents', function(id)
+    local src = source
     local incident = incidentId(id)
     if not incident or deleting[incident] then return end
+
+    -- Anybody can fire this event, and each id starts a thread and a query.
+    local now = GetGameTimer()
+    if lastDelete[src] and now - lastDelete[src] < 2000 then return end
+    lastDelete[src] = now
     deleting[incident] = true
 
     -- This event is ps-mdt's, and ANY client can fire it with ANY id. ps-mdt

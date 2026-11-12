@@ -279,3 +279,6 @@ Config.Locations = {
 -- than the interaction distance: the client's coordinates lag the server's, and
 -- refusing a real haircut is worse than the metre it gives away.
 Config.SaveDistance = 20.0
+
+-- Largest appearance table a save may carry, as encoded JSON.
+Config.MaxSaveBytes = 20000
