@@ -161,6 +161,7 @@ function Interior.PropertyOf(source)
 end
 
 exports('propertyOf', Interior.PropertyOf)
+exports('shellOffset', Shells.OffsetFor)
 
 -- ---------------------------------------------------------------------------
 -- Cleanup

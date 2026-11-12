@@ -96,6 +96,31 @@ function Market.Quote(item, quantity)
     return gross, math.floor(gross / quantity)
 end
 
+---Moves a price down by a real sale of `quantity`, and records the volume. For
+---a seller that pays by some other route than Market.Sell (a capped buyer).
+---@param item string
+---@param quantity number
+---@return number|nil newPrice
+function Market.Saturate(item, quantity)
+    local row = cache[item]
+    if not row or type(quantity) ~= 'number' or quantity % 1 ~= 0 or quantity < 1 or quantity > 10000 then return nil end
+
+    local newPrice = row.current_price
+    for _ = 1, quantity do
+        newPrice = math.floor(newPrice * (1.0 - row.saturation))
+        if newPrice < row.min_price then newPrice = row.min_price break end
+    end
+
+    row.current_price = newPrice
+    row.volume_sold = row.volume_sold + quantity
+
+    MySQL.update.await(
+        'UPDATE som_market SET current_price = ?, volume_sold = volume_sold + ? WHERE item = ?',
+        { newPrice, quantity, item }
+    )
+    return newPrice
+end
+
 ---Executes a sale: pays the seller, moves the price, logs it.
 ---
 ---The caller must already have removed the goods from the seller's inventory.
@@ -129,20 +154,7 @@ function Market.Sell(source, item, quantity, opts)
     )
     if not paid then return false, 'payment failed' end
 
-    -- Apply the saturation permanently now the sale is real.
-    local newPrice = row.current_price
-    for _ = 1, quantity do
-        newPrice = math.floor(newPrice * (1.0 - row.saturation))
-        if newPrice < row.min_price then newPrice = row.min_price break end
-    end
-
-    row.current_price = newPrice
-    row.volume_sold = row.volume_sold + quantity
-
-    MySQL.update.await(
-        'UPDATE som_market SET current_price = ?, volume_sold = volume_sold + ? WHERE item = ?',
-        { newPrice, quantity, item }
-    )
+    local newPrice = Market.Saturate(item, quantity)
 
     MySQL.insert.await([[
         INSERT INTO som_market_sales (item, citizenid, quantity, unit_price, gross, business)
@@ -187,6 +199,7 @@ exports('getMarketPrice', Market.GetPrice)
 exports('getMarket', Market.GetAll)
 exports('quoteMarketSale', Market.Quote)
 exports('sellToMarket', Market.Sell)
+exports('saturateMarket', Market.Saturate)
 
 lib.callback.register('som-economy:server:getMarket', function()
     return Market.GetAll()

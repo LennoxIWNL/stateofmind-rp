@@ -46,6 +46,8 @@ local function resetDb()
     mysql.db.phoneAudit = {}
     mysql.db.notes = {}
     mysql.db.heist = { dongles = {}, runs = {} }
+    mysql.db.burglary = { runs = {}, loot = {} }
+    mysql.db.market = { rows = {}, sales = {} }
     mysql.db.boost = { runs = {}, ownedPlates = {} }
     mysql.db.turf = { zones = {}, events = {}, market = {} }
     mysql.db.whitelist = {}
@@ -9880,6 +9882,406 @@ do
     _G.TriggerClientEvent = realT
     core.addMoney, core.businessTransact = saved.addMoney, saved.businessTransact
     Mocks.jobs, Mocks.credited, Mocks.invFull, Mocks.taxFails, Mocks.creditFails, Mocks.bizFails = nil, nil, {}, false, false, false
+end
+
+----------------------------------------------------------------------
+-- som-burglary
+----------------------------------------------------------------------
+local burgEnv, burgDefs
+
+local function burgScene(open)
+    boardScene()
+    burgDefs = {}
+    local realRegister = Mocks.exported.registerProvider
+    Mocks.exported.registerProvider = function(d) burgDefs[d.id] = d; return realRegister(d) end
+    burgEnv = loader.loadResource(REPO .. 'som-burglary', { 'shared/config.lua', 'server/main.lua' })
+    Mocks.exported.registerProvider = realRegister
+    Mocks.players[5] = { citizenid = 'P5', job = { name = 'police', onduty = true }, charinfo = { firstname = 'Po', lastname = 'Lice', phone = '555-0005' } }
+    Mocks.inv = { [1] = {}, [2] = {} }
+    Mocks.clock = 1000000
+    Mocks.calls.dispatchAlert = 0
+    Mocks.hackResult = true
+    Mocks.hacks = {}
+    Mocks.exported.run = function(_, kind, level) Mocks.hacks[#Mocks.hacks + 1] = kind .. ':' .. level; return Mocks.hackResult end
+    Mocks.exported.shellOffset = function(model) return model == 'shell_frankaunt' and { x = 1.0, y = 2.0, z = 3.0, h = 90.0 } or nil end
+    Buckets, FakeSpeed = {}, {}
+    _G.GetEntitySpeed = function(ped) return FakeSpeed[ped] or 0.0 end
+    if open ~= false then
+        local h = burgEnv.Config.houses[1]
+        h.enabled, h.coords = true, vec3(0, 0, 0)
+        burgEnv.Config.shells.shell_frankaunt.spots = { { offset = vec3(1, 0, 0), label = 'Drawers' }, { offset = vec3(6, 0, 0), label = 'Wardrobe' } }
+    end
+    return burgEnv
+end
+
+local function giveBurg(src, name, n)
+    Mocks.slot = (Mocks.slot or 0) + 1
+    Mocks.inv[src][Mocks.slot] = { name = name, count = n or 1, slot = Mocks.slot }
+end
+
+local function burgCount(src, name)
+    local n = 0
+    for _, it in pairs(Mocks.inv[src]) do if it.name == name then n = n + (it.count or 1) end end
+    return n
+end
+
+local function burgInfo(size, id)
+    local members = {}
+    for i = 1, size do members[i] = { citizenid = 'P' .. i, source = i } end
+    return { id = id or 1, leader = 1, members = members }
+end
+
+local function burgStart(size, tier)
+    giveBurg(1, 'lockpick')
+    local ok = burgDefs['burglary_' .. (tier or 'low')].start(burgInfo(size or 1))
+    FakePeds[1] = vec3(0, 0, 0)
+    return ok
+end
+
+local function burgEnter(src)
+    FakePeds[src] = vec3(0, 0, 0)
+    return RegisteredCallbacks['som-burglary:server:enter'](src)
+end
+
+do
+    local env = burgScene(false)
+    giveBurg(1, 'lockpick')
+    local low = burgDefs.burglary_low
+    local cop = Mocks.players[5]
+    Mocks.players[5] = nil
+    check(low.canStart(burgInfo(1)) == false and select(2, low.canStart(burgInfo(1))) == 'the city is too quiet for this', 'burglary: needs police on duty')
+    Mocks.players[5] = cop
+    check(select(2, low.canStart(burgInfo(1))) == 'no houses are open yet', 'burglary: every house ships disabled, so nothing can start')
+    env.Config.houses[1].enabled, env.Config.houses[1].coords = true, vec3(0, 0, 0)
+    check(select(2, low.canStart(burgInfo(1))) == 'no houses are open yet', 'burglary: a house with no spots in its shell cannot be picked')
+    env.Config.shells.shell_frankaunt.spots = { { offset = vec3(1, 0, 0), label = 'Drawers' } }
+    Mocks.exported.shellOffset = function() return nil end
+    check(select(2, low.canStart(burgInfo(1))) == 'no houses are open yet', 'burglary: a shell with no measured offset cannot be used')
+    Mocks.exported.shellOffset = function(model) return { x = 1.0, y = 2.0, z = 3.0, h = 90.0 } end
+    check(low.canStart(burgInfo(1)) == true, 'burglary: with a house, spots, a pick and police a crew can start')
+end
+
+do
+    local env = burgScene()
+    local low, high = burgDefs.burglary_low, burgDefs.burglary_high
+    Mocks.players[6] = { citizenid = 'P6', job = { name = 'police', onduty = true }, charinfo = { firstname = 'Po', lastname = 'Two', phone = '555-0006' } }
+    check(select(2, low.canStart(burgInfo(1))) == 'the leader needs lockpick', 'burglary: the leader needs the tier tool')
+    giveBurg(1, 'lockpick')
+    check(select(2, high.canStart(burgInfo(2))) == 'no houses are open yet', 'burglary: the high tier has no open house of its own')
+    local h2 = env.Config.houses[2]
+    h2.enabled, h2.coords = true, vec3(100, 0, 0)
+    env.Config.shells.shell_michael.spots = { { offset = vec3(1, 0, 0), label = 'Safe' } }
+    Mocks.exported.shellOffset = function() return { x = 1.0, y = 2.0, z = 3.0, h = 90.0 } end
+    check(select(2, high.canStart(burgInfo(2))) == 'the leader needs advancedlockpick', 'burglary: a plain lockpick does not open a high end house')
+    giveBurg(1, 'advancedlockpick')
+    check(high.canStart(burgInfo(2)) == true, 'burglary: the advanced pick starts a high end burglary')
+
+    env.Config.night.enabled = true
+    check(select(2, low.canStart(burgInfo(1))) == 'wait for dark', 'burglary: night only with no game clock set means nobody starts')
+    env.Config.night.hour = function() return 12 end
+    check(select(2, low.canStart(burgInfo(1))) == 'wait for dark', 'burglary: daytime refuses')
+    check(low.start(burgInfo(1)) == false, 'burglary: starting is refused by day too')
+    env.Config.night.hour = function() return 23 end
+    check(low.canStart(burgInfo(1)) == true, 'burglary: night allows it')
+    env.Config.night.hour = function() return 3 end
+    check(low.canStart(burgInfo(1)) == true, 'burglary: the window wraps past midnight')
+
+    Mocks.players[5], Mocks.players[6] = nil, nil
+    check(low.start(burgInfo(1)) == false, 'burglary: starting needs police on duty')
+    check(select(2, high.canStart(burgInfo(2))) == 'the city is too quiet for this', 'burglary: the high tier wants more police')
+end
+
+do
+    local env = burgScene()
+    check(burgStart(1) == true and mysql.db.burglary.runs[1].status == 'active', 'burglary: a run claims the house')
+    check(burgDefs.burglary_low.start(burgInfo(1, 2)) == false, 'burglary: a second crew cannot take a claimed house')
+
+    local close = RegisteredCallbacks['som-burglary:server:breakIn']
+    Mocks.exported.finish = function() return true end
+    env.Config.tiers.low.breakChance = 0
+    giveBurg(1, 'lockpick')
+    check(close(9).error == 'you are not on a job', 'burglary: outsiders are refused at the door')
+    FakePeds[1] = vec3(500, 0, 0)
+    check(close(1).error == 'you are too far away', 'burglary: the server checks the distance to the door')
+    FakePeds[1] = vec3(0, 0, 0)
+    check(RegisteredCallbacks['som-burglary:server:enter'](1).error == 'not now', 'burglary: you cannot walk in through a locked door')
+    check(RegisteredCallbacks['som-burglary:server:searchStart'](1, 1).error == 'you are not inside', 'burglary: you cannot search from outside')
+
+    Mocks.hackResult = false
+    env.Config.noise.perPoint, env.Config.noise.maxChance = 0, 0
+    check(close(1).error == 'that did not work' and Mocks.hacks[1] == 'memory:easy', 'burglary: a failed pick costs an attempt')
+    Mocks.hackResult = true
+    local r = close(1)
+    check(r.success == true and Mocks.calls.dispatchAlert == 0, 'burglary: the pick opens the door, quietly')
+    check(close(1).error == 'the door is already open', 'burglary: an open door is not picked twice')
+
+end
+
+do
+    local env = burgScene()
+    burgStart(1)
+    local close = RegisteredCallbacks['som-burglary:server:breakIn']
+    Mocks.exported.finish = function() return true end
+    env.Config.noise.perPoint, env.Config.noise.maxChance = 0, 0
+    Mocks.hackResult = false
+    env.Config.tiers.low.breakChance = 1
+    close(1)
+    check(burgCount(1, 'lockpick') == 0, 'burglary: a failed pick can break the tool')
+    giveBurg(1, 'lockpick')
+    check(close(1).error == 'the lock beat you and the street is awake' and mysql.db.burglary.runs[1].status == 'failed', 'burglary: two failed picks end the run as failed')
+
+    local t0 = os.time()
+    mysql.fakeNow = t0
+    giveBurg(1, 'lockpick')
+    check(burgDefs.burglary_low.start(burgInfo(1)) == false, 'burglary: a failed house stays shut')
+    mysql.fakeNow = t0 + 130 * 60
+    check(burgDefs.burglary_low.start(burgInfo(1)) == false, 'burglary: a failed house stays shut longer than a normal cooldown')
+    mysql.fakeNow = t0 + 250 * 60
+    check(burgDefs.burglary_low.start(burgInfo(1)) == true, 'burglary: after the failure cooldown the house opens again')
+    mysql.fakeNow = nil
+end
+
+do
+    local env = burgScene()
+    burgStart(2)
+    Mocks.exported.finish = function() return true end
+    giveBurg(2, 'lockpick')
+    Mocks.players[2].citizenid = 'P2'
+    FakePeds[2] = vec3(0, 0, 0)
+    RegisteredCallbacks['som-burglary:server:breakIn'](1)
+
+    env.Config.noise.perPoint, env.Config.noise.maxChance = 0, 0
+    local e1 = burgEnter(1)
+    check(e1.success and e1.shell == 'shell_frankaunt' and #e1.spots == 2 and e1.offset.h == 90.0 and Buckets[1] == 40001, 'burglary: entering puts the player in the house bucket and sends the shell and spots')
+    local e2 = burgEnter(2)
+    check(e2.success and Buckets[2] == 40001, 'burglary: the crew shares one bucket')
+    check(burgEnter(1).error == 'not now', 'burglary: you cannot enter twice')
+
+    local start, finish, cancel = RegisteredCallbacks['som-burglary:server:searchStart'], RegisteredCallbacks['som-burglary:server:searchDone'], RegisteredCallbacks['som-burglary:server:searchCancel']
+    local s1 = e1.spots[1]
+    FakePeds[1], FakePeds[2] = vec3(s1.x, s1.y, s1.z), vec3(s1.x, s1.y, s1.z)
+
+    check(start(1, 0).error == 'bad request' and start(1, 3).error == 'bad request' and start(1, 1.5).error == 'bad request' and start(1, '1').error == 'bad request' and start(1, nil).error == 'bad request', 'burglary: a spot must be a listed whole number')
+    check(finish(1, 1).error == 'start searching first', 'burglary: finishing without starting is refused')
+    FakePeds[1] = vec3(500, 0, 0)
+    check(start(1, 1).error == 'you are too far away', 'burglary: the server checks the distance to the spot')
+    FakePeds[1] = vec3(s1.x, s1.y, s1.z)
+
+    check(start(1, 1).success == true and start(1, 1).seconds == 8, 'burglary: the server sets the search time')
+    check(finish(1, 1).error == 'you were too quick' and mysql.db.burglary.loot['1:1'] == nil, 'burglary: a finish that comes too early is refused and takes nothing')
+    check(finish(1, 1).error == 'start searching first', 'burglary: a refused finish ends the session')
+    start(1, 1)
+    check(cancel(1).success == true and finish(1, 1).error == 'start searching first', 'burglary: cancelling drops the session')
+
+    start(1, 1); start(2, 1)
+    Mocks.clock = Mocks.clock + 9000
+    local a = finish(1, 1)
+    local b = finish(2, 1)
+    check(a.success == true and #a.items == 1 and burgCount(1, a.items[1].item) == a.items[1].count, 'burglary: the first searcher is given the rolled loot')
+    check(b.error == 'there is nothing left here' and #Mocks.inv[2] == 0, 'burglary: the same spot cannot be looted twice')
+    check(start(2, 1).error == 'there is nothing left here', 'burglary: a taken spot cannot be started')
+
+    local s2 = e1.spots[2]
+    FakePeds[2] = vec3(s2.x, s2.y, s2.z)
+    Mocks.invFull[2] = true
+    start(2, 2)
+    Mocks.clock = Mocks.clock + 9000
+    check(finish(2, 2).error == 'you cannot carry any more' and mysql.db.burglary.loot['1:2'] == nil, 'burglary: a failed add gives the spot back')
+    Mocks.invFull[2] = nil
+    check(Mocks.calls.dispatchAlert == 0, 'burglary: quiet searches with no noise chance raise no alert')
+
+    local leave = RegisteredCallbacks['som-burglary:server:leave']
+    FakePeds[1] = vec3(900, 0, 0)
+    check(leave(1).error == 'you are too far from the door', 'burglary: leaving is checked against the door')
+    FakePeds[1] = vec3(1150 + 1.0, 3000 + 2.0, -500 + 3.0)
+    check(leave(1).success == true and Buckets[1] == 0 and leave(1).error == 'not inside', 'burglary: leaving resets the bucket')
+    check(mysql.db.burglary.runs[1].status == 'active', 'burglary: the run stays open when somebody leaves, so they can go back for more')
+    check(burgEnter(1).success == true and Buckets[1] == 40001, 'burglary: a crew member can go back in')
+
+    start(2, 2)
+    Mocks.clock = Mocks.clock + 9000
+    check(finish(2, 2).success == true and mysql.db.burglary.loot['1:2'] == 'P2', 'burglary: the released spot can be searched again')
+    check(mysql.db.burglary.runs[1].status == 'done' and Buckets[1] == 0 and Buckets[2] == 0, 'burglary: the last spot ends the run and sends everyone out')
+end
+
+do
+    local env = burgScene()
+    burgStart(1)
+    Mocks.exported.finish = function() return true end
+    RegisteredCallbacks['som-burglary:server:breakIn'](1)
+    local e = burgEnter(1)
+    local s1 = e.spots[1]
+    FakePeds[1] = vec3(s1.x, s1.y, s1.z)
+    local start, finish = RegisteredCallbacks['som-burglary:server:searchStart'], RegisteredCallbacks['som-burglary:server:searchDone']
+
+    env.Config.noise.perPoint, env.Config.noise.maxChance = 1, 1
+    start(1, 1)
+    Mocks.clock = Mocks.clock + 9000
+    finish(1, 1)
+    check(Mocks.calls.dispatchAlert == 1 and Mocks.lastAlertType == 'burglary' and Mocks.lastAlertExtra.coords.x == 0, 'burglary: a search with a sure chance calls dispatch at the house')
+    local s2 = e.spots[2]
+    FakePeds[1] = vec3(s2.x, s2.y, s2.z)
+    start(1, 2)
+    Mocks.clock = Mocks.clock + 9000
+    finish(1, 2)
+    FakeSpeed[1] = 9.0
+    env.Burglary.Listen()
+    check(Mocks.calls.dispatchAlert == 1, 'burglary: only one neighbour call is made per run')
+end
+
+do
+    local env = burgScene()
+    burgStart(1)
+    Mocks.exported.finish = function() return true end
+    RegisteredCallbacks['som-burglary:server:breakIn'](1)
+    burgEnter(1)
+    env.Config.noise.perPoint, env.Config.noise.maxChance = 1, 1
+    FakeSpeed[1] = 1.0
+    env.Burglary.Listen()
+    check(Mocks.calls.dispatchAlert == 0, 'burglary: walking is not noise')
+    FakeSpeed[1] = 9.0
+    env.Burglary.Listen()
+    check(Mocks.calls.dispatchAlert == 1 and Mocks.lastAlertType == 'burglary', 'burglary: running inside is noise, read from the server speed')
+end
+
+do
+    local env = burgScene()
+    burgStart(1)
+    Mocks.exported.finish = function() return true end
+    RegisteredCallbacks['som-burglary:server:breakIn'](1)
+    burgEnter(1)
+    local realTime = os.time
+    os.time = function() return realTime() + env.Config.minutes * 60 + 5 end
+    env.Burglary.Sweep()
+    os.time = realTime
+    check(mysql.db.burglary.runs[1].status == 'failed' and Buckets[1] == 0, 'burglary: an expired run is failed and sends everyone out')
+    check(RegisteredCallbacks['som-burglary:server:enter'](1).error == 'you are not on a job', 'burglary: after the run nothing works for the crew')
+end
+
+do
+    local env = burgScene()
+    burgStart(1)
+    Mocks.exported.finish = function() return true end
+    local pick = RegisteredCallbacks['som-burglary:server:breakIn']
+    Mocks.exported.run = function() error('hack crashed') end
+    check(pick(1).error == 'try again in a moment', 'burglary: a crashing hack is an error, not a failed pick')
+    Mocks.exported.run = function() return true end
+    check(pick(1).success == true, 'burglary: a crash does not leave the lock stuck')
+end
+
+do
+    local env = burgScene()
+    burgStart(2)
+    Mocks.exported.finish = function() return true end
+    giveBurg(2, 'lockpick')
+    RegisteredCallbacks['som-burglary:server:breakIn'](1)
+    burgEnter(1); burgEnter(2)
+    Mocks.exported.getGroupById = function() return { members = { { citizenid = 'P1', source = 1 } } } end
+    Handlers['som-groups:server:changed'](1)
+    check(Buckets[2] == 0 and Buckets[1] == 40001, 'burglary: a member who leaves the group is sent out of the house')
+    check(RegisteredCallbacks['som-burglary:server:enter'](2).error == 'you are not on a job', 'burglary: and is no longer on the job')
+    Handlers['som:server:playerUnloaded'](1, 'P1')
+    check(Buckets[1] == 0, 'burglary: a player who drops while inside is put back in the world')
+    Mocks.exported.getGroupById = nil
+end
+
+do
+    local env = burgScene()
+    burgStart(1)
+    Mocks.exported.finish = function() return true end
+    RegisteredCallbacks['som-burglary:server:breakIn'](1)
+    burgEnter(1)
+    local hadName = _G.GetCurrentResourceName
+    _G.GetCurrentResourceName = function() return 'som-burglary' end
+    Handlers['onResourceStop']('som-burglary')
+    _G.GetCurrentResourceName = hadName
+    check(Buckets[1] == 0, 'burglary: stopping the resource puts everyone back in the world')
+end
+
+----------------------------------------------------------------------
+-- The fence (a market priced buyer) and the market split
+----------------------------------------------------------------------
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua', 'server/buyer.lua' })
+    Mocks.players = { [1] = { citizenid = 'F1' } }
+    Mocks.inv = { [1] = {} }
+    Mocks.saturated = nil
+    Mocks.marketPrice = { goldchain = 180, laptop = 150 }
+    FakePeds[1] = vec3(0, 0, 0)
+    local cb = RegisteredCallbacks
+    local slot = 1200
+    local function give(name, n)
+        for _, it in pairs(Mocks.inv[1]) do if it.name == name then it.count = it.count + n; return end end
+        slot = slot + 1; Mocks.inv[1][slot] = { name = name, count = n, slot = slot }
+    end
+    local function count(name) local n = 0; for _, it in pairs(Mocks.inv[1]) do if it.name == name then n = n + it.count end end; return n end
+
+    check(cb['som-outdoors:server:sell'](1, 'fence').error == 'nobody is buying', 'fence: ships disabled')
+    local F = env.Config.buyers.fence
+    check(F.market == true and F.enabled == false and F.coords == nil, 'fence: a market buyer that ships closed')
+    F.enabled, F.coords = true, vec3(0, 0, 0)
+    Mocks.treasury = 100000
+    check(cb['som-outdoors:server:sell'](1, 'fence').error == 'you have nothing they want', 'fence: nothing to sell')
+    give('goldchain', 2); give('laptop', 1); give('codfish', 4)
+    local s = cb['som-outdoors:server:sell'](1, 'fence')
+    check(s.success and s.paid == 510 and Mocks.treasury == 100000 - 510, 'fence: pays the market quote from the treasury')
+    check(count('goldchain') == 0 and count('laptop') == 0 and count('codfish') == 4, 'fence: takes only what it buys')
+    local sat = {}
+    for _, x in ipairs(Mocks.saturated or {}) do sat[x.item] = x.quantity end
+    check(sat.goldchain == 2 and sat.laptop == 1 and #Mocks.saturated == 2, 'fence: a paid sale moves the market price')
+
+    Mocks.saturated = nil
+    give('goldchain', 1)
+    Mocks.marketPrice.goldchain = nil
+    check(cb['som-outdoors:server:sell'](1, 'fence').error == 'you have nothing they want' and count('goldchain') == 1, 'fence: an item the market does not trade is not bought')
+    Mocks.marketPrice.goldchain = 180
+
+    mysql.db.buyer = {}
+    F.hourlyCap = 100
+    give('goldchain', 2)
+    local capped = cb['som-outdoors:server:sell'](1, 'fence')
+    check(capped.error == 'they cannot pay any more right now' and count('goldchain') == 3 and Mocks.saturated == nil, 'fence: the hourly cap holds and a sale of nothing leaves the market alone')
+
+    F.hourlyCap = 400
+    local part = cb['som-outdoors:server:sell'](1, 'fence')
+    check(part.success and part.paid == 360 and count('goldchain') == 1 and Mocks.saturated[1].quantity == 2, 'fence: a capped sale takes only what is paid for and saturates only that')
+
+    F.hourlyCap = 6000
+    mysql.db.buyer = {}
+    Mocks.saturated = nil
+    local before = Mocks.treasury
+    Mocks.addMoneyFails = true
+    local failed = cb['som-outdoors:server:sell'](1, 'fence')
+    Mocks.addMoneyFails = false
+    check(failed.success == false and Mocks.treasury == before and count('goldchain') == 1 and Mocks.saturated == nil, 'fence: a failed credit refunds the treasury and the goods and leaves the market alone')
+
+    local fish = env.Config.buyers.fish
+    fish.enabled, fish.coords = true, vec3(0, 0, 0)
+    give('codfish', 3)
+    local fs = cb['som-outdoors:server:sell'](1, 'fish')
+    check(fs.success and fs.paid == 280 and Mocks.saturated == nil, 'fence: a fixed price buyer is unchanged and does not touch the market')
+end
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-economy', { 'shared/config.lua', 'server/market.lua' })
+    Mocks.players = { [1] = { citizenid = 'M1' } }
+    env.Market.Load()
+    local row = env.Market.Get('goldchain')
+    check(row ~= nil and env.Market.Get('gold_chain') == nil and env.Market.Get('laptop') ~= nil, 'market: the stolen goods catalogue uses the inventory item names')
+
+    local base = row.current_price
+    local newPrice = env.Market.Saturate('goldchain', 3)
+    check(newPrice == row.current_price and newPrice < base and row.volume_sold == 3 and mysql.db.market.lastSaved.price == newPrice and mysql.db.market.lastSaved.volume == 3, 'market: Saturate moves the price, counts the volume and saves it')
+    check(env.Market.Saturate('goldchain', 0) == nil and env.Market.Saturate('goldchain', 1.5) == nil and env.Market.Saturate('nothing', 1) == nil and env.Market.Saturate('goldchain', 'x') == nil, 'market: Saturate refuses a bad item or quantity')
+
+    local priceBefore = row.current_price
+    local paid0 = Mocks.paid or 0
+    local ok, paid = env.Market.Sell(1, 'goldchain', 2)
+    check(ok == true and paid > 0 and (Mocks.paid or 0) == paid0 + paid and row.current_price < priceBefore and row.volume_sold == 5, 'market: Sell still pays, saturates and counts the volume')
+    check(#mysql.db.market.sales == 1 and mysql.db.market.sales[1].quantity == 2, 'market: Sell still records the sale')
+    check(select(1, env.Market.Sell(1, 'goldchain', 0)) == false and select(1, env.Market.Sell(1, 'nothing', 1)) == false, 'market: Sell still refuses a bad item or quantity')
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))

@@ -216,6 +216,15 @@ Config.Alerts = {
 
     -- Raised by som-boosting once, when a contract car is opened. NOT
     -- `reportable`: the server raises it with the car's own position.
+    burglary = {
+        label = 'Burglary',
+        code = '10-31',
+        priority = 2,
+        chance = 1.0,
+        cooldown = 30,
+        jobs = { 'police' },
+        blip = { sprite = 40, colour = 1, scale = 1.0, duration = 600 },
+    },
     boostTheft = {
         label = 'Vehicle Theft',
         code = '10-16',
