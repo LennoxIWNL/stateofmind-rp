@@ -9569,6 +9569,35 @@ end
 
 
 -- ---------------------------------------------------------------------------
+-- som-courier: the hourly pay cap
+-- ---------------------------------------------------------------------------
+
+do
+    boardScene()
+    local env = loader.loadResource(REPO .. 'som-courier', { 'shared/config.lua', 'server/main.lua' })
+    local spot = vec3(5, 0, 0)
+    env.Config.routes = { { label = 'Docks', pickup = spot, drops = { spot, spot, spot } } }
+    env.Config.hourlyCap = 250
+    FakePeds[1] = spot
+    Mocks.credits = {}
+    local function run()
+        crew(1)
+        j(1, 'queue', { provider = 'courier' })
+        boardEnv.JobBoard.Draw('courier')
+        j(1, 'accept')
+        local ok = RegisteredCallbacks['som-courier:server:interact'](1, 'pickup').success
+        for _ = 1, 3 do RegisteredCallbacks['som-courier:server:interact'](1, 'drop') end
+        return ok
+    end
+    local function paid() local n = 0 for _, c in ipairs(Mocks.credits) do if c.reason == 'courier' then n = n + c.amount end end return n end
+    check(run() and paid() == 250, 'courier: the third drop of a run is cut to what is left under the hourly cap')
+    check(run() and paid() == 250, 'courier: a second run inside the hour pays nothing more')
+    later(3601, function()
+        check(run() and paid() == 500, 'courier: the cap frees up an hour later')
+    end)
+end
+
+-- ---------------------------------------------------------------------------
 -- Player-run restaurants
 -- ---------------------------------------------------------------------------
 

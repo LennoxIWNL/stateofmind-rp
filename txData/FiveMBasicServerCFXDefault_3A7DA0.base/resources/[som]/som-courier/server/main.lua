@@ -8,6 +8,17 @@ Courier = {}
 
 local runs = {}
 local byCitizen = {}
+local paidLog = {}
+
+-- shortcut: the hourly cap lives in memory, so a restart resets it; upgrade to a table if abuse shows.
+local function capLeft(citizenid)
+    local cutoff, used, keep = os.time() - 3600, 0, {}
+    for _, e in ipairs(paidLog[citizenid] or {}) do
+        if e.t > cutoff then keep[#keep + 1] = e; used = used + e.amount end
+    end
+    paidLog[citizenid] = keep
+    return math.max(0, Config.hourlyCap - used)
+end
 
 local function objective(run)
     if run.stage == 'pickup' then
@@ -51,21 +62,22 @@ local function pay(run, at)
     for cid, source in pairs(run.members) do
         local ped = GetPlayerPed(source)
         if ped ~= 0 and #(GetEntityCoords(ped) - at) <= Config.shareDistance and core:getPlayer(source) then
-            present[#present + 1] = source
+            present[#present + 1] = { cid = cid, source = source }
         end
     end
 
-    for _, source in ipairs(present) do
-        local ok = exports['som-economy']:businessSpend(Config.business, Config.payPerDrop, 'courier')
-        if not ok then
-            TriggerClientEvent('som:client:notify', source, 'The company could not pay this drop', 'error')
+    for _, p in ipairs(present) do
+        local amount = math.min(Config.payPerDrop, capLeft(p.cid))
+        if amount < 1 then
+            TriggerClientEvent('som:client:notify', p.source, 'You have delivered enough for this hour', 'error')
+        elseif not exports['som-economy']:businessSpend(Config.business, amount, 'courier') then
+            TriggerClientEvent('som:client:notify', p.source, 'The company could not pay this drop', 'error')
+        elseif core:addMoney(p.source, 'bank', amount, 'courier') then
+            local log = paidLog[p.cid]
+            log[#log + 1] = { t = os.time(), amount = amount }
+            TriggerClientEvent('som:client:notify', p.source, ('Delivered: $%d'):format(amount), 'success')
         else
-            local credited = core:addMoney(source, 'bank', Config.payPerDrop, 'courier')
-            if credited then
-                TriggerClientEvent('som:client:notify', source, ('Delivered: $%d'):format(Config.payPerDrop), 'success')
-            else
-                core:businessTransact(Config.business, Config.payPerDrop, 'courier:refund')
-            end
+            core:businessTransact(Config.business, amount, 'courier:refund')
         end
     end
 end

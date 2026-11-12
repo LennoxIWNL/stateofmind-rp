@@ -6,6 +6,7 @@ Config = {
     business = 'postop',
     dropsPerRun = 3,
     payPerDrop = 120,
+    hourlyCap = 2000,       -- most one character is paid in a rolling hour, like trucking and garbage
     minutes = 25,
 
     maxSize = 4,

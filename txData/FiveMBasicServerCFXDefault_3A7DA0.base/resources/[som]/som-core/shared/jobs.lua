@@ -299,9 +299,9 @@ Jobs = {
         defaultDuty = false,
         offDutyPay = false,
         grades = {
-            [0] = { name = 'Crew', payment = 120 },
-            [1] = { name = 'Cook', payment = 160 },
-            [2] = { name = 'Manager', payment = 200 },
+            [0] = { name = 'Crew', payment = 200 },
+            [1] = { name = 'Cook', payment = 260 },
+            [2] = { name = 'Manager', payment = 320 },
             [3] = { name = 'Owner', payment = 0, isboss = true },
         },
     },

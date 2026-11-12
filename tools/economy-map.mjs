@@ -68,6 +68,38 @@ for (const m of mech.matchAll(/item = '(\w+)', count = \d+/g)) add(uses, m[1], '
 const trade = /trade = \{[\s\S]*?items = \{([\s\S]*?)\},\s*\},/.exec(mech)
 if (trade) for (const m of trade[1].matchAll(/(\w+) = \{ min = (\d+), max = (\d+) \}/g)) add(uses, m[1], `sold by mechanics ($${m[2]} to $${m[3]})`)
 
+// Buy low, sell high: an item a shop sells for less than a buyer will pay is free money.
+// Shops give the cheapest price; buyers give the best price they can reach (a market buyer at its ceiling).
+const shopPrice = new Map()
+for (const m of ox('data/shops.lua').matchAll(/name = '([A-Za-z0-9_]+)', price = (\d+)/g)) {
+  shopPrice.set(m[1], Math.min(shopPrice.get(m[1]) ?? Infinity, Number(m[2])))
+}
+const buyerPrice = new Map()
+const bid = (item, who, price) => {
+  if (!buyerPrice.has(item) || buyerPrice.get(item).price < price) buyerPrice.set(item, { who, price })
+}
+let buyers = 0
+// Any enabled state or coordinates: a buyer that is switched on in config must still be read.
+for (const b of out.matchAll(/(\w+) = \{\s*label = '[^']*',[^{}]*?hourlyCap = \d+,[^{}]*?prices = \{([^}]*)\}/g)) {
+  buyers++
+  for (const [i, p] of pairsOf(b[2])) bid(i, `the ${b[1]} buyer`, p)
+}
+const eco = som('som-economy/shared/config.lua')
+const ceiling = Number(/ceilingRatio = ([\d.]+)/.exec(eco)?.[1] ?? 1)
+for (const m of eco.matchAll(/\{ '(\w+)',\s*'[^']*',\s*'\w+',\s*(\d+),/g)) bid(m[1], 'the market', Math.floor(Number(m[2]) * ceiling))
+const bonus = Number(/ownerBonus = ([\d.]+)/.exec(turf)?.[1] ?? 0)
+for (const m of turf.matchAll(/(\w+) = \{ label = '[^']*', base = (\d+) \}/g)) bid(m[1], 'a turf sale', Math.floor(Number(m[2]) * (1 + bonus)))
+
+const findLoops = (shops, buyers) => [...buyers]
+  .filter(([item, b]) => shops.has(item) && shops.get(item) < b.price)
+  .map(([item, b]) => `${item}: a shop sells it for $${shops.get(item)} and ${b.who} pays up to $${b.price}`)
+
+// The detector must catch a loop, and must have read real data, or a broken pattern above would let one through silently.
+const probe = findLoops(new Map([['x', 5]]), new Map([['x', { who: 'a buyer', price: 6 }], ['y', { who: 'a buyer', price: 1 }]]))
+if (probe.length !== 1 || findLoops(new Map([['x', 6]]), new Map([['x', { who: 'a buyer', price: 6 }]])).length) throw new Error('loop check is broken')
+if (buyers < 5 || buyerPrice.size < 20 || shopPrice.size < 10) throw new Error(`loop check read too little (${shopPrice.size} shop items, ${buyers} buyers, ${buyerPrice.size} buyer items)`)
+const loops = findLoops(shopPrice, buyerPrice)
+
 const known = JSON.parse(readFileSync(join(root, 'tools', 'economy-known.json'), 'utf8'))
 const dead = []
 for (const [item, where] of uses) {
@@ -96,9 +128,11 @@ const file = join(root, 'ECONOMY-MAP.md')
 if (process.argv.includes('--check')) {
   let bad = false
   if (dead.length) { console.error('Items needed but with no source:\n  ' + dead.join('\n  ')); bad = true }
+  if (loops.length) { console.error('Buy low, sell high (a shop sells it for less than a buyer pays):\n  ' + loops.join('\n  ')); bad = true }
   if (!existsSync(file) || readFileSync(file, 'utf8') !== doc) { console.error('ECONOMY-MAP.md is stale: run node tools/economy-map.mjs'); bad = true }
   process.exit(bad ? 1 : 0)
 }
 writeFileSync(file, doc)
-console.log(`${names.length} items mapped, ${dead.length} dead ends`)
+console.log(`${names.length} items mapped, ${dead.length} dead ends, ${loops.length} buy-low-sell-high loops`)
 if (dead.length) console.log('  ' + dead.join('\n  '))
+if (loops.length) console.log('  ' + loops.join('\n  '))
