@@ -56,6 +56,13 @@ for (const b of out.matchAll(/(\w+) = \{\s*label = '[^']*', enabled = false, coo
   for (const [i, p] of pairsOf(b[3])) add(uses, i, `sold to the ${b[1]} buyer ($${p}, cap $${b[2]}/h)`)
 }
 
+for (const m of out.matchAll(/ore = '(\w+)', min = \d+/g)) add(sources, m[1], 'mining')
+add(uses, 'pickaxe', 'mining')
+for (const m of out.matchAll(/input = \{ (\w+) = \d+ \}, output = \{ '(\w+)', \d+ \}/g)) {
+  add(uses, m[1], `smelting ${m[2]}`)
+  add(sources, m[2], 'smelting')
+}
+
 const mech = som('som-mechanic/shared/config.lua')
 for (const m of mech.matchAll(/item = '(\w+)', count = \d+/g)) add(uses, m[1], 'vehicle repairs')
 const trade = /trade = \{[\s\S]*?items = \{([\s\S]*?)\},\s*\},/.exec(mech)
