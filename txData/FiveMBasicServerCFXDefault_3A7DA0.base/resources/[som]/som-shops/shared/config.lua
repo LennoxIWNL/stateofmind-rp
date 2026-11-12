@@ -27,7 +27,7 @@ Config = {
 
     -- Ships disabled: each shop needs coordinates (staff /place, or set here) and enabled = true.
     shops = {
-        { id = 'alta', label = 'Alta Street Store', price = 60000, enabled = false, coords = nil },
-        { id = 'strawberry', label = 'Strawberry Corner Shop', price = 60000, enabled = false, coords = nil },
+        { id = 'alta', label = 'Alta Street Store', price = 60000, enabled = false, coords = vec3(373.14, 328.62, 103.56) },
+        { id = 'strawberry', label = 'Strawberry Corner Shop', price = 60000, enabled = false, coords = vec3(24.47, -1344.99, 29.49) },
     },
 }

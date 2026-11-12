@@ -18,7 +18,7 @@ Config = {
     -- paid from that account, never more than `payShare` of the fee.
     hospital = {
         enabled = false, label = 'Pillbox Hill Medical Center',
-        desk = nil, bed = nil,
+        desk = vec3(298.60, -584.60, 43.26), bed = nil,
         distance = 3.0,         -- medic to desk
         vehicleDistance = 15.0, -- ambulance to desk
         loadDistance = 5.0,     -- medic to ambulance

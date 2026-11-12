@@ -27,13 +27,13 @@ Config = {
         },
     },
 
-    -- EVERY place ships disabled. Stand there and use `/place som-boosting pickups.<id>.coords`
-    -- (LAUNCH-TODO.md). A pickup is where a car appears, a dropoff is where it is handed over.
+    -- EVERY place ships disabled. Positions are proposed from a public script and not walked;
+    -- stand there and use `/place som-boosting pickups.<id>.coords` (LAUNCH-TODO.md). A pickup is where a car appears, a dropoff is where it is handed over.
     pickups = {
-        { id = 'pickup_1', label = 'Pickup 1', enabled = false, coords = nil, heading = 0.0, cooldownMinutes = 30 },
-        { id = 'pickup_2', label = 'Pickup 2', enabled = false, coords = nil, heading = 0.0, cooldownMinutes = 30 },
+        { id = 'pickup_1', label = 'Pickup 1', enabled = false, coords = vec3(947.81, -251.144, 67.105), heading = 327.47, cooldownMinutes = 30 },
+        { id = 'pickup_2', label = 'Pickup 2', enabled = false, coords = vec3(1241.101, -578.381, 68.958), heading = 269.59, cooldownMinutes = 30 },
     },
     dropoffs = {
-        { id = 'dropoff_1', label = 'Drop-off 1', enabled = false, coords = nil },
+        { id = 'dropoff_1', label = 'Drop-off 1', enabled = false, coords = vec3(555.46, -1631.398, 27.905) },
     },
 }

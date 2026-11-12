@@ -1659,6 +1659,7 @@ end
 local function wScene()
     local env = loadLaunder()
     mysql.fakeNow = os.time()
+    env.Config.Fronts.laundromat.coords = vec3(0.0, 0.0, 0.0)
     env.Config.Fronts.laundromat.enabled = true
     env.Config.Fronts.laundromat.set = true
     Mocks.players[1] = { citizenid = 'C1', job = { name = 'unemployed' } }
@@ -3714,6 +3715,13 @@ do
     check(r.success and r.paid == 0 and Mocks.business.ems == 750 and #Mocks.credits == 0, 'ems hospital: a crash paying the medic cannot undo the admission')
     H.enabled = false
     check(cb['som-ems:server:load'](1, 2, 800).error == 'the hospital is closed' and cb['som-ems:server:deskInfo'](1) == nil, 'ems hospital: ships closed')
+    local savedBed = H.bed
+    H.enabled, H.bed = true, nil
+    check(cb['som-ems:server:load'](1, 2, 800).error == 'the hospital is closed' and cb['som-ems:server:deskInfo'](1) == nil, 'ems hospital: a desk without a bed cannot half open it')
+    H.enabled, H.bed = false, savedBed
+    local shipped = loader.loadResource(REPO .. 'som-ems', { 'shared/config.lua' }).Config.hospital
+    local shippedFallback = loader.loadResource(REPO .. 'som-mechanic', { 'shared/config.lua' }).Config.fallback
+    check(shipped.enabled == false and shipped.bed == nil and shippedFallback.enabled == false, 'proposed coordinates: the hospital and the roadside desk still ship disabled, and the hospital has no bed')
     _G.TriggerClientEvent = realT
 end
 
@@ -8241,7 +8249,7 @@ do
     local function give(name, n) slot = slot + 1; Mocks.inv[1][slot] = { name = name, count = n, slot = slot } end
     local function count(name) local n = 0; for _, it in pairs(Mocks.inv[1]) do if it.name == name then n = n + (it.count or 1) end end; return n end
 
-    check(B.enabled == false and B.coords == nil and cb['som-outdoors:server:sell'](1, 'quarry').error == 'nobody is buying', 'quarry: the buyer ships disabled')
+    check(B.enabled == false and cb['som-outdoors:server:sell'](1, 'quarry').error == 'nobody is buying', 'quarry: the buyer ships disabled')
 
     local P = loader.loadResource(REPO .. 'som-core', { 'server/placements.lua' }).SomPlacements
     local fresh = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua' }).Config
@@ -10235,7 +10243,7 @@ do
 
     check(cb['som-outdoors:server:sell'](1, 'fence').error == 'nobody is buying', 'fence: ships disabled')
     local F = env.Config.buyers.fence
-    check(F.market == true and F.enabled == false and F.coords == nil, 'fence: a market buyer that ships closed')
+    check(F.market == true and F.enabled == false, 'fence: a market buyer that ships closed')
     F.enabled, F.coords = true, vec3(0, 0, 0)
     Mocks.treasury = 100000
     check(cb['som-outdoors:server:sell'](1, 'fence').error == 'you have nothing they want', 'fence: nothing to sell')
@@ -10847,6 +10855,25 @@ do
     _G.NetworkOverrideClockTime, _G.NetworkOverrideClockMillisecondsPerGameMinute = realNative.o1, realNative.o2
 
     os.time, _G.GlobalState, _G.IsPlayerAceAllowed, _G.TriggerClientEvent = realTime, realGlobal, realAce, realT
+end
+
+do
+    -- Proposed coordinates came from public scripts and were never walked: every place stays off.
+    local function cfg(res) return loader.loadResource(REPO .. res, { 'shared/config.lua' }).Config end
+    local function allOff(list) for _, e in ipairs(list) do if e.enabled ~= false then return false end end return true end
+    local fuel, boost, shops = cfg('som-fuel'), cfg('som-boosting'), cfg('som-shops')
+    local out, turf, heists, burg = cfg('som-outdoors'), cfg('som-turf'), cfg('som-heists'), cfg('som-burglary')
+    local buyersOff = true
+    for _, b in pairs(out.buyers) do if b.enabled ~= false then buyersOff = false end end
+    check(allOff(fuel.stations) and allOff(boost.pickups) and allOff(boost.dropoffs) and allOff(shops.shops), 'proposed coordinates: fuel, boosting and shops stay disabled')
+    check(buyersOff and allOff(out.fishing.spots) and allOff(out.chop.dropoffs) and out.mining.smelter.enabled == false, 'proposed coordinates: outdoors buyers, fishing, chop shop and smelter stay disabled')
+    check(allOff(turf.grow.spots) and allOff(turf.grow.bagTables) and allOff(turf.labs) and turf.supplier.enabled == false and allOff(turf.zones), 'proposed coordinates: turf spots stay disabled')
+    check(allOff(heists.sites) and allOff(burg.houses), 'proposed coordinates: heist sites and burglary houses stay disabled')
+    local front = cfg('som-launder').Fronts.laundromat
+    check(front.enabled == false and front.set == false, 'proposed coordinates: the laundromat is neither enabled nor marked as walked')
+    check(cfg('som-welcome').desk.enabled == false and cfg('som-dmv').desk.enabled == false and cfg('som-licences').school.enabled == false, 'proposed coordinates: job centre, DMV and driving school stay closed')
+    check(#cfg('som-licences').practical.route == 0 and #out.mining.sites[1].nodes == 0, 'proposed coordinates: the test route and the mining veins stay empty')
+    check(#cfg('som-garbage').routes == 0 and #cfg('som-trucking').routes == 0 and #cfg('som-courier').routes == 0, 'proposed coordinates: routes that only need data to go live stay empty')
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))

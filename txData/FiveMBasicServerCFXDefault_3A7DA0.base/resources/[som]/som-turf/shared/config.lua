@@ -65,11 +65,11 @@ Config = {
             weed_amnesia_seed = { label = 'Amnesia', bag = 'weed_amnesia', minLevel = 7 },
         },
         spots = {
-            { name = 'grow_1', label = 'Grow spot 1', enabled = false, center = nil, radius = nil },
+            { name = 'grow_1', label = 'Grow spot 1', enabled = false, center = vec3(278.5, 4383.7, 47.06), radius = 40.0 },
         },
         seedReturnChance = 0.25,  -- a harvest sometimes gives its own seed back
         bagTables = {
-            { name = 'bag_1', label = 'Bagging table', enabled = false, coords = nil },
+            { name = 'bag_1', label = 'Bagging table', enabled = false, coords = vec3(2328.66, 2572.17, 46.9) },
         },
     },
 

@@ -31,7 +31,7 @@ Config = {
     -- player per hour at a worse price, paid to the treasury. It never opens
     -- while a mechanic is on duty, so mechanics keep the trade. Ships disabled.
     fallback = {
-        enabled = false, label = 'Roadside assistance', coords = nil, distance = 3.0,
+        enabled = false, label = 'Roadside assistance', coords = vec3(-337.20, -136.30, 39.00), distance = 3.0,
         item = 'repairkit', price = 700, perHour = 1,
     },
 }

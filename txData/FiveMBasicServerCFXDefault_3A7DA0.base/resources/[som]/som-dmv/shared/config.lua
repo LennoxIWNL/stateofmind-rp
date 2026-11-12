@@ -1,6 +1,6 @@
 Config = {
     -- Ships closed. Staff set the counter with `/place som-dmv desk.coords`.
-    desk = { enabled = false, label = 'DMV', coords = nil, distance = 3.0 },
+    desk = { enabled = false, label = 'DMV', coords = vec3(-265.0, -963.6, 31.2), distance = 3.0 },
 
     registration = {
         days = 14,       -- one renewal buys this long, and the grace for a car seen for the first time

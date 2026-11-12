@@ -33,8 +33,11 @@ Config = {
     -- it has terminal coordinates and loot points. Fill these on the real map
     -- (LAUNCH-TODO.md). `doors` are ox_doorlock names opened after the hack.
     sites = {
-        { id = 'store_1', tier = 'store', label = 'Corner store', enabled = false, terminal = nil, doors = {}, lootPoints = {} },
-        { id = 'bank_1', tier = 'bank', label = 'Small bank', enabled = false, terminal = nil, doors = {}, lootPoints = {} },
+        { id = 'store_1', tier = 'store', label = 'Corner store', enabled = false, terminal = nil, doors = {}, lootPoints = { vec3(-47.24, -1757.65, 29.53), vec3(-48.58, -1759.21, 29.59) } },
+        { id = 'bank_1', tier = 'bank', label = 'Small bank', enabled = false, terminal = nil, doors = {}, lootPoints = {
+            vec3(149.84, -1044.9, 29.34), vec3(151.16, -1046.64, 29.34), vec3(147.16, -1047.72, 29.34),
+            vec3(146.54, -1049.28, 29.34), vec3(146.88, -1050.33, 29.34), vec3(150.0, -1050.67, 29.34),
+        } },
         { id = 'vault_1', tier = 'vault', label = 'City vault', enabled = false, terminal = nil, doors = {}, lootPoints = {} },
     },
 }

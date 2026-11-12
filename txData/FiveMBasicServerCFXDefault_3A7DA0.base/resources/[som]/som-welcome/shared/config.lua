@@ -12,7 +12,7 @@ Config = {
     jobMinutes = 30,
 
     -- Ships closed. Staff set the desk with `/place som-welcome desk.coords`.
-    desk = { enabled = false, label = 'Job centre', coords = nil, distance = 3.0, cooldownMinutes = 30 },
+    desk = { enabled = false, label = 'Job centre', coords = vec3(-265.0, -963.6, 31.2), distance = 3.0, cooldownMinutes = 30 },
 
     -- The only jobs the desk hands out, at grade 0. Whitelisted jobs never belong here.
     jobs = {
