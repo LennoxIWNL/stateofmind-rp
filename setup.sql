@@ -1825,6 +1825,36 @@ CREATE TABLE IF NOT EXISTS `som_shop_staff` (
   KEY `idx_shop` (`shop_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Player-run restaurants (som-restaurants). A restaurant is bought from the city and staffed through
+-- its core job; takings go to its own business account. An order is the claim: offered to the customer,
+-- paid, then served or (after the window) refunded to the customer's bank.
+CREATE TABLE IF NOT EXISTS `som_restaurants` (
+  `restaurant_id` VARCHAR(32) NOT NULL,
+  `business`      VARCHAR(48) NOT NULL,
+  `owner`         VARCHAR(16) DEFAULT NULL,
+  `bought_price`  BIGINT NOT NULL DEFAULT 0,
+  `bought_at`     TIMESTAMP NULL DEFAULT NULL,
+  `withdraw_at`   TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (`restaurant_id`),
+  KEY `idx_owner` (`owner`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_restaurant_orders` (
+  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `restaurant_id` VARCHAR(32) NOT NULL,
+  `cashier_cid`   VARCHAR(16) NOT NULL,
+  `customer_cid`  VARCHAR(16) NOT NULL,
+  `items`         TEXT NOT NULL,
+  `total`         BIGINT NOT NULL,
+  `state`         ENUM('offered','paying','paid','served','cancelled','refunded') NOT NULL DEFAULT 'offered',
+  `created_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `paid_at`       TIMESTAMP NULL DEFAULT NULL,
+  `served_at`     TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_restaurant_state` (`restaurant_id`, `state`),
+  KEY `idx_customer_state` (`customer_cid`, `state`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ===========================================================================
 --  7n. COURT SERVICE (som-serving)
 --

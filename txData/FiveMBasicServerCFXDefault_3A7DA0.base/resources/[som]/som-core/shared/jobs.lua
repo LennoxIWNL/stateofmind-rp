@@ -290,4 +290,19 @@ Jobs = {
             [2] = { name = 'Editor', payment = 250, isboss = true },
         },
     },
+
+    -- Player-run restaurant (som-restaurants). Nobody holds it until a boss buys the restaurant
+    -- and hires staff; wages are the ordinary paycheck out of the restaurant's own account.
+    burgershot = {
+        label = 'Burger Shot',
+        business = 'burgershot',
+        defaultDuty = false,
+        offDutyPay = false,
+        grades = {
+            [0] = { name = 'Crew', payment = 120 },
+            [1] = { name = 'Cook', payment = 160 },
+            [2] = { name = 'Manager', payment = 200 },
+            [3] = { name = 'Owner', payment = 0, isboss = true },
+        },
+    },
 }

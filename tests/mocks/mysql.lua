@@ -45,6 +45,7 @@ M.db = {
     tow = { on = false, tickets = {}, impounds = {}, vehicles = {} },
     leases = {},
     shopsDb = { shops = {}, stock = {}, staff = {}, takings = 0, balance = 0 },
+    restDb = { owner = nil, orders = {}, nextId = 0, balance = 0 },
     shared = { accounts = { [7] = 100 }, frozen = {}, treasury = 500, updates = {}, ledger = {} },
     skills = {},
     newlife = {},
@@ -1168,6 +1169,103 @@ local function leases(kind, query, params)
     return false
 end
 
+local function restDb(kind, query, params)
+    local D = M.db.restDb
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    if kind == 'scalar' then
+        if has('SELECT 1 FROM som_restaurants WHERE restaurant_id = ? AND owner = ?') then return true, (D.owner == params[2]) and 1 or nil
+        elseif has('SELECT a.balance FROM som_businesses b JOIN som_bank_accounts a') and params[1] == 'burgershot' then return true, D.balance
+        elseif has('SELECT COALESCE(SUM(total), 0) FROM som_restaurant_orders') then
+            local n = 0
+            for _, o in pairs(D.orders) do if o.restaurant_id == params[1] and o.state == 'paid' then n = n + o.total end end
+            return true, n
+        elseif has('SELECT COALESCE(SUM(t.amount), 0) FROM som_transactions t JOIN som_businesses b') and params[1] == 'burgershot' then return true, 0
+        end
+    elseif kind == 'single' then
+        if has('SELECT owner FROM som_restaurants WHERE restaurant_id = ?') then return true, { owner = D.owner }
+        elseif has('SELECT restaurant_id, total FROM som_restaurant_orders WHERE id = ? AND customer_cid = ?') then
+            local o = D.orders[params[1]]
+            if o and o.customer_cid == params[2] and o.state == 'offered' and o.created_at > now() - params[3] then return true, { restaurant_id = o.restaurant_id, total = o.total } end
+            return true, nil
+        elseif has('SELECT items FROM som_restaurant_orders WHERE id = ?') then return true, D.orders[params[1]] and { items = D.orders[params[1]].items } or nil
+        elseif has('SELECT customer_cid, items, total FROM som_restaurant_orders') then
+            local o = D.orders[params[1]]
+            if o and o.restaurant_id == params[2] and o.state == 'paid' then return true, { customer_cid = o.customer_cid, items = o.items, total = o.total } end
+            return true, nil
+        end
+    elseif kind == 'update' then
+        if has('UPDATE som_restaurants SET owner = ?, bought_price = ?, bought_at = NOW(), withdraw_at = NULL') then
+            if D.owner then return true, 0 end
+            D.owner = params[1]
+            return true, 1
+        elseif has('UPDATE som_restaurants SET owner = NULL, bought_price = 0') then
+            if D.owner ~= params[2] then return true, 0 end
+            D.owner = nil
+            return true, 1
+        elseif has('UPDATE som_restaurants SET withdraw_at = NOW()') then
+            if D.owner ~= params[2] or (D.withdrawAt and D.withdrawAt > now() - params[3] * 60) then return true, 0 end
+            D.withdrawAt = now()
+            return true, 1
+        elseif has('UPDATE som_restaurants SET withdraw_at = NULL') then D.withdrawAt = nil; return true, 1
+        elseif has("SET state = 'paying' WHERE id = ? AND customer_cid = ?") then
+            local o = D.orders[params[1]]
+            if o and o.customer_cid == params[2] and o.state == 'offered' and o.created_at > now() - params[3] then o.state = 'paying'; return true, 1 end
+            return true, 0
+        elseif has("SET state = 'paid', paid_at = NOW() WHERE id = ? AND state = 'paying'") then
+            local o = D.orders[params[1]]
+            if o and o.state == 'paying' then o.state, o.paid_at = 'paid', now(); return true, 1 end
+            return true, 0
+        elseif has("SET state = 'cancelled' WHERE id = ? AND customer_cid = ? AND state = 'offered'") then
+            local o = D.orders[params[1]]
+            if o and o.customer_cid == params[2] and o.state == 'offered' then o.state = 'cancelled'; return true, 1 end
+            return true, 0
+        elseif has("SET state = 'cancelled' WHERE id = ? AND state = 'paying'") then
+            local o = D.orders[params[1]]
+            if o and o.state == 'paying' then o.state = 'cancelled'; return true, 1 end
+            return true, 0
+        elseif has("SET state = 'served', served_at = NOW() WHERE id = ? AND state = 'paid'") then
+            local o = D.orders[params[1]]
+            if o and o.state == 'paid' then o.state = 'served'; return true, 1 end
+            return true, 0
+        elseif has("SET state = 'paid', served_at = NULL WHERE id = ? AND state = 'served'") then
+            local o = D.orders[params[1]]
+            if o and o.state == 'served' then o.state = 'paid'; return true, 1 end
+            return true, 0
+        elseif has("SET state = 'refunded' WHERE id = ? AND state = 'paid' AND paid_at <") then
+            local o = D.orders[params[1]]
+            if o and o.state == 'paid' and o.paid_at < now() - params[2] * 60 then o.state = 'refunded'; return true, 1 end
+            return true, 0
+        elseif has("SET state = 'paid' WHERE id = ? AND state = 'refunded'") then
+            local o = D.orders[params[1]]
+            if o and o.state == 'refunded' then o.state = 'paid'; return true, 1 end
+            return true, 0
+        end
+    elseif kind == 'insert' then
+        if has('INSERT INTO som_restaurant_orders') then
+            for _, o in pairs(D.orders) do
+                if o.customer_cid == params[6] and o.state == 'offered' and o.created_at > now() - params[7] then return true, 0 end
+            end
+            D.nextId = D.nextId + 1
+            D.orders[D.nextId] = { id = D.nextId, restaurant_id = params[1], cashier_cid = params[2], customer_cid = params[3], items = params[4], total = params[5], state = 'offered', created_at = now() }
+            return true, D.nextId
+        end
+    elseif kind == 'query' then
+        if has('SELECT id, items FROM som_restaurant_orders WHERE restaurant_id = ?') then
+            local out = {}
+            for id = 1, D.nextId do local o = D.orders[id]; if o and o.restaurant_id == params[1] and o.state == 'paid' then out[#out + 1] = { id = o.id, items = o.items } end end
+            return true, out
+        elseif has("SELECT id, restaurant_id, customer_cid, total FROM som_restaurant_orders WHERE state = 'paid'") then
+            local out = {}
+            for id = 1, D.nextId do
+                local o = D.orders[id]
+                if o and o.state == 'paid' and o.paid_at < now() - params[1] * 60 then out[#out + 1] = { id = o.id, restaurant_id = o.restaurant_id, customer_cid = o.customer_cid, total = o.total } end
+            end
+            return true, out
+        end
+    end
+    return false
+end
+
 local function shopsDb(kind, query, params)
     local D = M.db.shopsDb
     local function has(text) return query:find(text, 1, true) ~= nil end
@@ -1983,6 +2081,7 @@ function M.single(query, params)
     do local handled, value = loansDb('single', query, params); if handled then return value end end
     do local handled, value = courtService('single', query, params); if handled then return value end end
     do local handled, value = leases('single', query, params); if handled then return value end end
+    do local handled, value = restDb('single', query, params); if handled then return value end end
     do local handled, value = shopsDb('single', query, params); if handled then return value end end
     do local handled, value = dmv('single', query, params); if handled then return value end end
     do local handled, value = carsales('single', query, params); if handled then return value end end
@@ -2077,6 +2176,7 @@ function M.scalar(query, params)
     if query:find('FROM som_transactions WHERE citizenid IS NULL AND reason = ?', 1, true) then
         return _G.Mocks.budgetDrawn or 0
     end
+    do local handled, value = restDb('scalar', query, params); if handled then return value end end
     do local handled, value = shopsDb('scalar', query, params); if handled then return value end end
     do local handled, value = dmv('scalar', query, params); if handled then return value end end
     do local handled, value = sharedAccounts('scalar', query, params); if handled then return value end end
@@ -2197,6 +2297,7 @@ function M.update(query, params)
     do local handled, value = loansDb('update', query, params); if handled then return value end end
     do local handled, value = courtService('update', query, params); if handled then return value end end
     do local handled, value = leases('update', query, params); if handled then return value end end
+    do local handled, value = restDb('update', query, params); if handled then return value end end
     do local handled, value = shopsDb('update', query, params); if handled then return value end end
     do local handled, value = dmv('update', query, params); if handled then return value end end
     do local handled, value = welcome('update', query, params); if handled then return value end end
@@ -2561,6 +2662,7 @@ function M.insert(query, params)
     do local handled, value = loansDb('insert', query, params); if handled then return value end end
     do local handled, value = courtService('insert', query, params); if handled then return value end end
     do local handled, value = leases('insert', query, params); if handled then return value end end
+    do local handled, value = restDb('insert', query, params); if handled then return value end end
     do local handled, value = shopsDb('insert', query, params); if handled then return value end end
     do local handled, value = dmv('insert', query, params); if handled then return value end end
     do local handled, value = carsales('insert', query, params); if handled then return value end end
@@ -2745,6 +2847,7 @@ function M.query(query, params)
     do local handled, value = loansDb('query', query, params); if handled then return value end end
     do local handled, value = leases('query', query, params); if handled then return value end end
     do local handled, value = armoury('query', query, params); if handled then return value end end
+    do local handled, value = restDb('query', query, params); if handled then return value end end
     do local handled, value = shopsDb('query', query, params); if handled then return value end end
     do local handled, value = dmv('query', query, params); if handled then return value end end
     do local handled, value = social('query', query, params); if handled then return value end end
