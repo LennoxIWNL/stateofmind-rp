@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>som-hack</title>
+    <link rel="stylesheet" href="https://cfx-nui-som-assets/tokens.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="hack" class="hack" hidden>
+        <div class="hack__card" role="dialog" aria-labelledby="hack-title">
+            <header class="hack__head">
+                <span id="hack-title" class="hack__title"></span>
+                <span id="hack-note" class="hack__note"></span>
+            </header>
+            <div id="hack-body" class="hack__body"></div>
+            <footer class="hack__foot">
+                <span id="hack-status" class="hack__status" aria-live="polite"></span>
+                <span class="hack__esc"><span class="som-key">ESC</span> leave</span>
+            </footer>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

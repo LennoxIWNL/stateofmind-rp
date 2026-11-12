@@ -41,9 +41,17 @@ Everything lives under `txData/FiveMBasicServerCFXDefault_3A7DA0.base/`.
 - Commit as the repo owner: `Lennox <95040675+LennoxIWNL@users.noreply.github.com>`
   (author and committer). The session-start hook sets this locally; verify
   with `git log -1 --format='%an <%ae> / %cn <%ce>'`.
-- Commit messages: a short imperative subject, then a body explaining why. Do
-  not commit WIP to `BetaRelease` or `main`; WIP is fine on a feature branch if
-  labelled WIP.
+- Commit messages are public: the Discord #changelogs channel shows them to
+  players. The subject says specifically what changed, in words a player or
+  staff member understands ("Turf: gangs can claim and contest zones by tagging
+  walls", not "Add turf"), and the body adds two to four lines on what they get.
+  Not vague, not an essay. Do not commit WIP to `BetaRelease` or `main`; WIP is
+  fine on a feature branch if labelled WIP.
+- Release batches: work for one update goes on one integration branch
+  (`feature/<update-name>`) as several well described commits, and reaches
+  `BetaRelease` in a single PR and a single merge commit, so the changelog gets
+  one push rather than a stream. Do not merge feature by feature.
+- Every own resource lists `author 'Lennox'` in its manifest.
 - Open a PR into `BetaRelease`, let CI pass, merge, then delete the branch.
   Never push directly to `BetaRelease` or `main`, and never force-push either.
   Promotion `BetaRelease` into `main` uses a merge commit, never a squash, so
@@ -136,3 +144,6 @@ scope cuts in the PR description so they are not silently dropped.
 - No literal webhook URL or secret in tracked files.
 - State what was and was not verified, including anything only checkable in a
   live FXServer.
+- Anything the change leaves unset or unverified (coordinates, maps, job
+  whitelists, convars, schema statements, placeholder assets) is added to
+  `LAUNCH-TODO.md`.

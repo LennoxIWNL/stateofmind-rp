@@ -77,11 +77,15 @@ local function transact(player, account, delta, reason, opts)
         flow = opts.counterparty and 'transfer' or (delta > 0 and 'faucet' or 'sink')
     end
 
+    -- The balance is written as a change (`col + delta`), never as the result. Two
+    -- changes in flight can reach the database in either order; adding both always
+    -- lands on the same total, while writing "the balance I computed" would let the
+    -- older one win and bring money back.
     local ok, err = pcall(function()
-        MySQL.transaction.await({
+        local done = MySQL.transaction.await({
             {
-                query = ('UPDATE som_character_money SET `%s` = ? WHERE citizenid = ?'):format(account),
-                values = { balance, player.citizenid },
+                query = ('UPDATE som_character_money SET `%s` = `%s` + ? WHERE citizenid = ?'):format(account, account),
+                values = { delta, player.citizenid },
             },
             {
                 query = [[
@@ -96,11 +100,13 @@ local function transact(player, account, delta, reason, opts)
                 },
             },
         })
+        if not done then error('transaction failed') end
     end)
 
     if not ok then
         -- Roll the in-memory balance back so state and database stay agreed.
-        player.money[account] = balance - delta
+        -- Undo only this change: another one may have landed in memory while this save was waiting.
+        player.money[account] = player.money[account] - delta
         print(('[som-core] transaction failed for %s: %s'):format(player.citizenid, err))
         return false, 'database error'
     end
@@ -179,6 +185,7 @@ function Money.Transfer(fromRef, toRef, account, amount, reason)
 
     local value = sanitiseAmount(amount)
     if not value then return false, 'invalid amount' end
+    if type(reason) ~= 'string' or reason == '' then return false, 'reason required' end
     if from.money[account] < value then return false, 'insufficient funds' end
 
     local resource = callerResource()
@@ -216,33 +223,32 @@ end
 local function creditOffline(citizenid, account, value, reason, opts)
     opts = opts or {}
 
-    local current = MySQL.scalar.await(
-        ('SELECT `%s` FROM som_character_money WHERE citizenid = ?'):format(account),
-        { citizenid })
+    if not MySQL.scalar.await('SELECT 1 FROM som_character_money WHERE citizenid = ?', { citizenid }) then
+        return false, 'no such character'
+    end
 
-    if not current then return false, 'no such character' end
-
-    local balance = current + value
-
+    -- Added in the database, not read then written back: two credits to the same
+    -- offline character (or one landing as they log in) must both count.
     local ok, err = pcall(function()
-        MySQL.transaction.await({
+        local done = MySQL.transaction.await({
             {
-                query = ('UPDATE som_character_money SET `%s` = ? WHERE citizenid = ?'):format(account),
-                values = { balance, citizenid },
+                query = ('UPDATE som_character_money SET `%s` = `%s` + ? WHERE citizenid = ?'):format(account, account),
+                values = { value, citizenid },
             },
             {
-                query = [[
+                query = ([[
                     INSERT INTO som_transactions
                         (citizenid, account, amount, balance, direction, flow, reason, resource, counterparty, business_id)
-                    VALUES (?, ?, ?, ?, 'credit', ?, ?, ?, ?, ?)
-                ]],
+                    SELECT m.citizenid, ?, ?, m.`%s`, 'credit', ?, ?, ?, ?, ?
+                    FROM som_character_money m WHERE m.citizenid = ?
+                ]]):format(account),
                 values = {
-                    citizenid, account, value, balance,
-                    opts.flow or 'transfer', reason,
-                    opts.resource or callerResource(), opts.counterparty, opts.businessId,
+                    account, value, opts.flow or 'transfer', reason,
+                    opts.resource or callerResource(), opts.counterparty, opts.businessId, citizenid,
                 },
             },
         })
+        if not done then error('transaction failed') end
     end)
 
     if not ok then
@@ -280,6 +286,7 @@ function Money.TransferToCitizen(fromRef, toCitizenId, account, amount, reason)
 
     local value = sanitiseAmount(amount)
     if not value then return false, 'invalid amount' end
+    if type(reason) ~= 'string' or reason == '' then return false, 'reason required' end
     if from.money[account] < value then return false, 'insufficient funds' end
 
     local resource = callerResource()
@@ -302,6 +309,20 @@ function Money.TransferToCitizen(fromRef, toCitizenId, account, amount, reason)
     end
 
     return true
+end
+
+---Credits a character by citizenid, online or not. For paying back money owed to someone who may
+---have logged off, such as a refund. The caller has already taken the money from its source.
+---@return boolean success, string|nil err
+function Money.CreditCitizen(citizenid, account, amount, reason)
+    if type(citizenid) ~= 'string' then return false, 'invalid recipient' end
+    if not validAccount[account] or Config.Money.protected[account] then return false, 'invalid account' end
+    local value = sanitiseAmount(amount)
+    if not value then return false, 'invalid amount' end
+    if type(reason) ~= 'string' or reason == '' then return false, 'reason required' end
+
+    if Players.GetByCitizenId(citizenid) then return Money.Add(citizenid, account, value, reason) end
+    return creditOffline(citizenid, account, value, reason)
 end
 
 local payable = {}
@@ -434,40 +455,101 @@ function Money.BusinessTransact(businessName, amount, reason)
     if type(businessName) ~= 'string' then return false, 'invalid business' end
 
     local delta = tonumber(amount)
-    if not delta or delta % 1 ~= 0 or delta == 0 then return false, 'invalid amount' end
+    if not delta or delta % 1 ~= 0 or delta == 0 or math.abs(delta) > 1e12 then return false, 'invalid amount' end
     if type(reason) ~= 'string' or reason == '' then return false, 'reason required' end
 
     local business = MySQL.single.await(
-        'SELECT b.id, b.account_id, a.balance FROM som_businesses b '
-        .. 'LEFT JOIN som_bank_accounts a ON a.id = b.account_id WHERE b.name = ?',
+        'SELECT b.id, b.account_id FROM som_businesses b WHERE b.name = ?',
         { businessName }
     )
     if not business or not business.account_id then return false, 'business has no account' end
 
-    local balance = business.balance + delta
-    if balance < 0 then return false, 'insufficient business funds' end
+    -- One conditional add: two payments cannot both pass a balance check, and an older
+    -- write cannot overwrite a newer one.
+    local changed = MySQL.update.await(
+        'UPDATE som_bank_accounts SET balance = balance + ? WHERE id = ? AND frozen = 0 AND balance + ? >= 0',
+        { delta, business.account_id, delta })
+    if (changed or 0) < 1 then
+        local frozen = MySQL.scalar.await('SELECT frozen FROM som_bank_accounts WHERE id = ?', { business.account_id })
+        return false, frozen == 1 and 'account frozen' or 'insufficient business funds'
+    end
 
-    MySQL.transaction.await({
-        {
-            query = 'UPDATE som_bank_accounts SET balance = ? WHERE id = ?',
-            values = { balance, business.account_id },
-        },
-        {
-            query = [[
-                INSERT INTO som_transactions
-                    (citizenid, account, amount, balance, direction, flow, reason, resource, business_id)
-                VALUES (NULL, 'bank', ?, ?, ?, ?, ?, ?, ?)
-            ]],
-            values = {
-                math.abs(delta), balance,
-                delta > 0 and 'credit' or 'debit',
-                delta > 0 and 'faucet' or 'sink',
-                reason, callerResource(), business.id,
-            },
-        },
+    local balance = MySQL.scalar.await('SELECT balance FROM som_bank_accounts WHERE id = ?', { business.account_id }) or 0
+    local ok, id = pcall(MySQL.insert.await, [[
+        INSERT INTO som_transactions
+            (citizenid, account, amount, balance, direction, flow, reason, resource, business_id)
+        VALUES (NULL, 'bank', ?, ?, ?, ?, ?, ?, ?)
+    ]], {
+        math.abs(delta), balance,
+        delta > 0 and 'credit' or 'debit',
+        delta > 0 and 'faucet' or 'sink',
+        reason, callerResource(), business.id,
     })
+    if not ok or not id or id < 1 then
+        -- No ledger row means no money moved: put the balance back.
+        MySQL.update.await('UPDATE som_bank_accounts SET balance = balance - ? WHERE id = ?', { delta, business.account_id })
+        print(('[som-core] business ledger write failed for %s: %s'):format(businessName, tostring(id)))
+        return false, 'database error'
+    end
 
     return true
+end
+
+---Signed movement on a gang's bank account, created on first use. The balance
+---is changed with one conditional UPDATE so two payments cannot both pass a
+---balance check, and the ledger row carries the gang as counterparty.
+---@param gangName string
+---@param amount number signed, negative to pay out
+---@param reason string
+---@return boolean success, string|nil err
+function Money.GangTransact(gangName, amount, reason)
+    if type(gangName) ~= 'string' or gangName == 'none' or not Gangs[gangName] then return false, 'invalid gang' end
+
+    local delta = tonumber(amount)
+    if not delta or delta % 1 ~= 0 or delta == 0 or math.abs(delta) > 1e12 then return false, 'invalid amount' end
+    if type(reason) ~= 'string' or reason == '' then return false, 'reason required' end
+
+    local row = MySQL.single.await('SELECT account_id FROM som_gangs WHERE name = ?', { gangName })
+    if not row then return false, 'gang not set up' end
+
+    local accountId = row.account_id
+    if not accountId then
+        MySQL.update.await(
+            "INSERT IGNORE INTO som_bank_accounts (account_no, label, type, owner) VALUES (?, ?, 'gang', ?)",
+            { 'GANG-' .. gangName:upper(), Gangs[gangName].label, gangName })
+        accountId = MySQL.scalar.await('SELECT id FROM som_bank_accounts WHERE account_no = ?', { 'GANG-' .. gangName:upper() })
+        if not accountId then return false, 'no account' end
+        MySQL.update.await('UPDATE som_gangs SET account_id = ? WHERE name = ? AND account_id IS NULL', { accountId, gangName })
+    end
+
+    local changed = MySQL.update.await(
+        'UPDATE som_bank_accounts SET balance = balance + ? WHERE id = ? AND frozen = 0 AND balance + ? >= 0',
+        { delta, accountId, delta })
+    if (changed or 0) < 1 then return false, 'insufficient gang funds' end
+
+    local balance = MySQL.scalar.await('SELECT balance FROM som_bank_accounts WHERE id = ?', { accountId }) or 0
+    local ok, id = pcall(MySQL.insert.await, [[
+        INSERT INTO som_transactions
+            (citizenid, account, amount, balance, direction, flow, reason, resource, counterparty)
+        VALUES (NULL, 'bank', ?, ?, ?, 'transfer', ?, ?, ?)
+    ]], { math.abs(delta), balance, delta > 0 and 'credit' or 'debit', reason, callerResource(), gangName })
+    if not ok or not id or id < 1 then
+        -- No ledger row means no money moved: put the balance back.
+        MySQL.update.await('UPDATE som_bank_accounts SET balance = balance - ? WHERE id = ?', { delta, accountId })
+        print(('[som-core] gang ledger write failed for %s: %s'):format(gangName, tostring(id)))
+        return false, 'database error'
+    end
+
+    return true
+end
+
+---@param gangName string
+---@return number
+function Money.GetGangBalance(gangName)
+    if type(gangName) ~= 'string' then return 0 end
+    return MySQL.scalar.await(
+        'SELECT a.balance FROM som_gangs g JOIN som_bank_accounts a ON a.id = g.account_id WHERE g.name = ?',
+        { gangName }) or 0
 end
 
 ---Moves tax into the state treasury. Phase 4 exposes this in a UI.
@@ -502,24 +584,31 @@ end
 ---@return boolean success, string|nil err
 function Money.TreasuryTransact(delta, reason)
     local value = tonumber(delta)
-    if not value or value ~= value or value % 1 ~= 0 or value == 0 then
+    if not value or value ~= value or value % 1 ~= 0 or value == 0 or math.abs(value) > 1e12 then
         return false, 'invalid amount'
     end
 
-    local balance = Money.GetTreasury() + value
-    if balance < 0 then return false, 'insufficient treasury funds' end
+    local changed = MySQL.update.await(
+        'UPDATE som_treasury SET balance = balance + ? WHERE id = 1 AND balance + ? >= 0',
+        { value, value })
+    if (changed or 0) < 1 then return false, 'insufficient treasury funds' end
 
-    MySQL.update.await('UPDATE som_treasury SET balance = ? WHERE id = 1', { balance })
-    MySQL.insert.await([[
+    local ok, id = pcall(MySQL.insert.await, [[
         INSERT INTO som_transactions
             (citizenid, account, amount, balance, direction, flow, reason, resource)
-        VALUES (NULL, 'bank', ?, ?, ?, ?, ?, ?)
+        VALUES (NULL, 'bank', ?, (SELECT balance FROM som_treasury WHERE id = 1), ?, ?, ?, ?)
     ]], {
-        math.abs(value), balance,
+        math.abs(value),
         value > 0 and 'credit' or 'debit',
         value > 0 and 'sink' or 'faucet',
         reason or 'treasury', callerResource(),
     })
+    if not ok or not id or id < 1 then
+        -- No ledger row means no money moved: put the balance back.
+        MySQL.update.await('UPDATE som_treasury SET balance = balance - ? WHERE id = 1', { value })
+        print(('[som-core] treasury ledger write failed: %s'):format(tostring(id)))
+        return false, 'database error'
+    end
 
     return true
 end
@@ -535,9 +624,12 @@ exports('stealCash', Money.StealCash)
 exports('hasMoney', Money.Has)
 exports('transferMoney', Money.Transfer)
 exports('transferToCitizen', Money.TransferToCitizen)
+exports('creditCitizen', Money.CreditCitizen)
 exports('payWith', Money.PayWith)
 exports('paymentOptions', Money.PaymentOptions)
 exports('businessTransact', Money.BusinessTransact)
+exports('gangTransact', Money.GangTransact)
+exports('getGangBalance', Money.GetGangBalance)
 exports('taxToTreasury', Money.TaxToTreasury)
 exports('getTreasury', Money.GetTreasury)
 exports('treasuryTransact', Money.TreasuryTransact)

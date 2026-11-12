@@ -41,24 +41,124 @@ a third-party app passing an emoji keeps working.
 The phone opens **locked**. One click, and it is the difference between a menu
 and something that reads as a phone.
 
+## Architecture
+
+One door. Every request from the page is `(app, action, payload)` through a single
+client callback to `som-phone:server:action`, and `Phone.Action` in `server/core.lua`
+is the only place that decides whether it may run: the player is loaded, the phone
+item is in the bag, the player is not downed, the phone is not locked, the app is
+allowed for their job and perks, the payload is small and shallow, the per-action rate
+limit holds, and only then does the app handler run. A change leaves a row in
+`som_phone_audit`. Handlers are local functions, so there is no per-app net event a
+client could call directly, and a handler that errors is a refusal, not a crash.
+
+- `server/device.lua`: each phone item carries an `imei` the server writes and reads
+  back; `som_phone_devices` is the truth. An optional four digit passcode is a salted
+  hash with a pepper from the `som_phone_pepper` convar; five wrong tries lock it for 30 s.
+- `server/apps.lua`: the built-in apps (Bank, Properties, Settings).
+- The page is React in `ui/apps/som-phone`, built into `html/`. Apps import only
+  `@som/phone-sdk`, which a test enforces.
+
 ## The app registry
 
-Other resources ship their own apps rather than this resource knowing about
-every feature. This is how `som-jobs`, `som-gangs` and the Twitter app arrive.
+Another resource ships an app with `registerApp`, and its handler answers the phone's
+actions. The page shows it with a view description: plain data, no markup.
 
 ```lua
 exports['som-phone']:registerApp({
-    id = 'dispatch',
-    label = 'Dispatch',
-    icon = '!',
-    colour = '#4a9eff',
-    order = 20,
-    perk = nil,          -- or a supporter perk name to gate it
+    id = 'jobs', label = 'Jobs', icon = 'briefcase', colour = '#4a9eff', order = 30,
+    jobs = nil,            -- or { 'police' } to hide it from everyone else
+    perk = nil,            -- or a supporter perk, checked on the server
+    reads = { view = true },  -- actions that only read are not audited
+    handler = function(source, action, payload)
+        if action == 'view' then
+            return { view = { sections = { { title = 'Open', rows = { { title = 'A job', action = 'take', payload = { id = 3 } } } } } } }
+        end
+        return { success = true }
+    end,
 })
 ```
 
-`perk` is filtered **server side**. Sending an app and hiding it in the UI would
-let the client decide what it is entitled to.
+`handler` is called with a source the pipeline has already checked. `notifyApp` and
+`billCitizen` keep their signatures.
+
+## Contacts, messages and calls
+
+All three are apps on the pipeline, resolved from phone numbers on the server (a client
+never names a player).
+
+- **Contacts**: per character, names are stripped of markup, capped at `Config.Contacts.max`.
+  Block and unblock a number.
+- **Messages**: one row per message keyed by phone number, so a lost and replaced phone keeps
+  its history. Text is stripped of markup and control characters and cut to 280. A blocked
+  sender is told it sent and nothing is stored, so a block cannot be probed. An online
+  receiver who carries a phone gets a banner; otherwise it waits as unread.
+- **Calls**: a call is a server record. Ringing times out after `Config.Calls.ringSeconds`.
+  On answer the server picks a large random channel and puts both players on it with
+  pma-voice's server export `setPlayerCall`; ending, a dropped player or a downed player
+  frees it. Busy lines, blocked callers and offline numbers are refused and logged. The client
+  only rings, shows the call bar and relays Y (answer) and N (decline or end).
+
+### A pma-voice limit this cannot fix
+
+pma-voice registers its own net event, `pma-voice:setPlayerCall`, that lets ANY client join ANY
+call channel. This resource cannot change third-party code, so the defence is that channels are
+random numbers up to two billion rather than player ids, which makes one hard to guess but not
+impossible. Hardening it means patching or replacing pma-voice (see `LAUNCH-TODO.md`).
+
+### Prior art
+
+Read from source before writing: npwd's call and message services. Its calls use the caller's
+server id as the voice channel and have no busy check, no cleanup when a player drops and no
+check that the acting player is the receiver; its messages take recipients from the client,
+have no length limit and no membership check. Each of those is a test here.
+
+## Chirp and Pages
+
+`server/social.lua`. Two apps on the same pipeline, so every action is owner, downed, lock,
+size and rate checked before it runs.
+
+**Chirp** is the public feed: 280 characters, replies one level deep, likes, report, delete
+your own. A handle is made from the character name on first use (`annone42`). A custom handle
+is the `twitterHandle` supporter perk (3 to 16 of `a-z0-9_`, unique in the database, cannot be
+or start with a reserved word such as `police`, `admin`, `gov`, changeable once a day); the
+`twitterColour` perk value is how many of `Config.Social.colours` are unlocked. A post
+can be made as a business only while the character is the on duty boss of a job that has a
+business, and the label comes from the server, never the client. Images are `https` URLs on
+`Config.Social.imageHosts` only (empty by default, so no images).
+
+**Pages** has two halves. Adverts (yellow pages): a category, title, description and optional
+price, at most one per category and three in total, expiring after 48 hours; the poster's number
+is shown only if they chose, and a Message button sends a normal text without revealing it.
+White pages: nobody is listed until they opt in; a search needs three characters, treats `%`
+and `_` as letters, returns at most ten names with numbers and never an id or an address.
+
+Moderation: staff run `/removepost post|advert <id>` (needs `som.mod`, written to
+`som_phone_audit`). Reports are rows in `som_phone_reports`; set the `som_phone_webhook`
+convar to also post each new report to Discord.
+
+### Prior art
+
+Read from source: npwd's twitter and marketplace services (the author's name came from the
+client, there was no length or rate limit, and a delete trusted the post id), plus the docs and
+READMEs of sky_phone, v-phone, peak-phone, sd-phone and z-phone for features. Their licences
+(GPL, AGPL, commercial) mean no code was taken, only ideas: yellow pages expiry and categories
+(peak), handles and a report queue (sky), a feed that is one table for people and businesses.
+Each weakness above is a test here.
+
+## Garage, Services and Notes
+
+`server/city.lua`. **Garage** lists the character's own vehicles from `som_vehicles` (model, plate,
+where it is) and does nothing else; locating and recalling a car wait for a client side waypoint.
+**Services** shows how many people are on duty for the services in `Config.City.services` and
+raises a 911 call: the server types it (`emergencyCall`), names the caller and number, and leaves the
+position to dispatch, which reads the ped. Police and ambulance counts are never listed on purpose,
+because staffing is what a heist crew wants to read. The phone keeps its own 30 second gap per
+character because dispatch's cooldown lives behind its net event. **Notes** are private to the
+character (30 each, 40 character titles, 2000 character bodies).
+
+Camera and Gallery are not built: they need an image host and a `screenshot-basic` upload flow that
+nobody has chosen yet (`LAUNCH-TODO.md`).
 
 ## Bank
 
@@ -105,13 +205,7 @@ against `som-core` entitlements server side. The selected accent overrides
 
 ## Known gaps
 
-- **No messages, contacts or calls.** 4b-2. Calls need pma-voice channel work,
-  which is the least predictable part.
-- **No Twitter**, so the custom handle and colourway perks in `patreon.md` are
-  still unbuildable.
-- **No camera or gallery.** Deferred; `screenshot-basic` is already kept.
-- Apps registered by other resources appear on the home screen but have no view
-  container yet, so tapping one returns home. 4b-2.
+- **No camera or gallery.** Deferred until an image host is chosen; `screenshot-basic` is already kept.
 - **Custom phone numbers** (an Insider perk) are not implemented;
   `som_characters.phone` is still auto-generated.
 - No replacement shop, so `Config.Replacement` is unused and a lost phone

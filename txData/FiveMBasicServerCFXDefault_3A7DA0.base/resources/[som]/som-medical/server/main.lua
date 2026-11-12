@@ -93,6 +93,11 @@ end
 exports('isDowned', Medical.IsDowned)
 exports('down', Medical.Down)
 exports('revive', Medical.Revive)
+exports('getDownInfo', function(ref)
+    local cid = type(ref) == 'string' and ref or cidOf(ref)
+    local entry = cid and downed[cid]
+    return entry and { since = entry.since } or nil
+end)
 
 -- ---------------------------------------------------------------------------
 -- Going down
@@ -166,7 +171,14 @@ local function chargeFee(source)
     for _, account in ipairs(Config.FeeAccounts or { 'bank' }) do
         if core:hasMoney(source, account, fee) then
             local ok = core:removeMoney(source, account, fee, 'hospital-treatment')
-            if ok then return fee end
+            if ok then
+                -- The fee is the EMS service's income, not a sink. A failed credit
+                -- gives the money back and the patient is treated for free.
+                local called, credited = pcall(function() return core:businessTransact(Config.FeeBusiness, fee, 'hospital-treatment') end)
+                if called and credited then return fee end
+                core:addMoney(source, account, fee, 'hospital-treatment:refund')
+                return 0
+            end
         end
     end
 
@@ -201,6 +213,7 @@ lib.callback.register('som-medical:server:respawn', function(source)
     publish(source, false)
 
     TriggerEvent('som:server:playerRevived', source, cid, nil)
+    TriggerEvent('som:server:playerRespawned', source, cid)
 
     return {
         success = true,

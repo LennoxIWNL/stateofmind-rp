@@ -262,6 +262,7 @@ form.addEventListener('submit', async (event) => {
         dob: data.get('dob'),
         gender: Number(data.get('gender')),
         nationality: data.get('nationality'),
+        backstory: (data.get('backstory') || '').trim(),
     };
 
     // Client-side checks are for fast feedback only. som-core re-validates
@@ -276,6 +277,11 @@ form.addEventListener('submit', async (event) => {
     }
     if (payload.dob > dateYearsAgo(MIN_AGE)) {
         formError.textContent = `Characters must be at least ${MIN_AGE} years old.`;
+        return;
+    }
+
+    if (payload.backstory.length < 100) {
+        formError.textContent = 'Write a backstory of at least 100 characters.';
         return;
     }
 

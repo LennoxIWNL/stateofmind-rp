@@ -11,6 +11,25 @@ Config = {}
 -- as history in the call list.
 Config.CallLifetime = 30 * 60   -- seconds
 
+-- Repeat reports of the same detected crime close together are one call with a
+-- count, not a new call each. At `escalateAt` reports a routine call is raised
+-- one priority step, so a sustained incident is noticed without a flood.
+Config.Merge = { radius = 40.0, window = 120, escalateAt = 3 }
+
+-- A call nobody has attached to for this long is flagged unattended.
+Config.UnattendedAfter = 120
+
+-- Detected reports one player may send per minute, across every alert type.
+Config.ReportBudget = 30
+
+-- The dispatcher job hears every call and may assign, close and declare a major
+-- incident. Responders at or above SupervisorGrade may declare and close too.
+Config.DispatcherJob = 'dispatcher'
+Config.SupervisorGrade = 4
+
+-- Closed calls leave the board this long after the last service closed.
+Config.ClosedKeep = 120
+
 -- Hard cap on stored calls. A busy night must not grow this without bound,
 -- because the whole table is serialised to every MDT that opens.
 Config.MaxCalls = 100
@@ -61,6 +80,8 @@ Config.Alerts = {
         -- Raised by client detection, so the report event may carry it.
         reportable = true,
         label = 'Fight In Progress',
+        -- The blip is a search area, so repeat reports cannot be averaged to the exact spot.
+        offset = 60.0,
         code = '10-10',
         priority = 2,
         chance = 0.4,
@@ -73,6 +94,7 @@ Config.Alerts = {
         -- Raised by client detection, so the report event may carry it.
         reportable = true,
         label = 'Vehicle Theft In Progress',
+        offset = 60.0,
         code = '10-35',
         priority = 2,
         chance = 0.6,
@@ -106,8 +128,136 @@ Config.Alerts = {
         priority = 1,
         chance = 1.0,
         cooldown = 20,
-        jobs = { 'police', 'ambulance' },
+        jobs = { 'police', 'ambulance', 'firefighter' },
         blip = { sprite = 280, colour = 5, scale = 1.0, duration = 600 },
+    },
+
+    -- Raised by som-medical when a player stays down. NOT `reportable`.
+    personDown = {
+        label = 'Person Down',
+        code = '10-52',
+        priority = 2,
+        chance = 1.0,
+        cooldown = 0,
+        jobs = { 'ambulance' },
+        blip = { sprite = 61, colour = 1, scale = 1.0, duration = 600 },
+    },
+
+    -- Raised by som-fire when a fire starts. NOT `reportable`.
+    structureFire = {
+        label = 'Fire',
+        code = '10-70',
+        priority = 1,
+        chance = 1.0,
+        cooldown = 0,
+        jobs = { 'firefighter', 'ambulance', 'police' },
+        blip = { sprite = 436, colour = 1, scale = 1.0, duration = 600 },
+    },
+
+    -- Raised by som-turf on a street sale, at the seller's position, so most
+    -- sales go unseen. NOT `reportable`.
+    drugDeal = {
+        label = 'Suspicious Exchange',
+        code = '10-66',
+        priority = 3,
+        chance = 0.25,
+        cooldown = 120,
+        jobs = { 'police' },
+        blip = { sprite = 51, colour = 1, scale = 0.9, duration = 240 },
+    },
+
+    -- Raised by som-police when a supervisor flags a department weapon missing
+    -- from the armoury ledger, at the armoury. NOT `reportable`.
+    armouryMissing = {
+        label = 'Weapon Missing',
+        code = '10-99',
+        priority = 2,
+        chance = 1.0,
+        cooldown = 60,
+        jobs = { 'police' },
+        blip = { sprite = 110, colour = 1, scale = 0.9, duration = 600 },
+    },
+
+    -- Raised by som-anpr when a police plate reader scans a stolen, BOLO'd or
+    -- police flagged plate, at the scanned vehicle's position. NOT `reportable`.
+    flaggedVehicle = {
+        label = 'Flagged Vehicle',
+        code = '10-29',
+        priority = 2,
+        chance = 1.0,
+        cooldown = 60,
+        jobs = { 'police' },
+        blip = { sprite = 225, colour = 47, scale = 0.9, duration = 240 },
+    },
+
+    -- Raised by som-outdoors when a vehicle is brought to a chop shop, at the
+    -- shop's own coordinates. NOT `reportable`.
+    chopShop = {
+        label = 'Suspicious Vehicle Activity',
+        code = '10-66',
+        priority = 2,
+        chance = 0.4,
+        cooldown = 120,
+        jobs = { 'police' },
+        blip = { sprite = 225, colour = 1, scale = 0.9, duration = 300 },
+    },
+
+    -- Raised by som-heists when a terminal is touched. NOT `reportable`: the
+    -- server raises it with the site's own coordinates.
+    heistInProgress = {
+        label = 'Alarm Triggered',
+        code = '10-90',
+        priority = 1,
+        chance = 1.0,
+        cooldown = 30,
+        jobs = { 'police' },
+        blip = { sprite = 161, colour = 1, scale = 1.2, duration = 600 },
+    },
+
+    -- Raised by som-boosting once, when a contract car is opened. NOT
+    -- `reportable`: the server raises it with the car's own position.
+    burglary = {
+        label = 'Burglary',
+        code = '10-31',
+        priority = 2,
+        chance = 1.0,
+        cooldown = 30,
+        jobs = { 'police' },
+        blip = { sprite = 40, colour = 1, scale = 1.0, duration = 600 },
+    },
+    boostTheft = {
+        label = 'Vehicle Theft',
+        code = '10-16',
+        priority = 2,
+        chance = 1.0,
+        cooldown = 30,
+        jobs = { 'police' },
+        blip = { sprite = 225, colour = 1, scale = 1.0, duration = 600 },
+    },
+
+    -- Raised by som-racing once, when a race starts and its roll passes. NOT
+    -- `reportable`: the server raises it at the start line.
+    streetRace = {
+        label = 'Street Race Reported',
+        code = '10-85',
+        priority = 3,
+        chance = 1.0,
+        cooldown = 60,
+        jobs = { 'police' },
+        blip = { sprite = 225, colour = 47, scale = 0.9, duration = 300 },
+    },
+
+    -- Raised by som-jail's yard-radius check, not by detection. NOT
+    -- `reportable` for the same reason emergencyCall isn't: it has its own
+    -- trigger with its own validation.
+    inmateEscaped = {
+        label = 'Inmate Escaped',
+        code = '10-80',
+        priority = 1,
+        chance = 1.0,
+        cooldown = 20,
+        jobs = { 'police' },
+        blip = { sprite = 59, colour = 1, scale = 1.0, duration = 600 },
     },
 }
 
@@ -171,4 +321,5 @@ Config.AutomaticWeapons = {
 Config.RespondingJobs = {
     police = true,
     ambulance = true,
+    firefighter = true,
 }

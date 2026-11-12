@@ -3,12 +3,13 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-housing'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Property: houses, apartments and warehouses in shell interiors, with keys, storage, mortgages and police raids'
 version '0.1.0'
 
 shared_scripts {
     '@ox_lib/init.lua',
+    '@som-core/shared/trace.lua',
     -- shells.lua first: config.lua validates its own property list against the
     -- offsets in it at load, so a property pointing at a shell nobody has
     -- measured is caught at boot rather than when somebody tries to walk in.
@@ -38,6 +39,10 @@ server_scripts {
     'server/properties.lua',
     'server/ownership.lua',
     'server/finance.lua',
+    -- Leases read Properties and Ownership, so after both.
+    'server/lease.lua',
+    -- Agent sales read Properties and Ownership; interior.lua asks Agent.IsViewing at the door.
+    'server/agent.lua',
     -- raid before interior: entering consults Raid.CanEnter for a forced door.
     'server/raid.lua',
     'server/interior.lua',

@@ -94,6 +94,24 @@ return {
 		}
 	},
 
+	['cola'] = {
+		label = 'Cola',
+		weight = 350,
+		client = {
+			status = { thirst = 200000 },
+			anim = { dict = 'mp_player_intdrink', clip = 'loop_bottle' },
+			prop = { model = `prop_ld_can_01`, pos = vec3(0.01, 0.01, 0.06), rot = vec3(5.0, 5.0, -180.5) },
+			usetime = 2500,
+			notification = 'You drank a cold cola'
+		}
+	},
+
+	['medikit'] = {
+		label = 'Medical Kit',
+		weight = 1500,
+		description = 'A kit for treating injuries. Medics use it on patients.',
+	},
+
 	['parachute'] = {
 		label = 'Parachute',
 		weight = 30000,
@@ -1414,6 +1432,15 @@ return {
 		},
 	},
 
+	['racing_dongle'] = {
+		label = 'Racing Dongle',
+		weight = 0,
+		description = 'Unlocks the street racing app on a phone',
+		client = {
+			image = 'usb_device.png'
+		},
+	},
+
 	['screwdriverset'] = {
 		label = 'Toolkit',
 		weight = 1000,
@@ -2271,6 +2298,14 @@ return {
 		description = 'Painting F',
 	},
 
+	['burgershot_patty'] = {
+		label = 'Cooked Patty',
+		weight = 100,
+		stack = false,
+		description = 'A grilled patty, ready to assemble',
+		client = { image = 'burgershot_meat.png' },
+	},
+
 	['burgershot_bagbig'] = {
 		label = 'Big Size Package',
 		weight = 100,
@@ -2283,6 +2318,12 @@ return {
 		weight = 100,
 		stack = false,
 		description = 'Big King',
+		client = {
+			status = { hunger = 450000, stress = -30000 },
+			anim = 'eating',
+			prop = 'burger',
+			usetime = 3000,
+		},
 	},
 
 	['burgershot_colab'] = {
@@ -2290,6 +2331,12 @@ return {
 		weight = 100,
 		stack = false,
 		description = 'Big Size Cola',
+		client = {
+			status = { thirst = 350000 },
+			anim = { dict = 'mp_player_intdrink', clip = 'loop_bottle' },
+			prop = { model = `prop_ld_can_01`, pos = vec3(0.01, 0.01, 0.06), rot = vec3(5.0, 5.0, -180.5) },
+			usetime = 3000,
+		},
 	},
 
 	['burgershot_patatob'] = {
@@ -2297,6 +2344,12 @@ return {
 		weight = 100,
 		stack = false,
 		description = 'Big Size Patato',
+		client = {
+			status = { hunger = 150000 },
+			anim = 'eating',
+			prop = 'burger',
+			usetime = 3000,
+		},
 	},
 
 	['burgershot_bagsmall'] = {
@@ -2311,6 +2364,12 @@ return {
 		weight = 100,
 		stack = false,
 		description = 'Bleeder Burger',
+		client = {
+			status = { hunger = 350000, stress = -20000 },
+			anim = 'eating',
+			prop = 'burger',
+			usetime = 3000,
+		},
 	},
 
 	['burgershot_colas'] = {
@@ -2318,6 +2377,12 @@ return {
 		weight = 100,
 		stack = false,
 		description = 'Small Size Cola',
+		client = {
+			status = { thirst = 250000 },
+			anim = { dict = 'mp_player_intdrink', clip = 'loop_bottle' },
+			prop = { model = `prop_ld_can_01`, pos = vec3(0.01, 0.01, 0.06), rot = vec3(5.0, 5.0, -180.5) },
+			usetime = 3000,
+		},
 	},
 
 	['vpn'] = {
@@ -2332,6 +2397,12 @@ return {
 		weight = 100,
 		stack = false,
 		description = 'Small Size Patato',
+		client = {
+			status = { hunger = 100000 },
+			anim = 'eating',
+			prop = 'burger',
+			usetime = 3000,
+		},
 	},
 
 	['burgershot_baggoat'] = {
@@ -2374,6 +2445,12 @@ return {
 		weight = 100,
 		stack = false,
 		description = 'Burger Shot Coffee',
+		client = {
+			status = { thirst = 150000, stress = -30000 },
+			anim = { dict = 'mp_player_intdrink', clip = 'loop_bottle' },
+			prop = { model = `prop_ld_can_01`, pos = vec3(0.01, 0.01, 0.06), rot = vec3(5.0, 5.0, -180.5) },
+			usetime = 3000,
+		},
 	},
 
 	['burgershot_macaroon'] = {
@@ -4506,5 +4583,71 @@ return {
 		placeable = { models = { `prop_worklight_03b` }, avoid = true },
 		client = { anim = 'placing', usetime = 900, disable = { move = true, car = true, combat = true }, cancel = true },
 		server = { export = 'som-props.use' },
+	},
+
+	['coke_leaf'] = {
+		label = 'Coca Leaves',
+		weight = 50,
+		description = 'Fresh leaves, not much use as they are',
+	},
+
+	['acetone'] = {
+		label = 'Acetone',
+		weight = 300,
+		description = 'A strong solvent',
+	},
+
+	['lithium'] = {
+		label = 'Lithium',
+		weight = 200,
+		description = 'Cut from a battery',
+	},
+
+	['ephedrine'] = {
+		label = 'Ephedrine',
+		weight = 100,
+		description = 'A decongestant ingredient',
+	},
+
+	['hydrochloric_acid'] = {
+		label = 'Hydrochloric Acid',
+		weight = 500,
+		description = 'Corrosive. Handle with care',
+	},
+
+	['sulfuric_acid'] = {
+		label = 'Sulfuric Acid',
+		weight = 500,
+		description = 'Corrosive. Handle with care',
+	},
+
+	['venison'] = {
+		label = 'Venison',
+		weight = 600,
+		description = 'Fresh deer meat',
+	},
+
+	['deer_pelt'] = {
+		label = 'Deer Pelt',
+		weight = 800,
+		description = 'A skinned deer pelt',
+	},
+
+	['antlers'] = {
+		label = 'Antlers',
+		weight = 900,
+		description = 'A set of deer antlers',
+	},
+
+	['hunting_knife'] = {
+		label = 'Hunting Knife',
+		weight = 400,
+		description = 'A blade for skinning',
+	},
+
+	['hunting_license'] = {
+		label = 'Hunting License',
+		weight = 0,
+		description = 'Permission to hunt',
 	},
 }

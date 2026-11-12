@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-inventory'
-author 'State of Mind RP'
+author 'Lennox'
 description 'The inventory actions ox_inventory has no stock path for: throwing, and giving to a named nearby player'
 version '0.1.0'
 

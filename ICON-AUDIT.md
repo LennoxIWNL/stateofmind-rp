@@ -141,3 +141,31 @@ WEAPON_GAS.png     WEAPON_GRENADELAUNCHER_SMOKE.png      WEAPON_HANDCUFFS.png
 The audit is a script, not a one-off reading, so it can be re-run after any
 item or art change. It lives outside the repo deliberately; regenerate it from
 the resolution rules at the top of this file if it is needed again.
+
+## Additions for the drug chain and hunting (2026-11-05)
+
+Eleven icons copied from `aifazi/items-images` (the community pack this repo already draws on; the repo has no licence file, its README credits community contributors, so treat provenance as community-shared and re-check before any public redistribution). Each is saved under the item name it will carry, ahead of the items themselves, so the items arrive with art:
+
+| File | Source path in the pack |
+|---|---|
+| `coke_leaf.png` | `drugs/leaf/cocaineleaf.png` |
+| `acetone.png` | `drugs/chemicals/acetone.png` |
+| `lithium.png` | `drugs/chemicals/lithium.png` |
+| `ephedrine.png` | `drugs/chemicals/ephedrine.png` |
+| `hydrochloric_acid.png` | `drugs/chemicals/hydrochloricacid.png` |
+| `sulfuric_acid.png` | `drugs/chemicals/acid.png` |
+| `venison.png` | `hunting/deer_leg.png` |
+| `deer_pelt.png` | `hunting/pelt/pelt-deer-1star.png` |
+| `antlers.png` | `hunting/antlers.png` |
+| `hunting_knife.png` | `weapons/meele/meleeWpnBladeT1HuntingKnife.png` |
+| `hunting_license.png` | `license/hunting_license.png` |
+
+No item uses these yet; they are orphan art until the meth chain and hunting branches add the items. Fishing, mechanic and chop shop items reuse art already in the folder (`fishingrod`, `fishbait`, `codfish`, `repairkit`, `scrapmetal`, `steel`, `aluminum`, `plastic`, `rubber`, `copper`, `glass` and others).
+
+## Medical, police and access icons (2026-11-05)
+
+Four of the 18 baseline gaps filled from `aifazi/items-images`: `spikespack.png` (`police/policespikes.png`), `accesstool.png` (`general/keys/access_key.png`), `surgical_tray.png` (`general/tray.png`), `surgical_gloves.png` (`tools/cleaning/wandgloves_blue.png`). The other 14 (clothing parts, syringe, forceps, staples, breathalyzer, drug test kit, glasses, EMP ammo, luxury finish) have no match in either pack and need drawn or commissioned art.
+
+## Generated icons (realistic house style)
+
+Generated with Higgsfield (`gpt_image_2_6`), cut out and scaled to 100px with `tools/icon-process.mjs`, reviewed by the owner before adding: `syringe.png`, `breathalyzer.png`, `glasses.png`. The style audit of all 736 icons found the set mostly realistic; outliers (flat camo skins, cartoon sweets and toys, a monkey mask, icons too small or dark to read) are queued for replacement in the same style.

@@ -3,12 +3,13 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-economy'
-author 'State of Mind RP'
+author 'Lennox'
 description 'SOM economy: market saturation, business register, departments, fines'
 version '0.1.0'
 
 shared_scripts {
     '@ox_lib/init.lua',
+    '@som-core/shared/trace.lua',
     'shared/config.lua',
 }
 
@@ -17,6 +18,7 @@ server_scripts {
     'server/business.lua',
     'server/market.lua',
     'server/fines.lua',
+    'server/watch.lua',
     'server/main.lua',
 }
 

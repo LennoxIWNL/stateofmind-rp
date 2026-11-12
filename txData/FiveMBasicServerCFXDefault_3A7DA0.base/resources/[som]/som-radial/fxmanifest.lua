@@ -3,12 +3,13 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-radial'
-author 'State of Mind RP'
+author 'Lennox'
 description 'SOM radial menu: contextual actions on F1, contributed by other resources'
 version '0.1.0'
 
 shared_scripts {
     '@ox_lib/init.lua',
+    '@som-core/shared/trace.lua',
     'config.lua',
 }
 

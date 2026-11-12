@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-dispatch'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Crime alerts and the call store, answering to the ps-dispatch surface ps-mdt expects'
 version '0.1.0'
 
@@ -17,10 +17,14 @@ provide 'ps-dispatch'
 
 shared_scripts {
     '@ox_lib/init.lua',
+    '@som-core/shared/trace.lua',
     'shared/config.lua',
 }
 
 client_scripts {
+    '@som-ui/client/context.lua',
+    '@som-ui/client/dialog.lua',
+    'client/panel.lua',
     'client/detect.lua',
     'client/alerts.lua',
     -- The client half of the ps-dispatch export surface. ps-mdt calls
@@ -53,4 +57,5 @@ files {
 dependencies {
     'ox_lib',
     'som-core',
+    'som-ui',
 }

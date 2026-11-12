@@ -1,0 +1,12 @@
+local o = exports['other']
+o:realExport()
+o:missingExport()
+exports['other']:alsoMissing()
+lib.callback.await('other:server:real')
+lib.callback.await('other:server:nope')
+TriggerClientEvent('other:client:real', 1)
+TriggerClientEvent('som:client:nobody', 1)
+MySQL.query.await('SELECT * FROM som_real')
+MySQL.query.await('SELECT * FROM som_missing')
+ox:AddItem(1, 'realitem', 1)
+ox:AddItem(1, 'fakeitem', 1)

@@ -3,12 +3,13 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-police'
-author 'State of Mind RP'
+author 'Lennox'
 description 'LSPD: duty, armoury, custody, fines, impounds and certifications'
 version '0.1.0'
 
 shared_scripts {
     '@ox_lib/init.lua',
+    '@som-core/shared/trace.lua',
     'shared/config.lua',
 }
 
@@ -25,6 +26,7 @@ client_scripts {
     -- duty first: stations, custody and keybinds all read Duty.IsOnDuty().
     'client/duty.lua',
     'client/armoury.lua',
+    'client/armoury_ledger.lua',
     'client/stations.lua',
     'client/custody.lua',
     'client/vehicles.lua',
@@ -42,6 +44,7 @@ server_scripts {
     'server/fines.lua',
     'server/impound.lua',
     'server/incidents.lua',
+    'server/armoury.lua',
 }
 
 -- Built from ui/apps/som-police. Do not edit html/ by hand, it is generated.

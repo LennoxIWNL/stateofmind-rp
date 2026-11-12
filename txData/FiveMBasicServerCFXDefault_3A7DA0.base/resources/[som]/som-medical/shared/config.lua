@@ -102,6 +102,9 @@ Config.RespawnFee = 350
 -- statement line exist at all.
 Config.FeeAccounts = { 'bank' }
 
+-- The business account the respawn fee is paid into.
+Config.FeeBusiness = 'ems'
+
 -- A player who cannot pay is still treated. The debt is not pursued, because a
 -- player stuck on the floor because they are broke is a player who logs off.
 -- The shortfall is simply not collected, and the treatment still happens.
@@ -134,3 +137,24 @@ Config.RespawnHealth = 150
 -- keypress while a medic is on the way.
 Config.RespawnKey = 38          -- E
 Config.RespawnHoldMs = 1200
+
+-- ---------------------------------------------------------------------------
+-- New life
+--
+-- Respawning at the hospital is a new life: the character forgets how they
+-- died. How long they must keep away from where it happened depends on how they
+-- died, derived on the server (never from the client's label). A medic revive
+-- is not a new life. Nothing is enforced in code beyond telling the player and
+-- recording it for staff.
+-- ---------------------------------------------------------------------------
+Config.NewLife = {
+    violence = 15,   -- minutes, killed by another player
+    accident = 0,    -- fall, vehicle, fire, environment, an NPC: remember it
+    radius = 200.0,
+}
+
+-- Ambulance staff are called to a player who is still down after the delay. One
+-- call per character per cooldown, so going down again and again raises nothing.
+-- `enabled = false` stops new calls (checked on the server when a player goes down
+-- and again when the call would be raised).
+Config.EmsCall = { enabled = true, delaySeconds = 30, cooldownSeconds = 120 }

@@ -120,6 +120,16 @@ Config.Finance = {
     repossessRefundRate = 0.35,
 }
 
+--- Estate agent sales. The price goes to Config.Finance.business and the commission comes out of it.
+Config.Agent = {
+    -- Lowest agent grade that may close a realtor_only sale. Anyone on duty can show a property.
+    approveGrade = 1,
+    commission = 0.03,
+    offerSeconds = 60,
+    -- How long an accepted viewing lets the buyer and the agent through the door and keeps the sale open.
+    saleWindowMinutes = 10,
+}
+
 -- ---------------------------------------------------------------------------
 -- Raids
 -- ---------------------------------------------------------------------------
@@ -168,6 +178,24 @@ Config.Purchase = {
     -- Keys held on other people's properties do not count towards this. Being
     -- given a spare key to six houses must not stop somebody buying their first.
     maxOwned = 3,
+}
+
+-- ---------------------------------------------------------------------------
+-- Leases
+-- ---------------------------------------------------------------------------
+
+--- An owner lets a property to one person at a weekly rent. The rent moves from the tenant's bank to
+--- the owner's bank (offline owners included); nothing is created and no tax is taken. The range
+--- keeps rent from being used to move absurd sums: the most is a share of the property price.
+Config.Lease = {
+    intervalDays = 7,
+    minRent = 100,
+    maxRentShare = 0.02,
+    maxPerTenant = 2,
+    -- Weeks missed (tenant offline or short of money) before the tenant is evicted.
+    evictAfterMissed = 2,
+    offerSeconds = 60,
+    sweepMinutes = 30,
 }
 
 -- ---------------------------------------------------------------------------

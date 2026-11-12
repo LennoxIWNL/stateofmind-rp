@@ -3,12 +3,13 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-core'
-author 'State of Mind RP'
+author 'Lennox'
 description 'SOM framework core: players, characters, money bus, permissions, state bridge'
 version '0.1.0'
 
 shared_scripts {
     '@ox_lib/init.lua',
+    'shared/trace.lua',
     'shared/config.lua',
     'shared/tiers.lua',
     'shared/jobs.lua',

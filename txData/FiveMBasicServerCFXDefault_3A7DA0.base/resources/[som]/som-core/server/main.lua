@@ -82,94 +82,79 @@ end)
 -- mechanism that makes the Phase 4 faucet side of the economy bounded.
 -- ---------------------------------------------------------------------------
 
+function PayCheck(player)
+    local job = player.job
+    local jobDef = Jobs[job.name]
+    local payment = job.payment or 0
+
+    -- Hard ceiling, applied here rather than trusted from config, so a
+    -- mistake in a job definition cannot flood the economy.
+    local ceiling = Config.Money.maxHourlyPaycheck
+    if ceiling and payment > ceiling then payment = ceiling end
+
+    if payment <= 0 or not jobDef then return end
+
+    local eligible = job.onduty
+        or jobDef.offDutyPay
+        or Config.Money.payOffDutyByDefault
+    if not eligible then return end
+
+    local reason = ('paycheck:%s'):format(job.name)
+
+    if not jobDef.business then
+        -- Jobs with no business register entry are a faucet.
+        -- Only 'unemployed' should reach this branch.
+        Money.Add(player.source, 'bank', payment, reason)
+        return
+    end
+
+    if not Money.BusinessTransact(jobDef.business, -payment, ('payroll:%s'):format(job.name)) then
+        if Config.Debug then
+            print(('[som-core] %s could not cover payroll for %s'):format(jobDef.business, player.citizenid))
+        end
+        return
+    end
+
+    local paid = Money.Add(player.source, 'bank', payment, reason, {
+        counterparty = jobDef.business,
+        flow = 'transfer',
+    })
+    if not paid then
+        Money.BusinessTransact(jobDef.business, payment, ('payroll:%s:refund'):format(job.name))
+    end
+end
+
 CreateThread(function()
     while true do
         Wait(paycheckInterval)
 
         for _, player in ipairs(Players.GetAll()) do
-            local job = player.job
-            local jobDef = Jobs[job.name]
-            local payment = job.payment or 0
-
-            -- Hard ceiling, applied here rather than trusted from config, so a
-            -- mistake in a job definition cannot flood the economy.
-            local ceiling = Config.Money.maxHourlyPaycheck
-            if ceiling and payment > ceiling then payment = ceiling end
-
-            if payment > 0 and jobDef then
-                local eligible = job.onduty
-                    or jobDef.offDutyPay
-                    or Config.Money.payOffDutyByDefault
-
-                if eligible then
-                    if jobDef.business then
-                        local paid = Money.BusinessTransact(
-                            jobDef.business, -payment, ('payroll:%s'):format(job.name)
-                        )
-                        if paid then
-                            Money.Add(player.source, 'bank', payment, ('paycheck:%s'):format(job.name), {
-                                counterparty = jobDef.business,
-                                flow = 'transfer',
-                            })
-                        elseif Config.Debug then
-                            print(('[som-core] %s could not cover payroll for %s')
-                                :format(jobDef.business, player.citizenid))
-                        end
-                    else
-                        -- Jobs with no business register entry are a faucet.
-                        -- Only 'unemployed' should reach this branch.
-                        Money.Add(player.source, 'bank', payment, ('paycheck:%s'):format(job.name))
-                    end
-                end
-            end
+            -- One failed database call must not end paychecks for everyone.
+            local ok, err = pcall(PayCheck, player)
+            if not ok then print(('[som-core] paycheck failed for %s: %s'):format(player.citizenid, tostring(err))) end
         end
     end
 end)
 
 -- ---------------------------------------------------------------------------
--- Status adjustment from item use
+-- Status from item use
 --
--- TRUST BOUNDARY. ox_inventory applies item status effects on the client
--- (modules/bridge/som/client.lua -> client.setPlayerStatus), so this is a
--- client-reachable event. The server has already validated that the item was
--- consumed via ox's usingItem state machine, but the delta itself arrives from
--- the client, so it is treated as hostile:
---   only three keys are accepted, the delta is clamped, and calls are rate
---   limited per player. setMetadata then clamps the result to 0-100.
---
--- Nothing here touches money, items, jobs, or permissions, so the worst a
--- spoofed call achieves is refilling the caller's own hunger bar.
+-- ox_inventory fires 'ox_inventory:usedItem' on the server (server.lua, a plain
+-- TriggerEvent, not a net event) only after the item was really consumed and the
+-- client's report matched the slot the server recorded. The effect comes from
+-- Config.ItemStatus, so the client sends nothing and a cancelled use changes nothing.
+-- ox deletes an item's `client` table on the server, which is why this is not read
+-- from data/items.lua; a test keeps the two in step.
 -- ---------------------------------------------------------------------------
 
-local STATUS_KEYS = { hunger = true, thirst = true, stress = true }
-local MAX_STATUS_DELTA = 50
-local STATUS_COOLDOWN = 500
-
-local lastStatusCall = {}
-
-RegisterNetEvent('som:server:adjustStatus', function(key, delta)
-    local source = source
-
-    if not STATUS_KEYS[key] then return end
-
-    local value = tonumber(delta)
-    if not value or value ~= value then return end
-
-    local now = GetGameTimer()
-    if lastStatusCall[source] and now - lastStatusCall[source] < STATUS_COOLDOWN then return end
-    lastStatusCall[source] = now
-
-    if value > MAX_STATUS_DELTA then value = MAX_STATUS_DELTA end
-    if value < -MAX_STATUS_DELTA then value = -MAX_STATUS_DELTA end
-
+AddEventHandler('ox_inventory:usedItem', function(source, name)
     local player = Players.Get(source)
-    if not player then return end
+    local effect = type(name) == 'string' and Config.ItemStatus[name]
+    if not player or not effect then return end
 
-    player:setMetadata(key, (player.metadata[key] or 0) + value)
-end)
-
-AddEventHandler('playerDropped', function()
-    lastStatusCall[source] = nil
+    for key, points in pairs(effect) do
+        player:setMetadata(key, (player.metadata[key] or 0) + points)
+    end
 end)
 
 -- ---------------------------------------------------------------------------
@@ -311,4 +296,5 @@ CreateThread(function()
     for _ in pairs(Gangs) do gangCount = gangCount + 1 end
 
     print(('[som-core] ready. %d jobs, %d gangs.'):format(jobCount, gangCount))
+    print('[som] State of Mind RP framework, made by Lennox')
 end)

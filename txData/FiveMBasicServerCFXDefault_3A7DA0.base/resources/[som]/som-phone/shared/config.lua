@@ -10,6 +10,85 @@ Config.RequireItem = true
 
 Config.OpenKey = 'M'
 
+-- The action pipeline: every request the phone makes goes through one server
+-- function that checks these before an app sees it.
+Config.Pipeline = {
+    maxPayload = 4096,        -- characters of strings and keys in one request, nesting included
+    maxDepth = 5,
+    readsPerMinute = 90,      -- per player per action
+    writesPerMinute = 20,
+}
+
+Config.Messages = { maxLength = 280, threadLimit = 40, historyLimit = 60 }
+
+Config.Contacts = { max = 100, nameLength = 32 }
+
+-- The public feed ("Chirp") and Pages. Everything here is re-checked on the server.
+Config.Social = {
+    postLength = 280,
+    postGapSeconds = 20,       -- between two posts by one character
+    postsPerDay = 40,
+    feedSize = 30,
+    replySize = 40,
+    handleChangeHours = 24,
+
+    -- Images are shown by URL, so a viewer's client fetches them from that
+    -- host. Only hosts listed here are accepted; empty means no images. Set
+    -- this to the image host the server chose (see LAUNCH-TODO.md).
+    imageHosts = {},
+
+    -- A custom handle cannot be one of these or start with one, so nobody can
+    -- pose as a department or the staff.
+    reserved = { 'police', 'lspd', 'bcso', 'sasp', 'sheriff', 'ems', 'doj', 'court', 'judge', 'gov', 'mayor',
+        'admin', 'staff', 'mod', 'moderator', 'support', 'official', 'som', 'news', 'dispatch', 'system' },
+
+    -- A supporter with the twitterColour perk may pick from the first N of these
+    -- (N is the perk's value). Purely a text colour.
+    colours = { '#ff6b9d', '#4a9eff', '#2ecc71', '#f0932b', '#e566e8', '#f1c40f' },
+}
+
+Config.Pages = {
+    categories = { 'for_sale', 'wanted', 'services', 'business', 'property', 'vehicles', 'other' },
+    expireHours = 48,
+    maxActive = 3,
+    titleLength = 48,
+    bodyLength = 280,
+    priceLength = 24,
+    searchMin = 3,
+    searchLimit = 10,
+    feedSize = 40,
+}
+
+-- Garage, Services and Notes.
+Config.City = {
+    -- Counts are only shown where knowing them gives no one an edge. Police and
+    -- ambulance staffing is the thing a heist crew would love to read.
+    services = {
+        { job = 'mechanic', label = 'Mechanic', showCount = true },
+        { job = 'taxi', label = 'Taxi', showCount = true },
+        { job = 'realtor', label = 'Real estate', showCount = true },
+        { job = 'cardealer', label = 'Car dealer', showCount = true },
+    },
+    emergencyGapSeconds = 30,
+    emergencyLength = 140,
+
+    notes = { max = 30, titleLength = 40, bodyLength = 2000 },
+    vehicleLimit = 60,
+}
+
+-- A call is a server record. The server picks the voice channel, and the
+-- number is large and random so a channel cannot be guessed: pma-voice
+-- registers its own net event that lets any client join any channel number,
+-- which this resource cannot change.
+Config.Calls = { ringSeconds = 30, historyLimit = 30, channelMin = 100000, channelMax = 2000000000 }
+
+-- A passcode is four digits, stored as a salted hash. The pepper is a convar
+-- (som_phone_pepper) so it never sits in a file clients download.
+Config.Lock = {
+    failsBeforeLock = 5,
+    lockSeconds = 30,
+}
+
 -- ---------------------------------------------------------------------------
 -- Animation
 --
@@ -100,49 +179,6 @@ Config.Bank = {
         autoCollectDays = 7,
         -- How often the collector sweeps, in minutes.
         autoCollectInterval = 15,
-    },
-}
-
--- ---------------------------------------------------------------------------
--- Apps
---
--- The registry is the point of the architecture: other resources add their own
--- apps rather than this resource knowing about every feature. som-jobs and
--- som-gangs will use it, and it is how the Twitter app arrives in 4b-2.
---
--- `perk` gates an app behind a supporter entitlement, checked server side.
---
--- `icon` is a name from the ICONS table in html/app.js, not a glyph. Names
--- already drawn: bank, settings, message, phone, contacts, camera, twitter,
--- dispatch, briefcase. Anything unrecognised falls back to rendering the
--- string itself, so a third-party app passing an emoji still works.
--- ---------------------------------------------------------------------------
-
-Config.Apps = {
-    {
-        id = 'bank',
-        label = 'Bank',
-        icon = 'bank',
-        colour = '#2ecc71',
-        order = 10,
-    },
-    {
-        id = 'properties',
-        label = 'Properties',
-        -- briefcase is already in the ICONS table in html/app.js. An icon name
-        -- that is not there renders as the raw string, so this is checked
-        -- rather than chosen.
-        icon = 'briefcase',
-        colour = '#e0a13b',
-        -- Between bank at 10 and settings at 90, so money things sit together.
-        order = 20,
-    },
-    {
-        id = 'settings',
-        label = 'Settings',
-        icon = 'settings',
-        colour = '#8e8e93',
-        order = 90,
     },
 }
 

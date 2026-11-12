@@ -5,7 +5,7 @@
 ## SOM FRAMEWORK REBUILD IN PROGRESS.
 ## The QBox framework layer has been removed. som-core is not finished, so
 ## this config will NOT produce a playable server yet. The ensure list below
-## reflects the target state; lines that depend on unfinished work are
+## reflects the target state, lines that depend on unfinished work are
 ## commented out and marked TODO.
 
 ## You CAN edit the following:
@@ -38,6 +38,33 @@ set lac_webhook_events "YOUR_DISCORD_WEBHOOK_URL"
 set lac_webhook_connections "YOUR_DISCORD_WEBHOOK_URL"
 
 # ps-mdt's webhooks (mug shots, clock-in notifications).
+# som-phone: a secret mixed into passcode hashes. Never put this in a file in
+# the repo. Changing it invalidates every existing passcode.
+set som_phone_pepper "CHANGE_ME_TO_A_LONG_RANDOM_STRING"
+# som-staff: 1 turns the connection whitelist on. Whitelist every staff licence first
+# (whitelist add license:<hex> note from the console) or nobody can join.
+set som_whitelist 0
+# 1 logs every server callback (name, source, result, time) for bug hunting. Leave 0 in production.
+set som_debug 0
+# som-phone: Chirp reports (optional).
+set som_phone_webhook "YOUR_DISCORD_WEBHOOK_URL"
+
+# som-heists: heist starts and endings (optional).
+set som_heist_webhook "YOUR_DISCORD_WEBHOOK_URL"
+
+# som-launder: bills minted and washed.
+set som_launder_webhook "YOUR_DISCORD_WEBHOOK_URL"
+
+# som-evidence: collection, custody and lab events.
+set som_evidence_webhook "YOUR_DISCORD_WEBHOOK_URL"
+
+# som-court: case, ruling and warrant events.
+set som_court_webhook "YOUR_DISCORD_WEBHOOK_URL"
+
+# som-jail: bookings, releases and escapes.
+set som_jail_webhook "YOUR_DISCORD_WEBHOOK_URL"
+set som_combatlog_webhook "YOUR_DISCORD_WEBHOOK_URL"
+
 set psmdt_webhook_mugshot "YOUR_DISCORD_WEBHOOK_URL"
 set psmdt_webhook_clockin "YOUR_DISCORD_WEBHOOK_URL"
 

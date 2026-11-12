@@ -3,12 +3,13 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-garage'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Vehicle ownership and garages: personal, business fleets and the police pool, with a live preview'
 version '0.1.0'
 
 shared_scripts {
     '@ox_lib/init.lua',
+    '@som-core/shared/trace.lua',
     'shared/config.lua',
     -- What the dealerships sell. Shared, because the server sells from it and
     -- the client's zones read Config.Shops beside it.

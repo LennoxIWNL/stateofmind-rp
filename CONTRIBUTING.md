@@ -54,6 +54,7 @@ sudo apt-get install -y lua5.4            # once
 lua5.4 tests/run.lua                      # server Lua against mocked FiveM
 node tests/nui/run.mjs                    # NUI in headless Chromium (needs playwright)
 tools/check-lua.sh                        # syntax check our Lua
+python3 tools/check-item-icons.py           # every inventory item has an icon file
 ```
 
 CI runs the same checks plus a scan for committed Discord webhook URLs.
@@ -64,6 +65,11 @@ CI runs the same checks plus a scan for committed Discord webhook URLs.
 section next to the feature they belong to, make them safe to re-run
 (`CREATE TABLE IF NOT EXISTS`), and note in the PR that the live database
 needs the new section imported before the resource starts.
+
+## Before launch
+
+`LAUNCH-TODO.md` lists everything that must be set, installed or verified before
+`BetaRelease` is promoted. Add to it whenever a change leaves something unset.
 
 ## Secrets
 

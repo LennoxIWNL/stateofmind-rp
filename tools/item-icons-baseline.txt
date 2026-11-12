@@ -1,0 +1,9 @@
+# Items that had no inventory icon when tools/check-item-icons.py was added.
+# Remove a line when its icon is added.
+arms
+ears
+emp_ammo
+jeans
+luxuryfinish_attachment
+torso
+tshirt

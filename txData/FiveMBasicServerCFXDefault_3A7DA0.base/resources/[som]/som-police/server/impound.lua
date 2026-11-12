@@ -25,6 +25,64 @@ end
 -- Impound
 -- ---------------------------------------------------------------------------
 
+---Records the impound and removes the car. An unowned vehicle is still towed, it just has nobody to charge and
+---nothing to mark. `entity` is deleted when it exists.
+---@return boolean
+function Police.SealImpound(plate, officerCid, reasonIndex, entity)
+    local reason = Config.Impound.reasons[reasonIndex]
+    if not reason then return false end
+
+    local owned = MySQL.single.await(
+        'SELECT id, citizenid FROM som_vehicles WHERE plate = ?', { plate })
+
+    if owned then
+        MySQL.update.await(
+            'UPDATE som_vehicles SET state = ?, garage = ? WHERE id = ?',
+            { 'impounded', 'impound', owned.id })
+    end
+
+    -- One open row per plate, so a retry after a failure part way through does not charge the owner twice.
+    MySQL.insert.await([[
+        INSERT INTO som_police_impound (plate, citizenid, officer_cid, reason, fee)
+        SELECT ?, ?, ?, ?, ? FROM DUAL
+        WHERE NOT EXISTS (SELECT 1 FROM som_police_impound WHERE plate = ? AND released_at IS NULL)
+    ]], { plate, owned and owned.citizenid or nil, officerCid, reason,
+          Config.Impound.fee, plate })
+
+    if entity and DoesEntityExist(entity) then DeleteEntity(entity) end
+
+    if owned and owned.citizenid then
+        local owner = core:getPlayerByCitizenId(owned.citizenid)
+        if owner then
+            TriggerClientEvent('som:client:notify', owner.source,
+                ('%s has been impounded: %s'):format(plate, reason), 'error', 10000)
+        end
+    end
+
+    return true
+end
+
+---For som-tow: seals a towed car that was delivered to the lot, or whose ticket ran out. `entity` is the car when the
+---caller already has it, which saves another scan of every vehicle.
+exports('impoundPlate', function(plate, officerCid, reasonIndex, entity)
+    if type(plate) ~= 'string' or plate == '' or #plate > 12 or type(officerCid) ~= 'string' then return false end
+    reasonIndex = tonumber(reasonIndex)
+    if not reasonIndex or not Config.Impound.reasons[reasonIndex] then return false end
+
+    local function plateOf(vehicle) return ((GetVehicleNumberPlateText(vehicle) or ''):upper():gsub('%s+', '')) end
+    local key = plate:upper():gsub('%s+', '')
+    local car = tonumber(entity)
+    if not car or not DoesEntityExist(car) or plateOf(car) ~= key then
+        car = nil
+        for _, vehicle in ipairs(GetAllVehicles()) do
+            if plateOf(vehicle) == key then car = vehicle break end
+        end
+    end
+    return Police.SealImpound(plate, officerCid, reasonIndex, car)
+end)
+
+exports('impoundReasons', function() return Config.Impound.reasons end)
+
 lib.callback.register('som-police:server:impound', function(source, data)
     if type(data) ~= 'table' then return { success = false, error = 'invalid request' } end
 
@@ -48,36 +106,21 @@ lib.callback.register('som-police:server:impound', function(source, data)
 
     -- Reason comes from the config list, not from the client, so the record
     -- cannot be filled with anything a player fancies typing.
-    local reason = Config.Impound.reasons[tonumber(data.reason) or 0]
-    if not reason then return { success = false, error = 'pick a reason' } end
+    local reasonIndex = tonumber(data.reason) or 0
+    if not Config.Impound.reasons[reasonIndex] then return { success = false, error = 'pick a reason' } end
 
-    local owned = MySQL.single.await(
-        'SELECT id, citizenid FROM som_vehicles WHERE plate = ?', { plate })
-
-    -- An unowned vehicle is still towed, it just has nobody to charge and
-    -- nothing to mark, so it is simply removed.
-    if owned then
-        MySQL.update.await(
-            'UPDATE som_vehicles SET state = ?, garage = ? WHERE id = ?',
-            { 'impounded', 'impound', owned.id })
+    -- With a tow driver on duty the car stays put and waits for a ticket. Without one, or if the ticket
+    -- cannot be raised, it is impounded at once, so an officer is never stuck.
+    if data.tow == true then
+        local coords = GetEntityCoords(entity)
+        local ok, ticketed = pcall(function()
+            return exports['som-tow']:request(plate, reasonIndex, officer.citizenid, { x = coords.x, y = coords.y, z = coords.z })
+        end)
+        if ok and ticketed then return { success = true, plate = plate, towed = true } end
     end
 
-    MySQL.insert.await([[
-        INSERT INTO som_police_impound (plate, citizenid, officer_cid, reason, fee)
-        VALUES (?, ?, ?, ?, ?)
-    ]], { plate, owned and owned.citizenid or nil, officer.citizenid, reason,
-          Config.Impound.fee })
-
-    DeleteEntity(entity)
-
-    if owned and owned.citizenid then
-        local owner = core:getPlayerByCitizenId(owned.citizenid)
-        if owner then
-            TriggerClientEvent('som:client:notify', owner.source,
-                ('%s has been impounded: %s'):format(plate, reason), 'error', 10000)
-        end
-    end
-
+    pcall(function() exports['som-tow']:cancelPlate(plate) end)
+    Police.SealImpound(plate, officer.citizenid, reasonIndex, entity)
     return { success = true, plate = plate }
 end)
 
@@ -226,11 +269,14 @@ lib.callback.register('som-police:server:checkPlate', function(source, netId)
         WHERE v.plate = ?
     ]], { plate })
 
+    local ok, registration = pcall(function() return exports['som-dmv']:registration(plate) end)
+
     return {
         success = true,
         plate = plate,
         owner = owner and ('%s %s'):format(owner.firstname, owner.lastname) or 'Unregistered',
         flagged = flag and flag.reason or nil,
+        registration = ok and registration or nil,
     }
 end)
 

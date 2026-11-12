@@ -25,6 +25,14 @@ local nextId = 1
 -- for a prefix, which mis-fires the moment player 1 and player 12 coexist.
 local cooldowns = {}
 
+-- The exact position of each call. Calls with an `offset` are shown at a fixed
+-- jittered point, and this table stays server side so the jitter cannot be
+-- undone from what the MDT receives. Keyed like `calls`.
+local truth = {}
+
+-- Reports in the current minute, per player.
+local budgets = {}
+
 -- ---------------------------------------------------------------------------
 -- Helpers
 -- ---------------------------------------------------------------------------
@@ -99,7 +107,44 @@ local function recipients(jobs)
         end
     end
 
+    for _, player in ipairs(core:getPlayersByJob(Config.DispatcherJob, true) or {}) do
+        if not seen[player.source] then
+            seen[player.source] = true
+            out[#out + 1] = player
+        end
+    end
+
     return out
+end
+
+---Folds a repeat report into an open call of the same kind nearby.
+---@param alertType string
+---@param def table
+---@param coords vector3
+---@return number|nil call id when merged
+local function mergeInto(alertType, def, coords)
+    if not def.reportable then return nil end
+
+    local now = os.time()
+
+    for id, call in pairs(calls) do
+        local at = truth[id]
+
+        if call.alertType == alertType and call.status ~= 'closed' and at
+            and now - call.createdAt <= Config.Merge.window
+            and #(vector3(at.x, at.y, at.z) - coords) <= Config.Merge.radius then
+            call.count = (call.count or 1) + 1
+
+            if call.count == Config.Merge.escalateAt and call.priority > 1 then
+                call.priority = call.priority - 1
+                for _, recipient in ipairs(recipients(call.jobs)) do
+                    TriggerClientEvent('som-dispatch:client:call', recipient.source, call)
+                end
+            end
+
+            return id
+        end
+    end
 end
 
 ---Drops calls that have aged out, and trims to the cap.
@@ -111,7 +156,10 @@ local function prune()
     local live = {}
 
     for id, call in pairs(calls) do
-        if now - call.createdAt < Config.CallLifetime then live[id] = call end
+        local expired = now - call.createdAt >= Config.CallLifetime
+            or (call.status == 'closed' and now - call.closedAt >= Config.ClosedKeep)
+
+        if not expired then live[id] = call else truth[id] = nil end
     end
 
     calls = live
@@ -124,7 +172,10 @@ local function prune()
 
     table.sort(ids, function(a, b) return calls[a].createdAt < calls[b].createdAt end)
 
-    for i = 1, #ids - Config.MaxCalls do calls[ids[i]] = nil end
+    for i = 1, #ids - Config.MaxCalls do
+        calls[ids[i]] = nil
+        truth[ids[i]] = nil
+    end
 end
 
 -- ---------------------------------------------------------------------------
@@ -153,6 +204,9 @@ function Dispatch.Create(source, alertType, extra)
     if not coords then return nil end
 
     local player = source and core:getPlayer(source) or nil
+
+    local merged = mergeInto(alertType, def, coords)
+    if merged then return merged end
 
     local id = nextId
     nextId = nextId + 1
@@ -221,14 +275,30 @@ function Dispatch.Create(source, alertType, extra)
         blip = def.blip,
     }
 
+    call.count = 1
+    call.major = false
+
+    truth[id] = { x = coords.x, y = coords.y, z = coords.z }
+
+    if def.offset then
+        local r = def.offset
+        local x, y = coords.x + (math.random() * 2 - 1) * r, coords.y + (math.random() * 2 - 1) * r
+        call.coords = { x = x, y = y, z = coords.z }
+        call.origin = { x = x, y = y }
+        call.offset = r
+    end
+
     calls[id] = call
     prune()
 
     for _, recipient in ipairs(recipients(def.jobs)) do
+        -- Units attached to a major incident only hear priority 1 traffic.
+        if def.priority and def.priority < 2 or not Dispatch.OnMajor(recipient) then
         -- ps-mdt's own live-call handler. Feeding it means the MDT updates
         -- without being reopened.
         TriggerClientEvent('dispatch:clNotify', recipient.source, call, id)
         TriggerClientEvent('som-dispatch:client:call', recipient.source, call)
+        end
     end
 
     return id
@@ -257,6 +327,20 @@ RegisterNetEvent('som-dispatch:server:report', function(alertType, extra)
 
     local player = core:getPlayer(source)
     if not player then return end
+
+    -- A server-only event, so a client cannot raise it. som-evidence records
+    -- what a detected crime leaves behind, independent of the call's own
+    -- cooldown and chance roll below.
+    TriggerEvent('som:server:crimeReported', source, alertType)
+
+    local now = os.time()
+    local budget = budgets[source]
+    if not budget or now - budget.since >= 60 then
+        budget = { since = now, used = 0 }
+        budgets[source] = budget
+    end
+    budget.used = budget.used + 1
+    if budget.used > Config.ReportBudget then return end
 
     if not offCooldown(source, alertType) then return end
 
@@ -514,4 +598,275 @@ exports('getCalls', function() return calls end)
 
 AddEventHandler('som:server:playerUnloaded', function(source)
     cooldowns[source] = nil
+    budgets[source] = nil
 end)
+
+-- ---------------------------------------------------------------------------
+-- Working a call: attach, assign, close, major incident
+--
+-- The board only shows what the server has already decided the caller may do,
+-- and every action here is checked again against the caller's job, duty and
+-- grade and the call's own state.
+-- ---------------------------------------------------------------------------
+
+local function fail(err) return { success = false, error = err } end
+
+---'dispatcher', 'supervisor' (a responder at the supervisor grade), 'unit', or nil.
+---@param player table|nil
+---@return string|nil
+local function roleOf(player)
+    if not player or not player.job or not player.job.onduty then return nil end
+    if player.job.name == Config.DispatcherJob then return 'dispatcher' end
+    if not Config.RespondingJobs[player.job.name] then return nil end
+    return (player.job.grade or 0) >= Config.SupervisorGrade and 'supervisor' or 'unit'
+end
+
+---@param player table
+---@param call table
+---@return boolean whether the call involves this responder's service
+local function servesCall(player, call)
+    return call.services[player.job.name] ~= nil
+end
+
+local function attached(call, citizenid)
+    for _, unit in ipairs(call.units) do
+        if unitKey(unit) == citizenid then return true end
+    end
+    return false
+end
+
+---Is this responder attached to a call that has been declared a major incident?
+---@param player table
+---@return boolean
+function Dispatch.OnMajor(player)
+    local cid = player.citizenid
+    if not cid then return false end
+
+    for _, call in pairs(calls) do
+        if call.major and call.status ~= 'closed' and attached(call, cid) then return true end
+    end
+    return false
+end
+
+---@param callId any
+---@return table|nil
+local function openCall(callId)
+    local call = callById(callId)
+    if call and call.status ~= 'closed' then return call end
+end
+
+---@param call table
+---@param player table
+local function addUnit(call, player)
+    call.units[#call.units + 1] = {
+        cid = player.citizenid,
+        name = ('%s %s'):format(player.charinfo.firstname, player.charinfo.lastname),
+        job = player.job.name,
+    }
+
+    local service = call.services[player.job.name]
+    if service and service.status == 'open' then service.status = 'responding' end
+end
+
+---@param source number
+---@param callId any
+---@return table result
+function Dispatch.Attach(source, callId)
+    local player = core:getPlayer(source)
+    local role = roleOf(player)
+    if not role or role == 'dispatcher' then return fail('only responding units attach to a call') end
+
+    local call = openCall(callId)
+    if not call or not servesCall(player, call) then return fail('that call is not open to you') end
+    if attached(call, player.citizenid) then return fail('you are already on that call') end
+
+    addUnit(call, player)
+    return { success = true }
+end
+
+---@param source number
+---@param callId any
+---@return table result
+function Dispatch.Detach(source, callId)
+    local player = core:getPlayer(source)
+    if not roleOf(player) then return fail('not permitted') end
+
+    local call = openCall(callId)
+    if not call then return fail('that call is not open') end
+
+    for i, unit in ipairs(call.units) do
+        if unitKey(unit) == player.citizenid then
+            table.remove(call.units, i)
+            return { success = true }
+        end
+    end
+
+    return fail('you are not on that call')
+end
+
+---A dispatcher or supervisor puts a named on-duty responder on a call.
+---@param source number
+---@param callId any
+---@param targetSource any
+---@return table result
+function Dispatch.Assign(source, callId, targetSource)
+    local role = roleOf(core:getPlayer(source))
+    if role ~= 'dispatcher' and role ~= 'supervisor' then return fail('not permitted') end
+
+    local call = openCall(callId)
+    if not call then return fail('that call is not open') end
+
+    local target = core:getPlayer(tonumber(targetSource))
+    local targetRole = roleOf(target)
+    if not targetRole or targetRole == 'dispatcher' or not servesCall(target, call) then
+        return fail('that unit cannot take this call')
+    end
+    if attached(call, target.citizenid) then return fail('they are already on that call') end
+
+    addUnit(call, target)
+    TriggerClientEvent('som-dispatch:client:call', target.source or tonumber(targetSource), call)
+    TriggerClientEvent('som:client:notify', target.source or tonumber(targetSource),
+        ('You have been assigned: %s'):format(call.dispatchMessage), 'inform')
+    return { success = true }
+end
+
+---Closes the caller's own service on a call; a dispatcher closes every service.
+---@param source number
+---@param callId any
+---@return table result
+function Dispatch.Close(source, callId)
+    local player = core:getPlayer(source)
+    local role = roleOf(player)
+    if not role then return fail('not permitted') end
+
+    local call = openCall(callId)
+    if not call then return fail('that call is not open') end
+
+    if role == 'unit' and not attached(call, player.citizenid) then
+        return fail('only a unit on the call can close it')
+    end
+
+    if role == 'dispatcher' then
+        for _, service in pairs(call.services) do
+            service.status, service.closedAt = 'closed', os.time()
+        end
+    else
+        local service = call.services[player.job.name]
+        if not service then return fail('that call is not open to you') end
+        service.status, service.closedAt = 'closed', os.time()
+    end
+
+    local allClosed = true
+    for _, service in pairs(call.services) do
+        if service.status ~= 'closed' then allClosed = false end
+    end
+
+    if allClosed then
+        call.status, call.closedAt, call.major = 'closed', os.time(), false
+    end
+
+    return { success = true }
+end
+
+---Closes every open service of a call with no player involved. Server only: it is
+---an export, never a net event or a callback, so a client cannot reach it.
+---@param callId any
+---@param disposition string|nil
+---@return boolean closed
+function Dispatch.Resolve(callId, disposition)
+    local call = openCall(callId)
+    if not call then return false end
+
+    local at = os.time()
+    for _, service in pairs(call.services) do
+        if service.status ~= 'closed' then
+            service.status, service.closedAt = 'closed', at
+            service.disposition = type(disposition) == 'string' and disposition:sub(1, 48) or nil
+        end
+    end
+    call.status, call.closedAt, call.major = 'closed', at, false
+    return true
+end
+
+exports('resolve', Dispatch.Resolve)
+
+---Declares or stands down a major incident. Every on-duty responder hears it.
+---@param source number
+---@param callId any
+---@param on boolean
+---@return table result
+function Dispatch.Major(source, callId, on)
+    local role = roleOf(core:getPlayer(source))
+    if role ~= 'dispatcher' and role ~= 'supervisor' then return fail('only a supervisor or dispatcher can do that') end
+
+    local call = openCall(callId)
+    if not call then return fail('that call is not open') end
+
+    on = on == true
+    if call.major == on then return fail(on and 'already a major incident' or 'not a major incident') end
+    call.major = on
+
+    for _, recipient in ipairs(recipients(call.jobs)) do
+        TriggerClientEvent('som:client:notify', recipient.source,
+            on and ('MAJOR INCIDENT: %s'):format(call.dispatchMessage) or 'Major incident stood down',
+            on and 'error' or 'inform', 10000)
+    end
+
+    return { success = true }
+end
+
+---Calls this player should see on the board, newest first.
+---@param player table
+---@return table[]
+local function boardFor(player)
+    local role = roleOf(player)
+    local now = os.time()
+    local out = {}
+
+    for _, call in pairs(calls) do
+        if call.status ~= 'closed' and (role == 'dispatcher' or servesCall(player, call)) then
+            out[#out + 1] = {
+                id = call.id, label = call.dispatchMessage, code = call.code, priority = call.priority,
+                count = call.count, major = call.major, units = #call.units, createdAt = call.createdAt,
+                unattended = #call.units == 0 and now - call.createdAt >= Config.UnattendedAfter,
+                mine = attached(call, player.citizenid),
+            }
+        end
+    end
+
+    table.sort(out, function(a, b) return a.createdAt > b.createdAt end)
+    return out
+end
+
+lib.callback.register('som-dispatch:server:board', function(source)
+    local player = core:getPlayer(source)
+    local role = roleOf(player)
+    if not role then return fail('not permitted') end
+
+    return { success = true, role = role, calls = boardFor(player) }
+end)
+
+lib.callback.register('som-dispatch:server:units', function(source, callId)
+    local role = roleOf(core:getPlayer(source))
+    if role ~= 'dispatcher' and role ~= 'supervisor' then return fail('not permitted') end
+
+    local call = openCall(callId)
+    if not call then return fail('that call is not open') end
+
+    local out = {}
+    for job in pairs(call.services) do
+        for _, unit in ipairs(core:getPlayersByJob(job, true) or {}) do
+            if not attached(call, unit.citizenid) then
+                out[#out + 1] = { source = unit.source, name = ('%s %s'):format(unit.charinfo.firstname, unit.charinfo.lastname) }
+            end
+        end
+    end
+
+    return { success = true, units = out }
+end)
+
+lib.callback.register('som-dispatch:server:attach', function(source, id) return Dispatch.Attach(source, id) end)
+lib.callback.register('som-dispatch:server:detach', function(source, id) return Dispatch.Detach(source, id) end)
+lib.callback.register('som-dispatch:server:assign', function(source, id, target) return Dispatch.Assign(source, id, target) end)
+lib.callback.register('som-dispatch:server:close', function(source, id) return Dispatch.Close(source, id) end)
+lib.callback.register('som-dispatch:server:major', function(source, id, on) return Dispatch.Major(source, id, on) end)

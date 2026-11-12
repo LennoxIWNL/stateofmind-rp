@@ -3,12 +3,13 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-theft'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Server-validated cash robbery, so cash is stealable without being an inventory item'
 version '0.1.0'
 
 shared_scripts {
     '@ox_lib/init.lua',
+    '@som-core/shared/trace.lua',
     'config.lua',
 }
 

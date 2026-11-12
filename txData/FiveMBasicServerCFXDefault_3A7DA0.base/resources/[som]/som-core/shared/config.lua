@@ -5,6 +5,11 @@ Config.Debug = false
 Config.Characters = {
     -- No character may be a minor. Enforced server side in Characters.Create,
     -- and used by the client to default and bound the date picker.
+    -- A written backstory is required at creation (AUDIT 18.6), stored in the
+    -- character's metadata and shown to staff.
+    backstoryMin = 100,
+    backstoryMax = 1000,
+
     minimumAge = 18,
     maximumAge = 90,
 
@@ -91,9 +96,32 @@ Config.Needs = {
     thirstPerInterval = 5,
 }
 
+-- What using an item does to the needs, in points on the 0 to 100 bars. Applied on the
+-- server when ox_inventory reports the item used. Every item in ox_inventory's
+-- data/items.lua that has `client.status` needs an entry here with the same value
+-- divided by 10000 (a test checks it).
+Config.ItemStatus = {
+    testburger = { hunger = 20 },
+    burger = { hunger = 20 },
+    sandwich = { hunger = 20 },
+    water = { thirst = 20 },
+    cola = { thirst = 20 },
+    sprunk = { thirst = 20 },
+    mustard = { hunger = 2.5, thirst = 2.5 },
+    panties = { thirst = -10, stress = -2.5 },
+    burgershot_bigking = { hunger = 45, stress = -3 },
+    burgershot_bleeder = { hunger = 35, stress = -2 },
+    burgershot_patatob = { hunger = 15 },
+    burgershot_patatos = { hunger = 10 },
+    burgershot_colab = { thirst = 35 },
+    burgershot_colas = { thirst = 25 },
+    burgershot_coffee = { thirst = 15, stress = -3 },
+}
+
 -- Metadata keys created on every new character. Anything not listed here is
 -- rejected by SetMetadata, so a compromised client cannot invent state.
 Config.DefaultMetadata = {
+    backstory = '',
     hunger = 100,
     thirst = 100,
     stress = 0,

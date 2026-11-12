@@ -1,0 +1,16 @@
+{
+  "name": "@som/app-phone",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --configLoader runner",
+    "build": "vite build --configLoader runner",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@som/phone-sdk": "*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}

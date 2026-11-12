@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-interact'
-author 'State of Mind RP'
+author 'Lennox'
 description 'SOM interaction wrapper around the preserved target system, plus the single TextUI'
 version '0.1.0'
 

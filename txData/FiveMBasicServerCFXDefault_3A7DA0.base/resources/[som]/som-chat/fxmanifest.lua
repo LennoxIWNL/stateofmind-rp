@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-chat'
-author 'State of Mind RP'
+author 'Lennox'
 description 'SOM chat: proximity messages, command input, and the stock chat:addMessage compatibility'
 version '0.1.0'
 

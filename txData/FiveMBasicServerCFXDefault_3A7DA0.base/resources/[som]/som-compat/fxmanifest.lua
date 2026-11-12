@@ -3,7 +3,7 @@ game 'gta5'
 lua54 'yes'
 
 name 'som-compat'
-author 'State of Mind RP'
+author 'Lennox'
 description 'Legacy qb-core export surface backed by som-core, so preserved resources run untouched'
 version '0.1.0'
 
@@ -13,6 +13,7 @@ provide 'qb-core'
 
 shared_scripts {
     '@ox_lib/init.lua',
+    '@som-core/shared/trace.lua',
     -- NOT loaded into som-compat itself, only EXPOSED so ps-hud's manifest can
     -- @-reference it. Listed in files{} below rather than here, because loading
     -- it into every script that includes som-compat would define a global

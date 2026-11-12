@@ -58,7 +58,7 @@ position, at its own cooldown.
 
 `CEventGunShot` is subscribed by name, matching how r14-evidence does it on this
 same server, so it is known to work in this build rather than assumed. **Only
-the local player's own shots report** — every nearby client receives that event,
+the local player's own shots report**, every nearby client receives that event,
 so without the check one gunshot files one call per witness.
 
 Melee and vehicle theft are polled, because neither has a game event worth
@@ -79,6 +79,37 @@ one call per round.
 Dispatch is radio traffic. It goes through `som:client:notify`, not som-phone:
 an officer hears a call because they are on duty, not because they happened to
 have their phone out. See the routing note on som-phone's `notifyApp` export.
+
+## Working a call
+
+`/dispatch` opens the board. Every action is a callback the server checks again
+against the caller's job, duty, grade and the call's own state.
+
+- **Repeat reports merge.** A detected crime of the same kind within
+  `Config.Merge.radius` and `window` is one call with a count. At
+  `escalateAt` reports a routine call goes up one priority step and is re-sent.
+- **Offset alerts.** Types with `offset` are shown at a fixed jittered point
+  and a search radius. The real position stays in a server-only table and is
+  what merging uses, so repeats cannot be averaged to find it.
+- **Respond, assign, close.** A responder attaches to a call for their own
+  service. A dispatcher (the `dispatcher` job, which hears every call) or a
+  responder at `Config.SupervisorGrade` can assign a named on-duty unit. A unit
+  on the call closes its own service; a dispatcher closes all of them. A call
+  closes when every service has, and leaves the board after `ClosedKeep`.
+- **Major incidents.** A dispatcher or supervisor declares one on a call. Every
+  on-duty responder hears it, and units attached to it are spared priority 2 and
+  lower traffic until it is stood down.
+- **Unattended.** A call with no unit after `UnattendedAfter` is flagged on the board.
+- **Report budget.** `Config.ReportBudget` caps detected reports per player per minute.
+
+Calls live in memory, as before; a restart clears the board.
+
+Compared before extending: Project-Sloth/ps-dispatch (merge window, unattended
+flag, offset blips, supervisor-declared incidents, rate limits), pessimi-dispatch
+(dispatcher panel, nearest-unit fallback when nobody is dispatching),
+nb-dispatch (grade based permissions, server-owned callsigns), SolidCore MDT
+(respond and clear), xs-mdt, Nexus-Dispatch, skr-dispatch and SnailyCAD (a
+separate web CAD). Most are GPL, so only ideas were taken.
 
 ## Known gaps
 

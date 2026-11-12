@@ -1,0 +1,157 @@
+--- Cast, wait, reel and sell. The server picks the bite time and the catch.
+
+local zones = {}
+
+local function say(result)
+    if not result then return end
+    if result.success then
+        TriggerEvent('som:client:notify', result.paid and ('Sold for $%d'):format(result.paid) or 'Done', 'success')
+    elseif result.error then
+        TriggerEvent('som:client:notify', result.error, 'error')
+    end
+end
+
+local function fish()
+    local cast = lib.callback.await('som-outdoors:server:cast', false)
+    if not cast or not cast.success then return say(cast) end
+
+    local waited = lib.progressBar({
+        duration = cast.wait * 1000, label = 'Waiting for a bite', canCancel = true,
+        disable = { move = true, combat = true },
+    })
+    if not waited then return end
+
+    local reel = lib.callback.await('som-outdoors:server:reel', false)
+    if reel and reel.success then
+        TriggerEvent('som:client:notify', 'You caught something', 'success')
+    else
+        say(reel)
+    end
+end
+
+local function chop(drop)
+    local vehicle = GetVehiclePedIsIn(cache.ped, true)
+    if vehicle == 0 then return say({ error = 'Bring a vehicle' }) end
+    local begun = lib.callback.await('som-outdoors:server:chopBegin', false, drop.name, NetworkGetNetworkIdFromEntity(vehicle))
+    if not begun or not begun.success then return say(begun) end
+
+    if not lib.progressBar({ duration = begun.seconds * 1000, label = 'Scrubbing the VIN', canCancel = true, disable = { move = true, combat = true } }) then return end
+    local result = lib.callback.await('som-outdoors:server:chopFinish', false)
+    if result and result.success then
+        TriggerEvent('som:client:notify', 'Stripped for parts', 'success')
+    else
+        say(result)
+    end
+end
+
+local function mine(key)
+    local begun = lib.callback.await('som-outdoors:server:mineBegin', false, key)
+    if not begun or not begun.success then return say(begun) end
+
+    local ok = lib.progressBar({
+        duration = begun.seconds * 1000, label = 'Mining', canCancel = true,
+        disable = { move = true, combat = true },
+        anim = { dict = 'melee@large_wpn@streamed_core', clip = 'ground_attack_on_spot' },
+    })
+    -- A cancelled swing still calls finish: the server refuses it as too quick and frees the vein.
+    local result = lib.callback.await('som-outdoors:server:mineFinish', false)
+    if not ok then return end
+    if result and result.success then
+        TriggerEvent('som:client:notify', 'You broke off some ore', 'success')
+    else
+        say(result)
+    end
+end
+
+local function smelt(id)
+    local begun = lib.callback.await('som-outdoors:server:smeltBegin', false, id)
+    if not begun or not begun.success then return say(begun) end
+
+    if not lib.progressBar({ duration = begun.seconds * 1000, label = 'Smelting', canCancel = true, disable = { move = true, combat = true } }) then return end
+    local result = lib.callback.await('som-outdoors:server:smeltFinish', false)
+    if result and result.success then
+        TriggerEvent('som:client:notify', 'The metal is ready', 'success')
+    else
+        say(result)
+    end
+end
+
+local function clear()
+    for _, id in ipairs(zones) do exports['som-interact']:removeZone(id) end
+    zones = {}
+end
+
+local function build()
+    clear()
+    for _, s in ipairs(lib.callback.await('som-outdoors:server:fishSpots', false) or {}) do
+        zones[#zones + 1] = exports['som-interact']:addSphereZone({
+            name = 'som_fish_' .. s.name,
+            coords = vec3(s.center.x, s.center.y, s.center.z),
+            radius = s.radius,
+            options = { { name = 'som_fish_cast', label = 'Fish here', icon = 'fa-solid fa-fish', distance = s.radius, onSelect = fish } },
+        })
+    end
+    for _, d in ipairs(lib.callback.await('som-outdoors:server:chopSpots', false) or {}) do
+        zones[#zones + 1] = exports['som-interact']:addSphereZone({
+            name = 'som_chop_' .. d.name,
+            coords = vec3(d.coords.x, d.coords.y, d.coords.z),
+            radius = d.distance,
+            options = { { name = 'som_chop_start', label = 'Chop the vehicle', icon = 'fa-solid fa-car-burst', distance = d.distance, onSelect = function() chop(d) end } },
+        })
+    end
+    for _, n in ipairs(lib.callback.await('som-outdoors:server:mineNodes', false) or {}) do
+        zones[#zones + 1] = exports['som-interact']:addSphereZone({
+            name = 'som_mine_' .. n.key,
+            coords = vec3(n.coords.x, n.coords.y, n.coords.z),
+            radius = 1.5,
+            options = { { name = 'som_mine_strike', label = 'Mine: ' .. n.label, icon = 'fa-solid fa-hammer', distance = 2.0, onSelect = function() mine(n.key) end } },
+        })
+    end
+    local smelter = lib.callback.await('som-outdoors:server:smelterInfo', false)
+    if smelter then
+        local options = {}
+        for _, r in ipairs(smelter.recipes) do
+            options[#options + 1] = { name = 'som_smelt_' .. r.id, label = r.label, icon = 'fa-solid fa-fire-flame-simple', distance = smelter.distance, onSelect = function() smelt(r.id) end }
+        end
+        zones[#zones + 1] = exports['som-interact']:addSphereZone({
+            name = 'som_smelter',
+            coords = vec3(smelter.coords.x, smelter.coords.y, smelter.coords.z),
+            radius = smelter.distance,
+            options = options,
+        })
+    end
+    for _, b in ipairs(lib.callback.await('som-outdoors:server:buyers', false) or {}) do
+        zones[#zones + 1] = exports['som-interact']:addSphereZone({
+            name = 'som_buyer_' .. b.name,
+            coords = vec3(b.coords.x, b.coords.y, b.coords.z),
+            radius = 1.5,
+            options = { { name = 'som_buyer_sell', label = 'Sell: ' .. b.label, icon = 'fa-solid fa-sack-dollar', distance = 2.0,
+                onSelect = function() say(lib.callback.await('som-outdoors:server:sell', false, b.name)) end } },
+        })
+    end
+end
+
+local animalModels = {}
+for _, name in ipairs({ 'a_c_deer', 'a_c_boar' }) do animalModels[joaat(name)] = true end
+
+local function skin(entity)
+    if not lib.progressBar({ duration = 8000, label = 'Skinning', canCancel = true, disable = { move = true, combat = true } }) then return end
+    local result = lib.callback.await('som-outdoors:server:skin', false, NetworkGetNetworkIdFromEntity(entity))
+    if result and result.success then
+        TriggerEvent('som:client:notify', 'You skinned it', 'success')
+    else
+        say(result)
+    end
+end
+
+exports['som-interact']:addGlobalPed({
+    {
+        name = 'som_hunt_skin', label = 'Skin', icon = 'fa-solid fa-knife', distance = 2.5,
+        canInteract = function(entity) return IsEntityDead(entity) and animalModels[GetEntityModel(entity)] == true end,
+        onSelect = function(data) skin(data.entity) end,
+    },
+})
+
+AddEventHandler('som:client:playerLoaded', build)
+CreateThread(function() Wait(3000); build() end)
+AddEventHandler('onResourceStop', function(name) if name == GetCurrentResourceName() then clear() end end)
