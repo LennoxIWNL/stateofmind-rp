@@ -3714,6 +3714,13 @@ do
     check(r.success and r.paid == 0 and Mocks.business.ems == 750 and #Mocks.credits == 0, 'ems hospital: a crash paying the medic cannot undo the admission')
     H.enabled = false
     check(cb['som-ems:server:load'](1, 2, 800).error == 'the hospital is closed' and cb['som-ems:server:deskInfo'](1) == nil, 'ems hospital: ships closed')
+    local savedBed = H.bed
+    H.enabled, H.bed = true, nil
+    check(cb['som-ems:server:load'](1, 2, 800).error == 'the hospital is closed' and cb['som-ems:server:deskInfo'](1) == nil, 'ems hospital: a desk without a bed cannot half open it')
+    H.enabled, H.bed = false, savedBed
+    local shipped = loader.loadResource(REPO .. 'som-ems', { 'shared/config.lua' }).Config.hospital
+    local shippedFallback = loader.loadResource(REPO .. 'som-mechanic', { 'shared/config.lua' }).Config.fallback
+    check(shipped.enabled == false and shipped.bed == nil and shippedFallback.enabled == false, 'proposed coordinates: the hospital and the roadside desk still ship disabled, and the hospital has no bed')
     _G.TriggerClientEvent = realT
 end
 
