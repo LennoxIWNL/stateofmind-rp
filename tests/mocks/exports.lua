@@ -171,6 +171,7 @@ function core:getMetadata(source, key)
     return player and player.metadata and player.metadata[key] or nil
 end
 function core:setMetadata(source, key, value)
+    Mocks.setMetadataCalls = (Mocks.setMetadataCalls or 0) + 1
     local player = Mocks.players[source]
     if not player then return false end
     player.metadata = player.metadata or {}
@@ -283,6 +284,12 @@ function ox:SetMetadata(inv, slot, metadata)
         if item.slot == slot then item.metadata = metadata end
     end
 end
+function ox:GetSlot(inv, slot) return (Mocks.inv[inv] or {})[slot] end
+function ox:CustomDrop(prefix, items, coords, slots, weight, instance, model)
+    Mocks.drops = Mocks.drops or {}
+    Mocks.drops[#Mocks.drops + 1] = { items = items, coords = coords, model = model }
+    return 'drop'
+end
 function ox:GetCurrentWeapon(inv) return Mocks.weapons[inv] end
 function ox:RegisterStash(id) Mocks.inv[id] = Mocks.inv[id] or {} end
 function ox:GetInventoryItems(inv) return Mocks.inv[inv] end
@@ -296,6 +303,7 @@ function ox:AddItem(inv, name, count, metadata)
 end
 function ox:CanCarryItem(inv, name, count) return not Mocks.invFull[inv] end
 function ox:RemoveItem(inv, name, count, metadata, slot)
+    if Mocks.removeFails then return false end
     local list = Mocks.inv[inv] or {}
     for k, item in pairs(list) do
         if item.name == name and (slot == nil or item.slot == slot) then

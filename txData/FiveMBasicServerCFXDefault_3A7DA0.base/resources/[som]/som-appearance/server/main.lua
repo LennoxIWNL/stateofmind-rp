@@ -147,6 +147,10 @@ lib.callback.register('som-appearance:server:save', function(source, data)
         return { success = false, error = 'invalid request' }
     end
 
+    -- A real appearance is a few KB. The client's table is stored and sent back at
+    -- every login, so an oversized one is refused rather than saved.
+    if #json.encode(data.appearance) > Config.MaxSaveBytes then return { success = false, error = 'invalid request' } end
+
     local scope = type(data.scope) == 'string' and data.scope or 'creator'
     if not Config.Scopes[scope] then return { success = false, error = 'unknown scope' } end
 

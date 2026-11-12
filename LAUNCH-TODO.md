@@ -621,3 +621,11 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Courier now has an hourly cap of 2000 a character in `som-courier/shared/config.lua`, held in memory like trucking and garbage, so a restart resets it.
 - [ ] Every estimate in the sheet that rests on an assumed cycle time (casts, courier runs, taxi fares, animals) needs one measured hour in a game. Trucking route pay and burglary spot counts are unplaced, so those rows are bounds only.
 - [ ] `node tools/economy-map.mjs --check` now also fails when a shop sells an item for less than a buyer, the market (at its ceiling) or a turf sale pays. Keep it in CI.
+## Handler security audit
+
+- [ ] Character creation: starting cash, bank and the welcome gift now go to the first 5 characters a licence ever created (`Config.Characters.fundedLimit`, deleted ones count). A licence that already created more than 5 gets none for new ones. Existing characters are untouched. Not run in a live FXServer.
+- [ ] Character delete is refused while the character has a sentence, community service, a loan, a mortgage, unpaid fines, a property, a shop, or is cuffed or down. Delete still orphans: owned vehicles (`som_vehicles`), gang membership, and any business bank account. Decide whether those should block deletion too. The new query joins `JSON_EXTRACT(metadata, ...)`, checked on the dev MariaDB only.
+- [ ] Thrown items now take their drop prop from `Config.dropModels` in `som-inventory/server/main.lua`, which mirrors the item props in ox_inventory `data/items.lua`. Add an entry there when an item gets a `client.prop` model you want on the ground. Everything else drops as a paper bag.
+- [ ] Rate limits added (wardrobe 400 ms, hands up 300 ms, MDT incident delete 2 s per player) and a 20000 byte cap on a saved appearance. A real appearance is far smaller; raise `Config.MaxSaveBytes` if a legitimate save is refused.
+- [ ] Left as design, say if you want them changed: any player can search or escort a cuffed player (hostage and robbery RP), and any nearby player can uncuff.
+- [ ] Third party risk: `som-compat` `AddMoney` credits with no debit for ps-mdt and r14-evidence, and ps-mdt registers `mdt:server:deleteIncidents` and `qb-communityservice:server:StartCommunityService` as net events. Review those resources before adding any other script that calls the qb shim.

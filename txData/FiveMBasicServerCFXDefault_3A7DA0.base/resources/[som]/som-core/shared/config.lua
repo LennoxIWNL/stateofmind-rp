@@ -16,6 +16,10 @@ Config.Characters = {
     maxSlots = 5,
     startingCash = 500,
     startingBank = 5000,
+    -- Starting funds and the welcome gift go to this many characters per licence,
+    -- counting deleted ones. Without it, creating and deleting characters is a
+    -- money tap.
+    fundedLimit = 5,
     -- Given once, on character creation only. Enough to not be stranded:
     -- a phone, ID, and basic food and water.
     --

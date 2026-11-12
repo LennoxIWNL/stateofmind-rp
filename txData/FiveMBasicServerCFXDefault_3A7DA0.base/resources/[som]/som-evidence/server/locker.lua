@@ -60,7 +60,12 @@ lib.callback.register('som-evidence:server:store', function(source, stationKey, 
     ]], { stationKey, id, officer.citizenid })
     if won ~= 1 then return fail('that evidence is not yours to lock up') end
 
-    ox:RemoveItem(source, Config.Items.filledBag, 1, nil, slot)
+    if not ox:RemoveItem(source, Config.Items.filledBag, 1, nil, slot) then
+        MySQL.update.await(
+            "UPDATE som_evidence SET status = 'collected', holder_cid = ?, station = NULL WHERE id = ? AND status = 'stored' AND station = ?",
+            { officer.citizenid, id, stationKey })
+        return fail('the bag is no longer in your pack')
+    end
     Evidence.Custody(id, officer.citizenid, 'stored', stationKey)
     return { success = true }
 end)

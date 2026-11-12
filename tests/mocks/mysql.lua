@@ -444,6 +444,48 @@ local function boost(kind, query, params)
     return false
 end
 
+local function charrows(kind, query, params)
+    local C = M.db.charrows
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    if kind == 'scalar' then
+        if has("FROM som_jail_sentences WHERE citizenid = ? AND status IN ('serving','absconded')") and has('SELECT CASE') then
+            return true, C.blocked
+        elseif has('SELECT COUNT(*) FROM som_characters WHERE license = ?') then
+            local n = 0
+            for _, r in ipairs(C.rows) do if r.license == params[1] then n = n + 1 end end
+            return true, n
+        elseif has('SELECT 1 FROM som_characters WHERE license = ? AND slot = ? AND deleted = 0') then
+            for _, r in ipairs(C.rows) do if r.license == params[1] and r.slot == params[2] and not r.deleted then return true, 1 end end
+            return true, nil
+        elseif has('SELECT 1 FROM som_characters WHERE citizenid = ? AND license = ?') then
+            for _, r in ipairs(C.rows) do if r.citizenid == params[1] and r.license == params[2] then return true, 1 end end
+            return true, nil
+        elseif has('SELECT 1 FROM som_characters WHERE citizenid = ?') then
+            for _, r in ipairs(C.rows) do if r.citizenid == params[1] then return true, 1 end end
+            return true, nil
+        end
+    elseif kind == 'single' and has('SELECT * FROM som_characters WHERE citizenid = ? AND license = ? AND deleted = 0') then
+        if M.afterCharRead then local hook = M.afterCharRead; M.afterCharRead = nil; hook() end
+        return true, nil
+    elseif kind == 'insert' then
+        if has('INSERT INTO som_users') then return true, 1 end
+        if has('INSERT INTO som_characters') then
+            C.rows[#C.rows + 1] = { citizenid = params[1], license = params[2], slot = params[3], welcomed = params[10]:find('welcomed=true', 1, true) ~= nil }
+            return true, #C.rows
+        elseif has('INSERT INTO som_character_money') then
+            C.money[params[1]] = { cash = params[2], bank = params[3] }
+            return true, 1
+        elseif has('INSERT INTO som_transactions') then
+            C.ledger[#C.ledger + 1] = params[1]
+            return true, 1
+        end
+    elseif kind == 'update' and has('UPDATE som_characters SET deleted = 1, slot = NULL WHERE citizenid = ?') then
+        for _, r in ipairs(C.rows) do if r.citizenid == params[1] then r.deleted, r.slot = true, nil; return true, 1 end end
+        return true, 0
+    end
+    return false
+end
+
 local function market(kind, query, params)
     local K = M.db.market
     local function has(text) return query:find(text, 1, true) ~= nil end
@@ -2334,6 +2376,7 @@ function M.single(query, params)
     do local handled, value = social('single', query, params); if handled then return value end end
     do local handled, value = city('single', query, params); if handled then return value end end
     do local handled, value = boost('single', query, params); if handled then return value end end
+    do local handled, value = charrows('single', query, params); if handled then return value end end
     do local handled, value = burglary('single', query, params); if handled then return value end end
     do local handled, value = racing('single', query, params); if handled then return value end end
     do local handled, value = heist('single', query, params); if handled then return value end end
@@ -2430,6 +2473,7 @@ function M.scalar(query, params)
     do local handled, value = sharedAccounts('scalar', query, params); if handled then return value end end
     do local handled, value = social('scalar', query, params); if handled then return value end end
     do local handled, value = city('scalar', query, params); if handled then return value end end
+    do local handled, value = charrows('scalar', query, params); if handled then return value end end
     do local handled, value = burglary('scalar', query, params); if handled then return value end end
     do local handled, value = heist('scalar', query, params); if handled then return value end end
     do local handled, value = turf('scalar', query, params); if handled then return value end end
@@ -2502,11 +2546,13 @@ function M.scalar(query, params)
         end
         return nil
     end
-    if query:find('FROM som_launder_orders WHERE citizenid = ?', 1, true) then
+    if query:find('FROM som_launder_orders WHERE citizenid = ?', 1, true) and not query:find('INSERT', 1, true) then
         local sum = 0
         for _, o in ipairs(M.db.orders) do
             if o.citizenid == params[1] and o.status ~= 'cancelled' and o.created_at > now() - 86400 then sum = sum + o.face end
         end
+        -- Lets a test run another deposit between this read and the insert, as a second call in flight would.
+        if M.afterDayRead then local hook = M.afterDayRead; M.afterDayRead = nil; hook() end
         return sum
     end
     if query:find('FROM som_launder_orders WHERE status <> ', 1, true) then
@@ -2557,6 +2603,7 @@ function M.update(query, params)
     do local handled, value = city('update', query, params); if handled then return value end end
     do local handled, value = boost('update', query, params); if handled then return value end end
     do local handled, value = market('update', query, params); if handled then return value end end
+    do local handled, value = charrows('update', query, params); if handled then return value end end
     do local handled, value = burglary('update', query, params); if handled then return value end end
     do local handled, value = racing('update', query, params); if handled then return value end end
     do local handled, value = heist('update', query, params); if handled then return value end end
@@ -2923,6 +2970,7 @@ function M.insert(query, params)
     do local handled, value = city('insert', query, params); if handled then return value end end
     do local handled, value = boost('insert', query, params); if handled then return value end end
     do local handled, value = market('insert', query, params); if handled then return value end end
+    do local handled, value = charrows('insert', query, params); if handled then return value end end
     do local handled, value = burglary('insert', query, params); if handled then return value end end
     do local handled, value = racing('insert', query, params); if handled then return value end end
     do local handled, value = heist('insert', query, params); if handled then return value end end
@@ -3050,6 +3098,14 @@ function M.insert(query, params)
         return 1
     end
     if query:find('INSERT INTO som_launder_orders', 1, true) then
+        if query:find('WHERE (SELECT COALESCE(SUM(face), 0) FROM som_launder_orders', 1, true) then
+            local day, hour = 0, 0
+            for _, o in ipairs(M.db.orders) do
+                if o.status ~= 'cancelled' and o.citizenid == params[6] and o.created_at > now() - 86400 then day = day + o.face end
+                if o.status ~= 'cancelled' and o.created_at > now() - 3600 then hour = hour + o.face end
+            end
+            if day + params[7] > params[8] or hour >= params[9] then return 0 end
+        end
         local id = M.db.nextId.orders
         M.db.nextId.orders = id + 1
         M.db.orders[#M.db.orders + 1] = {

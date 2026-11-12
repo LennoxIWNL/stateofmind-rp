@@ -26,6 +26,16 @@ local Config = {
     -- One throw per this many ms, per player. Without it the charge bar is a
     -- suggestion and the event is a firehose.
     throwCooldown = 900,
+    -- The prop a thrown item lands as, chosen here from the item. The client's
+    -- own value is never used: the drop is announced to every player. Mirrors the
+    -- item props in ox_inventory's data/items.lua, which the server cannot read.
+    dropModel = joaat('prop_paper_bag_01'),
+    dropModels = {
+        bandage = joaat('prop_rolled_sock_02'),
+        sprunk = joaat('prop_ld_can_01'), cola = joaat('prop_ld_can_01'),
+        burgershot_colab = joaat('prop_ld_can_01'), burgershot_colas = joaat('prop_ld_can_01'), burgershot_coffee = joaat('prop_ld_can_01'),
+        panties = joaat('prop_cs_panties_02'), mustard = joaat('prop_food_mustard'), water = joaat('prop_ld_flow_bottle'),
+    },
 }
 
 local lastThrow = {}
@@ -117,15 +127,9 @@ RegisterNetEvent('som-inventory:server:throw', function(data)
 
     lastThrow[src] = now
 
-    -- The MODEL is cosmetic and comes from the client, because ox_inventory
-    -- strips `client` from the server copy of an item so the prop genuinely is
-    -- not readable here. It is passed to CustomDrop as a model and used for
-    -- nothing else, so a forged value makes an oddly shaped bag and no more.
-    local model = tonumber(data.model)
-
     ox:CustomDrop('Thrown', {
         { name = item.name, count = 1, metadata = item.metadata },
-    }, landing, nil, nil, nil, model)
+    }, landing, nil, nil, nil, Config.dropModels[item.name] or Config.dropModel)
 end)
 
 -- ---------------------------------------------------------------------------

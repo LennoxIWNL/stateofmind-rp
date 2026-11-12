@@ -147,9 +147,18 @@ local function wearOne(appearance, kind, id)
     return true
 end
 
+local lastWardrobe = {}
+
+AddEventHandler('playerDropped', function() lastWardrobe[source] = nil end)
+
 RegisterNetEvent('som-appearance:server:wardrobe', function(data)
     local src = source
     if type(data) ~= 'table' then return end
+
+    -- Each change is a database write, so it is spaced out per player.
+    local now = GetGameTimer()
+    if lastWardrobe[src] and now - lastWardrobe[src] < 200 then return end
+    lastWardrobe[src] = now
 
     local action = data.action
     if action ~= 'remove' and action ~= 'wear' and action ~= 'removeAll' and action ~= 'wearAll' then

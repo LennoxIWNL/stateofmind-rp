@@ -176,9 +176,16 @@ function Characters.Create(source, data)
     local backstory, storyErr = Characters.ValidateBackstory(data.backstory)
     if not backstory then return false, storyErr end
 
+    -- Deleted characters still count, so deleting and recreating cannot reset it.
+    -- shortcut: counted before the insert, so creates in two slots at once can both pass, bounded by the slot count.
+    local funded = (MySQL.scalar.await('SELECT COUNT(*) FROM som_characters WHERE license = ?', { license }) or 0)
+        < Config.Characters.fundedLimit
+
     local metadata = {}
     for k, v in pairs(Config.DefaultMetadata) do metadata[k] = v end
     metadata.backstory = backstory
+    -- An unfunded character never gets the welcome gift either.
+    if not funded then metadata.welcomed = true end
 
     local citizenid = generateCitizenId()
     local phone = ('%03d-%04d'):format(math.random(100, 999), math.random(1000, 9999))
@@ -197,24 +204,31 @@ function Characters.Create(source, data)
         json.encode(metadata),
     })
 
+    local cash = funded and Config.Characters.startingCash or 0
+    local bank = funded and Config.Characters.startingBank or 0
+
     -- Starting funds are a faucet and are ledgered like any other, so the very
     -- first money a character owns is already auditable.
     MySQL.insert.await(
         'INSERT INTO som_character_money (citizenid, cash, bank) VALUES (?, ?, ?)',
-        { citizenid, Config.Characters.startingCash, Config.Characters.startingBank }
+        { citizenid, cash, bank }
     )
+    if not funded then return true, citizenid end
+
     MySQL.insert.await([[
         INSERT INTO som_transactions
             (citizenid, account, amount, balance, direction, flow, reason, resource)
         VALUES (?, 'cash', ?, ?, 'credit', 'faucet', 'character-creation', 'som-core'),
                (?, 'bank', ?, ?, 'credit', 'faucet', 'character-creation', 'som-core')
     ]], {
-        citizenid, Config.Characters.startingCash, Config.Characters.startingCash,
-        citizenid, Config.Characters.startingBank, Config.Characters.startingBank,
+        citizenid, cash, cash,
+        citizenid, bank, bank,
     })
 
     return true, citizenid
 end
+
+local selecting = {}
 
 ---Loads a character and makes it the player's active one.
 ---@param source number
@@ -223,6 +237,18 @@ end
 function Characters.Select(source, citizenid)
     if type(citizenid) ~= 'string' then return false, 'invalid character' end
 
+    -- One character per connection. A second one would replace the first in the
+    -- player table and leave it loaded with nobody to save it.
+    if Players.Get(source) or selecting[source] then return false, 'a character is already loaded' end
+
+    selecting[source] = true
+    local ran, ok, err = pcall(Characters.SelectLoad, source, citizenid)
+    selecting[source] = nil
+    if not ran then error(ok, 0) end
+    return ok, err
+end
+
+function Characters.SelectLoad(source, citizenid)
     local license = getLicense(source)
     if not license then return false, 'could not identify player' end
 
@@ -365,6 +391,23 @@ function Characters.Delete(source, citizenid)
 
     local active = Players.GetByCitizenId(citizenid)
     if active then return false, 'character is currently loaded' end
+
+    -- A character is not a way out of a sentence, a debt or a custody state.
+    local blocked = MySQL.scalar.await([[
+        SELECT CASE
+            WHEN EXISTS (SELECT 1 FROM som_jail_sentences WHERE citizenid = ? AND status IN ('serving','absconded')) THEN 'is serving a sentence'
+            WHEN EXISTS (SELECT 1 FROM som_community_service WHERE citizenid = ? AND status IN ('active','absconded')) THEN 'owes community service'
+            WHEN EXISTS (SELECT 1 FROM som_loans WHERE citizenid = ? AND status IN ('active','defaulted')) THEN 'has a loan to repay'
+            WHEN EXISTS (SELECT 1 FROM som_property_finance WHERE citizenid = ? AND status = 'active') THEN 'has a mortgage to repay'
+            WHEN EXISTS (SELECT 1 FROM som_fines WHERE citizenid = ? AND status = 'unpaid') THEN 'has unpaid fines'
+            WHEN EXISTS (SELECT 1 FROM som_property_owners WHERE citizenid = ? AND role IN ('owner','tenant')) THEN 'holds a property'
+            WHEN EXISTS (SELECT 1 FROM som_shops WHERE owner = ?) THEN 'owns a shop'
+            WHEN EXISTS (SELECT 1 FROM som_characters WHERE citizenid = ?
+                AND (JSON_EXTRACT(metadata, '$.cuffed') = 'true' OR JSON_EXTRACT(metadata, '$.isdead') = 'true' OR JSON_EXTRACT(metadata, '$.inlaststand') = 'true'))
+                THEN 'is restrained or downed'
+        END
+    ]], { citizenid, citizenid, citizenid, citizenid, citizenid, citizenid, citizenid, citizenid })
+    if blocked then return false, ('this character %s, sort that out before deleting it'):format(blocked) end
 
     -- Clearing slot frees it for reuse. The row itself survives so the
     -- transaction ledger keeps referential integrity.
