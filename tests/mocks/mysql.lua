@@ -922,6 +922,11 @@ local function placements(kind, query, params)
         local out = {}
         for _, r in ipairs(P) do out[#out + 1] = { resource = r.resource, path = r.path, kind = r.kind, value = r.value } end
         return true, out
+    elseif kind == 'update' and has('DELETE FROM som_placements WHERE resource = ? AND path = ? ORDER BY id DESC LIMIT 1') then
+        for i = #P, 1, -1 do
+            if P[i].resource == params[1] and P[i].path == params[2] then table.remove(P, i) return true, 1 end
+        end
+        return true, 0
     elseif kind == 'update' and has('DELETE FROM som_placements WHERE resource = ? AND path = ?') then
         local n, keep = 0, {}
         for _, r in ipairs(P) do if r.resource == params[1] and r.path == params[2] then n = n + 1 else keep[#keep + 1] = r end end

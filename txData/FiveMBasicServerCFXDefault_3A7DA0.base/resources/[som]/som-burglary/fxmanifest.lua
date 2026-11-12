@@ -22,6 +22,7 @@ server_scripts {
     '@oxmysql/lib/MySQL.lua',
     '@som-core/server/placements.lua',
     'server/main.lua',
+    'server/survey.lua',
 }
 
 dependencies {

@@ -313,5 +313,16 @@ Same rules as before: nothing here has run with a client. Extra commands used, a
 - Steps: `/somhealth` after a full restart; read the console for `som-duty`, `som-taxi`, `som-shops`, `som-anpr`, `som-trucking`, `som-fuel` and `som-garbage`.
 - Expect: no FAIL lines. `som_shops`, `som_shop_stock`, `som_shop_staff` and `som_police_plates` present. `fuelco`, `sanitation` and `downtowncab` exist in `som_businesses`. `wk_wars2x` started before `som-anpr`. Repeat flows 59 to 67 once after a restart to prove nothing was only in memory.
 
+**Burglary spots: measure the shells, then play one** (staff first, then a crew; not yet run with a client)
+- Needs: an admin (`som.admin`), a second tester for the crew part, police on duty for the crew part, a lockpick, and the server game hour between 22 and 5 (or `Config.night.enabled = false`).
+- Steps:
+  1. As a non admin run `/burglarysurvey house_1`: it must refuse.
+  2. As the admin run `/burglarysurvey house_1`. The screen fades and you are inside the Frank Aunt shell. Run `/burglaryspot` with no text (refused), then walk to a drawer and run `/burglaryspot Kitchen drawers`. Add four or five more (wardrobe, bedroom drawers, safe). `/burglaryspots` lists them, `/burglaryspotundo` removes the last one.
+  3. Use the Leave prompt at the door point. You must land where you were. Repeat with `/burglarysurvey house_2` for the Michael shell.
+  4. stand at the door and `/place som-burglary houses.house_1.coords` (this switches the house on; to keep the proposed door run `/place som-burglary houses.house_1.enabled true` instead), then `restart som-burglary`, then check `/burglarysurvey house_1` then `/burglaryspots` still lists every spot.
+  5. As a crew of one at night, queue "House burglary" in the Jobs app, pick the lock at the marked door, go in, search every spot, leave.
+- Expect: each saved spot shows a "Search" prompt at the place you stood, reachable and not inside furniture; the job finishes when every spot is looted; the staff survey created no job and paid nothing.
+- Check: `som_placements` has one `som-burglary` row per spot with the path `shells.<model>.spots+`; `som_staff_audit` has a `burglaryspot` row for each; `som_burglary_runs` has no row from the survey step.
+
 ## After the session
 Fix in small branches, one logical fix each, merge as a batch (see CLAUDE.md). Add every bug's regression test to `tests/run.lua` before closing it, and tick or add lines in `LAUNCH-TODO.md`.
