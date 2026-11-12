@@ -2158,3 +2158,83 @@ CREATE TABLE IF NOT EXISTS `som_burglary_loot` (
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`run_id`, `spot`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
+--  7s. STREET RACING (som-racing)
+--
+--  Dongles are ledger rows: the item carries the uid and the row decides if it
+--  works (status, tier, and the first character to use it owns it). Buy-ins are
+--  escrow rows: an entry goes pending -> held (debited) -> owed (settled) ->
+--  paid, one conditional UPDATE per hop. A pending row at startup is voided, it
+--  was never debited for sure. Track points are a JSON array of {x,y,z}.
+--  No foreign keys.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_race_dongles` (
+  `uid`        CHAR(16) NOT NULL,
+  `tier`       ENUM('creator','racer') NOT NULL,
+  `status`     ENUM('issued','void') NOT NULL DEFAULT 'issued',
+  `holder_cid` VARCHAR(50) NULL DEFAULT NULL,
+  `source_tag` VARCHAR(32) NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`uid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_race_aliases` (
+  `citizenid` VARCHAR(50) NOT NULL,
+  `alias`     VARCHAR(16) NOT NULL,
+  PRIMARY KEY (`citizenid`),
+  UNIQUE KEY `uniq_alias` (`alias`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_race_tracks` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name`        VARCHAR(32) NOT NULL,
+  `creator_cid` VARCHAR(50) NOT NULL,
+  `points`      LONGTEXT NOT NULL,
+  `length_m`    INT UNSIGNED NOT NULL,
+  `active`      TINYINT(1) NOT NULL DEFAULT 1,
+  `created_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_name` (`name`),
+  KEY `idx_creator` (`creator_cid`, `active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_races` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `track_id`   BIGINT UNSIGNED NOT NULL,
+  `host_cid`   VARCHAR(50) NOT NULL,
+  `laps`       TINYINT UNSIGNED NOT NULL,
+  `stake`      BIGINT NOT NULL DEFAULT 0,
+  `status`     ENUM('open','running','done','cancelled') NOT NULL DEFAULT 'open',
+  `join_until` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `started_at` TIMESTAMP NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_host` (`host_cid`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_race_entries` (
+  `id`        BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `race_id`   BIGINT UNSIGNED NOT NULL,
+  `citizenid` VARCHAR(50) NOT NULL,
+  `alias`     VARCHAR(16) NOT NULL,
+  `stake`     BIGINT NOT NULL DEFAULT 0,
+  `state`     ENUM('pending','held','owed','paid','void') NOT NULL DEFAULT 'pending',
+  `owed`      BIGINT NOT NULL DEFAULT 0,
+  `position`  TINYINT UNSIGNED NULL DEFAULT NULL,
+  `total_ms`  INT UNSIGNED NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_entry` (`race_id`, `citizenid`),
+  KEY `idx_owner` (`citizenid`, `state`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_race_times` (
+  `track_id`  BIGINT UNSIGNED NOT NULL,
+  `citizenid` VARCHAR(50) NOT NULL,
+  `alias`     VARCHAR(16) NOT NULL,
+  `best_ms`   INT UNSIGNED NOT NULL,
+  PRIMARY KEY (`track_id`, `citizenid`),
+  KEY `idx_board` (`track_id`, `best_ms`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

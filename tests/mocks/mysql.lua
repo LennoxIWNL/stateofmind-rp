@@ -501,6 +501,194 @@ local function burglary(kind, query, params)
     return false
 end
 
+local function racing(kind, query, params)
+    local D = M.db.racing
+    local function has(text) return query:find(text, 1, true) ~= nil end
+    local function each(fn) for _, e in ipairs(D.entries) do fn(e) end end
+    local function raceOf(id) return D.races[id] end
+    local function setEntries(match, change)
+        local n = 0
+        each(function(e) if match(e) then change(e); n = n + 1 end end)
+        return true, n
+    end
+    local function race(from, to, id)
+        local r = id and raceOf(id)
+        if r and from[r.status] then r.status = to; return true, 1 end
+        return true, 0
+    end
+    if kind == 'insert' then
+        if has('INSERT INTO som_race_dongles') then
+            D.dongles[params[1]] = { uid = params[1], tier = params[2], status = 'issued', source_tag = params[3] }
+            return true, 1
+        end
+        if has('INSERT IGNORE INTO som_race_tracks') then
+            for _, t in ipairs(D.tracks) do if t.name:lower() == params[1]:lower() then return true, 0 end end
+            local id = #D.tracks + 1
+            D.tracks[id] = { id = id, name = params[1], creator_cid = params[2], points = params[3], length_m = params[4], active = 1 }
+            return true, id
+        end
+        if has('INSERT INTO som_races (track_id') then
+            local cid, max = params[2], params[7]
+            local open = 0
+            for _, r in ipairs(D.races) do
+                if r.host_cid == cid and (r.status == 'open' or r.status == 'running') then return true, 0 end
+                if r.status == 'open' then open = open + 1 end
+            end
+            if open >= max then return true, 0 end
+            local id = #D.races + 1
+            D.races[id] = { id = id, track_id = params[1], host_cid = cid, laps = params[3], stake = params[4], status = 'open', join_until = now() + params[5] }
+            return true, id
+        end
+        if has('INSERT IGNORE INTO som_race_entries') then
+            local cid, alias, raceId, max = params[1], params[2], params[3], params[4]
+            local r = raceOf(raceId)
+            if not r or r.status ~= 'open' or r.join_until <= now() then return true, 0 end
+            local taken = 0
+            for _, e in ipairs(D.entries) do
+                if e.race_id == raceId and (e.state == 'pending' or e.state == 'held') then taken = taken + 1 end
+                if e.citizenid == cid and (e.state == 'pending' or e.state == 'held') then
+                    local other = raceOf(e.race_id)
+                    if other.status == 'open' or other.status == 'running' then return true, 0 end
+                end
+                if e.race_id == raceId and e.citizenid == cid then return true, 0 end
+            end
+            if taken >= max then return true, 0 end
+            local id = #D.entries + 1
+            D.entries[id] = { id = id, race_id = raceId, citizenid = cid, alias = alias, stake = r.stake, state = 'pending', owed = 0 }
+            return true, id
+        end
+        if has('INSERT INTO som_race_times') then
+            local key = params[1] .. ':' .. params[2]
+            local t = D.times[key]
+            if t then t.best_ms, t.alias = math.min(t.best_ms, params[4]), params[3]
+            else D.times[key] = { track_id = params[1], citizenid = params[2], alias = params[3], best_ms = params[4] } end
+            return true, 0
+        end
+    elseif kind == 'single' then
+        if has('SELECT tier, status, holder_cid FROM som_race_dongles WHERE uid = ?') then return true, D.dongles[params[1]] end
+        if has('SELECT creator_cid FROM som_race_tracks WHERE id = ? AND active = 1')
+            or has('SELECT id, name, points FROM som_race_tracks WHERE id = ? AND active = 1')
+            or has('SELECT id, name, creator_cid FROM som_race_tracks WHERE id = ? AND active = 1') then
+            local t = D.tracks[params[1]]
+            return true, (t and t.active == 1) and t or nil
+        end
+        if has('SELECT owed FROM som_race_entries WHERE id = ?') then return true, D.entries[params[1]] end
+    elseif kind == 'scalar' then
+        if has('SELECT alias FROM som_race_aliases WHERE citizenid = ?') then return true, D.aliases[params[1]] end
+        if has('SELECT COUNT(*) FROM som_race_tracks WHERE creator_cid = ? AND active = 1') then
+            local n = 0
+            for _, t in ipairs(D.tracks) do if t.creator_cid == params[1] and t.active == 1 then n = n + 1 end end
+            return true, n
+        end
+        if has('SELECT 1 FROM som_race_tracks WHERE id = ? AND active = 1') then
+            local t = D.tracks[params[1]]
+            return true, (t and t.active == 1) and 1 or nil
+        end
+        if has("SELECT COALESCE(SUM(stake), 0) FROM som_race_entries WHERE race_id = ? AND state = 'held'") then
+            local sum = 0
+            each(function(e) if e.race_id == params[1] and e.state == 'held' then sum = sum + e.stake end end)
+            return true, sum
+        end
+        if has("SELECT COALESCE(SUM(owed), 0) FROM som_race_entries WHERE citizenid = ? AND state = 'owed'") then
+            local sum = 0
+            each(function(e) if e.citizenid == params[1] and e.state == 'owed' then sum = sum + e.owed end end)
+            return true, sum
+        end
+        if has("SELECT 1 FROM som_races WHERE id = ? AND status = 'open' AND join_until <= NOW()") then
+            local r = raceOf(params[1])
+            return true, (r and r.status == 'open' and r.join_until <= now()) and 1 or nil
+        end
+    elseif kind == 'query' then
+        if has("SELECT id, owed FROM som_race_entries WHERE citizenid = ? AND state = 'owed'") then
+            local out = {}
+            each(function(e) if e.citizenid == params[1] and e.state == 'owed' then out[#out + 1] = { id = e.id, owed = e.owed } end end)
+            return true, out
+        end
+        if has("SELECT id, citizenid, owed FROM som_race_entries WHERE race_id = ? AND state = 'owed'") then
+            local out = {}
+            each(function(e) if e.race_id == params[1] and e.state == 'owed' then out[#out + 1] = { id = e.id, citizenid = e.citizenid, owed = e.owed } end end)
+            return true, out
+        end
+        if has('SELECT alias, best_ms FROM som_race_times WHERE track_id = ? ORDER BY best_ms ASC LIMIT ?') then
+            local out = {}
+            for _, t in pairs(D.times) do if t.track_id == params[1] then out[#out + 1] = t end end
+            table.sort(out, function(a, b) return a.best_ms < b.best_ms end)
+            while #out > params[2] do out[#out] = nil end
+            return true, out
+        end
+        if has('SELECT id, name, length_m FROM som_race_tracks WHERE active = 1 ORDER BY name') then
+            local out = {}
+            for _, t in ipairs(D.tracks) do if t.active == 1 then out[#out + 1] = t end end
+            return true, out
+        end
+    elseif kind == 'update' then
+        if has('INSERT IGNORE INTO som_race_aliases') then
+            for cid, alias in pairs(D.aliases) do
+                if cid == params[1] or alias:lower() == params[2]:lower() then return true, 0 end
+            end
+            D.aliases[params[1]] = params[2]
+            return true, 1
+        end
+        if has('UPDATE som_race_dongles SET holder_cid = ? WHERE uid = ? AND holder_cid IS NULL') then
+            local d = D.dongles[params[2]]
+            if d and not d.holder_cid then d.holder_cid = params[1]; return true, 1 end
+            return true, 0
+        end
+        if has("UPDATE som_race_dongles SET status = 'void' WHERE uid = ? AND status = 'issued'") then
+            local d = D.dongles[params[1]]
+            if d and d.status == 'issued' then d.status = 'void'; return true, 1 end
+            return true, 0
+        end
+        if has('UPDATE som_race_tracks SET active = 0 WHERE id = ?') then
+            if D.tracks[params[1]] then D.tracks[params[1]].active = 0 end
+            return true, 1
+        end
+        if has("UPDATE som_races SET status = 'cancelled' WHERE id = ? AND status IN ('open', 'running')") then return race({ open = true, running = true }, 'cancelled', params[1]) end
+        if has("UPDATE som_races SET status = 'cancelled' WHERE id = ? AND status = 'open'") then return race({ open = true }, 'cancelled', params[1]) end
+        if has("UPDATE som_races SET status = 'done' WHERE id = ? AND status = 'running'") then return race({ running = true }, 'done', params[1]) end
+        if has("UPDATE som_races SET status = 'running', started_at = NOW() WHERE id = ? AND status = 'open'") then return race({ open = true }, 'running', params[1]) end
+        if has("UPDATE som_races SET status = 'cancelled' WHERE status IN ('open', 'running')") then
+            for _, r in ipairs(D.races) do if r.status == 'open' or r.status == 'running' then r.status = 'cancelled' end end
+            return true, 1
+        end
+        if has("UPDATE som_race_entries SET state = 'paid' WHERE id = ? AND state = 'owed'") then
+            return setEntries(function(e) return e.id == params[1] and e.state == 'owed' end, function(e) e.state = 'paid' end)
+        end
+        if has("UPDATE som_race_entries SET state = 'owed' WHERE id = ? AND state = 'paid'") then
+            return setEntries(function(e) return e.id == params[1] and e.state == 'paid' end, function(e) e.state = 'owed' end)
+        end
+        if has("UPDATE som_race_entries SET state = 'owed', owed = stake WHERE race_id = ? AND state = 'held'") then
+            return setEntries(function(e) return e.race_id == params[1] and e.state == 'held' end, function(e) e.state, e.owed = 'owed', e.stake end)
+        end
+        if has("UPDATE som_race_entries SET state = 'owed', owed = stake WHERE id = ? AND state = 'held'") then
+            return setEntries(function(e) return e.id == params[1] and e.state == 'held' end, function(e) e.state, e.owed = 'owed', e.stake end)
+        end
+        if has("UPDATE som_race_entries SET state = 'owed', owed = stake WHERE state = 'held' AND race_id IN (SELECT id FROM som_races WHERE status IN ('open', 'running'))") then
+            return setEntries(function(e)
+                local r = raceOf(e.race_id)
+                return e.state == 'held' and (r.status == 'open' or r.status == 'running')
+            end, function(e) e.state, e.owed = 'owed', e.stake end)
+        end
+        if has("UPDATE som_race_entries SET state = 'owed', owed = ?, position = ?, total_ms = ? WHERE id = ? AND state = 'held'") then
+            return setEntries(function(e) return e.id == params[4] and e.state == 'held' end,
+                function(e) e.state, e.owed, e.position, e.total_ms = 'owed', params[1], params[2], params[3] end)
+        end
+        if has("UPDATE som_race_entries SET state = 'paid', owed = 0 WHERE race_id = ? AND state = 'held'") then
+            return setEntries(function(e) return e.race_id == params[1] and e.state == 'held' end, function(e) e.state, e.owed = 'paid', 0 end)
+        end
+        if has("UPDATE som_race_entries SET state = 'held' WHERE id = ? AND state = 'pending'") then
+            return setEntries(function(e) return e.id == params[1] and e.state == 'pending' end, function(e) e.state = 'held' end)
+        end
+        if has("DELETE FROM som_race_entries WHERE id = ? AND state = 'pending'") then
+            return setEntries(function(e) return e.id == params[1] and e.state == 'pending' end, function(e) e.state = 'deleted' end)
+        end
+        if has("UPDATE som_race_entries SET state = 'void' WHERE state = 'pending'") then
+            return setEntries(function(e) return e.state == 'pending' end, function(e) e.state = 'void' end)
+        end
+    end
+    return false
+end
+
 local function heist(kind, query, params)
     local H = M.db.heist
     local function has(text) return query:find(text, 1, true) ~= nil end
@@ -2147,6 +2335,7 @@ function M.single(query, params)
     do local handled, value = city('single', query, params); if handled then return value end end
     do local handled, value = boost('single', query, params); if handled then return value end end
     do local handled, value = burglary('single', query, params); if handled then return value end end
+    do local handled, value = racing('single', query, params); if handled then return value end end
     do local handled, value = heist('single', query, params); if handled then return value end end
     do local handled, value = turf('single', query, params); if handled then return value end end
     do local handled, value = trade('single', query, params); if handled then return value end end
@@ -2223,6 +2412,7 @@ end
 
 function M.scalar(query, params)
     do local handled, value = boost('scalar', query, params); if handled then return value end end
+    do local handled, value = racing('scalar', query, params); if handled then return value end end
     params = params or {}
     do local handled, value = insDb('scalar', query, params); if handled then return value end end
     do local handled, value = newsDb('scalar', query, params); if handled then return value end end
@@ -2368,6 +2558,7 @@ function M.update(query, params)
     do local handled, value = boost('update', query, params); if handled then return value end end
     do local handled, value = market('update', query, params); if handled then return value end end
     do local handled, value = burglary('update', query, params); if handled then return value end end
+    do local handled, value = racing('update', query, params); if handled then return value end end
     do local handled, value = heist('update', query, params); if handled then return value end end
     do local handled, value = buyer('update', query, params); if handled then return value end end
     do local handled, value = turf('update', query, params); if handled then return value end end
@@ -2733,6 +2924,7 @@ function M.insert(query, params)
     do local handled, value = boost('insert', query, params); if handled then return value end end
     do local handled, value = market('insert', query, params); if handled then return value end end
     do local handled, value = burglary('insert', query, params); if handled then return value end end
+    do local handled, value = racing('insert', query, params); if handled then return value end end
     do local handled, value = heist('insert', query, params); if handled then return value end end
     do local handled, value = turf('insert', query, params); if handled then return value end end
     do local handled, value = bans('insert', query, params); if handled then return value end end
@@ -2901,6 +3093,7 @@ end
 
 function M.query(query, params)
     do local handled, value = courtService('query', query, params); if handled then return value end end
+    do local handled, value = racing('query', query, params); if handled then return value end end
     if query:find('FROM som_businesses b', 1, true) then return M.db.businessRows or {} end
     params = params or {}
     do local handled, value = insDb('query', query, params); if handled then return value end end

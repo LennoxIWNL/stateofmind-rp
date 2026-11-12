@@ -1432,6 +1432,15 @@ return {
 		},
 	},
 
+	['racing_dongle'] = {
+		label = 'Racing Dongle',
+		weight = 0,
+		description = 'Unlocks the street racing app on a phone',
+		client = {
+			image = 'usb_device.png'
+		},
+	},
+
 	['screwdriverset'] = {
 		label = 'Toolkit',
 		weight = 1000,
