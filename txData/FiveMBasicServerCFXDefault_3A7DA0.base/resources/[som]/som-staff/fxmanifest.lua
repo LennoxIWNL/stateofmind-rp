@@ -24,6 +24,7 @@ server_scripts {
     '@som-core/server/placements.lua',
     'server/whitelist.lua',
     'server/staff.lua',
+    'server/combatlog.lua',
     'server/placements.lua',
     'server/health.lua',
 }

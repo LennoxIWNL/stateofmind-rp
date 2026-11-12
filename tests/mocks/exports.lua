@@ -111,6 +111,12 @@ function core:transferToCitizen(from, toCitizenId, account, amount, reason)
     Mocks.credited[toCitizenId] = (Mocks.credited[toCitizenId] or 0) + amount
     return true
 end
+function core:creditCitizen(citizenid, account, amount, reason)
+    if Mocks.creditFails or type(reason) ~= 'string' then return false, 'refused' end
+    Mocks.credited = Mocks.credited or {}
+    Mocks.credited[citizenid] = (Mocks.credited[citizenid] or 0) + amount
+    return true
+end
 function core:removeMoney(source, account, amount, reason)
     if (Mocks.bank[source] or 0) < amount then return false, 'insufficient funds' end
     Mocks.bank[source] = Mocks.bank[source] - amount
@@ -187,6 +193,16 @@ function economy:businessSpend(name, amount, reason)
     end
     return true
 end
+function economy:quoteMarketSale(item, quantity)
+    local unit = (Mocks.marketPrice or {})[item]
+    if not unit then return 0, 0 end
+    return unit * quantity, unit
+end
+function economy:saturateMarket(item, quantity)
+    Mocks.saturated = Mocks.saturated or {}
+    Mocks.saturated[#Mocks.saturated + 1] = { item = item, quantity = quantity }
+    return true
+end
 function economy:getBusinessBalance(name) return (Mocks.bizBalance or {})[name] or 0 end
 function economy:fundFromTreasury(name, amount)
     Mocks.calls.fund = (Mocks.calls.fund or 0) + 1
@@ -223,7 +239,16 @@ function dispatch:alert(source, alertType, extra)
     Mocks.lastAlertType = alertType
     Mocks.lastAlertExtra = extra
     if Mocks.alertFails then return nil end
-    return 1
+    return Mocks.alertId or 1
+end
+function dispatch:resolve(id, disposition)
+    Mocks.resolved = Mocks.resolved or {}
+    Mocks.resolved[#Mocks.resolved + 1] = { id = id, disposition = disposition }
+    return true
+end
+
+function dispatch:getCalls()
+    return Mocks.exported.getCalls and Mocks.exported.getCalls() or {}
 end
 
 local medical = {}
@@ -313,7 +338,15 @@ local registry = {
         local fn = Mocks.exported[name]
         return fn and function(_, ...) return fn(...) end or nil
     end }),
+    ['som-housing'] = setmetatable({}, { __index = function(_, name)
+        local fn = Mocks.exported[name]
+        return fn and function(_, ...) return fn(...) end or nil
+    end }),
     ['som-launder'] = setmetatable({}, { __index = function(_, name)
+        local fn = Mocks.exported[name]
+        return fn and function(_, ...) return fn(...) end or nil
+    end }),
+    ['som-jail'] = setmetatable({}, { __index = function(_, name)
         local fn = Mocks.exported[name]
         return fn and function(_, ...) return fn(...) end or nil
     end }),
@@ -326,6 +359,14 @@ local registry = {
     ['som-economy'] = economy,
     ['som-phone'] = phone,
     ['som-dispatch'] = dispatch,
+    ['som-police'] = setmetatable({}, { __index = function(_, name)
+        local fn = Mocks.exported[name]
+        return fn and function(_, ...) return fn(...) end or nil
+    end }),
+    ['som-tow'] = setmetatable({}, { __index = function(_, name)
+        local fn = Mocks.exported[name]
+        return fn and function(_, ...) return fn(...) end or nil
+    end }),
     ['som-dmv'] = { registration = function(_, plate) return Mocks.registrationOf and Mocks.registrationOf[plate] end },
 }
 

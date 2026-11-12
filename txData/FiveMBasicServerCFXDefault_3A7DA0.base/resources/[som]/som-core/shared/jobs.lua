@@ -86,6 +86,23 @@ Jobs = {
         },
     },
 
+    firefighter = {
+        label = 'San Andreas Fire Department',
+        type = 'ems',
+        business = 'fire',
+        whitelisted = true,
+        defaultDuty = false,
+        offDutyPay = false,
+        radio = 2,
+        grades = {
+            [0] = { name = 'Probationary Firefighter', payment = 1200 },
+            [1] = { name = 'Firefighter', payment = 1700 },
+            [2] = { name = 'Engineer', payment = 2200 },
+            [3] = { name = 'Captain', payment = 2900 },
+            [4] = { name = 'Fire Chief', payment = 3800 },
+        },
+    },
+
     -- Radio dispatch. Hears every call, and assigns, closes and declares major
     -- incidents through som-dispatch. Paid by the department it works for.
     dispatcher = {
@@ -163,6 +180,18 @@ Jobs = {
             [1] = { name = 'Mechanic', payment = 300 },
             [2] = { name = 'Lead Mechanic', payment = 380 },
             [3] = { name = 'Owner', payment = 450, isboss = true },
+        },
+    },
+
+    -- Tow driver. No business and no salary on purpose: the only income is the per tow fee som-tow pays from
+    -- the department, so standing on duty earns nothing. Not whitelisted; staff can make it so.
+    tow = {
+        label = 'Tow Driver',
+        whitelisted = false,
+        defaultDuty = false,
+        offDutyPay = false,
+        grades = {
+            [0] = { name = 'Driver', payment = 0 },
         },
     },
 
@@ -244,6 +273,36 @@ Jobs = {
             [0] = { name = 'Courier', payment = 250 },
             [1] = { name = 'Driver', payment = 300 },
             [2] = { name = 'Depot Manager', payment = 400, isboss = true },
+        },
+    },
+
+    -- Weazel News. Whitelisted and off duty by default: only an on duty reporter can publish, and
+    -- each story pays from the city treasury under a cap (som-news), not from the wage below.
+    news = {
+        label = 'Weazel News',
+        business = 'weazel',
+        whitelisted = true,
+        defaultDuty = false,
+        offDutyPay = false,
+        grades = {
+            [0] = { name = 'Reporter', payment = 150 },
+            [1] = { name = 'Anchor', payment = 200 },
+            [2] = { name = 'Editor', payment = 250, isboss = true },
+        },
+    },
+
+    -- Player-run restaurant (som-restaurants). Nobody holds it until a boss buys the restaurant
+    -- and hires staff; wages are the ordinary paycheck out of the restaurant's own account.
+    burgershot = {
+        label = 'Burger Shot',
+        business = 'burgershot',
+        defaultDuty = false,
+        offDutyPay = false,
+        grades = {
+            [0] = { name = 'Crew', payment = 120 },
+            [1] = { name = 'Cook', payment = 160 },
+            [2] = { name = 'Manager', payment = 200 },
+            [3] = { name = 'Owner', payment = 0, isboss = true },
         },
     },
 }

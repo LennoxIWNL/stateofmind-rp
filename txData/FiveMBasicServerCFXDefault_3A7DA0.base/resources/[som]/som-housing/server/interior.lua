@@ -69,6 +69,7 @@ lib.callback.register('som-housing:server:enter', function(source, slug)
     -- for everyone else including the owner's friends, so a breach opens the
     -- property to the raid rather than to the public.
     if not Ownership.HasAccess(player.citizenid, property.id)
+        and not Agent.IsViewing(player.citizenid, property.id)
         and not Raid.CanEnter(source, property.id) then
         return { success = false, error = 'you do not have a key' }
     end
@@ -160,6 +161,7 @@ function Interior.PropertyOf(source)
 end
 
 exports('propertyOf', Interior.PropertyOf)
+exports('shellOffset', Shells.OffsetFor)
 
 -- ---------------------------------------------------------------------------
 -- Cleanup

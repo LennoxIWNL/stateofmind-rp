@@ -1432,6 +1432,15 @@ return {
 		},
 	},
 
+	['racing_dongle'] = {
+		label = 'Racing Dongle',
+		weight = 0,
+		description = 'Unlocks the street racing app on a phone',
+		client = {
+			image = 'usb_device.png'
+		},
+	},
+
 	['screwdriverset'] = {
 		label = 'Toolkit',
 		weight = 1000,
@@ -2289,6 +2298,14 @@ return {
 		description = 'Painting F',
 	},
 
+	['burgershot_patty'] = {
+		label = 'Cooked Patty',
+		weight = 100,
+		stack = false,
+		description = 'A grilled patty, ready to assemble',
+		client = { image = 'burgershot_meat.png' },
+	},
+
 	['burgershot_bagbig'] = {
 		label = 'Big Size Package',
 		weight = 100,
@@ -2301,6 +2318,12 @@ return {
 		weight = 100,
 		stack = false,
 		description = 'Big King',
+		client = {
+			status = { hunger = 450000, stress = -30000 },
+			anim = 'eating',
+			prop = 'burger',
+			usetime = 3000,
+		},
 	},
 
 	['burgershot_colab'] = {
@@ -2308,6 +2331,12 @@ return {
 		weight = 100,
 		stack = false,
 		description = 'Big Size Cola',
+		client = {
+			status = { thirst = 350000 },
+			anim = { dict = 'mp_player_intdrink', clip = 'loop_bottle' },
+			prop = { model = `prop_ld_can_01`, pos = vec3(0.01, 0.01, 0.06), rot = vec3(5.0, 5.0, -180.5) },
+			usetime = 3000,
+		},
 	},
 
 	['burgershot_patatob'] = {
@@ -2315,6 +2344,12 @@ return {
 		weight = 100,
 		stack = false,
 		description = 'Big Size Patato',
+		client = {
+			status = { hunger = 150000 },
+			anim = 'eating',
+			prop = 'burger',
+			usetime = 3000,
+		},
 	},
 
 	['burgershot_bagsmall'] = {
@@ -2329,6 +2364,12 @@ return {
 		weight = 100,
 		stack = false,
 		description = 'Bleeder Burger',
+		client = {
+			status = { hunger = 350000, stress = -20000 },
+			anim = 'eating',
+			prop = 'burger',
+			usetime = 3000,
+		},
 	},
 
 	['burgershot_colas'] = {
@@ -2336,6 +2377,12 @@ return {
 		weight = 100,
 		stack = false,
 		description = 'Small Size Cola',
+		client = {
+			status = { thirst = 250000 },
+			anim = { dict = 'mp_player_intdrink', clip = 'loop_bottle' },
+			prop = { model = `prop_ld_can_01`, pos = vec3(0.01, 0.01, 0.06), rot = vec3(5.0, 5.0, -180.5) },
+			usetime = 3000,
+		},
 	},
 
 	['vpn'] = {
@@ -2350,6 +2397,12 @@ return {
 		weight = 100,
 		stack = false,
 		description = 'Small Size Patato',
+		client = {
+			status = { hunger = 100000 },
+			anim = 'eating',
+			prop = 'burger',
+			usetime = 3000,
+		},
 	},
 
 	['burgershot_baggoat'] = {
@@ -2392,6 +2445,12 @@ return {
 		weight = 100,
 		stack = false,
 		description = 'Burger Shot Coffee',
+		client = {
+			status = { thirst = 150000, stress = -30000 },
+			anim = { dict = 'mp_player_intdrink', clip = 'loop_bottle' },
+			prop = { model = `prop_ld_can_01`, pos = vec3(0.01, 0.01, 0.06), rot = vec3(5.0, 5.0, -180.5) },
+			usetime = 3000,
+		},
 	},
 
 	['burgershot_macaroon'] = {

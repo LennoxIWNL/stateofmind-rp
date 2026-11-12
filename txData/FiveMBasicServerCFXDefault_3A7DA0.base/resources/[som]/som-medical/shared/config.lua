@@ -152,3 +152,9 @@ Config.NewLife = {
     accident = 0,    -- fall, vehicle, fire, environment, an NPC: remember it
     radius = 200.0,
 }
+
+-- Ambulance staff are called to a player who is still down after the delay. One
+-- call per character per cooldown, so going down again and again raises nothing.
+-- `enabled = false` stops new calls (checked on the server when a player goes down
+-- and again when the call would be raised).
+Config.EmsCall = { enabled = true, delaySeconds = 30, cooldownSeconds = 120 }

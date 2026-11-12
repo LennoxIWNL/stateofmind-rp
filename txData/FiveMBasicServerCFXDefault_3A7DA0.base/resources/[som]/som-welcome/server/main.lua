@@ -1,6 +1,7 @@
 --- A first hour. Every step is read from data the server already holds, at the
 --- moment it is asked for. The settling-in payment is claimed first (one row per
---- character, inside a global monthly cap), then paid from the treasury.
+--- character and per licence, inside a monthly and a daily cap), then paid from
+--- the treasury.
 
 local core = exports['som-core']
 
@@ -18,7 +19,7 @@ local function track(citizenid, job)
     if type(citizenid) ~= 'string' or type(job) ~= 'string' then return end
     MySQL.update.await([[
         INSERT INTO som_welcome_jobs (citizenid, job) VALUES (?, ?)
-        ON DUPLICATE KEY UPDATE since = IF(job = VALUES(job), since, NOW()), job = VALUES(job)
+        ON DUPLICATE KEY UPDATE minutes = IF(job = VALUES(job), minutes, 0), job = VALUES(job)
     ]], { citizenid, job })
 end
 
@@ -29,6 +30,28 @@ end)
 
 AddEventHandler('som:server:jobChanged', function(_, citizenid, job)
     if type(job) == 'table' then track(citizenid, job.name) end
+end)
+
+-- A minute in the city counts toward the job step for each character who is
+-- loaded and holds a job. Time is only added while they are online.
+local function tick()
+    local ids = {}
+    for _, p in ipairs(core:getPlayers()) do
+        if p.citizenid and p.job and p.job.name ~= 'unemployed' then ids[#ids + 1] = p.citizenid end
+    end
+    if #ids == 0 then return end
+
+    MySQL.update.await(
+        ('UPDATE som_welcome_jobs SET minutes = minutes + 1 WHERE citizenid IN (%s)'):format(('?,'):rep(#ids):sub(1, -2)), ids)
+end
+
+Welcome = { Tick = tick }
+
+CreateThread(function()
+    while true do
+        Wait(60000)
+        tick()
+    end
 end)
 
 -- ---------------------------------------------------------------------------
@@ -44,7 +67,7 @@ local function steps(player)
 
     local job = player.job.name ~= 'unemployed' and MySQL.scalar.await([[
         SELECT 1 FROM som_welcome_jobs
-        WHERE citizenid = ? AND job = ? AND since <= DATE_SUB(NOW(), INTERVAL ? MINUTE)
+        WHERE citizenid = ? AND job = ? AND minutes >= ?
     ]], { cid, player.job.name, Config.jobMinutes })
 
     local home = MySQL.scalar.await(
@@ -53,8 +76,8 @@ local function steps(player)
     return { licence = licence ~= nil, job = job ~= nil and job ~= false, home = home ~= nil }
 end
 
-local function claimed(cid)
-    return MySQL.scalar.await('SELECT 1 FROM som_welcome_claims WHERE citizenid = ?', { cid }) ~= nil
+local function claimed(player)
+    return MySQL.scalar.await('SELECT 1 FROM som_welcome_claims WHERE citizenid = ? OR license = ?', { player.citizenid, player.license }) ~= nil
 end
 
 -- ---------------------------------------------------------------------------
@@ -65,17 +88,21 @@ local function claim(player)
     local s = steps(player)
     if not (s.licence and s.job and s.home) then return done(false, 'finish every step first') end
 
-    if claimed(player.citizenid) then return done(false, 'you have already had it') end
+    if type(player.license) ~= 'string' or player.license == '' then return done(false, 'not available') end
+    if claimed(player) then return done(false, 'you have already had it') end
 
-    -- Inserted before any money moves. The primary key is the once per character
-    -- rule; the subquery is the global cap, in the same statement.
+    -- Inserted before any money moves. The primary key (character) and the unique
+    -- licence key are the once per player rule, so a second character on the same
+    -- licence collides; the subqueries are the monthly and daily caps, in the same
+    -- statement. A thrown error here is that collision.
     local ok, inserted = pcall(MySQL.update.await, [[
-        INSERT INTO som_welcome_claims (citizenid, amount)
-        SELECT ?, ? FROM DUAL
+        INSERT INTO som_welcome_claims (citizenid, license, amount)
+        SELECT ?, ?, ? FROM DUAL
         WHERE (SELECT COALESCE(SUM(amount), 0) FROM som_welcome_claims WHERE created_at > DATE_SUB(NOW(), INTERVAL 30 DAY)) + ? <= ?
-    ]], { player.citizenid, Config.payment, Config.payment, Config.monthlyCap })
+          AND (SELECT COALESCE(SUM(amount), 0) FROM som_welcome_claims WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)) + ? <= ?
+    ]], { player.citizenid, player.license, Config.payment, Config.payment, Config.monthlyCap, Config.payment, Config.dailyCap })
     if not ok then return done(false, 'you have already had it') end
-    if (inserted or 0) < 1 then return done(false, 'the city cannot pay any more settling-in payments this month') end
+    if (inserted or 0) < 1 then return done(false, 'the city cannot pay any more settling-in payments right now, try again tomorrow') end
 
     local function release() MySQL.update.await('DELETE FROM som_welcome_claims WHERE citizenid = ?', { player.citizenid }) end
 
@@ -87,7 +114,8 @@ local function claim(player)
 
     local paidOk, paid = pcall(core.addMoney, core, player.source, 'bank', Config.payment, 'welcome:settling-in', { counterparty = 'treasury', flow = 'transfer' })
     if not (paidOk and paid) then
-        pcall(core.treasuryTransact, core, Config.payment, 'welcome:settling-in:undo')
+        local undone, back = pcall(core.treasuryTransact, core, Config.payment, 'welcome:settling-in:undo')
+        if not (undone and back) then print(('[som-welcome] treasury refund of %d failed for %s'):format(Config.payment, player.citizenid)) end
         release()
         return done(false, 'the payment could not be made, try again')
     end
@@ -102,13 +130,13 @@ end
 local function view(player)
     local s = steps(player)
     local rows = function(title, sub, ok) return { title = title, sub = ('%s. %s'):format(ok and 'Done' or 'Not yet', sub) } end
-    local got = claimed(player.citizenid)
+    local got = claimed(player)
 
     local sections = {
         { title = 'Welcome', rows = Config.guide },
         { title = 'Settling in', rows = {
             rows('Get a driver licence', 'Pass the theory and driving tests at the driving school.', s.licence),
-            rows('Hold a job', ('Keep a job for %d minutes. The job centre has ordinary jobs.'):format(Config.jobMinutes), s.job),
+            rows('Hold a job', ('Keep a job for %d minutes while you are in the city. The job centre has ordinary jobs.'):format(Config.jobMinutes), s.job),
             rows('Have a place to live', 'Buy a home or rent one.', s.home),
         } },
     }

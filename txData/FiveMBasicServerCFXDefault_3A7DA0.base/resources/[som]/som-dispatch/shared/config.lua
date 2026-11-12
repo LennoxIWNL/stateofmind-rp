@@ -128,8 +128,30 @@ Config.Alerts = {
         priority = 1,
         chance = 1.0,
         cooldown = 20,
-        jobs = { 'police', 'ambulance' },
+        jobs = { 'police', 'ambulance', 'firefighter' },
         blip = { sprite = 280, colour = 5, scale = 1.0, duration = 600 },
+    },
+
+    -- Raised by som-medical when a player stays down. NOT `reportable`.
+    personDown = {
+        label = 'Person Down',
+        code = '10-52',
+        priority = 2,
+        chance = 1.0,
+        cooldown = 0,
+        jobs = { 'ambulance' },
+        blip = { sprite = 61, colour = 1, scale = 1.0, duration = 600 },
+    },
+
+    -- Raised by som-fire when a fire starts. NOT `reportable`.
+    structureFire = {
+        label = 'Fire',
+        code = '10-70',
+        priority = 1,
+        chance = 1.0,
+        cooldown = 0,
+        jobs = { 'firefighter', 'ambulance', 'police' },
+        blip = { sprite = 436, colour = 1, scale = 1.0, duration = 600 },
     },
 
     -- Raised by som-turf on a street sale, at the seller's position, so most
@@ -190,6 +212,39 @@ Config.Alerts = {
         cooldown = 30,
         jobs = { 'police' },
         blip = { sprite = 161, colour = 1, scale = 1.2, duration = 600 },
+    },
+
+    -- Raised by som-boosting once, when a contract car is opened. NOT
+    -- `reportable`: the server raises it with the car's own position.
+    burglary = {
+        label = 'Burglary',
+        code = '10-31',
+        priority = 2,
+        chance = 1.0,
+        cooldown = 30,
+        jobs = { 'police' },
+        blip = { sprite = 40, colour = 1, scale = 1.0, duration = 600 },
+    },
+    boostTheft = {
+        label = 'Vehicle Theft',
+        code = '10-16',
+        priority = 2,
+        chance = 1.0,
+        cooldown = 30,
+        jobs = { 'police' },
+        blip = { sprite = 225, colour = 1, scale = 1.0, duration = 600 },
+    },
+
+    -- Raised by som-racing once, when a race starts and its roll passes. NOT
+    -- `reportable`: the server raises it at the start line.
+    streetRace = {
+        label = 'Street Race Reported',
+        code = '10-85',
+        priority = 3,
+        chance = 1.0,
+        cooldown = 60,
+        jobs = { 'police' },
+        blip = { sprite = 225, colour = 47, scale = 0.9, duration = 300 },
     },
 
     -- Raised by som-jail's yard-radius check, not by detection. NOT
@@ -266,4 +321,5 @@ Config.AutomaticWeapons = {
 Config.RespondingJobs = {
     police = true,
     ambulance = true,
+    firefighter = true,
 }

@@ -63,6 +63,24 @@ Config.Balance = {
 }
 
 -- ---------------------------------------------------------------------------
+-- Watch: hourly checks and a daily digest of som_transactions, posted to the
+-- Discord webhook in the `som_economy_webhook` convar (empty means console only).
+-- Read only. Alerts and digests carry citizenids, amounts and reasons, nothing else.
+-- The limits are first guesses; tune them against the real ledger (LAUNCH-TODO.md).
+-- ---------------------------------------------------------------------------
+
+Config.Watch = {
+    checkMinutes = 60,
+    digestHours = 24,
+    top = 8,                          -- sources listed per flow in the digest
+    citizenFaucetLimit = 50000,       -- one character's faucet income in a check window
+    citizenTransferInLimit = 100000,  -- one character's incoming transfers in a check window
+    singleRowLimit = 250000,          -- one faucet ledger row
+    treasuryFloor = 0,                -- alert below this; 0 turns it off
+    alertCooldownMinutes = 120,       -- the same alert about the same character, at most this often
+}
+
+-- ---------------------------------------------------------------------------
 -- Tax
 --
 -- Collected from business revenue into the treasury, never from a player's
@@ -112,7 +130,13 @@ Config.MarketItems = {
     { 'meth_bag',        'Bag of Meth',         'drugs',     180,   0.0055,     0.035 },
     { 'oxy_bottle',      'Oxy Bottle',          'drugs',      70,   0.0040,     0.045 },
 
-    { 'gold_chain',      'Gold Chain',          'stolen',    180,   0.0050,     0.040 },
+    { 'goldchain',       'Gold Chain',          'stolen',    180,   0.0050,     0.040 },
+    { 'silverchain',     'Silver Chain',        'stolen',     70,   0.0050,     0.040 },
+    { 'gold_ring',       'Gold Ring',           'stolen',    110,   0.0050,     0.040 },
+    { 'silver_ring',     'Silver Ring',         'stolen',     45,   0.0050,     0.040 },
+    { 'diamond_ring',    'Diamond Ring',        'stolen',    320,   0.0060,     0.035 },
+    { 'laptop',          'Laptop',              'stolen',    150,   0.0050,     0.040 },
+    { 'tablet',          'Tablet',              'stolen',     90,   0.0050,     0.040 },
     { 'rolex',           'Rolex',               'stolen',    400,   0.0060,     0.035 },
     { 'stolen_parts',    'Stolen Parts',        'stolen',    120,   0.0045,     0.045 },
 

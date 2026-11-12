@@ -191,6 +191,55 @@ local function mortgage(slug)
         ('%s sold. %d payments, your cut $%d.'):format(res.label, res.cycles, res.commission), 'success')
 end
 
+--- Showing a property, and selling it outright, from the estate agent's side. The server checks the
+--- job, duty, grade, that both people are at the door and that the buyer accepted the viewing first.
+---@param slug string
+---@param step string 'agentShow' or 'agentSell'
+local function agentStep(slug, callback)
+    local nearby = lib.callback.await('som-housing:server:nearbyBuyers', false)
+
+    if not nearby or not nearby.success or #nearby.players == 0 then
+        return TriggerEvent('som:client:notify', 'Nobody is standing with you', 'error')
+    end
+
+    local people = {}
+    for i, person in ipairs(nearby.players) do
+        people[i] = { value = person.source, label = person.name }
+    end
+
+    local answer = lib.inputDialog(callback == 'som-housing:server:agentShow' and 'Show this property' or 'Sell outright', {
+        { type = 'select', label = 'Buyer', options = people, required = true },
+    })
+    if not answer or not answer[1] then return end
+
+    local res = lib.callback.await(callback, false, { slug = slug, buyer = answer[1] })
+    TriggerEvent('som:client:notify', res and res.success and 'Offer sent' or (res and res.error or 'Could not do that'), res and res.success and 'success' or 'error')
+end
+
+local function askBuyer(callbackName, header, content, done)
+    local answer = lib.alertDialog({ header = header, content = content, centered = true, cancel = true })
+    local res = lib.callback.await(callbackName, false, answer == 'confirm')
+    if res and res.success and answer == 'confirm' then
+        done(res)
+    elseif res and res.error then
+        TriggerEvent('som:client:notify', res.error, 'error')
+    end
+end
+
+RegisterNetEvent('som-housing:client:agentViewing', function(label, price, agentName)
+    if type(label) ~= 'string' or type(price) ~= 'number' or type(agentName) ~= 'string' then return end
+    askBuyer('som-housing:server:agentViewAnswer', label,
+        ('%s would like to show you this property, listed at $%d. You can go inside together.'):format(agentName, price),
+        function() TriggerEvent('som:client:notify', 'Viewing accepted. The door is open to you for a few minutes.', 'success') end)
+end)
+
+RegisterNetEvent('som-housing:client:agentSale', function(label, price, agentName)
+    if type(label) ~= 'string' or type(price) ~= 'number' or type(agentName) ~= 'string' then return end
+    askBuyer('som-housing:server:agentSellAnswer', label,
+        ('%s offers you %s for $%d, paid from your bank.'):format(agentName, label, price),
+        function(res) TriggerEvent('som:client:notify', ('You bought %s'):format(res.label), 'success') end)
+end)
+
 --- Offering a lease, from the owner's side. The server checks that the caller owns the property, that
 --- the other person is next to them and that the rent is in range; the answer is theirs alone.
 ---@param slug string
@@ -287,6 +336,26 @@ CreateThread(function()
                         return core:hasJob(Config.Finance.job, nil, true)
                     end,
                     onSelect = function() mortgage(property.slug) end,
+                },
+                {
+                    name = ('property:%s:show'):format(property.slug),
+                    icon = 'fa-solid fa-people-arrows',
+                    label = 'Show this property',
+                    distance = 2.0,
+                    canInteract = function()
+                        return core:hasJob(Config.Finance.job, nil, true)
+                    end,
+                    onSelect = function() agentStep(property.slug, 'som-housing:server:agentShow') end,
+                },
+                {
+                    name = ('property:%s:sell'):format(property.slug),
+                    icon = 'fa-solid fa-handshake',
+                    label = 'Sell outright',
+                    distance = 2.0,
+                    canInteract = function()
+                        return core:hasJob(Config.Finance.job, nil, true)
+                    end,
+                    onSelect = function() agentStep(property.slug, 'som-housing:server:agentSell') end,
                 },
                 {
                     name = ('property:%s:lease'):format(property.slug),

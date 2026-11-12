@@ -136,7 +136,8 @@ CREATE TABLE IF NOT EXISTS `som_transactions` (
   KEY `idx_citizen_time` (`citizenid`, `created_at`),
   KEY `idx_flow_time` (`flow`, `created_at`),
   KEY `idx_reason` (`reason`),
-  KEY `idx_resource` (`resource`)
+  KEY `idx_resource` (`resource`),
+  KEY `idx_time` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Personal, business, gang and offshore accounts share one table.
@@ -1499,6 +1500,7 @@ INSERT IGNORE INTO `som_bank_accounts` (`account_no`, `label`, `type`, `balance`
   ('GOV-BCSO',  'Blaine County Sheriff Office',   'business', 0),
   ('GOV-SASP',  'San Andreas State Police',       'business', 0),
   ('GOV-EMS',   'San Andreas Medical Services',   'business', 500000),
+  ('GOV-FIRE',  'San Andreas Fire Department',    'business', 100000),
   ('GOV-SAN',   'Los Santos Sanitation',          'business', 0),
   ('GOV-DOJ',   'Department of Justice',          'business', 300000),
   ('BUS-LSC',   'Los Santos Customs',             'business', 150000),
@@ -1522,6 +1524,7 @@ VALUES
   -- EMS is funded by the city, not by what it sells. Charging for medical care
   -- would make treatment a paywall.
   ('ems',         'San Andreas Medical Services', 'ambulance', (SELECT id FROM som_bank_accounts WHERE account_no='GOV-EMS'),    0.0000, 'treasury', 'emergency',  1, 0.0000),
+  ('fire',        'San Andreas Fire Department',  'firefighter', (SELECT id FROM som_bank_accounts WHERE account_no='GOV-FIRE'), 0.0000, 'treasury', 'emergency',  1, 0.0000),
   -- The court. Funding is 'fines' so som-economy lets a judge issue one; the
   -- same 70/30 department/treasury split applies and the judge receives nothing.
   -- Sanitation is paid out of the city budget, a capped monthly top-up.
@@ -1542,6 +1545,16 @@ INSERT IGNORE INTO `som_businesses`
   (`name`, `label`, `job`, `account_id`, `tax_rate`, `funding`, `category`, `active`, `treasury_cut`)
 VALUES
   ('fuelco', 'Fuel Station Sales', NULL, (SELECT id FROM som_bank_accounts WHERE account_no='BUS-FUEL'), 0.0000, 'sales', 'private', 1, 0.0800);
+
+-- Weazel News (som-news). Opens at zero: reporters are paid per story from the city treasury,
+-- never from a seeded float, so payroll from this account pays nothing until the owner funds it.
+INSERT IGNORE INTO `som_bank_accounts` (`account_no`, `label`, `type`, `balance`) VALUES
+  ('BUS-WEAZEL', 'Weazel News', 'business', 0);
+
+INSERT IGNORE INTO `som_businesses`
+  (`name`, `label`, `job`, `account_id`, `tax_rate`, `funding`, `category`, `active`, `treasury_cut`)
+VALUES
+  ('weazel', 'Weazel News', 'news', (SELECT id FROM som_bank_accounts WHERE account_no='BUS-WEAZEL'), 0.0000, 'sales', 'private', 1, 0.0800);
 
 -- Corrections for databases seeded before the funding model existed, where
 -- INSERT IGNORE above skipped the rows and left them on column defaults.
@@ -1811,6 +1824,37 @@ CREATE TABLE IF NOT EXISTS `som_shop_staff` (
   PRIMARY KEY (`citizenid`),
   KEY `idx_shop` (`shop_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Player-run restaurants (som-restaurants). A restaurant is bought from the city and staffed through
+-- its core job; takings go to its own business account. An order is the claim: offered to the customer,
+-- paid, then served or (after the window) refunded to the customer's bank.
+CREATE TABLE IF NOT EXISTS `som_restaurants` (
+  `restaurant_id` VARCHAR(32) NOT NULL,
+  `business`      VARCHAR(48) NOT NULL,
+  `owner`         VARCHAR(16) DEFAULT NULL,
+  `bought_price`  BIGINT NOT NULL DEFAULT 0,
+  `bought_at`     TIMESTAMP NULL DEFAULT NULL,
+  `withdraw_at`   TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (`restaurant_id`),
+  KEY `idx_owner` (`owner`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_restaurant_orders` (
+  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `restaurant_id` VARCHAR(32) NOT NULL,
+  `cashier_cid`   VARCHAR(16) NOT NULL,
+  `customer_cid`  VARCHAR(16) NOT NULL,
+  `items`         TEXT NOT NULL,
+  `total`         BIGINT NOT NULL,
+  `state`         ENUM('offered','paying','paid','served','cancelled','refunded') NOT NULL DEFAULT 'offered',
+  `created_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `paid_at`       TIMESTAMP NULL DEFAULT NULL,
+  `served_at`     TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_restaurant_state` (`restaurant_id`, `state`),
+  KEY `idx_customer_state` (`customer_cid`, `state`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ===========================================================================
 --  7n. COURT SERVICE (som-serving)
 --
@@ -1953,27 +1997,244 @@ CREATE TABLE IF NOT EXISTS `som_loans` (
   KEY `idx_due` (`status`, `next_due`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Vehicle insurance (som-insurance). One policy per vehicle id, so a plate change (som-dmv) never
+-- orphans it, and a policy only counts while its citizenid is still the vehicle's holder (a sale, som-carsales,
+-- ends it). Cover is derived from paid_until and covered_from in the database, never from a counter.
+CREATE TABLE IF NOT EXISTS `som_vehicle_insurance` (
+  `vehicle_id`   INT UNSIGNED NOT NULL,
+  `citizenid`    VARCHAR(16) NOT NULL,
+  `paid_until`   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `covered_from` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `status`       ENUM('active','cancelled') NOT NULL DEFAULT 'active',
+  PRIMARY KEY (`vehicle_id`),
+  KEY `idx_citizen` (`citizenid`, `status`),
+  KEY `idx_due` (`status`, `paid_until`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- One row per claim. The limits per vehicle and per owner are counted from created_at in the
+-- claiming INSERT itself.
+CREATE TABLE IF NOT EXISTS `som_insurance_claims` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `vehicle_id` INT UNSIGNED NOT NULL,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `cost`       BIGINT NOT NULL,
+  `excess`     BIGINT NOT NULL,
+  `status`     ENUM('pending','paid','cancelled') NOT NULL DEFAULT 'pending',
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_vehicle` (`vehicle_id`, `created_at`),
+  KEY `idx_citizen` (`citizenid`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ===========================================================================
 --  7p. NEW PLAYER ONBOARDING (som-welcome)
 --
---  The settling-in payment: one row per character (the primary key is the once
---  only rule), and the rows from the last 30 days are the global monthly cap.
---  The jobs table remembers which job a character holds and since when, and
---  when they last used the job centre. No foreign keys: both are records.
--- ===========================================================================
-
+--  The settling-in payment: one row per character AND per licence (the primary
+--  key and the unique licence key are the once only rule, so alts on one
+--  licence get nothing extra), and the rows from the last 30 days and 24 hours
+--  are the global caps. The jobs table remembers which job a character holds
+--  and how many minutes they have spent online holding it, and when they last
+--  used the job centre. No foreign keys: both are records.
+-- ====================================================================
 CREATE TABLE IF NOT EXISTS `som_welcome_claims` (
   `citizenid`  VARCHAR(16) NOT NULL,
+  `license`    VARCHAR(64) NOT NULL,
   `amount`     BIGINT NOT NULL,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`citizenid`),
+  UNIQUE KEY `uniq_license` (`license`),
   KEY `idx_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `som_welcome_jobs` (
   `citizenid` VARCHAR(16) NOT NULL,
   `job`       VARCHAR(32) NOT NULL,
-  `since`     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `minutes`   INT UNSIGNED NOT NULL DEFAULT 0,
   `centre_at` TIMESTAMP NULL DEFAULT NULL,
   PRIMARY KEY (`citizenid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Weazel News (som-news). A story is public until staff remove it. Payouts are the hourly cap:
+-- the cap is the sum of the last hour, so a restart cannot reset it.
+CREATE TABLE IF NOT EXISTS `som_news_stories` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `author`     VARCHAR(64) NOT NULL,
+  `kind`       ENUM('story','breaking') NOT NULL DEFAULT 'story',
+  `headline`   VARCHAR(80) NOT NULL,
+  `body`       VARCHAR(500) NOT NULL,
+  `status`     ENUM('live','removed') NOT NULL DEFAULT 'live',
+  `paid`       BIGINT NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_status_id` (`status`, `id`),
+  KEY `idx_citizen_kind_time` (`citizenid`, `kind`, `created_at`),
+  KEY `idx_kind_time` (`kind`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_news_payouts` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `citizenid`  VARCHAR(16) NOT NULL,
+  `amount`     BIGINT NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_time` (`created_at`),
+  KEY `idx_citizen_time` (`citizenid`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
+--  7q. VEHICLE CONTRACTS (som-boosting)
+--
+--  One row per contract. `face` is the marked-bill value reserved against the
+--  class's hourly cap when the contract starts (failed contracts stop counting),
+--  `paid` is what was minted, `claimed_at` is when the delivery was claimed. 'unpaid' means a share
+--  could not be minted and `/boostpay` can pay the rest. No foreign keys: it is a record.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_boost_runs` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `class`       ENUM('C','B','A') NOT NULL,
+  `pickup`      VARCHAR(32) NOT NULL,
+  `group_id`    INT UNSIGNED NOT NULL,
+  `plate`       VARCHAR(12) NOT NULL,
+  `model`       VARCHAR(32) NOT NULL,
+  `status`      ENUM('active','done','failed','unpaid') NOT NULL DEFAULT 'active',
+  `face`        BIGINT NOT NULL DEFAULT 0,
+  `paid`        BIGINT NOT NULL DEFAULT 0,
+  `unlocked_at` TIMESTAMP NULL DEFAULT NULL,
+  `claimed_at`  TIMESTAMP NULL DEFAULT NULL,
+  `created_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_pickup` (`pickup`, `created_at`),
+  KEY `idx_class` (`class`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Tow tickets (som-tow). The state is the lock: a driver takes an open ticket with one conditional UPDATE,
+-- and delivery closes a claimed one. Times come from the database clock.
+CREATE TABLE IF NOT EXISTS `som_tow_tickets` (
+  `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `plate`        VARCHAR(12) NOT NULL,
+  `reason`       TINYINT UNSIGNED NOT NULL,
+  `requested_by` VARCHAR(16) NOT NULL,
+  `x`            FLOAT NOT NULL DEFAULT 0,
+  `y`            FLOAT NOT NULL DEFAULT 0,
+  `z`            FLOAT NOT NULL DEFAULT 0,
+  `driver`       VARCHAR(16) DEFAULT NULL,
+  `state`        ENUM('open','claimed','done','cancelled') NOT NULL DEFAULT 'open',
+  `paid`         BIGINT NOT NULL DEFAULT 0,
+  `created_at`   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `claimed_at`   TIMESTAMP NULL DEFAULT NULL,
+  `done_at`      TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_state` (`state`, `created_at`),
+  KEY `idx_plate` (`plate`, `state`),
+  KEY `idx_driver` (`driver`, `state`, `done_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
+--  7r. HOUSE BURGLARY (som-burglary)
+--
+--  One row per burglary. The insert is the claim on a house and its cooldown
+--  (a failed run keeps the house shut longer). `som_burglary_loot` holds one row
+--  per searched spot: its primary key is the lock, so a spot is taken once.
+--  No foreign keys: they are records.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_burglary_runs` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `house`      VARCHAR(32) NOT NULL,
+  `tier`       ENUM('low','high') NOT NULL,
+  `group_id`   INT UNSIGNED NOT NULL,
+  `status`     ENUM('active','done','failed') NOT NULL DEFAULT 'active',
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_house` (`house`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_burglary_loot` (
+  `run_id`     INT UNSIGNED NOT NULL,
+  `spot`       TINYINT UNSIGNED NOT NULL,
+  `citizenid`  VARCHAR(50) NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`run_id`, `spot`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
+--  7s. STREET RACING (som-racing)
+--
+--  Dongles are ledger rows: the item carries the uid and the row decides if it
+--  works (status, tier, and the first character to use it owns it). Buy-ins are
+--  escrow rows: an entry goes pending -> held (debited) -> owed (settled) ->
+--  paid, one conditional UPDATE per hop. A pending row at startup is voided, it
+--  was never debited for sure. Track points are a JSON array of {x,y,z}.
+--  No foreign keys.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS `som_race_dongles` (
+  `uid`        CHAR(16) NOT NULL,
+  `tier`       ENUM('creator','racer') NOT NULL,
+  `status`     ENUM('issued','void') NOT NULL DEFAULT 'issued',
+  `holder_cid` VARCHAR(50) NULL DEFAULT NULL,
+  `source_tag` VARCHAR(32) NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`uid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_race_aliases` (
+  `citizenid` VARCHAR(50) NOT NULL,
+  `alias`     VARCHAR(16) NOT NULL,
+  PRIMARY KEY (`citizenid`),
+  UNIQUE KEY `uniq_alias` (`alias`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_race_tracks` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name`        VARCHAR(32) NOT NULL,
+  `creator_cid` VARCHAR(50) NOT NULL,
+  `points`      LONGTEXT NOT NULL,
+  `length_m`    INT UNSIGNED NOT NULL,
+  `active`      TINYINT(1) NOT NULL DEFAULT 1,
+  `created_at`  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_name` (`name`),
+  KEY `idx_creator` (`creator_cid`, `active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_races` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `track_id`   BIGINT UNSIGNED NOT NULL,
+  `host_cid`   VARCHAR(50) NOT NULL,
+  `laps`       TINYINT UNSIGNED NOT NULL,
+  `stake`      BIGINT NOT NULL DEFAULT 0,
+  `status`     ENUM('open','running','done','cancelled') NOT NULL DEFAULT 'open',
+  `join_until` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `started_at` TIMESTAMP NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_host` (`host_cid`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_race_entries` (
+  `id`        BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `race_id`   BIGINT UNSIGNED NOT NULL,
+  `citizenid` VARCHAR(50) NOT NULL,
+  `alias`     VARCHAR(16) NOT NULL,
+  `stake`     BIGINT NOT NULL DEFAULT 0,
+  `state`     ENUM('pending','held','owed','paid','void') NOT NULL DEFAULT 'pending',
+  `owed`      BIGINT NOT NULL DEFAULT 0,
+  `position`  TINYINT UNSIGNED NULL DEFAULT NULL,
+  `total_ms`  INT UNSIGNED NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_entry` (`race_id`, `citizenid`),
+  KEY `idx_owner` (`citizenid`, `state`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `som_race_times` (
+  `track_id`  BIGINT UNSIGNED NOT NULL,
+  `citizenid` VARCHAR(50) NOT NULL,
+  `alias`     VARCHAR(16) NOT NULL,
+  `best_ms`   INT UNSIGNED NOT NULL,
+  PRIMARY KEY (`track_id`, `citizenid`),
+  KEY `idx_board` (`track_id`, `best_ms`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -18,6 +18,7 @@ server_scripts {
     'server/business.lua',
     'server/market.lua',
     'server/fines.lua',
+    'server/watch.lua',
     'server/main.lua',
 }
 

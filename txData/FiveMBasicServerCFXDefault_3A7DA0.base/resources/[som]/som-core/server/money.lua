@@ -311,6 +311,20 @@ function Money.TransferToCitizen(fromRef, toCitizenId, account, amount, reason)
     return true
 end
 
+---Credits a character by citizenid, online or not. For paying back money owed to someone who may
+---have logged off, such as a refund. The caller has already taken the money from its source.
+---@return boolean success, string|nil err
+function Money.CreditCitizen(citizenid, account, amount, reason)
+    if type(citizenid) ~= 'string' then return false, 'invalid recipient' end
+    if not validAccount[account] or Config.Money.protected[account] then return false, 'invalid account' end
+    local value = sanitiseAmount(amount)
+    if not value then return false, 'invalid amount' end
+    if type(reason) ~= 'string' or reason == '' then return false, 'reason required' end
+
+    if Players.GetByCitizenId(citizenid) then return Money.Add(citizenid, account, value, reason) end
+    return creditOffline(citizenid, account, value, reason)
+end
+
 local payable = {}
 for _, name in ipairs(Config.Money.payable or {}) do payable[name] = true end
 
@@ -610,6 +624,7 @@ exports('stealCash', Money.StealCash)
 exports('hasMoney', Money.Has)
 exports('transferMoney', Money.Transfer)
 exports('transferToCitizen', Money.TransferToCitizen)
+exports('creditCitizen', Money.CreditCitizen)
 exports('payWith', Money.PayWith)
 exports('paymentOptions', Money.PaymentOptions)
 exports('businessTransact', Money.BusinessTransact)

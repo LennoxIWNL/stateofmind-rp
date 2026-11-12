@@ -68,6 +68,11 @@ end
 
 _G.GetPlayers = function() local out = {}; for id in pairs(_G.FakePeds) do out[#out + 1] = tostring(id) end; return out end
 _G.GetPlayerName = function(source) return 'Player' .. tostring(source) end
+_G.Buckets = {}
+_G.SetPlayerRoutingBucket = function(source, bucket) _G.Buckets[source] = bucket end
+_G.GetPlayerRoutingBucket = function(source) return _G.Buckets[source] or 0 end
+_G.FakeSpeed = {}
+_G.GetEntitySpeed = function(ped) return _G.FakeSpeed[ped] or 0.0 end
 _G.Teleports = {}
 _G.SetEntityCoords = function(ped, x, y, z) _G.Teleports[#_G.Teleports + 1] = { ped = ped, x = x, y = y, z = z } end
 
@@ -111,6 +116,9 @@ _G.CreateVehicle = function(hash)
     return id
 end
 _G.MockCreateVehicle = _G.CreateVehicle
+_G.NetworkGetNetworkIdFromEntity = function(e) return e end
+_G.SetVehicleNumberPlateText = function(e, text) if _G.Vehicles[e] then _G.Vehicles[e].plate = text end end
+_G.SetVehicleDoorsLocked = function(e, state) if _G.Vehicles[e] then _G.Vehicles[e].locked = state end end
 _G.DeleteEntity = function(e) _G.Deleted[#_G.Deleted + 1] = e; _G.Vehicles[e] = nil end
 
 _G.Dropped = {}

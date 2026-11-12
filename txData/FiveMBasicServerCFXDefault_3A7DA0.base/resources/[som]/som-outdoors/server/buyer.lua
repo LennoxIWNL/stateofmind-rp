@@ -50,9 +50,11 @@ local function settle(source, name, b, state)
     local total, sold = 0, {}
     for item, price in pairs(b.prices) do
         local have = ox:Search(source, 'count', item) or 0
-        if have > 0 then
+        -- A market buyer pays what som-economy quotes now, as an average per unit.
+        if have > 0 and b.market then price = math.floor((exports['som-economy']:quoteMarketSale(item, have) or 0) / have) end
+        if have > 0 and price >= 1 then
             total = total + have * price
-            sold[#sold + 1] = { item = item, count = have }
+            sold[#sold + 1] = { item = item, count = have, price = price }
         end
     end
     if total < 1 then return done(false, 'you have nothing they want') end
@@ -67,12 +69,11 @@ local function settle(source, name, b, state)
     -- only what is paid for.
     local worth = 0
     for _, s in ipairs(sold) do
-        local price = b.prices[s.item]
-        local n = math.min(s.count, math.floor((pay - worth) / price))
+        local n = math.min(s.count, math.floor((pay - worth) / s.price))
         if n > 0 then
             if not ox:RemoveItem(source, s.item, n) then break end
             state.taken[#state.taken + 1] = { item = s.item, count = n }
-            worth = worth + n * price
+            worth = worth + n * s.price
         end
     end
     state.worth = worth
@@ -88,6 +89,10 @@ local function settle(source, name, b, state)
 
     if not core:addMoney(source, 'bank', worth, reason) then return done(false, 'the sale fell through') end
     state.paid = true
+    -- Only a paid sale moves the price, so a refunded one leaves the market alone.
+    if b.market then
+        for _, t in ipairs(state.taken) do exports['som-economy']:saturateMarket(t.item, t.count) end
+    end
 
     return done(true, nil, { paid = worth })
 end

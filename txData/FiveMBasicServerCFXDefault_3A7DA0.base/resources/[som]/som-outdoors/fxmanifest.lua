@@ -26,6 +26,7 @@ server_scripts {
     'server/fishing.lua',
     'server/hunting.lua',
     'server/chop.lua',
+    'server/mining.lua',
 }
 
 dependencies {

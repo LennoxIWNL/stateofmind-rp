@@ -46,6 +46,10 @@ local function resetDb()
     mysql.db.phoneAudit = {}
     mysql.db.notes = {}
     mysql.db.heist = { dongles = {}, runs = {} }
+    mysql.db.burglary = { runs = {}, loot = {} }
+    mysql.db.market = { rows = {}, sales = {} }
+    mysql.db.boost = { runs = {}, ownedPlates = {} }
+    mysql.db.racing = { dongles = {}, aliases = {}, tracks = {}, races = {}, entries = {}, times = {} }
     mysql.db.turf = { zones = {}, events = {}, market = {} }
     mysql.db.whitelist = {}
     mysql.db.bans = {}
@@ -4848,6 +4852,258 @@ do
 end
 
 -- ---------------------------------------------------------------------------
+-- Vehicle insurance
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    resetMocks()
+    mysql.fakeNow = 1000000
+    local D = mysql.db.ins
+    D.on = true
+    D.vehicles, D.policies, D.claims, D.flagged, D.bolo, D.wanted = {}, {}, {}, {}, {}, {}
+    local env = loader.loadResource(REPO .. 'som-insurance', { 'shared/config.lua', 'server/insurance.lua' })
+    local core = exports['som-core']
+    local C = env.Config
+    local app = Mocks.apps.insurance
+    local DAY = 86400
+
+    local function person(src, cid) return { citizenid = cid, source = src, charinfo = { firstname = 'P' .. src, lastname = 'Q' .. src } } end
+    Mocks.players = { [1] = person(1, 'OWN1'), [2] = person(2, 'OTH2'), [3] = person(3, 'STAFF3') }
+    Mocks.bank = { [1] = 50000, [2] = 50000, [3] = 0 }
+    Mocks.treasury = 100000
+    Mocks.admins = { [3] = true }
+    Mocks.taxFails, Mocks.addMoneyFails, Mocks.bizFails = false, false, false
+
+    local insurer = 0
+    local saved = { addMoney = core.addMoney, businessTransact = core.businessTransact, taxToTreasury = core.taxToTreasury, gav = _G.GetAllVehicles, plate = _G.GetVehicleNumberPlateText, eng = _G.GetVehicleEngineHealth }
+    function core:addMoney(source, _, amount)
+        if Mocks.addMoneyFails then return false, 'refused' end
+        Mocks.bank[source] = (Mocks.bank[source] or 0) + amount
+        return true
+    end
+    function core:businessTransact(name, amount)
+        if name ~= 'insurer' or Mocks.bizFails or insurer + amount < 0 then return false, 'refused' end
+        insurer = insurer + amount
+        return true
+    end
+    local world = {}
+    _G.GetAllVehicles = function() local out = {} for i = 1, #world do out[i] = i end return out end
+    _G.GetVehicleNumberPlateText = function(e) return world[e].plate end
+    _G.GetVehicleEngineHealth = function(e) return world[e].engine end
+    local notes = {}
+    local realT = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, ...) notes[#notes + 1] = { name = name, target = target, args = { ... } } end
+
+    local function veh(id, fields)
+        local v = { id = id, citizenid = 'OWN1', plate = 'AB' .. id .. ' 123', model = 'sultan', price = 20000, state = 'garaged' }
+        for k, x in pairs(fields or {}) do v[k] = x end
+        D.vehicles[#D.vehicles + 1] = v
+        return v
+    end
+    local function policy(id) for _, p in ipairs(D.policies) do if p.vehicle_id == id then return p end end end
+    local function insureV(src, id) return app.handler(src, 'insure', { vehicle = id }) end
+    local function claimV(src, id) return app.handler(src, 'claim', { vehicle = id }) end
+    local function advance(days) mysql.fakeNow = mysql.fakeNow + days * DAY end
+    local function goOut(v, minutes) v.state, v.taken = 'out', mysql.fakeNow - (minutes or 20) * 60 end
+    local function fund(n) insurer = insurer + n end
+
+    -- Buying cover
+    local v1 = veh(1)
+    local group = veh(9, { group = 'lspd' })
+    local cheap = veh(8, { price = 500 })
+    local theirs = veh(7, { citizenid = 'OTH2' })
+    check(#app.handler(1, 'view', {}).view.sections[1].rows == 1, 'insurance: the phone lists only your own insurable cars')
+    check(insureV(1, 7).error == 'that is not your vehicle' and insureV(1, 9).error == 'that is not your vehicle', 'insurance: you cannot insure someone else\'s car or a pool car')
+    check(insureV(1, 8).error == 'this vehicle cannot be insured' and policy(8) == nil, 'insurance: a car with no real recorded value cannot be insured')
+    check(insureV(1, '1').error == 'bad request' and insureV(1, 0).error == 'bad request', 'insurance: the vehicle must be a whole number')
+
+    local bought = insureV(1, 1)
+    local p1 = policy(1)
+    check(bought.success and p1.status == 'active' and p1.paid_until == mysql.fakeNow + 7 * DAY and Mocks.bank[1] == 49800 and insurer == 200, 'insurance: the first premium is a share of the price and goes to the insurer')
+    check(insureV(1, 1).error == 'this vehicle is already insured', 'insurance: a car already covered is not insured twice')
+
+    local v2 = veh(2)
+    Mocks.bank[1] = 0
+    check(insureV(1, 2).error == 'not enough in your bank' and policy(2).status == 'cancelled', 'insurance: without the premium there is no policy')
+    Mocks.bank[1] = 50000
+    Mocks.bizFails = true
+    check(insureV(1, 2).success == false and Mocks.bank[1] == 50000 and policy(2).status == 'cancelled', 'insurance: a premium the insurer cannot take is refunded')
+    Mocks.bizFails = false
+    check(insureV(1, 2).success and policy(2).status == 'active', 'insurance: a cancelled policy can be taken out again')
+    check(app.handler(1, 'cancel', { vehicle = 2 }).success and policy(2).status == 'cancelled' and app.handler(1, 'cancel', { vehicle = 2 }).error == 'that vehicle is not insured', 'insurance: cover can be cancelled')
+
+    -- Renewal
+    Mocks.bank[1] = 50000
+    insurer = 200
+    advance(7 - 0.25)
+    local fromBefore = p1.covered_from
+    env.Insurance.Sweep()
+    check(p1.paid_until == fromBefore + 14 * DAY and Mocks.bank[1] == 49800 and insurer == 400 and p1.covered_from == fromBefore, 'insurance: a policy is renewed before it ends without a new waiting period')
+    env.Insurance.Sweep()
+    check(Mocks.bank[1] == 49800, 'insurance: a period is never charged twice')
+
+    advance(7)
+    Mocks.bank[1] = 0
+    env.Insurance.Sweep()
+    local lapsedAt = p1.paid_until
+    check(Mocks.bank[1] == 0 and p1.status == 'active' and insurer == 400, 'insurance: an owner who cannot pay is not charged')
+    advance(1)
+    check(p1.paid_until < mysql.fakeNow, 'insurance: the policy has lapsed by time alone')
+    goOut(v1, 30)
+    check(claimV(1, 1).error == 'this vehicle is not covered for this', 'insurance: a lapsed policy covers nothing')
+    Mocks.bank[1] = 50000
+    env.Insurance.Sweep('OWN1')
+    check(p1.paid_until == mysql.fakeNow + 7 * DAY and p1.covered_from == mysql.fakeNow and Mocks.bank[1] == 49800, 'insurance: paying after a lapse starts cover again with a new waiting period')
+    check(claimV(1, 1).error == 'this vehicle is not covered for this', 'insurance: a car out before the new cover began is not covered')
+
+    -- Sold, and a plate change
+    v1.state, v1.taken = 'garaged', nil
+    local ex = Mocks.exported.insured
+    check(ex('ab1 123').insured == true and ex('AB1123').expires == p1.paid_until, 'insurance: police tools can read whether a plate is insured')
+    v1.plate = 'NEW 999'
+    check(ex('NEW999').insured == true and ex('AB1 123').insured == false, 'insurance: a plate change does not orphan the policy')
+    v1.plate = 'AB1 123'
+    v1.citizenid = 'OTH2'
+    check(ex('AB1 123').insured == false, 'insurance: a policy does not cover the person a car was sold to')
+    advance(7 - 0.25)
+    local before = Mocks.bank[1]
+    env.Insurance.Sweep()
+    check(p1.status == 'cancelled' and Mocks.bank[1] == before, 'insurance: a sold car ends its policy and is not charged again')
+    v1.citizenid = 'OWN1'
+    check(#app.handler(2, 'view', {}).view.sections[1].rows == 1, 'insurance: the new holder can insure the car themselves')
+
+    -- A car that was sold between players has a replaced price and is never insured
+    local resold = veh(20, { price = 1000 })
+    D.sold[20] = true
+    check(insureV(1, 20).error == 'a vehicle that has been sold between players cannot be insured' and policy(20) == nil, 'insurance: a car sold between players cannot be insured against its sale price')
+    local soldRows = app.handler(1, 'view', {}).view.sections[1].rows
+    local listed = false
+    for _, row in ipairs(soldRows) do if row.title:find('AB20', 1, true) then listed = true end end
+    check(not listed, 'insurance: a car sold between players is not offered for cover')
+    D.sold[20] = nil
+
+    -- Claims
+    local v3 = veh(3)
+    Mocks.bank[1] = 50000
+    insureV(1, 3)
+    advance(3)
+    local claimedBefore = #D.claims
+    check(claimV(1, 3).error == 'only a vehicle that is out can be claimed', 'insurance: a car in the garage cannot be claimed')
+    goOut(v3, 10)
+    check(claimV(1, 3).error == 'it has not been gone long enough', 'insurance: a car must have been out long enough by the database clock')
+    goOut(v3, 30)
+    D.flagged['AB3123'] = true
+    check(claimV(1, 3).error == 'this vehicle cannot be claimed right now', 'insurance: a flagged plate cannot be claimed')
+    D.flagged['AB3123'] = nil
+    D.bolo['AB3123'] = true
+    check(claimV(1, 3).error == 'this vehicle cannot be claimed right now', 'insurance: a BOLO plate cannot be claimed')
+    D.bolo['AB3123'] = nil
+    D.wanted['AB3123'] = true
+    check(claimV(1, 3).error == 'this vehicle cannot be claimed right now', 'insurance: a wanted vehicle cannot be claimed')
+    D.wanted['AB3123'] = nil
+    world[1] = { plate = 'ab3 123', engine = 900 }
+    check(claimV(1, 3).error == 'this vehicle is still out there', 'insurance: a car that still exists anywhere cannot be claimed')
+    world[1].engine = 0
+    check(claimV(1, 3).error == 'this vehicle is still out there', 'insurance: a wreck still blocks a claim by default')
+    C.wreckBlocksClaim = false
+    check(claimV(1, 3).error == 'the insurer cannot pay out right now', 'insurance: with wrecks counted as gone the claim goes on to the payout')
+    C.wreckBlocksClaim = true
+    world[1] = nil
+    check(#D.claims > claimedBefore and D.claims[#D.claims].status == 'cancelled', 'insurance: a claim that failed is cancelled')
+
+    -- The insurer cannot pay more than it holds
+    insurer = 1000
+    local bank, treasury = Mocks.bank[1], Mocks.treasury
+    check(claimV(1, 3).error == 'the insurer cannot pay out right now' and Mocks.bank[1] == bank and Mocks.treasury == treasury and insurer == 1000 and v3.state == 'out', 'insurance: if the insurer cannot pay, nothing moves and the car stays out')
+
+    -- Failures after the money moved are undone
+    fund(20000)
+    local base = insurer
+    Mocks.taxFails = true
+    check(claimV(1, 3).error == 'the payout fell through' and Mocks.bank[1] == bank and insurer == base and v3.state == 'out', 'insurance: a payout that cannot reach the treasury is undone')
+    Mocks.taxFails = false
+    local realTax = core.taxToTreasury
+    function core:taxToTreasury(amount, reason) v3.state = 'impounded'; return realTax(core, amount, reason) end
+    local tBefore = Mocks.treasury
+    check(claimV(1, 3).error == 'the vehicle changed hands or was found, nothing was paid' and Mocks.bank[1] == bank and insurer == base and Mocks.treasury == tBefore, 'insurance: a car found or impounded meanwhile undoes the payment, the excess and the treasury credit')
+    function core:taxToTreasury(amount, reason) v3.citizenid = 'OTH2'; return realTax(core, amount, reason) end
+    v3.state = 'out'
+    check(claimV(1, 3).error ~= nil and Mocks.bank[1] == bank and insurer == base, 'insurance: a car sold during the claim undoes it')
+    core.taxToTreasury = realTax
+    v3.citizenid, v3.state = 'OWN1', 'out'
+
+    -- Sold and bought back: the old policy would cover the holder again, at the sale price
+    D.sold[3] = true
+    check(claimV(1, 3).error == 'a vehicle that has been sold between players cannot be claimed' and v3.state == 'out', 'insurance: a car that was ever sold between players cannot be claimed on')
+    D.sold[3] = nil
+
+    -- A failed take-back from the treasury stops the other refunds: nothing is credited for a debit that never happened
+    function core:taxToTreasury(amount, reason)
+        v3.state = 'impounded'
+        Mocks.treasury = 0
+        return true
+    end
+    local bankMid, insMid = Mocks.bank[1], insurer
+    local logged = {}
+    local realPrint = _G.print
+    _G.print = function(...) logged[#logged + 1] = table.concat({ ... }, ' ') end
+    local stuck = claimV(1, 3)
+    _G.print = realPrint
+    local prices = env.Insurance.Prices(v3.price)
+    check(stuck.error == 'the vehicle changed hands or was found, nothing was paid', 'insurance: the claim still fails when the treasury cannot give the payout back')
+    check(insurer == insMid + prices.excess - prices.cost and Mocks.bank[1] == bankMid - prices.excess, 'insurance: a failed take-back from the treasury stops the refunds instead of minting money')
+    check(logged[1] and logged[1]:find('settle it by hand', 1, true) and D.claims[#D.claims].status == 'cancelled', 'insurance: an undo that stopped is logged for staff and the claim is cancelled')
+    -- put the world back for the next scenes
+    core.taxToTreasury = realTax
+    v3.state = 'out'
+    Mocks.bank[1], insurer, Mocks.treasury = bankMid, insMid, 100000
+
+    -- A good claim
+    local tBefore2 = Mocks.treasury
+    local ok = claimV(1, 3)
+    check(ok.success and v3.state == 'garaged' and v3.repaired and v3.taken == nil, 'insurance: a claim puts the car back in the garage repaired')
+    check(Mocks.bank[1] == bank - 2000 and insurer == base + 2000 - 16000 and Mocks.treasury == tBefore2 + 16000, 'insurance: the excess goes to the insurer and the replacement cost from the insurer to the treasury')
+    check(D.claims[#D.claims].status == 'paid', 'insurance: the claim is recorded as paid')
+
+    -- Limits
+    goOut(v3, 30)
+    check(claimV(1, 3).error == 'you have claimed too often recently', 'insurance: one claim per car in the window')
+    local v4, v5 = veh(4), veh(5)
+    insureV(1, 4); insureV(1, 5)
+    advance(3)
+    fund(40000)
+    goOut(v4, 30); goOut(v5, 30)
+    check(claimV(1, 4).success, 'insurance: a second car can be claimed')
+    check(claimV(1, 5).error == 'you have claimed too often recently', 'insurance: two claims per owner in the window')
+    advance(31)
+    check(claimV(1, 3).error == 'this vehicle is not covered for this', 'insurance: a lapsed policy is still not covered after the window')
+
+    -- Staff funding
+    local fundCmd = Mocks.commands.insurerfund
+    local ins0, tre0 = insurer, Mocks.treasury
+    fundCmd(2, { amount = 500 })
+    check(insurer == ins0 and Mocks.treasury == tre0, 'insurance: a player cannot fund the insurer')
+    fundCmd(3, { amount = 500 })
+    check(insurer == ins0 + 500 and Mocks.treasury == tre0 - 500, 'insurance: staff can move treasury money to the insurer')
+    fundCmd(3, { amount = 999999 }); fundCmd(3, { amount = '5' }); fundCmd(3, { amount = 0 })
+    check(insurer == ins0 + 500 and Mocks.treasury == tre0 - 500, 'insurance: a bad amount moves nothing')
+    Mocks.bizFails = true
+    fundCmd(3, { amount = 100 })
+    Mocks.bizFails = false
+    check(Mocks.treasury == tre0 - 500, 'insurance: a failed credit to the insurer gives the treasury its money back')
+    Mocks.treasury = 50
+    fundCmd(0, { amount = 100 })
+    check(insurer == ins0 + 500 and Mocks.treasury == 50, 'insurance: the treasury cannot be overdrawn')
+
+    core.addMoney, core.businessTransact, core.taxToTreasury = saved.addMoney, saved.businessTransact, saved.taxToTreasury
+    _G.GetAllVehicles, _G.GetVehicleNumberPlateText, _G.GetVehicleEngineHealth = saved.gav, saved.plate, saved.eng
+    _G.TriggerClientEvent = realT
+    D.on = false
+    mysql.fakeNow = nil
+end
+
+-- ---------------------------------------------------------------------------
 -- Phone loans
 -- ---------------------------------------------------------------------------
 
@@ -5351,6 +5607,15 @@ do
     env.Config.hireExpireSeconds = -1
     check(hire(2, 15).success and cb['som-shops:server:answerHire'](2, true).error == 'that offer is gone', 'shops: an old offer cannot be accepted')
     env.Config.hireExpireSeconds = 60
+    -- A shop that fills up between the offer and the answer refuses the hire and writes no row.
+    do
+        local shopId, before = D.staff[1].shop, #D.staff
+        check(hire(2, 15).success, 'shops: a full shop is only found out when the offer is answered')
+        for i = 1, env.Config.maxStaff - before do D.staff[#D.staff + 1] = { citizenid = 'FILL' .. i, shop = shopId, pay = 1, paid_at = 0 } end
+        local rows = #D.staff
+        check(cb['som-shops:server:answerHire'](2, true).error == 'the job is no longer open' and #D.staff == rows and not D.staff[rows + 1], 'shops: accepting a job in a shop that filled up is refused')
+        for i = #D.staff, before + 1, -1 do table.remove(D.staff, i) end
+    end
     check(cb['som-shops:server:setPay'](2, 'alta', 'STF3', 10).error == 'bad request' or cb['som-shops:server:setPay'](2, 'alta', 'STF3', 10).error == 'not available', 'shops: only the owner changes pay')
     check(cb['som-shops:server:setPay'](1, 'alta', 'STF3', 9999).error == 'bad request' and cb['som-shops:server:setPay'](1, 'alta', 'STF3', 30).success and D.staff[1].pay == 30, 'shops: the pay cap holds and the owner can change pay')
 
@@ -5456,6 +5721,15 @@ do
     local credit = mysql.transactions[2]
     check(paid == true and player.money.bank == 95 and credit and credit[1].query:find('+ ? WHERE', 1, true) and credit[1].values[1] == 25 and credit[2].query:find('FROM som_character_money', 1, true),
         'money: an offline credit is added in the database and the ledger reads the balance from it')
+
+    mysql.transactions = {}
+    check(env.Money.CreditCitizen('OFFLINE1', 'bank', 30, 'test:refund') == true and mysql.transactions[1] and mysql.transactions[1][1].values[1] == 30 and player.money.bank == 95,
+        'money: creditCitizen pays an offline character from the database without touching anyone else')
+    check(env.Money.CreditCitizen('NOBODY', 'bank', 30, 'test:refund') == false and env.Money.CreditCitizen('OFFLINE1', 'bank', 0.5, 'x') == false
+        and env.Money.CreditCitizen('OFFLINE1', 'bank', 5, '') == false and env.Money.CreditCitizen(7, 'bank', 5, 'x') == false,
+        'money: creditCitizen refuses an unknown character, a bad amount, no reason and a non citizenid')
+    check(env.Money.CreditCitizen(player.citizenid, 'bank', 5, 'test:refund') == true and player.money.bank == 100, 'money: creditCitizen pays an online character in memory')
+    player.money.bank = 95
 
     mysql.failTransaction = 'throw'
     local thrown = env.Money.Add(41, 'bank', 10, 'test:throw')
@@ -5615,6 +5889,8 @@ do
     end
     for name in pairs(env.Config.ItemStatus) do if not defined[name] then problems[#problems + 1] = name .. ' is not in items.lua' end end
     check(#problems == 0, 'status: Config.ItemStatus matches every client.status in ox_inventory items.lua ' .. table.concat(problems, ', '))
+    local S = env.Config.ItemStatus
+    check(S.burgershot_bigking.hunger > S.burger.hunger and S.burgershot_colab.thirst > S.cola.thirst and S.burgershot_bigking.stress < 0, 'status: restaurant food restores more than shop food and carries a small stress relief')
 end
 
 do
@@ -5966,6 +6242,317 @@ do
     _G.CreateThread = realCreate
     check(started == 1, 'mdt: repeated delete events for one incident start one check')
 end
+----------------------------------------------------------------------
+-- som-dispatch alert table
+----------------------------------------------------------------------
+do
+    -- A repeated key in a table constructor is not an error in Lua: the later one silently wins.
+    local path = REPO .. 'som-dispatch/shared/config.lua'
+    local handle = assert(io.open(path, 'r'))
+    local text = handle:read('a')
+    handle:close()
+    local body = text:match('Config%.Alerts = {\n(.-)\n}\n')
+    local seen, dupes = {}, {}
+    for key in body:gmatch('\n    ([%w_]+) = {') do
+        if seen[key] then dupes[#dupes + 1] = key end
+        seen[key] = true
+    end
+    check(#dupes == 0, 'dispatch: no alert type is defined twice (' .. table.concat(dupes, ', ') .. ')')
+
+    local env = loader.loadResource(REPO .. 'som-dispatch', { 'shared/config.lua' })
+    local theft, boost = env.Config.Alerts.vehicleTheft, env.Config.Alerts.boostTheft
+    check(theft.reportable == true and theft.offset == 60.0 and theft.chance == 0.6, 'dispatch: the client detected vehicle theft alert is still reportable')
+    check(boost and not boost.reportable, 'dispatch: the boosting alert has its own type and cannot be reported by a client')
+end
+
+----------------------------------------------------------------------
+-- som-boosting
+----------------------------------------------------------------------
+do
+    local function boostScene(open)
+        boardScene()
+        mysql.fakeNow = 1800000000
+        _G.CreateVehicle = _G.MockCreateVehicle
+        -- Earlier scenes replace these natives and do not always put them back.
+        _G.SetVehicleNumberPlateText = function(e, text) if Vehicles[e] then Vehicles[e].plate = text end end
+        _G.SetVehicleDoorsLocked = function(e, state) if Vehicles[e] then Vehicles[e].locked = state end end
+        _G.GetPedInVehicleSeat = function(e, seat) return seat == -1 and Vehicles[e] and Vehicles[e].driver or 0 end
+        local env = loader.loadResource(REPO .. 'som-boosting', { 'shared/config.lua', 'server/main.lua' })
+        Mocks.players[5] = { citizenid = 'P5', job = { name = 'police', onduty = true }, charinfo = { firstname = 'Po', lastname = 'Lice', phone = '555-0005' } }
+        Mocks.minted, Mocks.mintFails = {}, false
+        Mocks.exported.mintBills = function(src, worths, tag)
+            if Mocks.mintFails then return nil, 'could not carry the bills' end
+            Mocks.minted[#Mocks.minted + 1] = { src = src, worths = worths, tag = tag }
+            return { 'x' }
+        end
+        if open ~= false then
+            env.Config.pickups[1].enabled, env.Config.pickups[1].coords = true, vec3(0, 0, 0)
+            env.Config.dropoffs[1].enabled, env.Config.dropoffs[1].coords = true, vec3(500, 0, 0)
+        end
+        local seen = {}
+        local real = _G.TriggerClientEvent
+        _G.TriggerClientEvent = function(name, target, payload)
+            if name == 'som-boosting:client:contract' then seen[#seen + 1] = { target = target, data = payload } end
+        end
+        return env, seen, function() _G.TriggerClientEvent = real; _G.PedVehicle = nil end
+    end
+
+    local function begin(class, size)
+        crew(size or 1)
+        j(1, 'queue', { provider = 'boost_' .. class }); boardEnv.JobBoard.Draw('boost_' .. class)
+        return j(1, 'accept')
+    end
+
+    -- Opens the car for player 1, standing next to it.
+    local function openCar(unlock, car)
+        FakePeds[1] = vec3(10, 1, 0)
+        unlock(1, 'begin')
+        Mocks.clock = Mocks.clock + 13000
+        return unlock(1, 'finish')
+    end
+
+    do
+        local env, _, restore = boostScene(false)
+        crew(1)
+        check(j(1, 'queue', { provider = 'boost_C' }).error == 'no places are open yet', 'boost: every place ships closed, so nothing can start')
+        env.Config.pickups[1].enabled, env.Config.pickups[1].coords = true, vec3(0, 0, 0)
+        env.Config.dropoffs[1].enabled, env.Config.dropoffs[1].coords = true, vec3(500, 0, 0)
+        local a = j(1, 'queue', { provider = 'boost_A' })
+        check(a.success ~= true, 'boost: class A ships off')
+        Mocks.players[5] = nil
+        check(j(1, 'queue', { provider = 'boost_C' }).error == 'the city is too quiet for this', 'boost: no police on duty means no contract')
+        restore()
+    end
+
+    do
+        local env, seen, restore = boostScene()
+        local unlock, deliver = RegisteredCallbacks['som-boosting:server:unlock'], RegisteredCallbacks['som-boosting:server:deliver']
+        local treasury0, paid0 = Mocks.treasury, Mocks.calls.addMoney
+        local started = begin('C')
+        check(started.success == true, 'boost: a crew with police on duty starts a contract')
+
+        local row, car = mysql.db.boost.runs[1], Spawned[#Spawned]
+        check(row.status == 'active' and row.class == 'C' and row.face == 1000 and row.plate:match('^BST%d%d%d%d%d$'), 'boost: the run is recorded with its plate and reserved face value')
+        check(Vehicles[car].plate == row.plate and Vehicles[car].locked == 2, 'boost: the car is spawned with the server plate and locked')
+        check(#seen == 1 and seen[1].data.plate == row.plate and seen[1].data.netId == car and seen[1].data.model == row.model:upper(), 'boost: the crew is told the model and plate')
+        FakePeds[car] = vec3(10, 0, 0)
+        Vehicles[car].model = row.model
+
+        check(unlock(1, 'nope').error == 'bad request' and unlock(1, 5).error == 'bad request', 'boost: the unlock step must be begin or finish')
+        check(unlock(9, 'begin').error == 'there is nothing to open', 'boost: outsiders cannot unlock')
+        FakePeds[1] = vec3(500, 0, 0)
+        check(unlock(1, 'begin').error == 'you are not at the car', 'boost: the unlock needs you at the car')
+        FakePeds[1] = vec3(10, 1, 0)
+        check(unlock(1, 'finish').error == 'you were too quick', 'boost: finishing without starting is refused')
+        check(unlock(1, 'begin').success == true and unlock(1, 'finish').error == 'you were too quick', 'boost: the unlock takes the minimum time')
+        unlock(1, 'begin')
+        Mocks.clock = Mocks.clock + 13000
+        check(unlock(1, 'finish').success == true and Vehicles[car].locked == 1, 'boost: after the time the car opens')
+        check(Mocks.calls.dispatchAlert == 1 and Mocks.lastAlertType == 'boostTheft' and Mocks.lastAlertExtra.plate == row.plate and Mocks.lastAlertExtra.coords.x == 10,
+            'boost: dispatch is told once, at the car')
+        check(unlock(1, 'begin').error == 'there is nothing to open' and Mocks.calls.dispatchAlert == 1, 'boost: opening again raises no second call')
+
+        -- The delivery is for that exact car, driven by the sender, at the drop-off.
+        check(deliver(1, 'x').error == 'bad request' and deliver(1, 1.5).error == 'bad request', 'boost: the delivery needs an integer net id')
+        check(deliver(9, car).error == 'there is nothing to hand over', 'boost: outsiders cannot deliver')
+        Vehicles[9999] = { plate = row.plate, model = row.model }
+        check(deliver(1, 9999).error == 'that is not the car', 'boost: another car with the same plate and model is not the run car')
+        Vehicles[9999] = nil
+        Vehicles[car].plate = 'ZZZ999'
+        check(deliver(1, car).error == 'that is not the car', 'boost: a changed plate is refused')
+        Vehicles[car].plate = row.plate
+        Vehicles[car].model = 'adder'
+        check(deliver(1, car).error == 'that is not the car', 'boost: a changed model is refused')
+        Vehicles[car].model = row.model
+        check(deliver(1, car).error == 'you need to be driving it', 'boost: the sender must be in the car')
+        Vehicles[car].driver = 2
+        check(deliver(1, car).error == 'you need to be driving it', 'boost: a passenger cannot hand the car over, only the driver')
+        Vehicles[car].driver = 1
+        check(deliver(1, car).error == 'bring it to the drop-off', 'boost: the car must be at the drop-off')
+        FakePeds[car] = vec3(500, 0, 0)
+        check(deliver(1, car).error:find('give it a few minutes'), 'boost: a quick delivery is refused and the run stays open')
+        check(row.status == 'active' and #Mocks.minted == 0, 'boost: nothing is paid for it')
+        mysql.fakeNow = mysql.fakeNow + 60
+
+        local before = Mocks.calls.addMoney
+        check(deliver(1, car).success == true and row.status == 'done' and row.paid == 1000 and row.claimed == mysql.fakeNow, 'boost: the delivery is claimed and recorded')
+        check(#Mocks.minted == 1 and Mocks.minted[1].src == 1 and #Mocks.minted[1].worths == 4 and Mocks.minted[1].worths[1] == 250 and Mocks.minted[1].tag == 'boost:C', 'boost: the pay is marked bills through the launder ledger')
+        check(Mocks.treasury == treasury0 and Mocks.calls.addMoney == before, 'boost: the treasury is not touched and no cash is paid')
+        check(Deleted[#Deleted] == car and Mocks.exported.getGroup(1).busy == nil, 'boost: the car is removed and the group freed')
+        check(deliver(1, car).error == 'there is nothing to hand over' and #Mocks.minted == 1, 'boost: a second delivery pays nothing')
+
+        -- The hourly cap, counted from the face values of started runs.
+        env.Config.pickups[2].enabled, env.Config.pickups[2].coords = true, vec3(0, 0, 0)
+        env.Config.classes.C.hourlyCap = 1500
+        check(begin('C').success == false and mysql.db.boost.runs[2] == nil, 'boost: the hourly cap refuses a contract that would overshoot it')
+        env.Config.classes.C.hourlyCap = 2500
+        j(1, 'queue', { provider = 'boost_C' }); boardEnv.JobBoard.Draw('boost_C')
+        check(j(1, 'accept').success == true and mysql.db.boost.runs[2].pickup == 'pickup_2', 'boost: under the cap the other pickup is used, the first is cooling down')
+
+        -- Losing the car ends the run.
+        local car2 = Spawned[#Spawned]
+        Vehicles[car2] = nil
+        env.Boosting.Sweep()
+        check(mysql.db.boost.runs[2].status == 'failed' and Mocks.exported.getGroup(1).busy == nil, 'boost: a destroyed car fails the run and frees the group')
+        FakePeds[car] = nil
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        local unlock, deliver = RegisteredCallbacks['som-boosting:server:unlock'], RegisteredCallbacks['som-boosting:server:deliver']
+        check(begin('C', 2).success == true, 'boost: (setup) a crew of two starts')
+        local row, car = mysql.db.boost.runs[1], Spawned[#Spawned]
+        FakePeds[car] = vec3(10, 0, 0); Vehicles[car].model = row.model
+        check(openCar(unlock).success == true, 'boost: (setup) the car is opened')
+        FakePeds[car] = vec3(500, 0, 0); Vehicles[car].driver = 1
+        FakePeds[1] = vec3(500, 0, 0); FakePeds[2] = vec3(520, 0, 0)
+        mysql.fakeNow = mysql.fakeNow + 60
+        check(deliver(1, car).success == true and #Mocks.minted == 2, 'boost: a crew member at the drop-off shares the pay')
+        local total = 0
+        for _, m in ipairs(Mocks.minted) do total = total + #m.worths end
+        check(total == 4 and #Mocks.minted[1].worths == 2 and #Mocks.minted[2].worths == 2, 'boost: the bills are dealt out, not multiplied by the crew')
+        FakePeds[car], FakePeds[2] = nil, nil
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        local unlock, deliver = RegisteredCallbacks['som-boosting:server:unlock'], RegisteredCallbacks['som-boosting:server:deliver']
+        begin('C', 2)
+        local row, car = mysql.db.boost.runs[1], Spawned[#Spawned]
+        FakePeds[car] = vec3(10, 0, 0); Vehicles[car].model = row.model
+        openCar(unlock)
+        FakePeds[car] = vec3(500, 0, 0); Vehicles[car].driver = 1
+        FakePeds[1] = vec3(500, 0, 0); FakePeds[2] = vec3(5000, 0, 0)
+        mysql.fakeNow = mysql.fakeNow + 60
+        check(deliver(1, car).success == true and #Mocks.minted == 1 and #Mocks.minted[1].worths == 4, 'boost: a crew member far from the drop-off gets no share')
+        FakePeds[car], FakePeds[2] = nil, nil
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        local unlock, deliver = RegisteredCallbacks['som-boosting:server:unlock'], RegisteredCallbacks['som-boosting:server:deliver']
+        begin('C')
+        local row, car = mysql.db.boost.runs[1], Spawned[#Spawned]
+        FakePeds[car] = vec3(10, 0, 0); Vehicles[car].model = row.model
+        openCar(unlock)
+        FakePeds[car] = vec3(500, 0, 0); Vehicles[car].driver = 1
+        mysql.fakeNow = mysql.fakeNow + 60
+        Mocks.mintFails = true
+        check(deliver(1, car).success == true and row.status == 'unpaid' and row.paid == 0, 'boost: a mint that fails marks the run unpaid for staff')
+        Mocks.mintFails = false
+        check(deliver(1, car).error == 'there is nothing to hand over' and #Mocks.minted == 0, 'boost: and it is never paid a second time')
+        FakePeds[car] = nil
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        env.Config.minutes = -1
+        check(begin('C').success == true, 'boost: (setup) a contract that is already out of time')
+        local car = Spawned[#Spawned]
+        env.Boosting.Sweep()
+        check(mysql.db.boost.runs[1].status == 'failed' and Deleted[#Deleted] == car and Mocks.exported.getGroup(1).busy == nil, 'boost: a contract that runs out of time fails, removes the car and frees the group')
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        local unlock, deliver = RegisteredCallbacks['som-boosting:server:unlock'], RegisteredCallbacks['som-boosting:server:deliver']
+        begin('C', 2)
+        local row, car = mysql.db.boost.runs[1], Spawned[#Spawned]
+        FakePeds[car] = vec3(10, 0, 0); Vehicles[car].model = row.model
+        openCar(unlock)
+        Handlers['som:server:playerUnloaded'](2, Mocks.players[2].citizenid)
+        FakePeds[car] = vec3(500, 0, 0); Vehicles[car].driver = 1
+        FakePeds[1], FakePeds[2] = vec3(500, 0, 0), vec3(500, 0, 0)
+        mysql.fakeNow = mysql.fakeNow + 60
+        check(deliver(1, car).success == true and #Mocks.minted == 1 and #Mocks.minted[1].worths == 4, 'boost: a crew member who left the server is not paid and the others share the whole pay')
+        FakePeds[car], FakePeds[2] = nil, nil
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        local unlock, deliver = RegisteredCallbacks['som-boosting:server:unlock'], RegisteredCallbacks['som-boosting:server:deliver']
+        local pay, said = Mocks.commands.boostpay, nil
+        local realT = _G.TriggerClientEvent
+        _G.TriggerClientEvent = function(name, target, text) if name == 'som:client:notify' then said = text end end
+        begin('C')
+        local row, car = mysql.db.boost.runs[1], Spawned[#Spawned]
+        FakePeds[car] = vec3(10, 0, 0); Vehicles[car].model = row.model
+        openCar(unlock)
+        row.status, row.paid, row.claimed = 'done', 0, mysql.fakeNow   -- the server went down after the claim, before the mint
+        Mocks.minted = {}
+        pay(2, { run = 1, target = 1 })
+        check(said == 'You do not have permission to do that' and #Mocks.minted == 0, 'boost: only an admin can pay a stuck run')
+        Mocks.admins[2] = true
+        pay(2, { run = 1, target = 1 })
+        check(said == 'That run is not stuck' and #Mocks.minted == 0, 'boost: a run unlocked a moment ago is not stuck yet')
+        mysql.fakeNow = mysql.fakeNow + 301
+        pay(2, { run = 99, target = 1 })
+        check(said:find('No such run') and #Mocks.minted == 0, 'boost: an unknown run is refused')
+        Mocks.mintFails = true
+        pay(2, { run = 1, target = 1 })
+        check(row.paid == 0 and row.status == 'unpaid' and #Mocks.minted == 0, 'boost: a failed mint leaves the run unpaid and ready to retry')
+        Mocks.mintFails = false
+        pay(2, { run = 1, target = 1 })
+        check(row.paid == row.face and row.status == 'done' and #Mocks.minted == 1 and #Mocks.minted[1].worths == 4 and Mocks.minted[1].src == 1, 'boost: an admin pays the stuck run to the chosen player')
+        pay(2, { run = 1, target = 1 })
+        check(said:find('nothing is owed') and #Mocks.minted == 1, 'boost: a run is never paid twice')
+
+        -- A share that could not be minted leaves a part paid: the command pays what is still owed.
+        row.status, row.paid = 'unpaid', 500
+        Mocks.mintFails = true
+        pay(2, { run = 1, target = 1 })
+        check(row.paid == 500 and row.status == 'unpaid' and #Mocks.minted == 1, 'boost: a failed catch-up mint leaves the part paid as it was')
+        Mocks.mintFails = false
+        pay(2, { run = 1, target = 1 })
+        check(row.paid == row.face and #Mocks.minted == 2 and #Mocks.minted[2].worths == 2 and Mocks.minted[2].worths[1] == 250, 'boost: the command pays only what is still owed')
+        pay(2, { run = 1, target = 1 })
+        check(#Mocks.minted == 2, 'boost: and not again')
+        row.status, row.paid, row.claimed = 'unpaid', 500, mysql.fakeNow
+        pay(2, { run = 1, target = 1 })
+        check(said == 'That run is not stuck' and #Mocks.minted == 2, 'boost: a delivery claimed a moment ago is not paid by hand while it may still be minting')
+        Mocks.admins[2] = nil
+        _G.TriggerClientEvent = realT
+        FakePeds[car] = nil
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        local real = math.random
+        math.random = function(a, b) if b then return 7 elseif a then return 1 end return 0.5 end
+        mysql.db.boost.runs[1] = { id = 1, class = 'C', pickup = 'other', plate = 'BST00007', status = 'active', face = 0, paid = 0, ts = mysql.fakeNow }
+        local ok = begin('C').success
+        math.random = real
+        check(ok == false and mysql.db.boost.runs[2] == nil, 'boost: a plate that a running contract holds is never used')
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        check(begin('C').success == true, 'boost: (setup) a contract is running')
+        local D = mysql.db.boost
+        D.runs[2] = { id = 2, class = 'C', pickup = 'lost', plate = 'BST11111', status = 'active', face = 1000, paid = 0, ts = mysql.fakeNow - 120 }
+        D.runs[3] = { id = 3, class = 'C', pickup = 'young', plate = 'BST22222', status = 'active', face = 1000, paid = 0, ts = mysql.fakeNow }
+        env.Boosting.Sweep()
+        check(D.runs[2].status == 'failed', 'boost: an active row the server no longer keeps is failed, freeing its pickup and cap')
+        check(D.runs[3].status == 'active' and D.runs[1].status == 'active', 'boost: a new row and a running contract are left alone')
+        restore()
+    end
+
+    do
+        local env, _, restore = boostScene()
+        setmetatable(mysql.db.boost.ownedPlates, { __index = function() return true end })
+        check(begin('C').success == false and mysql.db.boost.runs[1] == nil, 'boost: a plate that a player vehicle holds is never used')
+        restore()
+    end
+end
+
 
 -- som-trucking
 ----------------------------------------------------------------------
@@ -7276,7 +7863,406 @@ do
 end
 
 
+-- ---------------------------------------------------------------------------
+-- Weazel News
+-- ---------------------------------------------------------------------------
 
+do
+    resetDb()
+    resetMocks()
+    mysql.fakeNow = 2000000
+    mysql.db.news = { stories = {}, payouts = {} }
+    local env = loader.loadResource(REPO .. 'som-news', { 'shared/config.lua', 'server/main.lua' })
+    local core = exports['som-core']
+    local C = env.Config
+    local app = Mocks.apps.news
+
+    local function person(src, cid, job, onduty)
+        return { citizenid = cid, source = src, job = { name = job, onduty = onduty },
+            charinfo = { firstname = 'F' .. src, lastname = 'L' .. src } }
+    end
+    Mocks.players = {
+        [1] = person(1, 'REP1', 'news', true), [2] = person(2, 'CIT2', 'unemployed', true),
+        [3] = person(3, 'REP3', 'news', false), [4] = person(4, 'STAFF4', 'unemployed', true),
+        [5] = person(5, 'REP5', 'news', true),
+    }
+    Mocks.bank = { [1] = 0, [2] = 0, [3] = 0, [4] = 0, [5] = 0 }
+    Mocks.treasury = 10000
+    Mocks.admins = { [4] = true }
+    Mocks.addMoneyFails = false
+    local saved = { addMoney = core.addMoney, getPlayers = core.getPlayers }
+    local lastOpts
+    function core:addMoney(source, _, amount, _, opts)
+        lastOpts = opts
+        if Mocks.addMoneyThrows then error('simulated crash') end
+        if Mocks.addMoneyFails then return false, 'refused' end
+        Mocks.bank[source] = (Mocks.bank[source] or 0) + amount
+        return true
+    end
+    function core:getPlayers() return { Mocks.players[1], Mocks.players[2], Mocks.players[3] } end
+    local pushed = {}
+    Mocks.exported.notifyApp = function(source, appId, text) pushed[#pushed + 1] = { source = source, app = appId, text = text } end
+
+    local BODY = 'A long enough account of what happened downtown this afternoon, with the details a reader wants.'
+    local function publish(src, kind, headline, body)
+        return app.handler(src, 'publish', { kind = kind, text = headline .. ' | ' .. (body or BODY), author = 'Spoofed' })
+    end
+    local function view(src) return app.handler(src, 'view', {}) end
+    local function titles(v)
+        local out = {}
+        for _, sec in ipairs(v.view.sections) do for _, r in ipairs(sec.rows) do out[#out + 1] = r.title end end
+        return out
+    end
+    local function has(list, x) for _, v in ipairs(list) do if v == x then return true end end return false end
+
+    check(app ~= nil and app.reads.view == true, 'news: the app registers with the phone and marks view as a read')
+    check(not publish(1, 'story', 'Bank robbery downtown').success and #mysql.db.news.stories == 0, 'news: nothing can be published while the newsroom ships closed')
+    check(view(1).view.buttons == nil, 'news: a reporter sees no publish buttons while it ships closed')
+
+    C.enabled = true
+    check(view(1).view.buttons ~= nil and view(2).view.buttons == nil and view(3).view.buttons == nil, 'news: only a reporter on duty is offered the publish buttons')
+    check(not publish(2, 'story', 'Bank robbery downtown').success, 'news: a citizen cannot publish')
+    check(not publish(3, 'story', 'Bank robbery downtown').success, 'news: a reporter off duty cannot publish')
+    check(not publish(99, 'story', 'Bank robbery downtown').success, 'news: an unloaded player cannot publish')
+    check(not publish(1, 'poll', 'Bank robbery downtown').success, 'news: an unknown kind is refused')
+    check(not publish(1, 'story', 'Short', BODY).success and not publish(1, 'story', 'A decent headline', 'too short').success, 'news: a short headline or a short body is refused')
+    check(not app.handler(1, 'publish', { kind = 'story', text = 12 }).success and not app.handler(1, 'nope', {}).success, 'news: bad text and unknown actions are refused')
+    check(#mysql.db.news.stories == 0 and Mocks.treasury == 10000, 'news: refused stories leave no row and cost nothing')
+
+    local r = publish(1, 'story', 'Bank robbery downtown')
+    check(r.success and r.paid == 150 and mysql.db.news.stories[1].author == 'F1 L1', 'news: the author comes from the character, not the request')
+    check(Mocks.bank[1] == 150 and Mocks.treasury == 9850, 'news: a story pays from the treasury with a matching debit')
+    check(lastOpts and lastOpts.counterparty == 'treasury' and lastOpts.flow == 'transfer', 'news: the credit is a transfer from the treasury, so the economy watch does not count it as a second faucet')
+
+
+    check(not publish(1, 'story', 'Another one coming', BODY .. ' More.').success and #mysql.db.news.stories == 1, 'news: a second story inside the gap is refused')
+    mysql.fakeNow = mysql.fakeNow + 121
+    check(not publish(1, 'story', 'bank robbery DOWNTOWN', BODY:upper()).success, 'news: the same story again is refused whatever the case')
+    local n = 0
+    local function next_story()
+        n = n + 1
+        mysql.fakeNow = mysql.fakeNow + 121
+        return publish(1, 'story', 'Update number ' .. n .. ' from the scene', BODY .. ' ' .. n)
+    end
+    check(next_story().paid == 150 and next_story().paid == 150 and next_story().paid == 150, 'news: stories keep paying up to the reporter cap')
+    local capped = next_story()
+    check(capped.success and capped.paid == 0 and Mocks.bank[1] == 600 and Mocks.treasury == 9400, 'news: past the reporter hourly cap the story publishes unpaid')
+    mysql.fakeNow = mysql.fakeNow + 3600
+    check(next_story().paid == 150, 'news: the cap frees up after an hour')
+
+    C.pay.hourlyCap = 200
+    mysql.db.news.payouts = {}
+    check(publish(5, 'story', 'Rival paper scoop on the harbour').paid == 150, 'news: a second reporter is paid')
+    mysql.fakeNow = mysql.fakeNow + 121
+    local global = publish(5, 'story', 'Second harbour scoop of the day', BODY .. ' Again.')
+    check(global.paid == 50 and Mocks.bank[5] == 200, 'news: the network cap shortens the last payment')
+    mysql.fakeNow = mysql.fakeNow + 121
+    check(publish(5, 'story', 'Third harbour scoop of the day', BODY .. ' Third.').paid == 0, 'news: the network cap stops further pay')
+    C.pay.hourlyCap = 3000
+
+    local before = Mocks.bank[1]
+    mysql.fakeNow = mysql.fakeNow + 4000
+    Mocks.treasury = 0
+    local broke = next_story()
+    check(broke.success and broke.paid == 0 and Mocks.bank[1] == before and Mocks.treasury == 0, 'news: an empty treasury publishes the story and pays nothing')
+
+    Mocks.treasury = 1000
+    Mocks.addMoneyFails = true
+    local payoutsBefore = #mysql.db.news.payouts
+    local failed = next_story()
+    Mocks.addMoneyFails = false
+    check(failed.success and failed.paid == 0 and Mocks.treasury == 1000 and #mysql.db.news.payouts == payoutsBefore, 'news: a failed credit refunds the treasury and leaves no payout row')
+
+    Mocks.addMoneyThrows = true
+    local crashed = next_story()
+    Mocks.addMoneyThrows = false
+    check(crashed.success and crashed.paid == 0 and Mocks.treasury == 1000 and #mysql.db.news.payouts == payoutsBefore, 'news: a crash after the treasury debit refunds it and leaves no payout row')
+    check(not app.handler(1, 'publish', { kind = 'story', text = 'no bar here' }).success, 'news: text without a bar is refused')
+
+    mysql.fakeNow = mysql.fakeNow + 121
+    local treasury, bank = Mocks.treasury, Mocks.bank[1]
+    local b = publish(1, 'breaking', 'Shots fired at the pier')
+    check(b.success and b.paid == 0 and Mocks.treasury == treasury and Mocks.bank[1] == bank, 'news: a breaking alert is not paid')
+    check(#pushed == 3 and pushed[1].app == 'news' and pushed[1].text == 'Shots fired at the pier', 'news: a breaking alert is pushed to every online phone')
+    mysql.fakeNow = mysql.fakeNow + 121
+    check(not publish(1, 'breaking', 'Second alert so soon', BODY .. ' Soon.').success, 'news: breaking alerts have their own longer gap')
+
+    local feed = view(2)
+    check(feed.success and has(titles(feed), 'Shots fired at the pier') and feed.view.sections[1].title == 'Breaking' and feed.view.sections[1].rows[1].title == 'Shots fired at the pier',
+        'news: a citizen reads the feed with breaking news on top')
+
+    Mocks.commands.removestory(2, { id = 1 })
+    check(mysql.db.news.stories[1].status == 'live', 'news: a citizen cannot remove a story')
+    Mocks.commands.removestory(4, { id = 1 })
+    check(mysql.db.news.stories[1].status == 'removed' and not has(titles(view(2)), 'Bank robbery downtown'), 'news: staff remove a story and it leaves the feed')
+    Mocks.commands.removestory(4, { id = 1 })
+    check(#mysql.db.phoneAudit == 2 and mysql.db.phoneAudit[2].ok == 0, 'news: removals are audited, including a repeat that removed nothing')
+
+    -- Multibyte text: cut on a character, measured in characters.
+    mysql.fakeNow = mysql.fakeNow + 4000
+    local accent = ('\195\169'):rep(100)
+    local wide = app.handler(5, 'publish', { kind = 'story', text = accent .. ' | ' .. ('\195\188'):rep(600) })
+    local last = mysql.db.news.stories[#mysql.db.news.stories]
+    check(wide.success and utf8.len(last.headline) == C.headline.max and utf8.len(last.body) <= C.body.max and utf8.len(last.body) > 400, 'news: long multibyte text is cut at the character limit and stored whole')
+    check(not app.handler(5, 'publish', { kind = 'story', text = ('\195\169'):rep(5) .. ' | ' .. BODY }).success, 'news: the headline minimum counts characters, not bytes')
+    mysql.fakeNow = mysql.fakeNow + 121
+    check(not app.handler(5, 'publish', { kind = 'story', text = 'A decent headline | ' .. ('\195\169'):rep(40) }).success, 'news: the story minimum counts characters, not bytes')
+    check(not app.handler(5, 'publish', { kind = 'story', text = 'A decent headline | ' .. BODY .. '\255\254' }).success, 'news: text that is not valid UTF-8 is refused')
+
+    -- Breaking alerts: one per network gap across all reporters.
+    mysql.fakeNow = mysql.fakeNow + 4000
+    check(publish(1, 'breaking', 'Fire at the docks tonight').success, 'news: a breaking alert goes out')
+    mysql.fakeNow = mysql.fakeNow + 60
+    check(not publish(5, 'breaking', 'Another alert from the rival paper', BODY .. ' Rival.').success, 'news: a second reporter cannot send a breaking alert inside the network gap')
+    check(publish(5, 'story', 'A plain story is not held back', BODY .. ' Plain.').success, 'news: the network gap holds back breaking alerts only')
+    mysql.fakeNow = mysql.fakeNow + C.breakingNetworkGapSeconds
+    check(publish(5, 'breaking', 'Another alert from the rival paper', BODY .. ' Rival.').success, 'news: another reporter can send one after the network gap')
+
+    -- /removestory takes a whole number.
+    local audits = #mysql.db.phoneAudit
+    Mocks.commands.removestory(4, { id = 1.5 })
+    check(#mysql.db.phoneAudit == audits and mysql.db.news.stories[2].status == 'live' and mysql.db.news.stories[1].status == 'removed', 'news: a story number that is not whole is refused before anything runs')
+    Mocks.commands.removestory(4, { id = 0 })
+    check(#mysql.db.phoneAudit == audits, 'news: story number zero is refused')
+
+    core.addMoney, core.getPlayers = saved.addMoney, saved.getPlayers
+    Mocks.exported.notifyApp = nil
+    C.enabled = false
+end
+
+
+
+-- som-outdoors: mining
+----------------------------------------------------------------------
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua', 'server/buyer.lua', 'server/mining.lua' })
+    local M = env.Config.mining
+    Mocks.players = { [1] = { citizenid = 'MI1' }, [2] = { citizenid = 'MI2' }, [3] = { citizenid = 'MI3' } }
+    Mocks.inv = { [1] = {}, [2] = {}, [3] = {} }
+    Mocks.invFull = {}
+    Mocks.clock = 1000000
+    FakePeds = { [1] = vec3(0, 0, 0), [2] = vec3(0, 0, 0), [3] = vec3(500, 0, 0) }
+    local cb = RegisteredCallbacks
+    local slot = 2000
+    local function give(src, name, n) slot = slot + 1; Mocks.inv[src][slot] = { name = name, count = n or 1, slot = slot } end
+    local function count(src, name) local n = 0; for _, it in pairs(Mocks.inv[src]) do if it.name == name then n = n + (it.count or 1) end end; return n end
+    local function begin(src, key) return cb['som-outdoors:server:mineBegin'](src, key) end
+    local function finish(src, wait)
+        Mocks.clock = Mocks.clock + (wait or 8000)
+        return cb['som-outdoors:server:mineFinish'](src)
+    end
+
+    check(#cb['som-outdoors:server:mineNodes'](1) == 0 and begin(1, 'copper_1:1').error == 'there is nothing to mine here', 'mining: a site with no placed nodes offers nothing')
+    local site = M.sites[1]
+    site.nodes, site.min, site.max = { vec3(0, 0, 0), vec3(50, 0, 0) }, 2, 2
+    check(#cb['som-outdoors:server:mineNodes'](1) == 2, 'mining: placed nodes are listed')
+
+    check(begin(1, 5).error == 'there is nothing to mine here' and begin(1, 'copper_1:9').error == 'there is nothing to mine here' and begin(1, 'nope:1').error == 'there is nothing to mine here', 'mining: a bad or unknown node key is refused')
+    check(begin(1, 'copper_1:1').error == 'you need a pickaxe', 'mining: a pickaxe is required')
+    give(1, 'pickaxe'); give(2, 'pickaxe'); give(3, 'pickaxe')
+    check(begin(3, 'copper_1:1').error == 'you are too far from the vein', 'mining: the distance is read from the server ped')
+    check(cb['som-outdoors:server:mineFinish'](1).error == 'you have not started', 'mining: finishing without starting yields nothing')
+
+    local b = begin(1, 'copper_1:1')
+    check(b.success and b.seconds == 8, 'mining: a swing starts next to a vein')
+    check(begin(2, 'copper_1:1').error == 'someone else is working that vein', 'mining: one vein, one striker at a time')
+    check(finish(1, 1000).error == 'you were too quick' and count(1, 'copperore') == 0, 'mining: an early finish yields nothing')
+    check(begin(2, 'copper_1:1').success == true, 'mining: a refused swing frees the vein')
+    cb['som-outdoors:server:mineFinish'](2)
+    begin(1, 'copper_1:1')
+    FakePeds[2] = vec3(0, 0, 0)
+    check(finish(1, 70000).error == 'you were too quick', 'mining: a stale finish yields nothing')
+
+    FakePeds[2] = vec3(500, 0, 0)
+    begin(1, 'copper_1:1')
+    FakePeds[1] = vec3(60, 0, 0)
+    check(finish(1).error == 'you are too far from the vein' and count(1, 'copperore') == 0, 'mining: walking away cancels the strike')
+    FakePeds[1] = vec3(0, 0, 0)
+
+    begin(1, 'copper_1:1')
+    local r = finish(1)
+    check(r.success and r.item == 'copperore' and r.count == 2 and count(1, 'copperore') == 2, 'mining: a full swing yields ore, rolled on the server')
+    check(begin(1, 'copper_1:1').error == 'this vein is spent for now', 'mining: a struck vein rests')
+    Mocks.clock = Mocks.clock + 601000
+    check(begin(1, 'copper_1:1').success == true, 'mining: the vein is ready again after its rest')
+    cb['som-outdoors:server:mineFinish'](1)
+
+    site.min, site.max = 1, 3
+    local seen = {}
+    for i = 1, 40 do
+        Mocks.clock = Mocks.clock + 700000
+        M.hourlyStrikes = 1000
+        FakePeds[1] = vec3(50, 0, 0)
+        begin(1, 'copper_1:2')
+        local got = finish(1)
+        FakePeds[1] = vec3(0, 0, 0)
+        if got.count then seen[got.count] = true end
+    end
+    check(seen[1] and seen[2] and seen[3] and not seen[0] and not seen[4], 'mining: the yield is rolled on the server within the range')
+end
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua', 'server/buyer.lua', 'server/mining.lua' })
+    local M = env.Config.mining
+    Mocks.players = { [1] = { citizenid = 'MA1' }, [2] = { citizenid = 'MA2' }, [3] = { citizenid = 'MA3' }, [4] = { citizenid = 'MA1' } }
+    Mocks.inv = { [1] = {}, [2] = {}, [3] = {}, [4] = {} }
+    Mocks.invFull = {}
+    Mocks.clock = 1000000
+    FakePeds = { [1] = vec3(0, 0, 0), [2] = vec3(2, 0, 0), [3] = vec3(4, 0, 0), [4] = vec3(1, 0, 0) }
+    local cb = RegisteredCallbacks
+    local slot = 2100
+    local function give(src, name, n) slot = slot + 1; Mocks.inv[src][slot] = { name = name, count = n or 1, slot = slot } end
+    local function count(src, name) local n = 0; for _, it in pairs(Mocks.inv[src]) do if it.name == name then n = n + (it.count or 1) end end; return n end
+    local function strike(src, key)
+        local b = cb['som-outdoors:server:mineBegin'](src, key)
+        Mocks.clock = Mocks.clock + 9000
+        return b, cb['som-outdoors:server:mineFinish'](src)
+    end
+    local site = M.sites[1]
+    site.nodes, site.min, site.max = { vec3(0, 0, 0), vec3(0, 0, 0), vec3(0, 0, 0), vec3(0, 0, 0), vec3(0, 0, 0) }, 2, 2
+    give(1, 'pickaxe')
+
+    local _, r = strike(1, 'copper_1:1')
+    check(r.count == 2, 'mining: nobody around, no bonus')
+    give(2, 'pickaxe')
+    check(cb['som-outdoors:server:mineBegin'](2, 'copper_1:01').success == false, 'mining: a zero padded key is not a second vein')
+    check(cb['som-outdoors:server:mineBegin'](2, 'copper_1:001').success == false, 'mining: a longer padded key is not a second vein')
+    Mocks.inv[2] = {}
+    cb['som-outdoors:server:mineBegin'](1, 'copper_1:3')
+    cb['som-outdoors:server:mineBegin'](1, 'copper_1:4')
+    give(2, 'pickaxe')
+    check(cb['som-outdoors:server:mineBegin'](2, 'copper_1:3').success == true, 'mining: starting a second vein frees the first one')
+    cb['som-outdoors:server:mineFinish'](2)
+    Mocks.inv[2] = {}
+    give(2, 'pickaxe')
+    _, r = strike(1, 'copper_1:2')
+    check(r.count == 3, 'mining: a friend with a pickaxe close by adds one ore')
+    give(3, 'pickaxe')
+    _, r = strike(1, 'copper_1:3')
+    check(r.count == 4, 'mining: two friends add two ore')
+    FakePeds[3] = vec3(40, 0, 0)
+    _, r = strike(1, 'copper_1:4')
+    check(r.count == 3, 'mining: a friend too far away adds nothing (server position)')
+    Mocks.inv[2] = {}
+    FakePeds[3] = vec3(4, 0, 0)
+    _, r = strike(1, 'copper_1:5')
+    check(r.count == 3, 'mining: a friend without a pickaxe adds nothing')
+
+    M.hourlyStrikes = 3
+    Mocks.clock = Mocks.clock + 700000
+    local b = cb['som-outdoors:server:mineBegin'](1, 'copper_1:1')
+    check(b.error == 'you have mined enough for this hour', 'mining: the hourly strike cap holds (and a twin account of the same character is not a friend)')
+
+    M.hourlyStrikes = 40
+    Mocks.invFull[3] = true
+    FakePeds[3] = vec3(0, 0, 0)
+    give(3, 'pickaxe')
+    Mocks.invFull[3] = nil
+    Mocks.clock = Mocks.clock + 9000
+    cb['som-outdoors:server:mineBegin'](3, 'copper_1:2')
+    Mocks.invFull[3] = true
+    Mocks.clock = Mocks.clock + 9000
+    local full = cb['som-outdoors:server:mineFinish'](3)
+    Mocks.invFull[3] = nil
+    check(full.error == 'you cannot carry it' and cb['som-outdoors:server:mineBegin'](3, 'copper_1:2').success == true, 'mining: a bag too full gives the vein back')
+
+    _G.GetCurrentResourceName = function() return 'som-outdoors' end
+    Handlers['onResourceStop']('som-outdoors')
+    check(cb['som-outdoors:server:mineFinish'](3).error == 'you have not started', 'mining: stopping the resource clears the state')
+end
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua', 'server/buyer.lua', 'server/mining.lua' })
+    local S = env.Config.mining.smelter
+    Mocks.players = { [1] = { citizenid = 'SM1' } }
+    Mocks.inv = { [1] = {} }
+    Mocks.invFull = {}
+    Mocks.clock = 1000000
+    FakePeds = { [1] = vec3(0, 0, 0) }
+    local cb = RegisteredCallbacks
+    local slot = 2200
+    local function give(name, n) slot = slot + 1; Mocks.inv[1][slot] = { name = name, count = n or 1, slot = slot } end
+    local function count(name) local n = 0; for _, it in pairs(Mocks.inv[1]) do if it.name == name then n = n + (it.count or 1) end end; return n end
+    local function begin(id) return cb['som-outdoors:server:smeltBegin'](1, id) end
+    local function finish(wait)
+        Mocks.clock = Mocks.clock + (wait or 10000)
+        return cb['som-outdoors:server:smeltFinish'](1)
+    end
+
+    check(cb['som-outdoors:server:smelterInfo'](1) == nil and begin('copper').error == 'there is no smelter here', 'smelter: ships disabled')
+    S.enabled, S.coords = true, vec3(0, 0, 0)
+    check(#cb['som-outdoors:server:smelterInfo'](1).recipes == 4, 'smelter: the recipes are offered')
+    check(begin('lead').error == 'there is no smelter here' and begin(5).error == 'there is no smelter here', 'smelter: an unknown recipe is refused')
+    check(begin('copper').error == 'you do not have enough ore', 'smelter: the ore is required')
+    give('copperore', 3)
+    FakePeds[1] = vec3(90, 0, 0)
+    check(begin('copper').error == 'you are too far from the smelter', 'smelter: the distance is checked')
+    FakePeds[1] = vec3(0, 0, 0)
+    check(begin('copper').success == true and finish(1000).error == 'you were too quick' and count('copperore') == 3, 'smelter: an early finish takes nothing')
+    begin('copper')
+    check(finish().success == true and count('copperore') == 0 and count('copper') == 2, 'smelter: three copper ore become two copper')
+
+    give('goldore', 4)
+    begin('gold')
+    check(finish().success == true and count('goldore') == 0 and count('goldingot') == 1, 'smelter: four gold ore become one gold ingot')
+
+    give('silverore', 4)
+    begin('silver')
+    local realAdd = exports.ox_inventory.AddItem
+    function exports.ox_inventory:AddItem(inv, name, n, meta)
+        if name == 'silveringot' then return false end
+        return realAdd(self, inv, name, n, meta)
+    end
+    local blocked = finish()
+    exports.ox_inventory.AddItem = realAdd
+    check(blocked.error == 'you cannot carry it' and count('silverore') == 4 and count('silveringot') == 0, 'smelter: when the metal cannot be added the ore comes back')
+
+    begin('silver')
+    Mocks.inv[1] = {}
+    check(finish().error == 'you do not have enough ore', 'smelter: ore spent between start and finish makes it fail with nothing created')
+    check(count('silveringot') == 0 and cb['som-outdoors:server:smeltFinish'](1).error == 'you have not started', 'smelter: a run finishes once')
+end
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua', 'server/buyer.lua', 'server/mining.lua' })
+    local B = env.Config.buyers.quarry
+    Mocks.players = { [1] = { citizenid = 'QB1' } }
+    Mocks.inv = { [1] = {} }
+    Mocks.invFull = {}
+    Mocks.clock = 1000000
+    mysql.fakeNow = 5000000
+    FakePeds = { [1] = vec3(0, 0, 0) }
+    local cb = RegisteredCallbacks
+    local slot = 3000
+    local function give(name, n) slot = slot + 1; Mocks.inv[1][slot] = { name = name, count = n, slot = slot } end
+    local function count(name) local n = 0; for _, it in pairs(Mocks.inv[1]) do if it.name == name then n = n + (it.count or 1) end end; return n end
+
+    check(B.enabled == false and B.coords == nil and cb['som-outdoors:server:sell'](1, 'quarry').error == 'nobody is buying', 'quarry: the buyer ships disabled')
+
+    local P = loader.loadResource(REPO .. 'som-core', { 'server/placements.lua' }).SomPlacements
+    local fresh = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua' }).Config
+    check(P.ApplyOne(fresh, 'mining.sites.copper_1.nodes+', vec3(1, 2, 3)) and #fresh.mining.sites[1].nodes == 1, 'place: a mining node is placed on a named site')
+    check(P.ApplyOne(fresh, 'mining.smelter.coords', vec3(4, 5, 6)) and fresh.mining.smelter.enabled == true, 'place: the smelter is placed')
+    check(P.ApplyOne(fresh, 'buyers.quarry.coords', vec3(7, 8, 9)) and fresh.buyers.quarry.enabled == true, 'place: the quarry buyer is placed')
+    B.enabled, B.coords = true, vec3(0, 0, 0)
+    Mocks.treasury = 100000
+    give('copperore', 5); give('goldore', 2)
+    check(cb['som-outdoors:server:sell'](1, 'quarry').error == 'you have nothing they want', 'quarry: raw ore is not bought, only refined metal')
+    give('copper', 4); give('goldingot', 1)
+    local paid0 = Mocks.paid or 0
+    local s = cb['som-outdoors:server:sell'](1, 'quarry')
+    check(s.success and s.paid == 4 * 30 + 120 and (Mocks.paid or 0) == paid0 + 240 and Mocks.treasury == 100000 - 240, 'quarry: metal is paid from the treasury under the shared path')
+    check(count('copperore') == 5 and count('copper') == 0, 'quarry: only the bought metal leaves the bag')
+    give('copper', 400)
+    mysql.db.buyer = {}
+    B.hourlyCap = 100
+    local c = cb['som-outdoors:server:sell'](1, 'quarry')
+    check(c.success and c.paid <= 100, 'quarry: the hourly cap applies')
+end
 
 do
     resetDb()
@@ -7289,13 +8275,21 @@ do
     }
     local env = loader.loadResource(REPO .. 'som-welcome', { 'shared/config.lua', 'server/main.lua' })
     _G.CreateThread = realThread
+    local coreMock = exports['som-core']
+    local realPlayers = coreMock.getPlayers
+    function coreMock:getPlayers()
+        local out = {}
+        for _, p in pairs(Mocks.players) do out[#out + 1] = p end
+        return out
+    end
+    local function minutes(n) for _ = 1, n do env.Welcome.Tick() end end
     local cb, C = RegisteredCallbacks, env.Config
     local W = mysql.db.welcome
     local app = Mocks.apps.welcome
     local base = 1800000000
 
-    local function person(src, cid, job)
-        Mocks.players[src] = { source = src, citizenid = cid, job = { name = job or 'unemployed', grade = 0 }, charinfo = { firstname = cid, lastname = 'T' } }
+    local function person(src, cid, job, license)
+        Mocks.players[src] = { source = src, citizenid = cid, license = license or ('license:' .. cid), job = { name = job or 'unemployed', grade = 0 }, charinfo = { firstname = cid, lastname = 'T' } }
         FakePeds[src] = vec3(0, 0, 0)
         Mocks.bank[src] = 0
     end
@@ -7308,11 +8302,12 @@ do
         for _, r in ipairs(rows(app.handler(src, 'view').view)) do if r.action == 'claim' then return true end end
         return false
     end
-    local function ready(src, cid, job)
-        person(src, cid, job)
+    local function ready(src, cid, job, license)
+        person(src, cid, job, license)
         mysql.db.licences.rows[cid .. ':driver'] = { citizenid = cid, type = 'driver', revoked = 0 }
         W.homes[cid] = true
         Handlers['som:server:jobChanged'](src, cid, { name = job })
+        minutes(C.jobMinutes)
     end
 
     mysql.fakeNow = base
@@ -7333,12 +8328,19 @@ do
     check(not claimable(1), 'welcome: a suspended licence is not a licence')
     mysql.db.licences.rows['W1:driver'].suspendedUntil = nil
     check(not claimable(1), 'welcome: a job just taken does not count yet')
-    mysql.fakeNow = base + (C.jobMinutes - 1) * 60
+    mysql.fakeNow = base + 100 * C.jobMinutes * 60
+    check(not claimable(1), 'welcome: wall clock time alone does not count, only minutes spent in the city')
+    minutes(C.jobMinutes - 1)
     check(not claimable(1), 'welcome: nor one minute before the time')
     Handlers['som:server:jobChanged'](1, 'W1', { name = 'delivery' }); Mocks.players[1].job.name = 'delivery'
-    mysql.fakeNow = base + (C.jobMinutes + 1) * 60
+    minutes(2)
     check(not claimable(1), 'welcome: changing job starts the clock again')
-    mysql.fakeNow = base + (2 * C.jobMinutes + 2) * 60
+    local away = Mocks.players[1]
+    Mocks.players[1] = nil
+    minutes(C.jobMinutes)
+    Mocks.players[1] = away
+    check(not claimable(1), 'welcome: time while logged out does not count')
+    minutes(C.jobMinutes - 2)
     Handlers['som:server:jobChanged'](1, 'W1', { name = 'delivery' })
     check(claimable(1), 'welcome: all three steps make the payment claimable, and a repeat job event does not reset the clock')
     W.homes.W1 = nil
@@ -7354,6 +8356,21 @@ do
         'welcome: the payment comes out of the treasury and goes to the player')
     check(W.claims.W1 and W.claims.W1.amount == C.payment, 'welcome: the claim is recorded')
     check(app.handler(1, 'claim').error == 'you have already had it' and Mocks.treasury == 50000 - C.payment, 'welcome: it is paid once')
+
+    -- One player, one payment: an alt on the same licence gets nothing, even when both
+    -- claims read "not yet claimed" before either insert (a true concurrent double claim).
+    ready(7, 'W7', 'taxi', 'license:W1')
+    check(app.handler(7, 'claim').error == 'you have already had it' and W.claims.W7 == nil and Mocks.treasury == 50000 - C.payment, 'welcome: another character on the same licence cannot claim')
+    W.hideClaimRead = true
+    check(app.handler(7, 'claim').error == 'you have already had it' and W.claims.W7 == nil and Mocks.treasury == 50000 - C.payment, 'welcome: a racing alt loses at the unique licence key and nothing is paid')
+    check(app.handler(1, 'claim').error == 'you have already had it' and Mocks.treasury == 50000 - C.payment, 'welcome: a racing second claim by the same character loses at the primary key')
+    W.hideClaimRead = nil
+    Mocks.players[8] = { source = 8, citizenid = 'W8N', job = { name = 'taxi', grade = 0 }, charinfo = { firstname = 'W8N', lastname = 'T' } }
+    mysql.db.licences.rows['W8N:driver'] = { citizenid = 'W8N', type = 'driver', revoked = 0 }
+    W.homes.W8N = true
+    Handlers['som:server:jobChanged'](8, 'W8N', { name = 'taxi' }); minutes(C.jobMinutes)
+    check(app.handler(8, 'claim').error == 'not available' and W.claims.W8N == nil, 'welcome: a player with no licence identifier cannot claim')
+    Mocks.players[8], Mocks.players[7] = nil, nil
     check(not claimable(1) and rows(app.handler(1, 'view').view)[#rows(app.handler(1, 'view').view)].title == 'Received', 'welcome: the app shows it was received')
 
     -- The global monthly cap.
@@ -7376,6 +8393,13 @@ do
     Mocks.addMoneyFails = false
     check(not r.success and W.claims.W3 == nil and Mocks.treasury == 5000, 'welcome: a failed credit returns the money to the treasury and frees the claim')
     check(app.handler(3, 'claim').success and W.claims.W3, 'welcome: and the player can claim again afterwards')
+
+    -- The daily cap: the month cannot be drained in one go.
+    ready(4, 'W4', 'taxi'); mysql.fakeNow = mysql.fakeNow + 60
+    check(W.claims.W3.amount + W.claims.W2.amount == C.dailyCap, 'welcome: two payments have used the day')
+    check(app.handler(4, 'claim').error:find('any more settling%-in payments') and W.claims.W4 == nil, 'welcome: the daily cap refuses a third payment the same day')
+    mysql.fakeNow = mysql.fakeNow + 86400 + 120
+    check(app.handler(4, 'claim').success, 'welcome: it is paid the next day')
 
     -- Job centre.
     person(10, 'J10')
@@ -7404,7 +8428,2289 @@ do
     Mocks.jobs.taxi = nil
     check(setJob(12, 'taxi').error == 'the job centre cannot place you there', 'welcome: a job the framework does not have is refused')
     Mocks.jobs = realJobs
+    coreMock.getPlayers = realPlayers
     _G.CreateThread = realThread
+end
+
+-- ---------------------------------------------------------------------------
+-- Estate agent sales
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    resetMocks()
+    local env = loader.loadResource(REPO .. 'som-housing', {
+        'shared/shells.lua', 'shared/config.lua', 'server/properties.lua', 'server/ownership.lua', 'server/finance.lua', 'server/agent.lua',
+    })
+    local cb = RegisteredCallbacks
+    local A = env.Config.Agent
+    local now = 1000000
+    local realTime, realTrigger = os.time, _G.TriggerClientEvent
+    os.time = function() return now end
+    local sent = {}
+    _G.TriggerClientEvent = function(name, target, ...) sent[#sent + 1] = { name = name, target = target } end
+
+    local function person(src, cid, job) return { citizenid = cid, source = src, job = job, charinfo = { firstname = 'P' .. src, lastname = 'Q' .. src } } end
+    local function agentJob(grade, duty) return { name = 'realtor', onduty = duty ~= false, grade = grade } end
+    local function setup()
+        Mocks.players = { [10] = person(10, 'AGENT', agentJob(1)), [1] = person(1, 'BUYER1'), [2] = person(2, 'BUYER2'), [3] = person(3, 'FAR3') }
+        placePed(10, 0, 0, 0); placePed(1, 0, 0, 0); placePed(2, 0, 0, 0); placePed(3, 500, 0, 0)
+        Mocks.business, Mocks.credits = { dynasty8 = 0 }, {}
+        mysql.db.owners = {}
+        Mocks.payWithFails, Mocks.businessTransactFails = false, false
+        Mocks.calls.payWith, Mocks.calls.addMoney = 0, 0
+        A.commission = 0.03
+    end
+    local function show(p, buyer, from) return cb['som-housing:server:agentShow'](from or 10, { slug = p.slug, buyer = buyer }) end
+    local function viewed(p, buyer, from)
+        local r = show(p, buyer, from)
+        if not r.success then return r end
+        return cb['som-housing:server:agentViewAnswer'](buyer, true)
+    end
+    local function sell(p, buyer, from) return cb['som-housing:server:agentSell'](from or 10, { slug = p.slug, buyer = buyer }) end
+    local function accept(buyer) return cb['som-housing:server:agentSellAnswer'](buyer, true) end
+    local function full(p, buyer) local r = viewed(p, buyer); if not r.success then return r end; r = sell(p, buyer); if not r.success then return r end; return accept(buyer) end
+    local function forSale(p) return env.Properties.Claim(p.id) end
+
+    -- Who can show and sell
+    setup()
+    local lux = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    Mocks.players[10].job = agentJob(1, false)
+    check(show(lux, 1).error == 'only an estate agent on duty can do this', 'agent: an off duty agent cannot show a property')
+    Mocks.players[10].job = { name = 'taxi', onduty = true, grade = 1 }
+    check(show(lux, 1).error == 'only an estate agent on duty can do this', 'agent: only the realtor job can show a property')
+    Mocks.players[10].job = agentJob(1)
+    check(show(lux, 3).error == 'that buyer is not here' or show(lux, 3).error == 'both of you must be at the property', 'agent: a buyer across the map cannot be shown a property')
+    check(show(lux, 10).error == 'that buyer is not here', 'agent: an agent cannot sell to themselves')
+    check(show(lux, '1').error == 'that buyer is not here', 'agent: the buyer must be a whole number source')
+    check(sell(lux, 1).error == 'show them the property first', 'agent: a sale needs an accepted viewing first')
+    check(show(lux, 1).success, 'agent: a viewing is offered')
+    check(sell(lux, 1).error == 'show them the property first', 'agent: an offered but unanswered viewing is not enough')
+    check(not env.Agent.IsViewing('BUYER1', lux.id), 'agent: an unanswered viewing opens no door')
+    check(cb['som-housing:server:agentViewAnswer'](1, true).success, 'agent: the buyer accepts the viewing')
+    check(env.Agent.IsViewing('BUYER1', lux.id) and env.Agent.IsViewing('AGENT', lux.id) and not env.Agent.IsViewing('BUYER2', lux.id), 'agent: a viewing lets the buyer and the agent in, nobody else')
+    now = now + A.saleWindowMinutes * 60 + 1
+    check(not env.Agent.IsViewing('BUYER1', lux.id) and sell(lux, 1).error == 'show them the property first', 'agent: a viewing runs out')
+    now = 1000000
+
+    -- Grade gate: anyone shows, only the threshold closes the tier that needs an agent
+    setup()
+    Mocks.players[10].job = agentJob(A.approveGrade - 1)
+    check(viewed(lux, 1).success, 'agent: a junior agent can show a luxury property')
+    check(sell(lux, 1).error == 'a more senior agent has to close this one', 'agent: a junior agent cannot close a luxury sale')
+    local plain = seedProperty({ price = 50000 })
+    check(viewed(plain, 1).success and sell(plain, 1).success and accept(1).success, 'agent: a junior agent can close an ordinary sale')
+
+    -- A full luxury sale and where the money goes
+    setup()
+    local lux2 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    local plainBuy = cb['som-housing:server:buy'](1, { slug = lux2.slug, account = 'bank' })
+    check(plainBuy.error == 'this one is sold through an estate agent', 'agent: a luxury property still cannot be bought without an agent')
+    local r = full(lux2, 1)
+    check(r.success and env.Ownership.RoleOf('BUYER1', lux2.id) == 'owner', 'agent: the buyer owns the property after the sale')
+    check(Mocks.lastPay.amount == 100000 and Mocks.business.dynasty8 == 100000 - 3000, 'agent: the price goes into the agency account and the commission comes out of it')
+    check(Mocks.credits[#Mocks.credits].source == 10 and Mocks.credits[#Mocks.credits].amount == 3000, 'agent: the agent is paid 3 percent')
+    check(not forSale(lux2) and accept(1).error == 'that offer is gone', 'agent: a sale cannot be completed twice')
+
+    -- Two buyers, one property
+    setup()
+    local lux3 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    check(viewed(lux3, 1).success and viewed(lux3, 2).success, 'agent: two buyers can both be shown the property')
+    check(sell(lux3, 1).success and sell(lux3, 2).success, 'agent: both can be offered it')
+    check(accept(1).success, 'agent: the first buyer to answer gets it')
+    local paidBefore = Mocks.calls.payWith
+    check(accept(2).error == 'not for sale' and Mocks.calls.payWith == paidBefore, 'agent: the second buyer is refused before paying')
+    check(not env.Agent.IsViewing('BUYER2', lux3.id) and not env.Agent.IsViewing('AGENT', lux3.id), 'agent: a viewing no longer opens the door of a property somebody has bought')
+
+    -- Failures undo everything
+    setup()
+    local lux4 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    check(viewed(lux4, 1).success and sell(lux4, 1).success, 'agent: offer ready')
+    Mocks.payWithFails = true
+    check(not accept(1).success and forSale(lux4), 'agent: a buyer who cannot pay leaves the property for sale')
+    env.Properties.Release(lux4.id)
+    Mocks.payWithFails = false
+    check(viewed(lux4, 1).success and sell(lux4, 1).success, 'agent: offer again')
+    Mocks.businessTransactFails = true
+    local addBefore = Mocks.calls.addMoney
+    local fail = accept(1)
+    Mocks.businessTransactFails = false
+    check(not fail.success and Mocks.calls.addMoney == addBefore + 1 and Mocks.credits[#Mocks.credits].amount == 100000 and forSale(lux4), 'agent: an agency account that cannot take the price refunds the buyer')
+    env.Properties.Release(lux4.id)
+
+    -- Commission is only paid after the agency debit worked
+    setup()
+    A.commission = 1.5
+    local lux5 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    check(viewed(lux5, 1).success and sell(lux5, 1).success, 'agent: offer ready')
+    local res = accept(1)
+    check(res.success and #Mocks.credits == 0 and Mocks.business.dynasty8 == 100000, 'agent: no commission is minted when the agency debit is refused, the sale stands')
+    A.commission = 0.03
+
+    -- The agent leaving before the buyer answers
+    setup()
+    local lux6 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    check(viewed(lux6, 1).success and sell(lux6, 1).success, 'agent: offer ready')
+    Mocks.players[10].job = agentJob(1, false)
+    check(accept(1).error == 'the agent is no longer here' and forSale(lux6), 'agent: a sale is refused if the agent went off duty meanwhile')
+    env.Properties.Release(lux6.id)
+    setup()
+    check(viewed(lux6, 1).success and sell(lux6, 1).success, 'agent: offer ready again')
+    now = now + A.offerSeconds + 1
+    check(accept(1).error == 'that offer is gone', 'agent: a priced offer runs out')
+    now = 1000000
+
+    -- Declining ends it, and owner cap
+    setup()
+    local lux7 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    check(viewed(lux7, 1).success and sell(lux7, 1).success and cb['som-housing:server:agentSellAnswer'](1, false).success and forSale(lux7), 'agent: declining leaves the property for sale')
+    env.Properties.Release(lux7.id)
+    for i = 1, env.Config.Purchase.maxOwned do env.Ownership.Grant(seedProperty({}).id, 'BUYER2', 'owner') end
+    check(viewed(lux7, 2).success and sell(lux7, 2).success and accept(2).error:find('you already own'), 'agent: the owner cap applies to agent sales')
+
+    -- A second agent cannot wipe another agent's live offer
+    setup()
+    Mocks.players[11] = person(11, 'AGENT2', agentJob(1)); placePed(11, 0, 0, 0)
+    local lux8 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    local other = seedProperty({ price = 50000 })
+    check(viewed(lux8, 1).success, 'agent: first agent has an accepted viewing')
+    check(show(other, 1, 11).error == 'they are already talking to another agent', 'agent: a second agent cannot take over a buyer who is mid offer')
+    check(sell(lux8, 1).success and accept(1).success, 'agent: the first agent still closes the sale')
+    check(viewed(other, 2).success and show(other, 2, 11).error == 'they are already talking to another agent', 'agent: a second agent is refused while the first offer is live')
+    now = now + A.saleWindowMinutes * 60 + 1
+    check(show(other, 2, 11).success, 'agent: once the first offer ran out a second agent can show the buyer')
+
+    -- A commission that cannot be credited goes back to the agency
+    setup()
+    local lux9 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    check(viewed(lux9, 1).success and sell(lux9, 1).success, 'agent: offer ready')
+    Mocks.addMoneyFails = true
+    local logged = {}
+    local realPrint = _G.print
+    _G.print = function(...) logged[#logged + 1] = table.concat({ ... }, ' ') end
+    local res9 = accept(1)
+    _G.print = realPrint
+    Mocks.addMoneyFails = false
+    check(res9.success and #Mocks.credits == 0 and Mocks.business.dynasty8 == 100000, 'agent: a commission the agent could not receive goes back to the agency')
+
+    -- A refund that fails is logged for staff
+    setup()
+    local lux10 = seedProperty({ price = 100000, tier = 'luxury', realtor_only = 1 })
+    check(viewed(lux10, 1).success and sell(lux10, 1).success, 'agent: offer ready')
+    Mocks.addMoneyFails, Mocks.businessTransactFails = true, true
+    logged = {}
+    _G.print = function(...) logged[#logged + 1] = table.concat({ ... }, ' ') end
+    local res10 = accept(1)
+    _G.print = realPrint
+    Mocks.addMoneyFails, Mocks.businessTransactFails = false, false
+    check(not res10.success and logged[1] and logged[1]:find('refund $100000 by hand', 1, true) and forSale(lux10), 'agent: a failed buyer refund is logged for staff and the property goes back on sale')
+
+    os.time, _G.TriggerClientEvent = realTime, realTrigger
+end
+
+
+-- som-dispatch resolve and the automatic person down call
+----------------------------------------------------------------------
+do
+    dispScene()
+    report(22, 'explosion')
+    local blast
+    for _, c in pairs(allCalls()) do if c.alertType == 'explosion' then blast = c end end
+    check(Mocks.exported.resolve(blast.id, 'done') == true and blast.status == 'closed' and blast.services.ambulance.status == 'closed' and blast.services.police.status == 'closed', 'resolve: closes every service of a call with no player')
+    check(blast.services.police.disposition == 'done', 'resolve: keeps the disposition')
+    check(Mocks.exported.resolve(blast.id) == false and Mocks.exported.resolve(9999) == false and Mocks.exported.resolve('x') == false, 'resolve: a closed or unknown call is a no-op')
+    local pid = Mocks.exported.alert(nil, 'personDown', { coords = vec3(1, 1, 30) })
+    check(allCalls()[pid].priority == 2 and allCalls()[pid].services.ambulance and not allCalls()[pid].services.police, 'person down: routine priority, so it does not page units on a major incident, and ambulance only')
+    local reachable = false
+    for name in pairs(RegisteredCallbacks) do if name:find('resolve') then reachable = true end end
+    for name in pairs(Handlers) do if tostring(name):find('resolve') then reachable = true end end
+    check(not reachable, 'resolve: no callback or event reaches it, so a client cannot close a call')
+end
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-medical', { 'shared/config.lua', 'server/main.lua', 'server/call.lua' })
+    local E = env.Config.EmsCall
+    Player = Player or function() return { state = { set = function() end } } end
+    local threads = {}
+    local realThread = _G.CreateThread
+    _G.CreateThread = function(fn) threads[#threads + 1] = fn end
+    local realExported = Mocks.exported
+    local gen, cidA, cidB = 0
+    local function reset()
+        gen = gen + 1
+        cidA, cidB = 'PDA' .. gen, 'PDB' .. gen
+        Mocks.players = { [1] = { citizenid = cidA, job = { name = 'unemployed' } }, [2] = { citizenid = cidB, job = { name = 'unemployed' } } }
+        Mocks.exported = { activeFor = function() return nil end }
+        Mocks.calls.dispatchAlert, Mocks.lastAlertType, Mocks.lastAlertExtra, Mocks.resolved, Mocks.alertId = 0, nil, nil, {}, nil
+        FakePeds = { [1] = vec3(10, 20, 30), [2] = vec3(0, 0, 0) }
+        E.cooldownSeconds = 120
+        threads = {}
+    end
+    local function down(src, cause)
+        threads = {}
+        env.Medical.Down(src, cause)
+        return threads[#threads]
+    end
+    reset()
+    env.Medical.Revive(1)
+    env.Medical.Revive(2)
+
+    local run = down(1, 'bled\nout')
+    check(Mocks.calls.dispatchAlert == 0, 'person down: nothing is raised the moment a player goes down')
+    run()
+    check(Mocks.calls.dispatchAlert == 1 and Mocks.lastAlertType == 'personDown', 'person down: a player still down after the delay raises a call')
+    local c = Mocks.lastAlertExtra.coords
+    check(c.x == 10 and c.y == 20 and c.z == 30 and Mocks.lastAlertExtra.message == 'Person down', 'person down: the position is the server ped and the text carries nothing the client sent')
+    Mocks.alertId = 7
+    Mocks.exported = realExported
+    Mocks.exported = { activeFor = function() return nil end }
+    env.Medical.Revive(1)
+    check(Mocks.resolved[1] and Mocks.resolved[1].id == 1, 'person down: being revived closes the call')
+
+    reset()
+    run = down(1)
+    env.Medical.Revive(1)
+    run()
+    check(Mocks.calls.dispatchAlert == 0, 'person down: someone helped up before the delay raises nothing')
+
+    reset()
+    run = down(1)
+    Mocks.players[1] = { citizenid = 'OTHER', job = { name = 'unemployed' } }
+    run()
+    check(Mocks.calls.dispatchAlert == 0, 'person down: a recycled server id raises nothing')
+    Mocks.players[1] = { citizenid = cidA, job = { name = 'unemployed' } }
+    env.Medical.Revive(1)
+
+    reset()
+    Mocks.exported.activeFor = function(cid) return { id = 1, status = 'serving' } end
+    run = down(1)
+    run()
+    check(Mocks.calls.dispatchAlert == 0, 'person down: nobody is called for a player serving a sentence or remand')
+    env.Medical.Revive(1)
+    Mocks.exported.activeFor = function() error('database down') end
+    run = down(1)
+    run()
+    check(Mocks.calls.dispatchAlert == 0, 'person down: if the jail cannot be asked nobody is called')
+    env.Medical.Revive(1)
+
+    reset()
+    run = down(1)
+    run()
+    env.Medical.Revive(1)
+    for _ = 1, 5 do
+        run = down(1)
+        run()
+        env.Medical.Revive(1)
+    end
+    check(Mocks.calls.dispatchAlert == 1, 'person down: going down again and again raises one call inside the cooldown')
+    E.cooldownSeconds = 0
+    run = down(1)
+    run()
+    check(Mocks.calls.dispatchAlert == 2, 'person down: a new call is possible once the cooldown has passed')
+
+    reset()
+    Mocks.alertId = 3
+    run = down(2)
+    run()
+    Handlers['som:server:playerUnloaded'](2, cidB)
+    check(Mocks.resolved[1] and Mocks.resolved[1].id == 3, 'person down: leaving the server closes the call')
+    run = down(1)
+    run()
+    Handlers['som:server:playerRevived'](1, cidA, nil)
+    check(Mocks.resolved[2] and Mocks.resolved[2].disposition == 'patient no longer down', 'person down: respawning at the hospital closes the call')
+
+    reset()
+    E.enabled = false
+    run = down(1)
+    if run then run() end
+    check(Mocks.calls.dispatchAlert == 0, 'person down: the kill switch stops new calls')
+    E.enabled = true
+    env.Medical.Revive(1)
+    run = down(1)
+    E.enabled = false
+    run()
+    check(Mocks.calls.dispatchAlert == 0, 'person down: the kill switch also stops a call already waiting out its delay')
+    E.enabled = true
+    env.Medical.Revive(1)
+
+    reset()
+    run = down(1)
+    run()
+    local lastCall
+    for i = 1, 20 do
+        local name, value = debug.getupvalue(env.Medical.RaiseCall, i)
+        if name == 'lastCall' then lastCall = value end
+    end
+    check(lastCall and lastCall[cidA], 'person down: a character in the cooldown is remembered')
+    lastCall[cidA] = os.time() - 1000
+    env.Medical.Revive(1)
+    E.cooldownSeconds = 120
+    run = down(1)
+    run()
+    check(Mocks.calls.dispatchAlert == 2 and lastCall[cidA] >= os.time() - 1, 'person down: entries older than the cooldown are pruned and the character can be called again')
+    env.Medical.Revive(1)
+
+    _G.CreateThread = realThread
+    Mocks.exported = realExported
+    Mocks.alertId = nil
+end
+
+-- som-fire: job, business and dispatch response
+----------------------------------------------------------------------
+do
+    local coreEnv = loader.loadResource(REPO .. 'som-core', { 'shared/config.lua', 'shared/tiers.lua', 'shared/jobs.lua', 'shared/gangs.lua' })
+    local J = coreEnv.Jobs.firefighter
+    check(J and J.business == 'fire' and J.business ~= coreEnv.Jobs.ambulance.business, 'fire: the firefighters have their own business, not the ambulance one')
+    local boss = false
+    for _, g in pairs(J.grades) do if g.isboss then boss = true end end
+    check(not boss, 'fire: no grade can void fines as a boss')
+
+    local env = dispScene()
+    Mocks.players[36] = person('FF1', 'firefighter', true, 1)
+    Mocks.players[37] = person('FF2', 'firefighter', false, 1)
+    local id = Mocks.exported.alert(nil, 'structureFire', { coords = vec3(5, 5, 30), message = 'Fire reported' })
+    local call = allCalls()[id]
+    local attach = RegisteredCallbacks['som-dispatch:server:attach']
+    local close = RegisteredCallbacks['som-dispatch:server:close']
+    check(call and call.services.firefighter and call.services.ambulance and call.services.police, 'fire: the call goes to firefighters, ambulance and police')
+    check(attach(37, id).success == false, 'fire: an off duty firefighter cannot attach')
+    check(attach(36, id).success == true and #call.units == 1, 'fire: a firefighter on duty can attach to a fire call')
+    check(close(36, id).success == true and call.services.firefighter.status == 'closed' and call.status ~= 'closed', 'fire: a firefighter closes their own service and leaves the others open')
+end
+
+-- som-fire
+----------------------------------------------------------------------
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-fire', { 'shared/config.lua', 'server/main.lua' })
+    local C, Fire = env.Config, env.Fire
+    local cb = RegisteredCallbacks
+    local events = {}
+    local saved = { GetVehiclePedIsIn = _G.GetVehiclePedIsIn, GetEntityModel = _G.GetEntityModel, GetCurrentResourceName = _G.GetCurrentResourceName }
+    _G.GetVehiclePedIsIn = function(ped) return PedVehicle[ped] or 0 end
+    _G.GetEntityModel = function(e) return joaat(Vehicles[e].model) end
+    _G.GetCurrentResourceName = function() return 'som-fire' end
+    _G.TriggerClientEvent = function(name, target, ...) events[#events + 1] = { name = name, target = target, args = { ... } } end
+    local function last(name) for i = #events, 1, -1 do if events[i].name == name then return events[i] end end end
+    local function reset()
+        Handlers['onResourceStop']('som-fire')
+        Mocks.players = {
+            [1] = { citizenid = 'FF1', job = { name = 'firefighter', onduty = true } },
+            [2] = { citizenid = 'FF2', job = { name = 'firefighter', onduty = true } },
+            [3] = { citizenid = 'CV3', job = { name = 'unemployed' } },
+        }
+        Mocks.inv = { [1] = { [1] = { name = 'WEAPON_FIREEXTINGUISHER', count = 1, slot = 1 } }, [2] = { [1] = { name = 'WEAPON_FIREEXTINGUISHER', count = 1, slot = 1 } }, [3] = { [1] = { name = 'WEAPON_FIREEXTINGUISHER', count = 1, slot = 1 } } }
+        Mocks.downed, Mocks.credits, Mocks.paid = {}, {}, 0
+        Mocks.bizBalance, Mocks.business, Mocks.treasury = { fire = 0 }, {}, 100000
+        Mocks.fundFails, Mocks.addMoneyFails, Mocks.businessTransactFails = false, false, false
+        Mocks.clock = Mocks.clock + 1000000
+        FakePeds = { [1] = vec3(0, 0, 0), [2] = vec3(1, 0, 0), [3] = vec3(2, 0, 0) }
+        PedVehicle = {}
+        Vehicles = {}
+        events = {}
+    end
+    local function spray(src, inc, point, advance)
+        Mocks.clock = Mocks.clock + (advance or 1000)
+        return cb['som-fire:server:douse'](src, inc, point)
+    end
+    local function puttOut(src, inc, point)
+        local r
+        for _ = 1, 10 do r = spray(src, inc, point) end
+        return r
+    end
+    local function points(id) local out = {}; for _, inc in ipairs(cb['som-fire:server:state'](1)) do if inc.id == id then out = inc.points end end; return out end
+
+    reset()
+    local before = Mocks.calls.dispatchAlert
+    local id = Fire.Start(vec3(10, 0, 0))
+    check(id and Mocks.calls.dispatchAlert == before + 1 and Mocks.lastAlertType == 'structureFire', 'fire: a fire raises a structure fire call')
+    check(#points(id) == 1 and last('som-fire:client:sync'), 'fire: clients are told where it burns')
+
+    for i = 1, 2 do Fire.Start(vec3(10 * i, 50, 0)) end
+    check(Fire.Start(vec3(0, 99, 0)) == nil, 'fire: no more than the incident cap burn at once')
+
+    Mocks.clock = Mocks.clock + C.spreadSeconds * 1000 + 1
+    Fire.Tick()
+    check(#points(id) == 2, 'fire: a fire left alone spreads')
+    for _ = 1, 10 do Mocks.clock = Mocks.clock + C.spreadSeconds * 1000 + 1; Fire.Tick() end
+    check(#points(id) == C.maxPoints, 'fire: spread stops at the flame cap')
+    Mocks.clock = Mocks.clock + C.lifetime * 1000 + 1
+    Fire.Tick()
+    check(#points(id) == 0 and Mocks.paid == 0, 'fire: an unfought fire burns out and nobody is paid')
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    local pid = points(id)[1].id
+    check(cb['som-fire:server:douse'](1, 'x', pid).error == 'that fire is out' and cb['som-fire:server:douse'](1, id, 99).error == 'that fire is out' and cb['som-fire:server:douse'](1, id, 1.5).error == 'that fire is out', 'fire: a bad incident or point is refused')
+    Mocks.inv[1] = {}
+    check(spray(1, id, pid).error == 'you need an extinguisher', 'fire: spraying needs an extinguisher')
+    PedVehicle[1] = 800
+    Vehicles[800] = { model = 'firetruk', seats = {} }
+    check(spray(1, id, pid).success, 'fire: a fire truck seat counts as a tool')
+    PedVehicle[1] = nil
+    FakePeds[1] = vec3(50, 0, 0)
+    Mocks.inv[1] = { [1] = { name = 'WEAPON_FIREEXTINGUISHER', count = 1, slot = 1 } }
+    check(spray(1, id, pid).error == 'you are too far from the fire', 'fire: the distance is read from the server ped')
+    FakePeds[1] = vec3(0, 0, 0)
+    spray(1, id, pid)
+    check(spray(1, id, pid, 100).error == 'too fast', 'fire: spray ticks are rate limited')
+    Mocks.downed[1] = true
+    check(spray(1, id, pid).error == 'you cannot do that now', 'fire: a downed player cannot spray')
+    Mocks.downed[1] = nil
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    pid = points(id)[1].id
+    local r = spray(1, id, pid)
+    check(r.success and r.out == false and #points(id) == 1, 'fire: one tick does not put a flame out')
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    for _ = 1, 3 do Mocks.clock = Mocks.clock + C.spreadSeconds * 1000 + 1; Fire.Tick() end
+    local grown = #points(id)
+    puttOut(1, id, points(id)[1].id)
+    Fire.Tick()
+    check(grown == 4 and #points(id) == 3, 'fire: putting a flame out does not make the fire regrow at once')
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    pid = points(id)[1].id
+    Mocks.bizBalance.fire = 0
+    r = puttOut(1, id, pid)
+    check(r.out == true and #points(id) == 0 and Mocks.paid == C.pay.perPoint, 'fire: ten ticks put a flame out and an on duty firefighter is paid')
+    check(Mocks.treasury == 100000 - C.pay.perPoint and Mocks.bizBalance.fire == 0, 'fire: the pay came from the treasury through the account')
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    pid = points(id)[1].id
+    Mocks.treasury = 0
+    puttOut(1, id, pid)
+    check(Mocks.paid == 0 and Mocks.treasury == 0, 'fire: an empty account and treasury pay nothing')
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    pid = points(id)[1].id
+    Mocks.addMoneyFails = true
+    puttOut(1, id, pid)
+    check(Mocks.paid == 0 and Mocks.lastTransact and Mocks.lastTransact.amount == C.pay.perPoint, 'fire: a failed credit puts the money back in the account')
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    pid = points(id)[1].id
+    Mocks.addMoneyFails = true
+    Mocks.businessThrowAt = Mocks.calls.businessTransact + 2
+    local lines, realPrint = {}, print
+    _G.print = function(...) lines[#lines + 1] = table.concat({ ... }, ' ') end
+    puttOut(1, id, pid)
+    _G.print = realPrint
+    Mocks.businessThrowAt = nil
+    local loud = false
+    for _, l in ipairs(lines) do if l:find('MONEY LOST', 1, true) then loud = true end end
+    check(Mocks.paid == 0 and loud, 'fire: a debit that cannot be given back is logged loudly')
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    pid = points(id)[1].id
+    for _ = 1, 10 do spray(3, id, pid) end
+    check(#points(id) == 0 and Mocks.paid == 0, 'fire: a civilian can put a fire out but is not paid')
+
+    reset()
+    id = Fire.Start(vec3(1, 0, 0))
+    pid = points(id)[1].id
+    for _ = 1, 5 do spray(1, id, pid); spray(2, id, pid, 100) end
+    check(#points(id) == 0 and Mocks.paid == C.pay.perPoint and #Mocks.credits == 2 and Mocks.credits[1].amount == C.pay.perPoint // 2, 'fire: a crew splits the pay for a flame')
+
+    reset()
+    C.pay.hourlyCap = 50
+    for i = 1, 3 do
+        local fid = Fire.Start(vec3(i * 100, 0, 0))
+        FakePeds[1] = vec3(i * 100, 0, 0)
+        puttOut(1, fid, points(fid)[1].id)
+    end
+    check(Mocks.paid == 50, 'fire: the hourly pay cap holds')
+    C.pay.hourlyCap = 1500
+
+    reset()
+    C.pay.drawCapHourly = 10
+    id = Fire.Start(vec3(1, 0, 0))
+    puttOut(1, id, points(id)[1].id)
+    check(Mocks.paid == 0 and Mocks.treasury == 100000, 'fire: the treasury top up is capped per hour')
+    C.pay.drawCapHourly = 4000
+
+    reset()
+    Fire.Start(vec3(0, 0, 0))
+    Mocks.downed[3] = true
+    FakePeds[3] = vec3(2, 0, 0)
+    check(cb['som-fire:server:rescueBegin'](3, 3).error == 'you are not on duty as a firefighter', 'rescue: only an on duty firefighter can pull someone clear')
+    check(cb['som-fire:server:rescueBegin'](1, 1).error == 'nobody here needs to be pulled out' and cb['som-fire:server:rescueBegin'](1, 'x').error == 'nobody here needs to be pulled out', 'rescue: a bad target is refused')
+    Mocks.downed[3] = nil
+    check(cb['som-fire:server:rescueBegin'](1, 3).error == 'nobody here needs to be pulled out', 'rescue: the patient must be down')
+    Mocks.downed[3] = true
+    FakePeds[3] = vec3(40, 0, 0)
+    check(cb['som-fire:server:rescueBegin'](1, 3).error == 'nobody here needs to be pulled out', 'rescue: out of reach is refused')
+    FakePeds[3] = vec3(2, 0, 0)
+    check(cb['som-fire:server:rescueBegin'](1, 3).success, 'rescue: starts next to a downed player in the fire')
+    Mocks.clock = Mocks.clock + 1000
+    check(cb['som-fire:server:rescueFinish'](1, 3).error == 'the rescue was not finished', 'rescue: an early finish moves nobody')
+    cb['som-fire:server:rescueBegin'](1, 3)
+    Mocks.clock = Mocks.clock + 6000
+    events = {}
+    check(cb['som-fire:server:rescueFinish'](1, 3).success, 'rescue: a full pull succeeds')
+    local mv = last('som-fire:client:moveTo')
+    check(mv and mv.target == 3 and mv.args[1] > 2 + C.rescue.clear - 1, 'rescue: the patient is moved away from the flame by the server')
+    FakePeds[3] = vec3(80, 0, 0)
+    FakePeds[1] = vec3(80, 0, 0)
+    cb['som-fire:server:rescueBegin'](1, 3)
+    check(cb['som-fire:server:rescueBegin'](1, 3).error == 'nobody here needs to be pulled out', 'rescue: nobody is pulled when no fire is near')
+
+    reset()
+    Fire.Start(vec3(1, 0, 0))
+    Handlers['onResourceStop']('som-fire')
+    check(#cb['som-fire:server:state'](1) == 0, 'fire: stopping the resource clears the fires')
+    _G.TriggerClientEvent = function() end
+    for k, v in pairs(saved) do _G[k] = v end
+end
+
+-- som-staff: combat log watch
+----------------------------------------------------------------------
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-staff', { 'shared/config.lua', 'server/combatlog.lua' })
+    local C = env.Config.combatLog
+    local threads, posted, said = {}, {}, {}
+    local realThread, realHttp, realT = _G.CreateThread, _G.PerformHttpRequest, _G.TriggerClientEvent
+    _G.CreateThread = function(fn) threads[#threads + 1] = fn end
+    _G.PerformHttpRequest = function(url, _, _, body) posted[#posted + 1] = { url = url, body = body } end
+    _G.TriggerClientEvent = function(name, target, text) if name == 'som:client:notify' then said[target] = text end end
+    local calls = {}
+    local gen = 0
+    local function scene(overrides)
+        gen = gen + 1
+        threads, posted = {}, {}
+        Mocks.players = {
+            [1] = { citizenid = 'CL' .. gen, job = { name = 'unemployed' }, position = { x = 100.0, y = 100.0, z = 30.0 } },
+            [2] = { citizenid = 'COP' .. gen, job = { name = 'police', onduty = true } },
+        }
+        Mocks.downed, Mocks.admins, Mocks.convars = {}, { [3] = true }, { som_combatlog_webhook = '' }
+        Mocks.exported = { getCalls = function() return calls end }
+        FakePeds = { [1] = vec3(100, 100, 30), [2] = vec3(500, 500, 30) }
+        calls = {}
+        for k, v in pairs(overrides or {}) do Mocks[k] = v end
+        return 'CL' .. gen
+    end
+    local function drop(cid, reason)
+        _G.source = 1
+        Handlers['playerDropped'](reason)
+        Handlers['som:server:playerUnloaded'](1, cid)
+        -- Newest first: the reason cleanup thread sleeps a second in the real server.
+        for i = #threads, 1, -1 do threads[i]() end
+        threads = {}
+    end
+    local function rows() local out = {}; for _, r in ipairs(mysql.db.staff.audit) do if r.action == 'combatlog' then out[#out + 1] = r end end; return out end
+    local function crime(kind, age, x, status) return { alertType = kind, status = status or 'open', createdAt = os.time() - (age or 10), coords = { x = x or 120.0, y = 100.0, z = 30.0 } } end
+    mysql.db.staff.audit = {}
+
+    local cid = scene()
+    drop(cid, 'Exiting')
+    check(#rows() == 0, 'combat log: a clean disconnect logs nothing')
+
+    cid = scene()
+    Mocks.downed[cid] = true
+    drop(cid, 'Exiting')
+    local r = rows()[1]
+    check(r and r.staff == 'system' and r.target == cid and r.detail:find('^downed | ') and r.detail:find('Exiting', 1, true), 'combat log: leaving while down logs the signal and the reason')
+
+    cid = scene()
+    Mocks.players[1].metadata = { cuffed = true }
+    local before = #rows()
+    drop(cid, 'x')
+    check(#rows() == before + 1 and rows()[#rows()].detail:find('^cuffed'), 'combat log: leaving while cuffed logs')
+
+    cid = scene()
+    calls = { crime('shotsFired') }
+    drop(cid, 'x')
+    check(#rows() == before + 1, 'combat log: a crime call alone logs nothing')
+
+    cid = scene()
+    FakePeds[2] = vec3(110, 100, 30)
+    drop(cid, 'x')
+    check(#rows() == before + 1, 'combat log: a police officer alone logs nothing')
+
+    cid = scene()
+    FakePeds[2] = vec3(110, 100, 30)
+    calls = { crime('shotsFired') }
+    drop(cid, 'x')
+    check(#rows() == before + 2 and rows()[#rows()].detail:find('crime-call,police-near', 1, true), 'combat log: a crime call and police together log')
+
+    for _, case in ipairs({
+        { 'an old call', crime('shotsFired', 600) },
+        { 'a closed call', crime('shotsFired', 10, 120.0, 'closed') },
+        { 'a far call', crime('shotsFired', 10, 900.0) },
+        { 'a call that is not a crime', crime('personDown') },
+    }) do
+        cid = scene()
+        FakePeds[2] = vec3(110, 100, 30)
+        calls = { case[2] }
+        drop(cid, 'x')
+        check(#rows() == before + 2, 'combat log: ' .. case[1] .. ' does not count')
+    end
+    cid = scene()
+    FakePeds[1] = nil
+    FakePeds[2] = vec3(110, 100, 30)
+    calls = { crime('shotsFired') }
+    drop(cid, 'x')
+    check(#rows() == before + 2, 'combat log: the soft signals are not used when the saved position may be stale')
+    cid = scene()
+    FakePeds[1] = nil
+    Mocks.downed[cid] = true
+    drop(cid, 'x')
+    check(#rows() == before + 3 and rows()[#rows()].detail:find('saved', 1, true), 'combat log: a hard signal still logs and the row says the position is saved')
+    before = before + 1
+
+    cid = scene()
+    FakePeds[2] = vec3(300, 100, 30)
+    calls = { crime('shotsFired') }
+    drop(cid, 'x')
+    check(#rows() == before + 2, 'combat log: police out of range does not count')
+
+    cid = scene()
+    Mocks.downed[cid] = true
+    local n = #rows()
+    drop(cid, 'a')
+    Mocks.players[1] = { citizenid = cid, job = { name = 'unemployed' }, position = { x = 1.0, y = 1.0, z = 1.0 } }
+    drop(cid, 'b')
+    check(#rows() == n + 1, 'combat log: one row per character inside the cooldown')
+
+    cid = scene()
+    Mocks.downed[cid] = true
+    n = #rows()
+    local realInsert = _G.MySQL.insert.await
+    _G.MySQL.insert.await = function() return nil end
+    drop(cid, 'a')
+    _G.MySQL.insert.await = realInsert
+    drop(cid, 'b')
+    check(#rows() == n + 1, 'combat log: a failed insert does not mute the character for the cooldown')
+
+    cid = scene()
+    Mocks.downed[cid] = true
+    Mocks.convars.som_combatlog_webhook = 'https://example.invalid/hook'
+    _G.MySQL.insert.await = function() error('db down') end
+    local realPrintCl = _G.print
+    local saidFailure = false
+    _G.print = function(text) if tostring(text):find('was not saved', 1, true) then saidFailure = true end end
+    drop(cid, 'a')
+    _G.print = realPrintCl
+    _G.MySQL.insert.await = realInsert
+    check(#posted == 1 and posted[1].body:find(cid, 1, true) and saidFailure, 'combat log: when the row cannot be saved the webhook still posts and the failure is printed')
+
+    cid = scene()
+    Mocks.downed[cid] = true
+    drop(cid, 'ok\1\2' .. string.rep('x', 300))
+    local d = rows()[#rows()].detail
+    check(#d <= 200 and not d:find('[%c]'), 'combat log: reason text is cleaned and cut')
+
+    cid = scene()
+    Mocks.downed[cid] = true
+    drop(cid, 'Exiting')
+    check(#posted == 0, 'combat log: no webhook is posted when the convar is blank')
+    cid = scene()
+    Mocks.convars.som_combatlog_webhook = 'https://example.invalid/hook'
+    Mocks.downed[cid] = true
+    drop(cid, 'secret reason')
+    local body = posted[1] and posted[1].body or ''
+    check(#posted == 1 and body:find(cid, 1, true) and body:find('downed', 1, true) and body:find('100,100,30', 1, true) and not body:find('secret reason', 1, true), 'combat log: the webhook carries only the citizenid, the signals and the position')
+
+    cid = scene()
+    Mocks.convars.som_combatlog_webhook = 'https://example.invalid/hook'
+    Mocks.downed[cid] = true
+    for i = 1, 2 do mysql.db.staff.audit[#mysql.db.staff.audit + 1] = { staff = 'system', action = 'combatlog', target = cid } end
+    drop(cid, 'x')
+    check(posted[1] and posted[1].body:find('repeat x3', 1, true), 'combat log: a third row in a day is marked repeat')
+
+    cid = scene()
+    said = {}
+    local out = {}
+    local realPrint = print
+    _G.print = function(...) out[#out + 1] = table.concat({ ... }, ' ') end
+    Mocks.commands.combatlogs(1, {})
+    check(#out == 0 and said[1] == nil, 'combat log: a player cannot list the logs')
+    Mocks.commands.combatlogs(3, { hours = 9999 })
+    _G.print = realPrint
+    check(#out >= 1 and said[3] and said[3]:find('168 hours', 1, true), 'combat log: staff list the logs, hours are capped')
+
+    _G.CreateThread, _G.PerformHttpRequest, _G.TriggerClientEvent = realThread, realHttp, realT
+    _G.source = nil
+    Mocks.convars = {}
+end
+
+-- ---------------------------------------------------------------------------
+-- som-economy: the watch (alerts and digest)
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    resetMocks()
+    mysql.fakeNow = 3000000
+    mysql.db.ledger = {}
+    local realThread = _G.CreateThread
+    _G.CreateThread = function() end
+    local env = loader.loadResource(REPO .. 'som-economy', { 'shared/config.lua', 'server/watch.lua' })
+    _G.CreateThread = realThread
+    local C, L = env.Config, mysql.db.ledger
+
+    local posts, realHttp = {}, _G.PerformHttpRequest
+    _G.PerformHttpRequest = function(url, _, _, body) posts[#posts + 1] = { url = url, body = body } end
+    local function row(cid, amount, flow, reason, ago, direction)
+        L[#L + 1] = { citizenid = cid, amount = amount, flow = flow, reason = reason, ts = mysql.fakeNow - (ago or 60),
+            direction = direction or (flow == 'sink' and 'debit' or 'credit') }
+    end
+    local function minutes(n) Mocks.clock = (Mocks.clock or 0) + n * 60000 end
+
+    Mocks.treasury = 100000
+    Mocks.convars = Mocks.convars or {}
+    Mocks.convars.som_economy_webhook = nil
+    row('NORMAL1', 10000, 'faucet', 'paycheck:taxi')
+    row('OLD1', 90000, 'faucet', 'heist:store', 7200)
+    check(env.Watch.Check() == 0 and #posts == 0, 'watch: a quiet hour raises no alert, and rows outside the window are ignored')
+
+    row('RICH1', 30000, 'faucet', 'heist:store')
+    row('RICH1', 30000, 'faucet', 'heist:store')
+    check(env.Watch.Check() == 1 and #posts == 0, 'watch: a character over the faucet limit is flagged, and with no webhook it only prints')
+    minutes(C.Watch.alertCooldownMinutes + 1)
+
+    Mocks.convars.som_economy_webhook = 'https://example.invalid/hook'
+    check(env.Watch.Check() == 1 and #posts == 1 and posts[1].url == 'https://example.invalid/hook', 'watch: the alert goes to the webhook convar')
+    check(posts[1].body:find('RICH1', 1, true) and posts[1].body:find('60000', 1, true) and posts[1].body:find('heist', 1, true) and not posts[1].body:find('store', 1, true),
+        'watch: the alert names the citizenid, the amount and the reason prefix')
+    check(env.Watch.Check() == 0 and #posts == 1, 'watch: the same alert is not repeated inside the cooldown')
+    minutes(C.Watch.alertCooldownMinutes + 1)
+    check(env.Watch.Check() == 1, 'watch: it can be raised again after the cooldown')
+
+    row('BIG1', 300000, 'faucet', '@everyone payout')
+    row('LINE1', 56000, 'faucet', 'x\n[som-economy] ALERT fake line\r\ny')
+    row('TICK1', 55000, 'faucet', 'a\96b\96:x')
+    row('TRADER1', 150000, 'transfer', 'trade:sale:77')
+    row(nil, 400000, 'faucet', 'budget:sanitation')
+    posts = {}
+    minutes(C.Watch.alertCooldownMinutes + 1)
+    local sent = env.Watch.Check()
+    local all = ''
+    for _, p in ipairs(posts) do all = all .. p.body end
+    check(sent == 6 and all:find('TRADER1', 1, true) and all:find('transfers', 1, true) and all:find('one faucet payment of 400000 to treasury', 1, true),
+        'watch: incoming transfers and a single huge faucet row are flagged, a treasury row is named as the treasury')
+    check(not all:find('@', 1, true) and not all:find('\96', 1, true), 'watch: mentions and backticks are stripped from what goes to Discord')
+    check(not all:find('[\r\n]') and all:find('x [som-economy] ALERT fake line y', 1, true), 'watch: a line break in a reason cannot start a fake line')
+
+    C.Watch.treasuryFloor = 200000
+    posts = {}
+    minutes(C.Watch.alertCooldownMinutes + 1)
+    env.Watch.Check()
+    all = ''
+    for _, p in ipairs(posts) do all = all .. p.body end
+    check(all:find('the treasury holds 100000', 1, true), 'watch: a treasury under the floor is flagged')
+    C.Watch.treasuryFloor = 0
+
+    -- The digest
+    L = {}
+    mysql.db.ledger = L
+    row('E1', 70000, 'faucet', 'paycheck:police', 3600)
+    row('E1', 5000, 'faucet', 'buyer:fish', 3600)
+    row('E2', 20000, 'faucet', 'news:story:4', 3600)
+    row('E1', 20000, 'sink', 'shop:purchase', 3600, 'debit')
+    local text = env.Watch.Digest(24)
+    check(text:find('faucet 95000, sink 20000, ratio 0.21', 1, true) and text:find('WARNING', 1, true), 'watch: the digest totals string valued sums and warns when the ratio is off target')
+    check(text:find('top faucets: paycheck 70000, news 20000, buyer 5000', 1, true) and text:find('top sinks: shop 20000', 1, true), 'watch: the digest lists the biggest sources by reason prefix')
+    check(text:find('top earners: E1 75000 (paycheck), E2 20000 (news)', 1, true) and text:find('treasury 100000', 1, true), 'watch: the digest lists the top earners and the treasury')
+    check(not text:find('shop:purchase', 1, true) and not text:find('license', 1, true), 'watch: nothing beyond citizenids, amounts and reasons is in the digest')
+    check(env.Watch.Digest(1):find('top earners: E1 75000', 1, true), 'watch: the digest window is the hours asked for')
+
+    -- Business account and treasury rows have no citizen and are not player faucets or sinks
+    row(nil, 500000, 'faucet', 'treasury:payout', 3600)
+    row(nil, 300000, 'sink', 'business:tax', 3600, 'debit')
+    local again = env.Watch.Digest(24)
+    check(again:find('faucet 95000, sink 20000', 1, true) and not again:find('treasury:payout', 1, true) and not again:find('top faucets: treasury', 1, true), 'watch: the digest counts player faucets and sinks once and leaves business and treasury rows out')
+    row('E3', 1000, 'faucet', 'a:1', 3600); row('E4', 2000, 'faucet', 'b:1', 3600); row('E5', 3000, 'faucet', 'c:1', 3600)
+    local queries = mysql.watchEarnerQueries or 0
+    env.Watch.Digest(24)
+    check((mysql.watchEarnerQueries or 0) - queries == 2, 'watch: the earners take two queries however many characters there are')
+    row('E6', 4000, 'faucet', 'd:1', 3600); row('E7', 5000, 'faucet', 'e:1', 3600); row('E8', 6000, 'faucet', 'f:1', 3600)
+    local listed = env.Watch.Digest(168):match('top earners: ([^\n]*)')
+    local count = 0
+    for _ in listed:gmatch('%(') do count = count + 1 end
+    check(count == 5 and not listed:find('E3', 1, true), 'watch: a long window lists only the top five earners, the rest are cut in the query')
+
+    -- The command
+    posts = {}
+    Mocks.admins = {}
+    Mocks.commands.economyreport(5, { hours = 24 })
+    check(#posts == 0, 'watch: a non staff player cannot ask for the report')
+    Mocks.admins = { [5] = true }
+    Mocks.commands.economyreport(5, { hours = 24 })
+    check(#posts == 1 and posts[1].body:find('top faucets', 1, true), 'watch: an admin can post the report')
+    Mocks.commands.economyreport(0, { hours = 100000 })
+    check(#posts == 2 and posts[2].body:find('last 24 h', 1, true), 'watch: the console can run it and an absurd window falls back to a day')
+
+    Mocks.admins = {}
+    Mocks.convars.som_economy_webhook = nil
+    _G.PerformHttpRequest = realHttp
+end
+
+
+
+-- ---------------------------------------------------------------------------
+-- Tow tickets
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    resetMocks()
+    mysql.fakeNow = 1000000
+    local D = mysql.db.tow
+    D.on = true
+    D.tickets, D.impounds = {}, {}
+    D.vehicles = { { id = 1, plate = 'ABC123', citizenid = 'OWNER1', state = 'out' } }
+    local police = loader.loadResource(REPO .. 'som-police', { 'shared/config.lua', 'server/main.lua', 'server/impound.lua' })
+    local env = loader.loadResource(REPO .. 'som-tow', { 'shared/config.lua', 'server/tow.lua' })
+    local C = env.Config
+    local app = Mocks.apps.tow
+    local lot = C.yard.coords
+
+    local function person(src, cid, job) return { citizenid = cid, source = src, job = job, charinfo = { firstname = 'P' .. src, lastname = 'Q' .. src } } end
+    local function driver(duty) return { name = 'tow', onduty = duty ~= false, grade = 0 } end
+    Mocks.players = {
+        [1] = person(1, 'COP1', { name = 'police', onduty = true, grade = 2 }),
+        [2] = person(2, 'TOW2', driver()), [3] = person(3, 'TOW3', driver()), [4] = person(4, 'CIV4', { name = 'unemployed', onduty = true, grade = 0 }),
+        [5] = person(5, 'OWNER1', { name = 'unemployed', onduty = true, grade = 0 }),
+    }
+    placePed(1, 0, 0, 0); placePed(2, 0, 0, 0); placePed(3, 0, 0, 0)
+    local bank = { [2] = 0, [3] = 0 }
+    local dept = 100000
+    local saved = { addMoney = exports['som-core'].addMoney, businessTransact = exports['som-core'].businessTransact, gav = _G.GetAllVehicles }
+    local core = exports['som-core']
+    function core:addMoney(source, _, amount) bank[source] = (bank[source] or 0) + amount; return true end
+    function core:businessTransact(name, amount)
+        if name ~= 'lspd' or dept + amount < 0 then return false, 'refused' end
+        dept = dept + amount
+        return true
+    end
+    local realTrigger = _G.TriggerClientEvent
+    local sent = {}
+    _G.TriggerClientEvent = function(name, target, ...) sent[#sent + 1] = { name = name, target = target, args = { ... } } end
+    _G.GetAllVehicles = function() local out = {} for id in pairs(_G.Vehicles) do out[#out + 1] = id end return out end
+
+    local function spawn(id, plate, at) _G.Vehicles[id] = { plate = plate }; FakePeds[id] = at end
+    local function impound(tow, netId) return RegisteredCallbacks['som-police:server:impound'](1, { netId = netId or 900, reason = 5, tow = tow }) end
+    local function act(src, action, ticket) return app.handler(src, action, { ticket = ticket }) end
+    local function tick(id) for _, t in ipairs(D.tickets) do if t.id == id then return t end end end
+    local function view(src) return app.handler(src, 'view', {}).view.sections[1].rows end
+
+    -- The officer's request
+    spawn(900, 'ABC123', vec3(1, 1, 0))
+    placePed(1, 1, 1, 0)
+    Mocks.players[2].job.onduty, Mocks.players[3].job.onduty = false, false
+    local r = impound(true)
+    check(r.success and not r.towed and #D.impounds == 1 and _G.Vehicles[900] == nil and D.vehicles[1].state == 'impounded', 'tow: with no driver on duty the car is impounded at once')
+    check(#D.tickets == 0, 'tow: no ticket is raised when nobody can take it')
+
+    D.impounds = {}; D.vehicles[1].state = 'out'
+    Mocks.players[2].job.onduty, Mocks.players[3].job.onduty = true, true
+    spawn(900, 'ABC123', vec3(1, 1, 0))
+    r = impound(true)
+    check(r.success and r.towed and #D.tickets == 1 and tick(1).state == 'open' and #D.impounds == 0 and _G.Vehicles[900] ~= nil, 'tow: with a driver on duty the car stays and a ticket is raised')
+    check(impound(true).towed == true and #D.tickets == 1 and #D.impounds == 0, 'tow: asking again for the same car keeps the one ticket and does not impound it')
+    check(impound(false).success and #D.impounds == 1 and tick(1).state == 'cancelled', 'tow: "impound now" still works with drivers on duty and closes the ticket')
+    D.impounds = {}; D.vehicles[1].state = 'out'; spawn(900, 'ABC123', vec3(1, 1, 0))
+    check(RegisteredCallbacks['som-police:server:impound'](1, { netId = 900, reason = 99, tow = true }).error == 'pick a reason', 'tow: the reason still has to be one of the list')
+    check(env.Tow.Request('ZZZ', 'x', 'COP1') == false and env.Tow.Request(string.rep('A', 20), 1, 'COP1') == false, 'tow: a bad request is refused')
+
+    -- A fresh ticket for the car after the instant impound closed the first one
+    D.impounds = {}; D.vehicles[1].state = 'out'; spawn(900, 'ABC123', vec3(1, 1, 0))
+    check(impound(true).towed == true, 'tow: a new request raises a new ticket')
+    local T = #D.tickets
+
+    -- Who can see and take it
+    check(app.handler(4, 'view', {}).error == 'not available', 'tow: only tow drivers have the app')
+    Mocks.players[2].job.onduty = false
+    check(app.handler(2, 'view', {}).error == 'not available', 'tow: an off duty driver has nothing to take')
+    Mocks.players[2].job.onduty = true
+    check(#view(2) == 1 and view(2)[1].action == 'claim', 'tow: a driver sees the open ticket')
+    check(act(2, 'claim', '1').error == 'bad request' and act(2, 'claim', 0).error == 'bad request', 'tow: the ticket id has to be a whole number')
+
+    -- One winner
+    check(act(2, 'claim', T).success, 'tow: a driver takes the ticket')
+    check(act(3, 'claim', T).error == 'someone else took it' and tick(T).driver == 'TOW2', 'tow: a second driver cannot take it too')
+    check(view(2)[1].action == 'deliver' and #view(3) == 0, 'tow: only the driver who took it sees it to deliver')
+
+    -- Delivery
+    check(act(3, 'deliver', T).error == 'that is not your ticket', 'tow: another driver cannot deliver it')
+    check(act(2, 'deliver', T).error == 'the car is not at the impound lot', 'tow: a car away from the lot is not delivered')
+    spawn(900, 'ABC123', lot)
+    placePed(2, 300, 0, 0)
+    check(act(2, 'deliver', T).error == 'you have to be with the car', 'tow: the driver has to be with the car')
+    placePed(2, lot.x, lot.y, lot.z)
+    local done = act(2, 'deliver', T)
+    check(done.success and done.paid == C.fee and bank[2] == C.fee and dept == 100000 - C.fee, 'tow: delivery pays the driver from the department')
+    check(tick(T).state == 'done' and tick(T).paid == C.fee and #D.impounds == 1 and D.vehicles[1].state == 'impounded' and _G.Vehicles[900] == nil, 'tow: delivery impounds the car and removes it')
+    check(act(2, 'deliver', T).error == 'that is not your ticket' and bank[2] == C.fee, 'tow: a ticket is paid once')
+
+    -- Hourly cap, and a department that cannot pay
+    D.vehicles[1].state = 'out'
+    for i = 1, C.maxPaidPerHour do
+        D.tickets[#D.tickets + 1] = { id = 100 + i, plate = 'OLD' .. i, state = 'done', driver = 'TOW2', done_at = mysql.fakeNow - 60, paid = C.fee, created_at = mysql.fakeNow - 600 }
+    end
+    spawn(901, 'CAP111', lot); D.vehicles[#D.vehicles + 1] = { id = 2, plate = 'CAP111', citizenid = 'OWNER1', state = 'out' }
+    check(env.Tow.Request('CAP111', 5, 'COP1', { x = 1, y = 1, z = 0 }) == true, 'tow: a ticket for a second car')
+    local capId = #D.tickets
+    check(act(2, 'claim', capId).success, 'tow: claimed')
+    local before = bank[2]
+    local capped = act(2, 'deliver', capId)
+    check(capped.success and capped.paid == 0 and bank[2] == before and tick(capId).state == 'done', 'tow: past the hourly cap the tow is done but not paid')
+
+    spawn(902, 'BRK222', lot); D.vehicles[#D.vehicles + 1] = { id = 3, plate = 'BRK222', citizenid = 'OWNER1', state = 'out' }
+    mysql.fakeNow = mysql.fakeNow + 7200
+    check(env.Tow.Request('BRK222', 5, 'COP1', { x = 1, y = 1, z = 0 }) == true, 'tow: a ticket for a third car')
+    local brkId = #D.tickets
+    act(3, 'claim', brkId)
+    placePed(3, lot.x, lot.y, lot.z)
+    dept = 100
+    local unpaid = act(3, 'deliver', brkId)
+    check(unpaid.success and unpaid.paid == 0 and bank[3] == 0 and dept == 100 and tick(brkId).state == 'done', 'tow: a department that cannot pay leaves the tow done and the driver unpaid, nothing minted')
+    dept = 100000
+
+    -- A street car nobody owns is towed but not paid for
+    spawn(906, 'NPC999', lot)
+    env.Tow.Request('NPC999', 5, 'COP1', { x = 1, y = 1, z = 0 })
+    local npcId = #D.tickets
+    act(3, 'claim', npcId)
+    dept = 100000
+    local npc = act(3, 'deliver', npcId)
+    check(npc.success and npc.paid == 0 and bank[3] == 0 and dept == 100000 and #D.impounds > 0 and D.impounds[#D.impounds].plate == 'NPC999', 'tow: a car nobody owns is towed but the department does not pay for it')
+
+    -- A failed impound reopens the delivery
+    spawn(903, 'FAIL33', lot); D.vehicles[#D.vehicles + 1] = { id = 4, plate = 'FAIL33', citizenid = 'OWNER1', state = 'out' }
+    env.Tow.Request('FAIL33', 5, 'COP1', { x = 1, y = 1, z = 0 })
+    local failId = #D.tickets
+    act(3, 'claim', failId)
+    local realPlate = Mocks.exported.impoundPlate
+    Mocks.exported.impoundPlate = function() return false end
+    local bank3 = bank[3]
+    check(act(3, 'deliver', failId).error == 'the impound could not be recorded' and tick(failId).state == 'claimed' and bank[3] == bank3, 'tow: if the impound cannot be recorded the ticket stays with the driver and nothing is paid')
+    Mocks.exported.impoundPlate = realPlate
+
+    -- Timeouts
+    local n = #D.tickets
+    spawn(904, 'OLD444', vec3(5, 5, 0)); D.vehicles[#D.vehicles + 1] = { id = 5, plate = 'OLD444', citizenid = 'OWNER1', state = 'out' }
+    env.Tow.Request('OLD444', 5, 'COP1', { x = 5, y = 5, z = 0 })
+    local oldId = #D.tickets
+    mysql.fakeNow = mysql.fakeNow + (C.ticketMinutes - 1) * 60
+    env.Tow.Sweep()
+    check(tick(oldId).state == 'open' and _G.Vehicles[904] ~= nil, 'tow: a young ticket is left alone')
+    mysql.fakeNow = mysql.fakeNow + 120
+    env.Tow.Sweep()
+    check(tick(oldId).state == 'cancelled' and D.vehicles[5].state == 'impounded' and _G.Vehicles[904] == nil, 'tow: an untaken ticket becomes an instant impound')
+    spawn(905, 'HOLD55', vec3(5, 5, 0)); D.vehicles[#D.vehicles + 1] = { id = 6, plate = 'HOLD55', citizenid = 'OWNER1', state = 'out' }
+    env.Tow.Request('HOLD55', 5, 'COP1', { x = 5, y = 5, z = 0 })
+    local holdId = #D.tickets
+    act(2, 'claim', holdId)
+    mysql.fakeNow = mysql.fakeNow + (C.claimMinutes + 1) * 60
+    env.Tow.Sweep()
+    check(tick(holdId).state == 'open' and tick(holdId).driver == nil, 'tow: a ticket taken and never delivered goes back on the board')
+
+    -- Review fixes: the sweep, the paid cap, a failing credit and a throwing impound
+    local T0 = mysql.fakeNow
+    local function ticketFor(plate, id, at)
+        spawn(id, plate, at); D.vehicles[#D.vehicles + 1] = { id = 50 + id, plate = plate, citizenid = 'OWNER1', state = 'out' }
+        env.Tow.Request(plate, 5, 'COP1', { x = at.x, y = at.y, z = at.z })
+        return #D.tickets
+    end
+
+    local movedId = ticketFor('MOV001', 910, vec3(5, 5, 0))
+    FakePeds[910] = vec3(300, 300, 0)
+    mysql.fakeNow = T0 + (C.ticketMinutes + 1) * 60
+    env.Tow.Sweep()
+    check(tick(movedId).state == 'cancelled' and _G.Vehicles[910] ~= nil and D.vehicles[#D.vehicles].state == 'out', 'tow: a stale ticket for a car that moved away closes without touching the car or its row')
+
+    local goneId = ticketFor('GON002', 911, vec3(5, 5, 0))
+    _G.Vehicles[911] = nil
+    mysql.fakeNow = mysql.fakeNow + (C.ticketMinutes + 1) * 60
+    local impoundsBefore = #D.impounds
+    env.Tow.Sweep()
+    check(tick(goneId).state == 'cancelled' and #D.impounds == impoundsBefore and D.vehicles[#D.vehicles].state == 'out', 'tow: a stale ticket for a car that is gone closes without impounding anything')
+
+    local slowId = ticketFor('SLW003', 912, vec3(5, 5, 0))
+    mysql.fakeNow = mysql.fakeNow + (C.ticketMinutes - 1) * 60
+    check(act(2, 'claim', slowId).success, 'tow: a driver takes a ticket late in its life')
+    mysql.fakeNow = mysql.fakeNow + (C.claimMinutes - 1) * 60
+    env.Tow.Sweep()
+    check(tick(slowId).state == 'claimed' and _G.Vehicles[912] ~= nil, 'tow: a ticket a driver still holds is not impounded, however old')
+    mysql.fakeNow = mysql.fakeNow + 2 * 60
+    env.Tow.Sweep()
+    check(tick(slowId).state == 'open' and _G.Vehicles[912] ~= nil and D.vehicles[#D.vehicles].state == 'out', 'tow: a ticket reopened in a sweep is not cancelled in the same run')
+    mysql.fakeNow = mysql.fakeNow + (C.ticketMinutes + 1) * 60
+    env.Tow.Sweep()
+    check(tick(slowId).state == 'cancelled' and _G.Vehicles[912] == nil and D.vehicles[#D.vehicles].state == 'impounded', 'tow: a reopened ticket nobody retakes is impounded a full window later')
+
+    -- Unpaid tows do not use up the paid cap
+    mysql.fakeNow = mysql.fakeNow + 7200
+    for i = 1, C.maxPaidPerHour do
+        D.tickets[#D.tickets + 1] = { id = 300 + i, plate = 'FREE' .. i, state = 'done', driver = 'TOW2', done_at = mysql.fakeNow - 60, paid = 0, created_at = mysql.fakeNow - 600 }
+    end
+    local freeId = ticketFor('PAY004', 913, lot)
+    act(2, 'claim', freeId)
+    placePed(2, lot.x, lot.y, lot.z)
+    local bank2 = bank[2]
+    local r1 = act(2, 'deliver', freeId)
+    check(r1.paid == C.fee and bank[2] == bank2 + C.fee, 'tow: unpaid tows do not count toward the hourly paid cap')
+
+    -- The driver is told when the department cannot pay
+    local brk2 = ticketFor('BRK005', 914, lot)
+    act(3, 'claim', brk2)
+    placePed(3, lot.x, lot.y, lot.z)
+    dept = 100
+    sent = {}
+    act(3, 'deliver', brk2)
+    local told = false
+    for _, e in ipairs(sent) do if e.name == 'som:client:notify' and e.target == 3 then told = true end end
+    check(told and tick(brk2).paid == 0, 'tow: the driver is told when the department cannot pay')
+    dept = 100000
+
+    -- A credit that throws refunds the department
+    local thr = ticketFor('THR006', 915, lot)
+    act(3, 'claim', thr)
+    local realAdd = core.addMoney
+    function core:addMoney() error('credit blew up') end
+    local deptBefore = dept
+    local r2 = act(3, 'deliver', thr)
+    core.addMoney = realAdd
+    check(r2.success and r2.paid == 0 and dept == deptBefore and tick(thr).paid == 0, 'tow: a credit that throws refunds the department and pays nobody')
+
+    -- An impound that throws puts the ticket back with the driver
+    local boom = ticketFor('BOM007', 916, lot)
+    act(3, 'claim', boom)
+    Mocks.exported.impoundPlate = function() error('db down') end
+    local bank3b = bank[3]
+    local r3 = act(3, 'deliver', boom)
+    Mocks.exported.impoundPlate = realPlate
+    check(r3.error == 'the impound could not be recorded' and tick(boom).state == 'claimed' and bank[3] == bank3b, 'tow: an impound that throws rolls the ticket back to the driver')
+
+    -- A sweep impound that throws leaves the ticket open to retry, and a driver past the cap is told why
+    local swId = ticketFor('SWT008', 917, vec3(5, 5, 0))
+    mysql.fakeNow = mysql.fakeNow + (C.ticketMinutes + 1) * 60
+    Mocks.exported.impoundPlate = function() error('db down') end
+    env.Tow.Sweep()
+    Mocks.exported.impoundPlate = realPlate
+    check(tick(swId).state == 'open' and _G.Vehicles[917] ~= nil, 'tow: a sweep impound that throws leaves the ticket open to retry')
+    env.Tow.Sweep()
+    check(tick(swId).state == 'cancelled' and _G.Vehicles[917] == nil, 'tow: and the next sweep impounds it')
+
+    for i = 1, C.maxPaidPerHour do
+        D.tickets[#D.tickets + 1] = { id = 400 + i, plate = 'CAPD' .. i, state = 'done', driver = 'TOW2', done_at = mysql.fakeNow - 60, paid = C.fee, created_at = mysql.fakeNow - 600 }
+    end
+    local lateId = ticketFor('LAT009', 918, lot)
+    act(2, 'claim', lateId)
+    placePed(2, lot.x, lot.y, lot.z)
+    sent = {}
+    act(2, 'deliver', lateId)
+    local capTold = false
+    for _, e in ipairs(sent) do if e.name == 'som:client:notify' and e.target == 2 then capTold = true end end
+    check(capTold and tick(lateId).paid == 0, 'tow: a driver past the hourly cap is told the tow is unpaid')
+
+    -- A passed car with the wrong plate is ignored in favour of the plate's own car
+    spawn(920, 'WRG012', vec3(5, 5, 0)); spawn(921, 'RGT013', vec3(6, 6, 0))
+    D.vehicles[#D.vehicles + 1] = { id = 71, plate = 'RGT013', citizenid = 'OWNER1', state = 'out' }
+    check(Mocks.exported.impoundPlate('RGT013', 'COP1', 5, 920) == true and _G.Vehicles[921] == nil and _G.Vehicles[920] ~= nil, 'tow: a car passed in with another plate is not removed, the right car is found by plate')
+    check(Mocks.exported.impoundPlate('WRG012', 'COP1', 5, 920) == true and _G.Vehicles[920] == nil, 'tow: a car passed in with the matching plate is the one removed')
+
+    -- One impound row per plate, even if the seal is repeated
+    D.vehicles[#D.vehicles + 1] = { id = 70, plate = 'IDM010', citizenid = 'OWNER1', state = 'out' }
+    local sealed = 0
+    for _ = 1, 2 do if police.Police.SealImpound('IDM010', 'COP1', 5, nil) then sealed = sealed + 1 end end
+    local rowsFor = 0
+    for _, i in ipairs(D.impounds) do if i.plate == 'IDM010' then rowsFor = rowsFor + 1 end end
+    check(sealed == 2 and rowsFor == 1 and D.vehicles[#D.vehicles].state == 'impounded', 'tow: sealing the same plate twice leaves one impound row')
+
+    -- The sweep looks through the vehicles once per stale ticket
+    ticketFor('SCN011', 919, vec3(5, 5, 0))
+    mysql.fakeNow = mysql.fakeNow + (C.ticketMinutes + 1) * 60
+    local scans, realScan = 0, _G.GetAllVehicles
+    _G.GetAllVehicles = function() scans = scans + 1; return realScan() end
+    env.Tow.Sweep()
+    _G.GetAllVehicles = realScan
+    check(scans == 1 and _G.Vehicles[919] == nil, 'tow: a stale ticket scans the vehicles once and still impounds the car')
+
+    -- A hold as long as the wait is clamped at load
+    local f = assert(io.open(REPO .. 'som-tow/server/tow.lua', 'rb'))
+    local source = f:read('a')
+    f:close()
+    local tuned = loader.loadResource(REPO .. 'som-tow', { 'shared/config.lua' })
+    tuned.Config.claimMinutes, tuned.Config.ticketMinutes = 30, 20
+    local realPrint = _G.print
+    local warned = false
+    _G.print = function(text) if tostring(text):find('claimMinutes', 1, true) then warned = true end end
+    assert(load(source, '@som-tow/server/tow.lua', 't', tuned))()
+    _G.print = realPrint
+    check(tuned.Config.claimMinutes == 19 and warned, 'tow: a claim time at or above the ticket time is clamped below it, loudly')
+
+    -- Leave the shared mocks as found
+    exports['som-core'].addMoney, exports['som-core'].businessTransact, _G.GetAllVehicles = saved.addMoney, saved.businessTransact, saved.gav
+    _G.TriggerClientEvent = realTrigger
+    D.on = false
+    Mocks.exported.request, Mocks.exported.impoundPlate = nil, nil
+end
+
+
+-- ---------------------------------------------------------------------------
+-- Player-run restaurants
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    mysql.fakeNow = 2000000
+    local env = loader.loadResource(REPO .. 'som-restaurants', { 'shared/config.lua', 'server/restaurants.lua', 'server/kitchen.lua', 'server/orders.lua' })
+    local cb = RegisteredCallbacks
+    local core = exports['som-core']
+    local C = env.Config
+    local D = mysql.db.restDb
+    D.owner, D.orders, D.nextId, D.balance, D.withdrawAt = nil, {}, 0, 0, nil
+
+    local rest = C.restaurants[1]
+    rest.enabled, rest.coords = false, vec3(0, 0, 0)
+    for _, st in ipairs(rest.stations) do st.coords = vec3(0, 0, 0) end
+    C.supplier.enabled, C.supplier.coords = true, vec3(0, 0, 0)
+    rest.selfServe.coords = vec3(0, 0, 0)
+
+    Mocks.jobs = {
+        unemployed = { defaultDuty = true },
+        burgershot = { defaultDuty = false },
+        police = { defaultDuty = true, whitelisted = true },
+    }
+    local function person(src, cid, job, grade, onduty)
+        return { citizenid = cid, source = src, charinfo = { firstname = 'P' .. src, lastname = 'Q' .. src }, job = { name = job, grade = grade or 0, onduty = onduty ~= false } }
+    end
+    Mocks.players = {
+        [1] = person(1, 'OWN1', 'unemployed'), [2] = person(2, 'CUS2', 'unemployed'),
+        [3] = person(3, 'STF3', 'burgershot', 0, true), [4] = person(4, 'FAR4', 'unemployed'), [5] = person(5, 'COP5', 'police'),
+    }
+    Mocks.inv = { [1] = {}, [2] = {}, [3] = {}, [4] = {}, [5] = {} }
+    FakePeds[1], FakePeds[2], FakePeds[3], FakePeds[4], FakePeds[5] = vec3(0, 0, 0), vec3(1, 0, 0), vec3(1, 1, 0), vec3(500, 0, 0), vec3(0, 1, 0)
+    Mocks.bank = { [1] = 1000000, [2] = 500, [3] = 0, [4] = 100000, [5] = 1000000 }
+    Mocks.treasury, Mocks.credited = 0, {}
+    Mocks.invFull, Mocks.addMoneyFails, Mocks.taxFails, Mocks.creditFails = {}, false, false, false
+
+    -- ox_inventory keeps these as slots; the shared mock removes whatever one stack holds.
+    local function count(src, item) return exports.ox_inventory:Search(src, 'count', item) end
+    function exports.ox_inventory:RemoveItem(inv, item, n)
+        if count(inv, item) < n then return false end
+        local left = n
+        for k, stack in pairs(Mocks.inv[inv]) do
+            if stack.name == item and left > 0 then
+                local take = math.min(stack.count, left)
+                stack.count = stack.count - take
+                left = left - take
+                if stack.count == 0 then Mocks.inv[inv][k] = nil end
+            end
+        end
+        return true
+    end
+    local function give(src, item, n) exports.ox_inventory:AddItem(src, item, n) end
+
+    local saved = { addMoney = core.addMoney, businessTransact = core.businessTransact, json = _G.json }
+    function core:addMoney(source, _, amount)
+        if Mocks.addMoneyFails then return false, 'refused' end
+        Mocks.bank[source] = (Mocks.bank[source] or 0) + amount
+        return true
+    end
+    function core:businessTransact(_, amount)
+        if Mocks.bizFails or D.balance + amount < 0 then return false, 'refused' end
+        D.balance = D.balance + amount
+        return true
+    end
+    -- Orders hold lists of tables, which the shared json mock cannot round trip.
+    local blobs = {}
+    _G.json = { encode = function(v) blobs[#blobs + 1] = v; return 'blob' .. #blobs end, decode = function(t) return blobs[tonumber(tostring(t):match('^blob(%d+)$'))] end }
+    local notes = {}
+    local realT = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, ...) notes[#notes + 1] = { name = name, target = target, args = { ... } } end
+
+    -- Ships disabled
+    check(cb['som-restaurants:server:buy'](1, 'burgershot').error == 'not available', 'restaurants: a restaurant that is not switched on cannot be bought')
+    check(cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, { { item = 'bigking', qty = 1 } }).error == 'not available', 'restaurants: an unplaced counter takes no orders')
+    rest.enabled = true
+
+    -- Buying
+    check(cb['som-restaurants:server:buy'](1, 'nope').error == 'not available', 'restaurants: an unknown id is refused')
+    check(cb['som-restaurants:server:buy'](4, 'burgershot').error == 'you are too far away', 'restaurants: buying needs the counter')
+    check(cb['som-restaurants:server:buy'](5, 'burgershot').error == 'leave your current job first', 'restaurants: a whitelisted job is never swapped away')
+    Mocks.bank[1] = 10
+    check(cb['som-restaurants:server:buy'](1, 'burgershot').error == 'not enough in your bank' and D.owner == nil, 'restaurants: without the money nothing is claimed')
+    Mocks.bank[1] = 1000000
+    Mocks.taxFails = true
+    check(cb['som-restaurants:server:buy'](1, 'burgershot').error == 'the sale fell through' and Mocks.bank[1] == 1000000 and D.owner == nil, 'restaurants: a refused payment to the city refunds the buyer and frees it')
+    Mocks.taxFails = false
+    check(cb['som-restaurants:server:buy'](1, 'burgershot').success and D.owner == 'OWN1', 'restaurants: a buyer becomes the owner')
+    check(Mocks.players[1].job.name == 'burgershot' and Mocks.players[1].job.grade == C.manageGrade, 'restaurants: the owner gets the boss grade of the job')
+    check(Mocks.treasury == rest.price and Mocks.bank[1] == 1000000 - rest.price, 'restaurants: the price moves from the buyer to the treasury')
+    check(cb['som-restaurants:server:buy'](2, 'burgershot').error == 'this restaurant is not for sale, or you already own one', 'restaurants: a second buyer loses')
+    Mocks.players[1].job.onduty = true
+
+    -- Hiring and firing
+    check(cb['som-restaurants:server:hire'](3, 'burgershot', 2).error == 'not available', 'restaurants: crew cannot hire')
+    check(cb['som-restaurants:server:hire'](1, 'burgershot', 4).error == 'they need to be next to you', 'restaurants: a hire must be next to the boss')
+    check(cb['som-restaurants:server:hire'](1, 'burgershot', 'x').error == 'there is nobody to hire', 'restaurants: a non number target is refused')
+    notes = {}
+    check(cb['som-restaurants:server:hire'](1, 'burgershot', 2).success, 'restaurants: the boss can offer a job')
+    check(cb['som-restaurants:server:answerHire'](2, 'yes').error == 'not available', 'restaurants: an answer must be a boolean')
+    check(cb['som-restaurants:server:answerHire'](2, true).success and Mocks.players[2].job.name == 'burgershot' and Mocks.players[2].job.grade == 0, 'restaurants: accepting puts them on the job')
+    check(cb['som-restaurants:server:answerHire'](2, true).error == 'that offer is gone', 'restaurants: an offer works once')
+    check(cb['som-restaurants:server:fire'](1, 'burgershot', 1).error == 'they do not work here', 'restaurants: the boss cannot fire themselves')
+    check(cb['som-restaurants:server:fire'](1, 'burgershot', 2).success and Mocks.players[2].job.name == 'unemployed', 'restaurants: the boss lets crew go')
+
+    -- Taking money out
+    D.balance = 5000
+    check(cb['som-restaurants:server:withdraw'](3, 'burgershot', 100).error == 'not available', 'restaurants: crew cannot take money out')
+    check(cb['som-restaurants:server:withdraw'](1, 'burgershot', 99999).error:find('at a time') ~= nil, 'restaurants: a withdrawal has a cap')
+    check(cb['som-restaurants:server:withdraw'](1, 'burgershot', 1.5).error:find('at a time') ~= nil, 'restaurants: a fractional withdrawal is refused')
+    local bankBefore = Mocks.bank[1]
+    check(cb['som-restaurants:server:withdraw'](1, 'burgershot', 1000).success and D.balance == 4000 and Mocks.bank[1] == bankBefore + 1000, 'restaurants: a withdrawal moves account money to the owner')
+    check(cb['som-restaurants:server:withdraw'](1, 'burgershot', 10).error == 'you took money out recently, try again later', 'restaurants: withdrawals have a cooldown')
+    D.withdrawAt = nil
+    D.orders[99] = { id = 99, restaurant_id = 'burgershot', customer_cid = 'X', state = 'paid', total = 3500, items = '', paid_at = mysql.fakeNow, created_at = mysql.fakeNow }
+    check(cb['som-restaurants:server:withdraw'](1, 'burgershot', 1000).error == 'that money is needed for unserved orders', 'restaurants: money owed for unserved orders cannot be withdrawn')
+    D.orders[99] = nil
+
+    -- An owner who quit the job keeps the restaurant and can take their place back
+    D.withdrawAt = nil
+    Mocks.players[1].job = { name = 'unemployed', grade = 0, onduty = true }
+    check(cb['som-restaurants:server:withdraw'](1, 'burgershot', 100).success, 'restaurants: an owner who left the job can still take money out')
+    check(cb['som-restaurants:server:open'](1, 'burgershot').away == true, 'restaurants: the counter tells the owner they are away from the job')
+    Mocks.players[1].job = { name = 'police', grade = 0, onduty = true }
+    check(cb['som-restaurants:server:resume'](1, 'burgershot').error == 'leave your current job first', 'restaurants: resuming never swaps a whitelisted job')
+    Mocks.players[1].job = { name = 'unemployed', grade = 0, onduty = true }
+    check(cb['som-restaurants:server:resume'](3, 'burgershot').error == 'not available', 'restaurants: only the owner can resume')
+    check(cb['som-restaurants:server:resume'](1, 'burgershot').success and Mocks.players[1].job.name == 'burgershot' and Mocks.players[1].job.grade == C.manageGrade, 'restaurants: the owner goes back to the boss grade')
+    Mocks.players[1].job.onduty = true
+    D.balance = D.balance - 100
+
+    -- Supplier
+    local treasury0 = Mocks.treasury
+    D.balance = 1000
+    check(cb['som-restaurants:server:supplier'](2, 'burgershot', 'burgershot_bread', 2).error == 'not available', 'supplier: only staff on duty can buy')
+    Mocks.players[3].job.onduty = false
+    check(cb['som-restaurants:server:supplier'](3, 'burgershot', 'burgershot_bread', 2).error == 'not available', 'supplier: staff off duty cannot buy')
+    Mocks.players[3].job.onduty = true
+    check(cb['som-restaurants:server:supplier'](3, 'burgershot', 'sprunk', 2).error == 'bad request', 'supplier: an item the wholesaler does not sell is refused')
+    check(cb['som-restaurants:server:supplier'](3, 'burgershot', 'burgershot_bread', 2.5).error == 'bad request', 'supplier: a fractional quantity is refused')
+    check(cb['som-restaurants:server:supplier'](3, 'burgershot', 'burgershot_bread', 999).error == 'bad request', 'supplier: an oversized quantity is refused')
+    check(cb['som-restaurants:server:supplier'](3, 'burgershot', 'burgershot_bread', 4).success, 'supplier: staff can buy ingredients')
+    check(D.balance == 1000 - 8 and Mocks.treasury == treasury0 + 8 and count(3, 'burgershot_bread') == 4, 'supplier: the restaurant account pays the city and the goods arrive')
+    Mocks.invFull[3] = true
+    check(cb['som-restaurants:server:supplier'](3, 'burgershot', 'burgershot_bread', 1).error == 'you cannot carry that' and D.balance == 992, 'supplier: a full bag buys nothing')
+    Mocks.invFull[3] = nil
+    Mocks.taxFails = true
+    check(cb['som-restaurants:server:supplier'](3, 'burgershot', 'burgershot_bread', 1).error == 'the supplier could not take the payment' and D.balance == 992, 'supplier: a refused payment puts the money back in the account')
+    Mocks.taxFails = false
+    D.balance = 1
+    check(cb['som-restaurants:server:supplier'](3, 'burgershot', 'burgershot_frozenmeat', 1).error == 'the restaurant account cannot pay for that' and count(3, 'burgershot_frozenmeat') == 0, 'supplier: an account that cannot pay buys nothing')
+    D.balance = 0
+
+    -- Cooking
+    Mocks.inv[3] = {}
+    check(cb['som-restaurants:server:cookStart'](3, 'burgershot', 'prep', 'thaw').error == 'you are missing ingredients', 'cook: a step without its ingredients does not start')
+    give(3, 'burgershot_frozenmeat', 1)
+    check(cb['som-restaurants:server:cookStart'](3, 'burgershot', 'grill', 'thaw').error == 'bad request', 'cook: a recipe belongs to its own station')
+    check(cb['som-restaurants:server:cookStart'](3, 'burgershot', 'prep', 'nope').error == 'bad request', 'cook: an unknown recipe is refused')
+    check(cb['som-restaurants:server:cookStart'](2, 'burgershot', 'prep', 'thaw').error == 'not available', 'cook: only staff on duty cook')
+    check(cb['som-restaurants:server:cookFinish'](3).error == 'you were not cooking', 'cook: a finish without a start does nothing')
+    check(cb['som-restaurants:server:cookStart'](3, 'burgershot', 'prep', 'thaw').success, 'cook: a step starts with its ingredients')
+    check(cb['som-restaurants:server:cookStart'](3, 'burgershot', 'prep', 'thaw').error == 'you are already cooking', 'cook: one step at a time')
+    Mocks.clock = Mocks.clock + C.recipes.thaw.duration + 31000
+    check(cb['som-restaurants:server:cookStart'](3, 'burgershot', 'prep', 'thaw').success, 'cook: a run whose finish never came expires instead of blocking the cook')
+    Mocks.clock = Mocks.clock + 1000
+    check(cb['som-restaurants:server:cookFinish'](3).error == 'that was not finished yet' and count(3, 'burgershot_frozenmeat') == 1 and count(3, 'burgershot_meat') == 0, 'cook: an early finish takes nothing and gives nothing')
+    cb['som-restaurants:server:cookStart'](3, 'burgershot', 'prep', 'thaw')
+    Mocks.clock = Mocks.clock + 5000
+    local realAdd = exports.ox_inventory.AddItem
+    function exports.ox_inventory:AddItem(inv, item, n, md) if Mocks.failOutput == item then return false end return realAdd(self, inv, item, n, md) end
+    Mocks.failOutput = 'burgershot_meat'
+    check(cb['som-restaurants:server:cookFinish'](3).error == 'you cannot carry that' and count(3, 'burgershot_frozenmeat') == 1 and count(3, 'burgershot_meat') == 0, 'cook: a failed handover puts the ingredients back')
+    Mocks.failOutput = nil
+    cb['som-restaurants:server:cookStart'](3, 'burgershot', 'prep', 'thaw')
+    Mocks.clock = Mocks.clock + 5000
+    check(cb['som-restaurants:server:cookFinish'](3).success and count(3, 'burgershot_frozenmeat') == 0 and count(3, 'burgershot_meat') == 2, 'cook: a full step turns the input into exactly its output')
+    check(cb['som-restaurants:server:cookFinish'](3).error == 'you were not cooking', 'cook: a step finishes once')
+    give(3, 'burgershot_meat', 0)
+    cb['som-restaurants:server:cookStart'](3, 'burgershot', 'grill', 'patty')
+    Mocks.inv[3] = {}
+    Mocks.clock = Mocks.clock + 9000
+    check(cb['som-restaurants:server:cookFinish'](3).error == 'you are missing ingredients' and count(3, 'burgershot_patty') == 0, 'cook: ingredients dropped meanwhile give no dish')
+    -- assemble a Big King: partial ingredient removal is undone when a later one is missing
+    give(3, 'burgershot_patty', 2); give(3, 'burgershot_bread', 1); give(3, 'burgershot_tomato', 1); give(3, 'burgershot_cheddar', 1); give(3, 'burgershot_sauce', 1)
+    cb['som-restaurants:server:cookStart'](3, 'burgershot', 'assemble', 'bigking')
+    Mocks.clock = Mocks.clock + 7000
+    check(cb['som-restaurants:server:cookFinish'](3).success and count(3, 'burgershot_bigking') == 1 and count(3, 'burgershot_patty') == 0, 'cook: assembling consumes every part and yields the dish')
+
+    -- Orders
+    Mocks.bank[2] = 500
+    D.balance = 0
+    local lines = { { item = 'bigking', qty = 2, price = 1 }, { item = 'colab', qty = 1 } }
+    check(cb['som-restaurants:server:orderCreate'](2, 'burgershot', 2, lines).error == 'not available', 'order: a customer cannot make their own order')
+    check(cb['som-restaurants:server:orderCreate'](3, 'burgershot', 4, lines).error == 'the customer needs to be at the counter', 'order: the customer must be at the counter')
+    check(cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, { { item = 'sprunk', qty = 1 } }).error == 'bad order', 'order: an item off the menu is refused')
+    check(cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, { { item = 'bigking', qty = 9 } }).error == 'bad order', 'order: a quantity over the cap is refused')
+    check(cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, { { item = 'bigking', qty = 1 }, { item = 'bigking', qty = 1 } }).error == 'bad order', 'order: a repeated line is refused')
+    check(cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, {}).error == 'bad order', 'order: an empty order is refused')
+    local made = cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, lines)
+    check(made.success and made.total == 2 * C.menu.bigking.price + C.menu.colab.price, 'order: the total comes from the menu, not from anything the client sent')
+    check(cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, lines).error == 'they already have an order waiting', 'order: one open offer per customer')
+    check(cb['som-restaurants:server:orderPay'](1, made.orderId).error == 'that order is gone', 'order: only the named customer can pay it')
+    check(cb['som-restaurants:server:orderPay'](2, 'x').error == 'not available', 'order: a non number order id is refused')
+
+    Mocks.bank[2] = 10
+    check(cb['som-restaurants:server:orderPay'](2, made.orderId).error == 'not enough in your bank' and D.orders[made.orderId].state == 'cancelled' and D.balance == 0, 'order: a customer who cannot pay cancels it with nothing moved')
+    Mocks.bank[2] = 500
+    made = cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, lines)
+    Mocks.bizFails = true
+    check(cb['som-restaurants:server:orderPay'](2, made.orderId).error == 'the restaurant could not take the payment' and Mocks.bank[2] == 500 and D.orders[made.orderId].state == 'cancelled', 'order: a failed credit to the restaurant refunds the customer')
+    Mocks.bizFails = false
+    made = cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, lines)
+    mysql.fakeNow = mysql.fakeNow + C.offerSeconds + 1
+    check(cb['som-restaurants:server:orderPay'](2, made.orderId).error == 'that order is gone' and Mocks.bank[2] == 500, 'order: an offer that waited too long cannot be paid')
+    made = cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, lines)
+    Mocks.players[3].job.onduty, Mocks.players[1].job.onduty = false, false
+    check(cb['som-restaurants:server:orderPay'](2, made.orderId).error == 'nobody is on duty to make that' and Mocks.bank[2] == 500, 'order: nobody pays a restaurant with nobody working')
+    Mocks.players[3].job.onduty, Mocks.players[1].job.onduty = true, true
+    notes = {}
+    check(cb['som-restaurants:server:orderPay'](2, made.orderId).success, 'order: the customer accepts and pays')
+    check(Mocks.bank[2] == 500 - made.total and D.balance == made.total and D.orders[made.orderId].state == 'paid', 'order: the debit and the credit are the same amount')
+    check(cb['som-restaurants:server:orderPay'](2, made.orderId).error == 'that order is gone' and Mocks.bank[2] == 500 - made.total, 'order: a second payment of the same order moves nothing')
+    local ticket
+    for _, n in ipairs(notes) do if n.name == 'som-restaurants:client:ticket' then ticket = n end end
+    check(ticket and ticket.target == 3, 'order: the kitchen gets a ticket')
+    local staffView, guestView = cb['som-restaurants:server:open'](3, 'burgershot'), cb['som-restaurants:server:open'](2, 'burgershot')
+    check(staffView and #staffView.queue == 1 and guestView and guestView.queue == nil, 'order: the ticket queue is shown to staff only')
+
+    -- Serving
+    local treasury1 = Mocks.treasury
+    check(cb['som-restaurants:server:orderServe'](3, 'burgershot', made.orderId).error == 'you do not have everything for that order', 'serve: the cook needs every item')
+    give(3, 'burgershot_bigking', 1); give(3, 'burgershot_colab', 1)
+    FakePeds[2] = vec3(500, 0, 0)
+    check(cb['som-restaurants:server:orderServe'](3, 'burgershot', made.orderId).error == 'the customer is not at the counter', 'serve: the customer must be there')
+    FakePeds[2] = vec3(1, 0, 0)
+    Mocks.invFull[2] = true
+    check(cb['som-restaurants:server:orderServe'](3, 'burgershot', made.orderId).error == 'they cannot carry all that' and D.orders[made.orderId].state == 'paid' and count(3, 'burgershot_bigking') == 2, 'serve: a customer who cannot carry it leaves the order open and the food with the cook')
+    Mocks.invFull[2] = nil
+    check(cb['som-restaurants:server:orderServe'](3, 'burgershot', made.orderId).success, 'serve: the cook hands it over')
+    check(count(2, 'burgershot_bigking') == 2 and count(2, 'burgershot_colab') == 1 and count(3, 'burgershot_bigking') == 0, 'serve: the customer gets exactly the order')
+    check(D.orders[made.orderId].state == 'served' and Mocks.treasury == treasury1 + math.floor(made.total * C.taxRate) and D.balance == made.total - math.floor(made.total * C.taxRate), 'serve: the city share leaves the account when the food is handed over')
+    check(cb['som-restaurants:server:orderServe'](3, 'burgershot', made.orderId).error == 'that order is gone', 'serve: an order is served once')
+
+    -- Orders nobody serves are refunded; serve and refund race on one claim
+    Mocks.bank[2] = 500
+    D.balance = 0
+    local function paidOrder(customerSrc, total)
+        mysql.fakeNow = mysql.fakeNow + 100
+        D.balance = D.balance + total
+        D.nextId = D.nextId + 1
+        D.orders[D.nextId] = { id = D.nextId, restaurant_id = 'burgershot', cashier_cid = 'STF3', customer_cid = Mocks.players[customerSrc] and Mocks.players[customerSrc].citizenid or 'GONE9', items = json.encode({ { item = 'bleeder', qty = 1 } }), total = total, state = 'paid', created_at = mysql.fakeNow, paid_at = mysql.fakeNow }
+        return D.nextId
+    end
+    local o1 = paidOrder(2, 20)
+    env.Orders.RefundTick()
+    check(D.orders[o1].state == 'paid' and Mocks.credited.CUS2 == nil, 'refund: an order inside the window is left alone')
+    mysql.fakeNow = mysql.fakeNow + C.serveWindowMinutes * 60 + 1
+    notes = {}
+    env.Orders.RefundTick()
+    check(D.orders[o1].state == 'refunded' and Mocks.credited.CUS2 == 20 and D.balance == 0, 'refund: an unserved order goes back from the account to the customer')
+    check(cb['som-restaurants:server:orderServe'](3, 'burgershot', o1).error == 'that order is gone', 'refund: a refunded order cannot be served afterwards')
+    env.Orders.RefundTick()
+    check(Mocks.credited.CUS2 == 20, 'refund: an order is refunded once')
+
+    local o2 = paidOrder(2, 20)
+    give(3, 'burgershot_bleeder', 1)
+    check(cb['som-restaurants:server:orderServe'](3, 'burgershot', o2).success, 'race: serve wins an order that is still paid')
+    mysql.fakeNow = mysql.fakeNow + C.serveWindowMinutes * 60 + 1
+    check(env.Orders.Refund({ id = o2, restaurant_id = 'burgershot', customer_cid = 'CUS2', total = 20 }) == false and Mocks.credited.CUS2 == 20, 'race: refund loses to a serve, nothing is paid back')
+
+    local o3 = paidOrder(2, 20)
+    mysql.fakeNow = mysql.fakeNow + C.serveWindowMinutes * 60 + 1
+    check(env.Orders.Refund({ id = o3, restaurant_id = 'burgershot', customer_cid = 'CUS2', total = 20 }) == true, 'race: refund wins an expired paid order')
+    give(3, 'burgershot_bleeder', 1)
+    check(cb['som-restaurants:server:orderServe'](3, 'burgershot', o3).error == 'that order is gone' and count(3, 'burgershot_bleeder') == 1 and Mocks.credited.CUS2 == 40, 'race: serve loses to a refund, the food stays and the customer is paid once')
+
+    local o4 = paidOrder(0, 30)
+    mysql.fakeNow = mysql.fakeNow + C.serveWindowMinutes * 60 + 1
+    env.Orders.RefundTick()
+    check(D.orders[o4].state == 'refunded' and Mocks.credited.GONE9 == 30, 'refund: a customer who is offline is refunded too')
+
+    local o5 = paidOrder(2, 50)
+    D.balance = 10
+    mysql.fakeNow = mysql.fakeNow + C.serveWindowMinutes * 60 + 1
+    env.Orders.RefundTick()
+    check(D.orders[o5].state == 'paid' and D.balance == 10 and (Mocks.credited.CUS2 or 0) == 40, 'refund: an account that cannot cover it leaves the order paid for a retry')
+    D.balance = 50
+    Mocks.creditFails = true
+    env.Orders.RefundTick()
+    check(D.orders[o5].state == 'paid' and D.balance == 50, 'refund: a failed credit puts the money back in the account and keeps the order paid')
+    Mocks.creditFails = false
+    env.Orders.RefundTick()
+    check(D.orders[o5].state == 'refunded' and D.balance == 0 and Mocks.credited.CUS2 == 90, 'refund: the retry pays the customer')
+
+    -- Self-serve
+    Mocks.bank[2] = 500
+    check(cb['som-restaurants:server:selfServe'](2, 'burgershot', 'burger', 1).error == 'the kitchen is open, order at the counter', 'selfserve: closed while staff are on duty')
+    local open = cb['som-restaurants:server:open'](2, 'burgershot')
+    check(open and open.fallback == nil, 'selfserve: the counter shows no machine while staffed')
+    Mocks.players[3].job.onduty = false
+    Mocks.players[1].job.onduty = false
+    open = cb['som-restaurants:server:open'](2, 'burgershot')
+    check(open and open.fallback ~= nil, 'selfserve: the machine appears once nobody is on duty')
+    check(cb['som-restaurants:server:selfServe'](2, 'burgershot', 'bigking', 1).error == 'bad request', 'selfserve: only the plain goods are sold')
+    check(cb['som-restaurants:server:selfServe'](2, 'burgershot', 'burger', 0).error == 'bad request', 'selfserve: a zero quantity is refused')
+    local t2, b2 = Mocks.treasury, D.balance
+    check(cb['som-restaurants:server:selfServe'](2, 'burgershot', 'burger', 2).success, 'selfserve: a customer can buy when nobody works')
+    check(Mocks.bank[2] == 500 - 2 * C.fallback.goods.burger.price and Mocks.treasury == t2 + 2 * C.fallback.goods.burger.price and D.balance == b2 and count(2, 'burger') == 2, 'selfserve: the city gets the money, not the restaurant')
+    Mocks.taxFails = true
+    check(cb['som-restaurants:server:selfServe'](2, 'burgershot', 'cola', 1).error == 'the machine would not take it' and Mocks.bank[2] == 500 - 2 * C.fallback.goods.burger.price, 'selfserve: a refused payment refunds the customer')
+    Mocks.taxFails = false
+    Mocks.invFull[2] = true
+    local bank2 = Mocks.bank[2]
+    check(cb['som-restaurants:server:selfServe'](2, 'burgershot', 'cola', 1).error == 'you cannot carry that' and Mocks.bank[2] == bank2, 'selfserve: a full bag buys nothing')
+    Mocks.invFull[2] = nil
+
+    _G.json = saved.json
+    exports.ox_inventory.AddItem = realAdd
+    _G.TriggerClientEvent = realT
+    core.addMoney, core.businessTransact = saved.addMoney, saved.businessTransact
+    Mocks.jobs, Mocks.credited, Mocks.invFull, Mocks.taxFails, Mocks.creditFails, Mocks.bizFails = nil, nil, {}, false, false, false
+end
+
+----------------------------------------------------------------------
+-- som-burglary
+----------------------------------------------------------------------
+local burgEnv, burgDefs
+
+local function burgScene(open)
+    boardScene()
+    burgDefs = {}
+    local realRegister = Mocks.exported.registerProvider
+    Mocks.exported.registerProvider = function(d) burgDefs[d.id] = d; return realRegister(d) end
+    burgEnv = loader.loadResource(REPO .. 'som-burglary', { 'shared/config.lua', 'server/main.lua' })
+    Mocks.exported.registerProvider = realRegister
+    Mocks.players[5] = { citizenid = 'P5', job = { name = 'police', onduty = true }, charinfo = { firstname = 'Po', lastname = 'Lice', phone = '555-0005' } }
+    Mocks.inv = { [1] = {}, [2] = {} }
+    Mocks.clock = 1000000
+    Mocks.calls.dispatchAlert = 0
+    Mocks.hackResult = true
+    Mocks.hacks = {}
+    Mocks.exported.run = function(_, kind, level) Mocks.hacks[#Mocks.hacks + 1] = kind .. ':' .. level; return Mocks.hackResult end
+    Mocks.exported.shellOffset = function(model) return model == 'shell_frankaunt' and { x = 1.0, y = 2.0, z = 3.0, h = 90.0 } or nil end
+    Buckets, FakeSpeed = {}, {}
+    _G.GetEntitySpeed = function(ped) return FakeSpeed[ped] or 0.0 end
+    if open ~= false then
+        local h = burgEnv.Config.houses[1]
+        h.enabled, h.coords = true, vec3(0, 0, 0)
+        burgEnv.Config.shells.shell_frankaunt.spots = { { offset = vec3(1, 0, 0), label = 'Drawers' }, { offset = vec3(6, 0, 0), label = 'Wardrobe' } }
+    end
+    return burgEnv
+end
+
+local function giveBurg(src, name, n)
+    Mocks.slot = (Mocks.slot or 0) + 1
+    Mocks.inv[src][Mocks.slot] = { name = name, count = n or 1, slot = Mocks.slot }
+end
+
+local function burgCount(src, name)
+    local n = 0
+    for _, it in pairs(Mocks.inv[src]) do if it.name == name then n = n + (it.count or 1) end end
+    return n
+end
+
+local function burgInfo(size, id)
+    local members = {}
+    for i = 1, size do members[i] = { citizenid = 'P' .. i, source = i } end
+    return { id = id or 1, leader = 1, members = members }
+end
+
+local function burgStart(size, tier)
+    giveBurg(1, 'lockpick')
+    local ok = burgDefs['burglary_' .. (tier or 'low')].start(burgInfo(size or 1))
+    FakePeds[1] = vec3(0, 0, 0)
+    return ok
+end
+
+local function burgEnter(src)
+    FakePeds[src] = vec3(0, 0, 0)
+    return RegisteredCallbacks['som-burglary:server:enter'](src)
+end
+
+do
+    local env = burgScene(false)
+    giveBurg(1, 'lockpick')
+    local low = burgDefs.burglary_low
+    local cop = Mocks.players[5]
+    Mocks.players[5] = nil
+    check(low.canStart(burgInfo(1)) == false and select(2, low.canStart(burgInfo(1))) == 'the city is too quiet for this', 'burglary: needs police on duty')
+    Mocks.players[5] = cop
+    check(select(2, low.canStart(burgInfo(1))) == 'no houses are open yet', 'burglary: every house ships disabled, so nothing can start')
+    env.Config.houses[1].enabled, env.Config.houses[1].coords = true, vec3(0, 0, 0)
+    check(select(2, low.canStart(burgInfo(1))) == 'no houses are open yet', 'burglary: a house with no spots in its shell cannot be picked')
+    env.Config.shells.shell_frankaunt.spots = { { offset = vec3(1, 0, 0), label = 'Drawers' } }
+    Mocks.exported.shellOffset = function() return nil end
+    check(select(2, low.canStart(burgInfo(1))) == 'no houses are open yet', 'burglary: a shell with no measured offset cannot be used')
+    Mocks.exported.shellOffset = function(model) return { x = 1.0, y = 2.0, z = 3.0, h = 90.0 } end
+    check(low.canStart(burgInfo(1)) == true, 'burglary: with a house, spots, a pick and police a crew can start')
+end
+
+do
+    local env = burgScene()
+    local low, high = burgDefs.burglary_low, burgDefs.burglary_high
+    Mocks.players[6] = { citizenid = 'P6', job = { name = 'police', onduty = true }, charinfo = { firstname = 'Po', lastname = 'Two', phone = '555-0006' } }
+    check(select(2, low.canStart(burgInfo(1))) == 'the leader needs lockpick', 'burglary: the leader needs the tier tool')
+    giveBurg(1, 'lockpick')
+    check(select(2, high.canStart(burgInfo(2))) == 'no houses are open yet', 'burglary: the high tier has no open house of its own')
+    local h2 = env.Config.houses[2]
+    h2.enabled, h2.coords = true, vec3(100, 0, 0)
+    env.Config.shells.shell_michael.spots = { { offset = vec3(1, 0, 0), label = 'Safe' } }
+    Mocks.exported.shellOffset = function() return { x = 1.0, y = 2.0, z = 3.0, h = 90.0 } end
+    check(select(2, high.canStart(burgInfo(2))) == 'the leader needs advancedlockpick', 'burglary: a plain lockpick does not open a high end house')
+    giveBurg(1, 'advancedlockpick')
+    check(high.canStart(burgInfo(2)) == true, 'burglary: the advanced pick starts a high end burglary')
+
+    env.Config.night.enabled = true
+    check(select(2, low.canStart(burgInfo(1))) == 'wait for dark', 'burglary: night only with no game clock set means nobody starts')
+    env.Config.night.hour = function() return 12 end
+    check(select(2, low.canStart(burgInfo(1))) == 'wait for dark', 'burglary: daytime refuses')
+    check(low.start(burgInfo(1)) == false, 'burglary: starting is refused by day too')
+    env.Config.night.hour = function() return 23 end
+    check(low.canStart(burgInfo(1)) == true, 'burglary: night allows it')
+    env.Config.night.hour = function() return 3 end
+    check(low.canStart(burgInfo(1)) == true, 'burglary: the window wraps past midnight')
+
+    Mocks.players[5], Mocks.players[6] = nil, nil
+    check(low.start(burgInfo(1)) == false, 'burglary: starting needs police on duty')
+    check(select(2, high.canStart(burgInfo(2))) == 'the city is too quiet for this', 'burglary: the high tier wants more police')
+end
+
+do
+    local env = burgScene()
+    check(burgStart(1) == true and mysql.db.burglary.runs[1].status == 'active', 'burglary: a run claims the house')
+    check(burgDefs.burglary_low.start(burgInfo(1, 2)) == false, 'burglary: a second crew cannot take a claimed house')
+
+    local close = RegisteredCallbacks['som-burglary:server:breakIn']
+    Mocks.exported.finish = function() return true end
+    env.Config.tiers.low.breakChance = 0
+    giveBurg(1, 'lockpick')
+    check(close(9).error == 'you are not on a job', 'burglary: outsiders are refused at the door')
+    FakePeds[1] = vec3(500, 0, 0)
+    check(close(1).error == 'you are too far away', 'burglary: the server checks the distance to the door')
+    FakePeds[1] = vec3(0, 0, 0)
+    check(RegisteredCallbacks['som-burglary:server:enter'](1).error == 'not now', 'burglary: you cannot walk in through a locked door')
+    check(RegisteredCallbacks['som-burglary:server:searchStart'](1, 1).error == 'you are not inside', 'burglary: you cannot search from outside')
+
+    Mocks.hackResult = false
+    env.Config.noise.perPoint, env.Config.noise.maxChance = 0, 0
+    check(close(1).error == 'that did not work' and Mocks.hacks[1] == 'memory:easy', 'burglary: a failed pick costs an attempt')
+    Mocks.hackResult = true
+    local r = close(1)
+    check(r.success == true and Mocks.calls.dispatchAlert == 0, 'burglary: the pick opens the door, quietly')
+    check(close(1).error == 'the door is already open', 'burglary: an open door is not picked twice')
+
+end
+
+do
+    local env = burgScene()
+    burgStart(1)
+    local close = RegisteredCallbacks['som-burglary:server:breakIn']
+    Mocks.exported.finish = function() return true end
+    env.Config.noise.perPoint, env.Config.noise.maxChance = 0, 0
+    Mocks.hackResult = false
+    env.Config.tiers.low.breakChance = 1
+    close(1)
+    check(burgCount(1, 'lockpick') == 0, 'burglary: a failed pick can break the tool')
+    giveBurg(1, 'lockpick')
+    check(close(1).error == 'the lock beat you and the street is awake' and mysql.db.burglary.runs[1].status == 'failed', 'burglary: two failed picks end the run as failed')
+
+    local t0 = os.time()
+    mysql.fakeNow = t0
+    giveBurg(1, 'lockpick')
+    check(burgDefs.burglary_low.start(burgInfo(1)) == false, 'burglary: a failed house stays shut')
+    mysql.fakeNow = t0 + 130 * 60
+    check(burgDefs.burglary_low.start(burgInfo(1)) == false, 'burglary: a failed house stays shut longer than a normal cooldown')
+    mysql.fakeNow = t0 + 250 * 60
+    check(burgDefs.burglary_low.start(burgInfo(1)) == true, 'burglary: after the failure cooldown the house opens again')
+    mysql.fakeNow = nil
+end
+
+do
+    local env = burgScene()
+    burgStart(2)
+    Mocks.exported.finish = function() return true end
+    giveBurg(2, 'lockpick')
+    Mocks.players[2].citizenid = 'P2'
+    FakePeds[2] = vec3(0, 0, 0)
+    RegisteredCallbacks['som-burglary:server:breakIn'](1)
+
+    env.Config.noise.perPoint, env.Config.noise.maxChance = 0, 0
+    local e1 = burgEnter(1)
+    check(e1.success and e1.shell == 'shell_frankaunt' and #e1.spots == 2 and e1.offset.h == 90.0 and Buckets[1] == 40001, 'burglary: entering puts the player in the house bucket and sends the shell and spots')
+    local e2 = burgEnter(2)
+    check(e2.success and Buckets[2] == 40001, 'burglary: the crew shares one bucket')
+    check(burgEnter(1).error == 'not now', 'burglary: you cannot enter twice')
+
+    local start, finish, cancel = RegisteredCallbacks['som-burglary:server:searchStart'], RegisteredCallbacks['som-burglary:server:searchDone'], RegisteredCallbacks['som-burglary:server:searchCancel']
+    local s1 = e1.spots[1]
+    FakePeds[1], FakePeds[2] = vec3(s1.x, s1.y, s1.z), vec3(s1.x, s1.y, s1.z)
+
+    check(start(1, 0).error == 'bad request' and start(1, 3).error == 'bad request' and start(1, 1.5).error == 'bad request' and start(1, '1').error == 'bad request' and start(1, nil).error == 'bad request', 'burglary: a spot must be a listed whole number')
+    check(finish(1, 1).error == 'start searching first', 'burglary: finishing without starting is refused')
+    FakePeds[1] = vec3(500, 0, 0)
+    check(start(1, 1).error == 'you are too far away', 'burglary: the server checks the distance to the spot')
+    FakePeds[1] = vec3(s1.x, s1.y, s1.z)
+
+    check(start(1, 1).success == true and start(1, 1).seconds == 8, 'burglary: the server sets the search time')
+    check(finish(1, 1).error == 'you were too quick' and mysql.db.burglary.loot['1:1'] == nil, 'burglary: a finish that comes too early is refused and takes nothing')
+    check(finish(1, 1).error == 'start searching first', 'burglary: a refused finish ends the session')
+    start(1, 1)
+    check(cancel(1).success == true and finish(1, 1).error == 'start searching first', 'burglary: cancelling drops the session')
+
+    start(1, 1); start(2, 1)
+    Mocks.clock = Mocks.clock + 9000
+    local a = finish(1, 1)
+    local b = finish(2, 1)
+    check(a.success == true and #a.items == 1 and burgCount(1, a.items[1].item) == a.items[1].count, 'burglary: the first searcher is given the rolled loot')
+    check(b.error == 'there is nothing left here' and #Mocks.inv[2] == 0, 'burglary: the same spot cannot be looted twice')
+    check(start(2, 1).error == 'there is nothing left here', 'burglary: a taken spot cannot be started')
+
+    local s2 = e1.spots[2]
+    FakePeds[2] = vec3(s2.x, s2.y, s2.z)
+    Mocks.invFull[2] = true
+    start(2, 2)
+    Mocks.clock = Mocks.clock + 9000
+    check(finish(2, 2).error == 'you cannot carry any more' and mysql.db.burglary.loot['1:2'] == nil, 'burglary: a failed add gives the spot back')
+    Mocks.invFull[2] = nil
+    check(Mocks.calls.dispatchAlert == 0, 'burglary: quiet searches with no noise chance raise no alert')
+
+    local leave = RegisteredCallbacks['som-burglary:server:leave']
+    FakePeds[1] = vec3(900, 0, 0)
+    check(leave(1).error == 'you are too far from the door', 'burglary: leaving is checked against the door')
+    FakePeds[1] = vec3(1150 + 1.0, 3000 + 2.0, -500 + 3.0)
+    check(leave(1).success == true and Buckets[1] == 0 and leave(1).error == 'not inside', 'burglary: leaving resets the bucket')
+    check(mysql.db.burglary.runs[1].status == 'active', 'burglary: the run stays open when somebody leaves, so they can go back for more')
+    check(burgEnter(1).success == true and Buckets[1] == 40001, 'burglary: a crew member can go back in')
+
+    start(2, 2)
+    Mocks.clock = Mocks.clock + 9000
+    check(finish(2, 2).success == true and mysql.db.burglary.loot['1:2'] == 'P2', 'burglary: the released spot can be searched again')
+    check(mysql.db.burglary.runs[1].status == 'done' and Buckets[1] == 0 and Buckets[2] == 0, 'burglary: the last spot ends the run and sends everyone out')
+end
+
+do
+    local env = burgScene()
+    burgStart(1)
+    Mocks.exported.finish = function() return true end
+    RegisteredCallbacks['som-burglary:server:breakIn'](1)
+    local e = burgEnter(1)
+    local s1 = e.spots[1]
+    FakePeds[1] = vec3(s1.x, s1.y, s1.z)
+    local start, finish = RegisteredCallbacks['som-burglary:server:searchStart'], RegisteredCallbacks['som-burglary:server:searchDone']
+
+    env.Config.noise.perPoint, env.Config.noise.maxChance = 1, 1
+    start(1, 1)
+    Mocks.clock = Mocks.clock + 9000
+    finish(1, 1)
+    check(Mocks.calls.dispatchAlert == 1 and Mocks.lastAlertType == 'burglary' and Mocks.lastAlertExtra.coords.x == 0, 'burglary: a search with a sure chance calls dispatch at the house')
+    local s2 = e.spots[2]
+    FakePeds[1] = vec3(s2.x, s2.y, s2.z)
+    start(1, 2)
+    Mocks.clock = Mocks.clock + 9000
+    finish(1, 2)
+    FakeSpeed[1] = 9.0
+    env.Burglary.Listen()
+    check(Mocks.calls.dispatchAlert == 1, 'burglary: only one neighbour call is made per run')
+end
+
+do
+    local env = burgScene()
+    burgStart(1)
+    Mocks.exported.finish = function() return true end
+    RegisteredCallbacks['som-burglary:server:breakIn'](1)
+    burgEnter(1)
+    env.Config.noise.perPoint, env.Config.noise.maxChance = 1, 1
+    FakeSpeed[1] = 1.0
+    env.Burglary.Listen()
+    check(Mocks.calls.dispatchAlert == 0, 'burglary: walking is not noise')
+    FakeSpeed[1] = 9.0
+    env.Burglary.Listen()
+    check(Mocks.calls.dispatchAlert == 1 and Mocks.lastAlertType == 'burglary', 'burglary: running inside is noise, read from the server speed')
+end
+
+do
+    local env = burgScene()
+    burgStart(1)
+    Mocks.exported.finish = function() return true end
+    RegisteredCallbacks['som-burglary:server:breakIn'](1)
+    burgEnter(1)
+    local realTime = os.time
+    os.time = function() return realTime() + env.Config.minutes * 60 + 5 end
+    env.Burglary.Sweep()
+    os.time = realTime
+    check(mysql.db.burglary.runs[1].status == 'failed' and Buckets[1] == 0, 'burglary: an expired run is failed and sends everyone out')
+    check(RegisteredCallbacks['som-burglary:server:enter'](1).error == 'you are not on a job', 'burglary: after the run nothing works for the crew')
+end
+
+do
+    local env = burgScene()
+    burgStart(1)
+    Mocks.exported.finish = function() return true end
+    local pick = RegisteredCallbacks['som-burglary:server:breakIn']
+    Mocks.exported.run = function() error('hack crashed') end
+    check(pick(1).error == 'try again in a moment', 'burglary: a crashing hack is an error, not a failed pick')
+    Mocks.exported.run = function() return true end
+    check(pick(1).success == true, 'burglary: a crash does not leave the lock stuck')
+end
+
+do
+    local env = burgScene()
+    burgStart(2)
+    Mocks.exported.finish = function() return true end
+    giveBurg(2, 'lockpick')
+    RegisteredCallbacks['som-burglary:server:breakIn'](1)
+    burgEnter(1); burgEnter(2)
+    Mocks.exported.getGroupById = function() return { members = { { citizenid = 'P1', source = 1 } } } end
+    Handlers['som-groups:server:changed'](1)
+    check(Buckets[2] == 0 and Buckets[1] == 40001, 'burglary: a member who leaves the group is sent out of the house')
+    check(RegisteredCallbacks['som-burglary:server:enter'](2).error == 'you are not on a job', 'burglary: and is no longer on the job')
+    Handlers['som:server:playerUnloaded'](1, 'P1')
+    check(Buckets[1] == 0, 'burglary: a player who drops while inside is put back in the world')
+    Mocks.exported.getGroupById = nil
+end
+
+do
+    local env = burgScene()
+    burgStart(1)
+    Mocks.exported.finish = function() return true end
+    RegisteredCallbacks['som-burglary:server:breakIn'](1)
+    burgEnter(1)
+    local hadName = _G.GetCurrentResourceName
+    _G.GetCurrentResourceName = function() return 'som-burglary' end
+    Handlers['onResourceStop']('som-burglary')
+    _G.GetCurrentResourceName = hadName
+    check(Buckets[1] == 0, 'burglary: stopping the resource puts everyone back in the world')
+end
+
+----------------------------------------------------------------------
+-- The fence (a market priced buyer) and the market split
+----------------------------------------------------------------------
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-outdoors', { 'shared/config.lua', 'server/buyer.lua' })
+    Mocks.players = { [1] = { citizenid = 'F1' } }
+    Mocks.inv = { [1] = {} }
+    Mocks.saturated = nil
+    Mocks.marketPrice = { goldchain = 180, laptop = 150 }
+    FakePeds[1] = vec3(0, 0, 0)
+    local cb = RegisteredCallbacks
+    local slot = 1200
+    local function give(name, n)
+        for _, it in pairs(Mocks.inv[1]) do if it.name == name then it.count = it.count + n; return end end
+        slot = slot + 1; Mocks.inv[1][slot] = { name = name, count = n, slot = slot }
+    end
+    local function count(name) local n = 0; for _, it in pairs(Mocks.inv[1]) do if it.name == name then n = n + it.count end end; return n end
+
+    check(cb['som-outdoors:server:sell'](1, 'fence').error == 'nobody is buying', 'fence: ships disabled')
+    local F = env.Config.buyers.fence
+    check(F.market == true and F.enabled == false and F.coords == nil, 'fence: a market buyer that ships closed')
+    F.enabled, F.coords = true, vec3(0, 0, 0)
+    Mocks.treasury = 100000
+    check(cb['som-outdoors:server:sell'](1, 'fence').error == 'you have nothing they want', 'fence: nothing to sell')
+    give('goldchain', 2); give('laptop', 1); give('codfish', 4)
+    local s = cb['som-outdoors:server:sell'](1, 'fence')
+    check(s.success and s.paid == 510 and Mocks.treasury == 100000 - 510, 'fence: pays the market quote from the treasury')
+    check(count('goldchain') == 0 and count('laptop') == 0 and count('codfish') == 4, 'fence: takes only what it buys')
+    local sat = {}
+    for _, x in ipairs(Mocks.saturated or {}) do sat[x.item] = x.quantity end
+    check(sat.goldchain == 2 and sat.laptop == 1 and #Mocks.saturated == 2, 'fence: a paid sale moves the market price')
+
+    Mocks.saturated = nil
+    give('goldchain', 1)
+    Mocks.marketPrice.goldchain = nil
+    check(cb['som-outdoors:server:sell'](1, 'fence').error == 'you have nothing they want' and count('goldchain') == 1, 'fence: an item the market does not trade is not bought')
+    Mocks.marketPrice.goldchain = 180
+
+    mysql.db.buyer = {}
+    F.hourlyCap = 100
+    give('goldchain', 2)
+    local capped = cb['som-outdoors:server:sell'](1, 'fence')
+    check(capped.error == 'they cannot pay any more right now' and count('goldchain') == 3 and Mocks.saturated == nil, 'fence: the hourly cap holds and a sale of nothing leaves the market alone')
+
+    F.hourlyCap = 400
+    local part = cb['som-outdoors:server:sell'](1, 'fence')
+    check(part.success and part.paid == 360 and count('goldchain') == 1 and Mocks.saturated[1].quantity == 2, 'fence: a capped sale takes only what is paid for and saturates only that')
+
+    F.hourlyCap = 6000
+    mysql.db.buyer = {}
+    Mocks.saturated = nil
+    local before = Mocks.treasury
+    Mocks.addMoneyFails = true
+    local failed = cb['som-outdoors:server:sell'](1, 'fence')
+    Mocks.addMoneyFails = false
+    check(failed.success == false and Mocks.treasury == before and count('goldchain') == 1 and Mocks.saturated == nil, 'fence: a failed credit refunds the treasury and the goods and leaves the market alone')
+
+    local fish = env.Config.buyers.fish
+    fish.enabled, fish.coords = true, vec3(0, 0, 0)
+    give('codfish', 3)
+    local fs = cb['som-outdoors:server:sell'](1, 'fish')
+    check(fs.success and fs.paid == 280 and Mocks.saturated == nil, 'fence: a fixed price buyer is unchanged and does not touch the market')
+end
+
+do
+    resetDb()
+    local env = loader.loadResource(REPO .. 'som-economy', { 'shared/config.lua', 'server/market.lua' })
+    Mocks.players = { [1] = { citizenid = 'M1' } }
+    env.Market.Load()
+    local row = env.Market.Get('goldchain')
+    check(row ~= nil and env.Market.Get('gold_chain') == nil and env.Market.Get('laptop') ~= nil, 'market: the stolen goods catalogue uses the inventory item names')
+
+    local base = row.current_price
+    local newPrice = env.Market.Saturate('goldchain', 3)
+    check(newPrice == row.current_price and newPrice < base and row.volume_sold == 3 and mysql.db.market.lastSaved.price == newPrice and mysql.db.market.lastSaved.volume == 3, 'market: Saturate moves the price, counts the volume and saves it')
+    check(env.Market.Saturate('goldchain', 0) == nil and env.Market.Saturate('goldchain', 1.5) == nil and env.Market.Saturate('nothing', 1) == nil and env.Market.Saturate('goldchain', 'x') == nil, 'market: Saturate refuses a bad item or quantity')
+
+    local priceBefore = row.current_price
+    local paid0 = Mocks.paid or 0
+    local ok, paid = env.Market.Sell(1, 'goldchain', 2)
+    check(ok == true and paid > 0 and (Mocks.paid or 0) == paid0 + paid and row.current_price < priceBefore and row.volume_sold == 5, 'market: Sell still pays, saturates and counts the volume')
+    check(#mysql.db.market.sales == 1 and mysql.db.market.sales[1].quantity == 2, 'market: Sell still records the sale')
+    check(select(1, env.Market.Sell(1, 'goldchain', 0)) == false and select(1, env.Market.Sell(1, 'nothing', 1)) == false, 'market: Sell still refuses a bad item or quantity')
+end
+
+----------------------------------------------------------------------
+-- som-racing
+----------------------------------------------------------------------
+do
+    local realJson = _G.json
+    _G.json = {
+        encode = function(v)
+            local parts = {}
+            for i, p in ipairs(v) do parts[i] = ('{x=%s,y=%s,z=%s}'):format(p.x, p.y, p.z) end
+            return '{' .. table.concat(parts, ',') .. '}'
+        end,
+        decode = realJson.decode,
+    }
+    local DONGLE = 'racing_dongle'
+    local SQUARE = { vec3(0, 0, 0), vec3(150, 0, 0), vec3(300, 0, 0), vec3(300, 150, 0), vec3(150, 150, 0), vec3(0, 150, 0) }
+
+    -- A fresh resource and a few people standing on the start line with a racer dongle each.
+    local function scene(count, cash)
+        resetDb()
+        ResetHandlers()
+        mysql.fakeNow = 1800000000
+        Mocks.clock = 100000
+        Mocks.admins, Mocks.inv, Mocks.bank, Mocks.credits, Mocks.addMoneyFails = {}, {}, {}, {}, false
+        Mocks.calls.dispatchAlert, Mocks.players = 0, {}
+        _G.PedVehicle, _G.source = {}, nil
+        -- Earlier scenes replace these natives and do not always put them back.
+        _G.GetVehiclePedIsIn = function(ped) return PedVehicle[ped] or 0 end
+        _G.GetPlayerPed = function(src) return FakePeds[src] ~= nil and src or 0 end
+        _G.GetEntityCoords = function(ped) return FakePeds[ped] or vec3(0, 0, 0) end
+        _G.TriggerClientEvent = function() end
+        local env = loader.loadResource(REPO .. 'som-racing', { 'shared/config.lua', 'server/main.lua', 'server/race.lua', 'server/app.lua' })
+        env.Config.enabled = true
+        env.Config.dispatch.chance = 0
+        for i = 1, count or 0 do
+            Mocks.players[i] = { citizenid = 'R' .. i, charinfo = { firstname = 'Rac', lastname = 'Er' .. i } }
+            Mocks.bank[i] = cash or 1000
+            FakePeds[i] = vec3(0, 0, 0)
+            PedVehicle[i] = 900 + i
+            mysql.db.racing.aliases['R' .. i] = 'Racer' .. i
+            env.Racing.MintDongle(i, 'racer', 'test')
+        end
+        return env, RegisteredCallbacks, Mocks.apps.racing.handler
+    end
+
+    local function track(name)
+        local t = mysql.db.racing.tracks
+        t[#t + 1] = { id = #t + 1, name = name or 'Square', creator_cid = 'R1', points = _G.json.encode(SQUARE), length_m = 900, active = 1 }
+        return #t
+    end
+
+    local function credited(src)
+        local sum = 0
+        for _, c in ipairs(Mocks.credits) do if c.source == src then sum = sum + c.amount end end
+        return sum
+    end
+
+    local function states()
+        local out = {}
+        for _, e in ipairs(mysql.db.racing.entries) do out[#out + 1] = e.state end
+        return table.concat(out, ',')
+    end
+
+    -- The point a racer must be at to pass sequence number `seq` on a six point track.
+    local function point(seq) return SQUARE[seq % 6 + 1] end
+
+    local function runLap(env, src, from, to, step)
+        for seq = from, to do
+            Mocks.clock = Mocks.clock + (step or 20000)
+            FakePeds[src] = point(seq)
+            env.Racing.Checkpoint(src, seq)
+        end
+    end
+
+    local function started(env, handler, count, stake, laps)
+        local id = track()
+        check(handler(1, 'host', { id = id, text = ('%d %d'):format(laps or 1, stake) }).success, 'racing: setup host')
+        for i = 2, count do check(handler(i, 'join', { id = 1 }).success, 'racing: setup join') end
+        mysql.fakeNow = mysql.fakeNow + env.Config.joinSeconds + 1
+        env.Racing.Tick()
+        Mocks.clock = Mocks.clock + env.Config.countdownSeconds * 1000 + 1
+        return env.Racing.live[1]
+    end
+
+    -- Gates ------------------------------------------------------------
+    do
+        local env, cb, app = scene(2)
+        env.Config.enabled = false
+        check(app(1, 'view').view.empty == 'Street racing is closed', 'racing: ships closed')
+        check(not app(1, 'host', { id = track(), text = '1 100' }).success and #mysql.db.racing.races == 0, 'racing: nothing hosts while closed')
+        env.Config.enabled = true
+
+        Mocks.inv[3] = nil
+        Mocks.players[3] = { citizenid = 'R3', charinfo = { firstname = 'No', lastname = 'Dongle' } }
+        check(app(3, 'view').view.empty == 'You need a racing dongle', 'racing: no dongle, no app')
+        check(not app(3, 'host', { id = 1, text = '1 0' }).success, 'racing: no dongle, no hosting')
+
+        check(not app(1, 'record').success, 'racing: a racer dongle cannot record tracks')
+        check(env.Racing.MintDongle(1, 'bogus', 'x') == nil, 'racing: only two tiers exist')
+        local uid = env.Racing.MintDongle(1, 'creator', 'test')
+        check(uid and app(1, 'record').success, 'racing: a creator dongle records')
+        env.Racing.recording[1] = nil
+
+        Mocks.commands.voidracedongle(0, { uid = uid })
+        check(mysql.db.racing.dongles[uid].status == 'void' and not app(1, 'record').success, 'racing: a voided dongle stops working')
+
+        -- the first character to use a dongle owns it, so a copy in other hands does nothing
+        local row = (function() for _, i in pairs(Mocks.inv[2]) do return i end end)()
+        Mocks.inv[3] = { { name = DONGLE, count = 1, slot = 1, metadata = { uid = row.metadata.uid, tier = 'racer' } } }
+        check(app(2, 'view').view.sections ~= nil and mysql.db.racing.dongles[row.metadata.uid].holder_cid == 'R2', 'racing: first use binds the dongle to the character')
+        check(app(3, 'view').view.empty == 'You need a racing dongle', 'racing: a copy of a bound dongle does nothing')
+        Mocks.inv[3] = { { name = DONGLE, count = 1, slot = 1, metadata = { uid = 'nothex!!nothex!!', tier = 'creator' } } }
+        check(app(3, 'view').view.empty == 'You need a racing dongle', 'racing: a made up uid does nothing')
+
+        check(not Mocks.commands.giveracedongle(2, { target = 1, tier = 'racer' }) and #(function() local n = {} for k in pairs(mysql.db.racing.dongles) do n[#n + 1] = k end return n end)() == 3,
+            'racing: the give command needs the admin group')
+        Mocks.admins[2] = true
+        local before = 0
+        for _ in pairs(mysql.db.racing.dongles) do before = before + 1 end
+        Mocks.commands.giveracedongle(2, { target = 1, tier = 'creator' })
+        local after = 0
+        for _ in pairs(mysql.db.racing.dongles) do after = after + 1 end
+        check(after == before + 1, 'racing: an admin can issue a dongle')
+    end
+
+    -- Alias and track recording ------------------------------------------
+    do
+        local env, cb, app = scene(2)
+        mysql.db.racing.aliases = {}
+        check(not app(1, 'alias', { text = 'x' }).success and not app(1, 'alias', { text = '<b>hi</b>' }).success, 'racing: a short or markup alias is refused')
+        check(app(1, 'alias', { text = 'Fast Eddie' }).success and mysql.db.racing.aliases.R1 == 'Fast Eddie', 'racing: an alias is saved')
+        check(not app(1, 'alias', { text = 'Other' }).success, 'racing: one alias per character')
+        check(not app(2, 'alias', { text = 'fast eddie' }).success, 'racing: an alias is unique, case aside')
+
+        env.Racing.MintDongle(1, 'creator', 'test')
+        check(app(1, 'record').success, 'racing: recording starts')
+        check(not cb['som-racing:server:drop'](2).success, 'racing: nobody drops a point without recording')
+        local drop, save = cb['som-racing:server:drop'], cb['som-racing:server:save']
+
+        FakePeds[1] = SQUARE[1]
+        PedVehicle[1] = nil; check(not drop(1).success, 'racing: points are dropped from the car')
+        PedVehicle[1] = 901
+        check(drop(1).success, 'racing: the first point drops')
+        FakePeds[1] = vec3(10, 0, 0)
+        check(not drop(1).success, 'racing: points too close are refused')
+        FakePeds[1] = vec3(1500, 0, 0)
+        check(not drop(1).success, 'racing: points too far apart are refused')
+        check(not save(1, 'Short Run').success, 'racing: too few checkpoints refuse the save')
+        for i = 2, 6 do FakePeds[1] = SQUARE[i]; check(drop(1).success, 'racing: point ' .. i) end
+        check(not save(1, '<x>').success, 'racing: a track name is clean')
+        check(not save(1, 'ab').success, 'racing: a track name has a minimum')
+        local ok = save(1, 'Harbour Loop')
+        check(ok.success and mysql.db.racing.tracks[1].name == 'Harbour Loop' and mysql.db.racing.tracks[1].length_m == 900, 'racing: the track saves with its length from server positions')
+        check(env.Racing.recording[1] == nil, 'racing: saving ends the recording')
+
+        app(1, 'record')
+        for i = 1, 4 do FakePeds[1] = SQUARE[i]; drop(1) end
+        FakePeds[1] = SQUARE[5]; drop(1); FakePeds[1] = vec3(300, 150, 20); drop(1)
+        check(not save(1, 'harbour loop').success, 'racing: a duplicate name is refused')
+
+        env.Racing.recording[1] = nil
+        env.Config.track.maxPerPerson = 1
+        check(not app(1, 'record').success, 'racing: a person keeps a limited number of tracks')
+        env.Config.track.maxPerPerson = 5
+
+        app(1, 'record')
+        Mocks.clock = Mocks.clock + env.Config.track.recordSeconds * 1000 + 1
+        check(not drop(1).success, 'racing: a recording window runs out')
+    end
+
+    -- Escrow --------------------------------------------------------------
+    do
+        local env, cb, app = scene(4)
+        local id = track()
+        Mocks.bank[4] = 50
+        check(not app(1, 'host', { id = id, text = '0 100' }).success and not app(1, 'host', { id = id, text = '99 100' }).success, 'racing: laps are bounded')
+        check(not app(1, 'host', { id = id, text = '1 99999' }).success, 'racing: the stake is bounded')
+        check(app(1, 'host', { id = id, text = '2 500' }).success, 'racing: a race opens')
+        check(Mocks.bank[1] == 500 and states() == 'held', 'racing: the host pays the buy-in and it is held')
+        check(not app(1, 'host', { id = id, text = '1 100' }).success, 'racing: one race at a time per host')
+        check(not app(1, 'join', { id = 1 }).success and Mocks.bank[1] == 500, 'racing: nobody pays twice for one race')
+
+        check(not app(4, 'join', { id = 1 }).success and Mocks.bank[4] == 50 and states() == 'held,deleted', 'racing: a racer who cannot pay gets no seat and loses nothing')
+
+        FakePeds[2] = vec3(500, 0, 0)
+        check(not app(2, 'join', { id = 1 }).success and Mocks.bank[2] == 1000, 'racing: joining needs the start line')
+        FakePeds[2] = vec3(0, 0, 0)
+        PedVehicle[2] = nil
+        check(not app(2, 'join', { id = 1 }).success and Mocks.bank[2] == 1000, 'racing: joining needs a car')
+        PedVehicle[2] = 902
+        mysql.db.racing.aliases.R2 = nil
+        check(not app(2, 'join', { id = 1 }).success, 'racing: joining needs an alias')
+        mysql.db.racing.aliases.R2 = 'Racer2'
+        check(app(2, 'join', { id = 1 }).success and Mocks.bank[2] == 500, 'racing: a racer joins and is debited the stake')
+        Mocks.addMoneyFails = false
+
+        env.Config.maxRacers = 2
+        check(not app(3, 'join', { id = 1 }).success and Mocks.bank[3] == 1000, 'racing: a full race refuses a third racer')
+        env.Config.maxRacers = 8
+
+        mysql.fakeNow = mysql.fakeNow + env.Config.joinSeconds + 1
+        check(not app(3, 'join', { id = 1 }).success and Mocks.bank[3] == 1000, 'racing: the join window closes')
+        env.Racing.live[1].status = 'open'
+        check(app(1, 'view').view.sections[2] ~= nil, 'racing: the view builds for a racer in a race')
+    end
+
+    -- Payout --------------------------------------------------------------
+    do
+        local env, cb, app = scene(3)
+        local race = started(env, app, 3, 500, 2)
+        check(race and race.status == 'running' and mysql.db.racing.races[1].status == 'running', 'racing: the window closing starts the race')
+        check(Mocks.bank[1] == 500 and Mocks.bank[2] == 500 and Mocks.bank[3] == 500, 'racing: every stake is in escrow')
+
+        -- before the countdown ends nothing counts
+        Mocks.clock = Mocks.clock - env.Config.countdownSeconds * 1000 - 1
+        FakePeds[2] = point(1)
+        env.Racing.Checkpoint(2, 1)
+        check(env.Racing.live[1].racers[2].seq == 0, 'racing: a checkpoint before the start is ignored')
+        Mocks.clock = Mocks.clock + env.Config.countdownSeconds * 1000 + 1
+
+        runLap(env, 2, 1, 12)
+        check(race.racers[2].done and race.order[1] == race.racers[2], 'racing: the server decides who finished first')
+        runLap(env, 1, 1, 12, 25000)
+        check(#race.order == 2 and race.status == 'running', 'racing: the race waits for the others')
+        runLap(env, 3, 1, 5)
+        Mocks.clock = Mocks.clock + env.Config.graceSeconds * 1000 + 1
+        env.Racing.Tick()
+
+        check(mysql.db.racing.races[1].status == 'done' and env.Racing.live[1] == nil, 'racing: the race settles after the grace time')
+        check(credited(2) == 1050 and credited(1) == 450 and credited(3) == 0, 'racing: the pot pays 70 and 30 to the finishers and the third racer forfeits')
+        check(states() == 'paid,paid,paid', 'racing: every entry ends paid')
+        check(credited(1) + credited(2) == 1500, 'racing: what was paid is exactly what was taken')
+        check(mysql.db.racing.entries[2].position == 1 and mysql.db.racing.entries[1].position == 2, 'racing: finishing order is recorded')
+        check(mysql.db.racing.times['1:R2'].best_ms < mysql.db.racing.times['1:R1'].best_ms, 'racing: best times are kept per track')
+        check(not env.Racing.Settle(1) and credited(2) == 1050, 'racing: a second settle pays nothing')
+
+        local old = mysql.db.racing.times['1:R2'].best_ms
+        env.Racing.Checkpoint(2, 1)
+        check(mysql.db.racing.times['1:R2'].best_ms == old, 'racing: a slower run does not replace the best time')
+        check(#app(1, 'view').view.sections > 0, 'racing: the lap board view builds')
+    end
+
+    do -- the split rows and the remainder
+        for _, row in ipairs(loader.loadResource(REPO .. 'som-racing', { 'shared/config.lua' }).Config.split) do
+            local sum = 0
+            for _, pct in ipairs(row) do sum = sum + pct end
+            check(sum == 100, 'racing: a split row sums to 100')
+        end
+        local env, cb, app = scene(3, 1000)
+        env.Config.stake.max = 100
+        local race = started(env, app, 3, 33, 1)
+        runLap(env, 1, 1, 6)
+        runLap(env, 2, 1, 6)
+        runLap(env, 3, 1, 6)
+        check(credited(1) + credited(2) + credited(3) == 99, 'racing: odd pots pay out whole with the remainder to first')
+        check(credited(1) == 99 * 55 // 100 + (99 - (99 * 55 // 100 + 99 * 30 // 100 + 99 * 15 // 100)), 'racing: the remainder goes to first place')
+    end
+
+    -- Refunds -------------------------------------------------------------
+    do
+        local env, cb, app = scene(3)
+        local id = track()
+        app(1, 'host', { id = id, text = '1 300' }); app(2, 'join', { id = 1 }); app(3, 'join', { id = 1 })
+        check(app(2, 'leave').success and credited(2) == 300, 'racing: leaving before the start returns the stake')
+                check(app(1, 'leave').success and mysql.db.racing.races[1].status == 'cancelled', 'racing: the host leaving cancels the race')
+        check(credited(1) == 300 and credited(3) == 300 and states() == 'paid,paid,paid', 'racing: a cancelled race refunds everyone')
+        check(not env.Racing.Settle(1) and credited(1) == 300, 'racing: a cancelled race cannot then pay out')
+    end
+
+    do
+        local env, cb, app = scene(2)
+        local id = track()
+        app(1, 'host', { id = id, text = '1 300' })
+        mysql.fakeNow = mysql.fakeNow + env.Config.joinSeconds + 1
+        env.Racing.Tick()
+        check(mysql.db.racing.races[1].status == 'cancelled' and credited(1) == 300, 'racing: a race nobody joined refunds the host when the window ends')
+    end
+
+    do
+        local env, cb, app = scene(3)
+        local id = track()
+        app(1, 'host', { id = id, text = '1 300' }); app(2, 'join', { id = 1 })
+        FakePeds[2] = vec3(900, 0, 0)
+        mysql.fakeNow = mysql.fakeNow + env.Config.joinSeconds + 1
+        env.Racing.Tick()
+        check(mysql.db.racing.races[1].status == 'cancelled' and credited(1) == 300 and credited(2) == 300, 'racing: a racer who left the line is refunded and a race of one is cancelled')
+    end
+
+    do -- the race ends while a buy-in is being taken
+        local env, cb, app = scene(3)
+        local id = track()
+        app(1, 'host', { id = id, text = '1 300' })
+        local core = exports['som-core']
+        local real = core.removeMoney
+        core.removeMoney = function(self, ...) env.Racing.Cancel(1); return real(self, ...) end
+        local joined = app(2, 'join', { id = 1 })
+        core.removeMoney = real
+        check(not joined.success and credited(2) == 300 and env.Racing.byRacer[2] == nil, 'racing: a buy-in taken as the race ends is given back')
+        check(states() == 'paid,paid', 'racing: the late entry is refunded, not left held')
+    end
+
+    do -- a dongle voided mid recording cannot save
+        local env, cb, app = scene(1)
+        local uid = env.Racing.MintDongle(1, 'creator', 'test')
+        app(1, 'record')
+        for i = 1, 6 do FakePeds[1] = SQUARE[i]; cb['som-racing:server:drop'](1) end
+        Mocks.commands.voidracedongle(0, { uid = uid })
+        local res = cb['som-racing:server:save'](1, 'Voided Run')
+        check(not res.success and res.ended and #mysql.db.racing.tracks == 0, 'racing: a voided dongle cannot save a track')
+        check(cb['som-racing:server:drop'](2).ended == true, 'racing: the client is told when a recording is over')
+    end
+
+    do -- startup
+        local env, cb, app = scene(2)
+        local id = track()
+        app(1, 'host', { id = id, text = '1 300' }); app(2, 'join', { id = 1 })
+        local E = mysql.db.racing.entries
+        E[#E + 1] = { id = #E + 1, race_id = 1, citizenid = 'R9', alias = 'Ghost', stake = 300, state = 'pending', owed = 0 }
+        env.Racing.Reset()
+        check(E[3].state == 'void', 'racing: a restart voids an entry that was never confirmed debited')
+        check(E[1].state == 'owed' and E[2].state == 'owed' and E[1].owed == 300, 'racing: a restart turns held stakes into refunds')
+        check(mysql.db.racing.races[1].status == 'cancelled', 'racing: a restart cancels open races')
+        app(1, 'view')
+        check(credited(1) == 300 and credited(2) == 0, 'racing: the owner collects what they are owed when they open the app')
+        app(2, 'view')
+        check(credited(2) == 300, 'racing: the other owner too')
+        app(2, 'view')
+        check(credited(2) == 300, 'racing: collecting twice pays once')
+    end
+
+    do -- a failed credit keeps the money owed
+        local env, cb, app = scene(2)
+        local id = track()
+        app(1, 'host', { id = id, text = '1 300' }); app(2, 'join', { id = 1 })
+        Mocks.addMoneyFails = true
+        env.Racing.Cancel(1)
+        check(states() == 'owed,owed' and credited(1) == 0, 'racing: a failed credit leaves the money owed')
+        Mocks.addMoneyFails = false
+        check(app(1, 'view').view.sections[1].rows[1].title == 'Racer1' and credited(1) == 300 and states() == 'paid,owed', 'racing: it is paid the next time they look')
+        Mocks.players[2] = nil
+        app(1, 'view')
+        check(states() == 'paid,owed', 'racing: an offline racer is not paid and stays owed')
+    end
+
+    -- Checkpoint judging ----------------------------------------------------
+    do
+        local env, cb, app = scene(2)
+        local race = started(env, app, 2, 100, 1)
+        local r = race.racers[1]
+        local function try(seq, at, wait)
+            Mocks.clock = Mocks.clock + (wait or 20000)
+            FakePeds[1] = at
+            env.Racing.Checkpoint(1, seq)
+        end
+
+        try(2, point(2))
+        check(r.seq == 0 and r.bad == 1, 'racing: a skipped checkpoint is refused')
+        try(1, vec3(100, 100, 0))
+        check(r.seq == 0 and r.bad == 2, 'racing: the right checkpoint from the wrong place is refused')
+        PedVehicle[1] = nil
+        try(1, point(1))
+        check(r.seq == 0 and r.bad == 3, 'racing: a checkpoint on foot is refused')
+        PedVehicle[1] = 901
+        try(1, point(1), 100)
+        check(r.seq == 0 and r.bad == 3, 'racing: events closer than the rate limit are dropped without a strike')
+        r.acceptAt = Mocks.clock
+        try(1, point(1), 600)
+        check(r.seq == 0 and r.bad == 4, 'racing: a checkpoint faster than any car can drive is refused')
+        try(1, point(1))
+        check(r.seq == 1 and r.bad == 4, 'racing: the right checkpoint at the right place counts')
+        check(not r.dnf, 'racing: four strikes are not yet out')
+        local other = race.racers[2]
+        for _, junk in ipairs({ 'x', {}, 7.5 }) do
+            Mocks.clock = Mocks.clock + 20000
+            FakePeds[2] = point(1)
+            env.Racing.Checkpoint(2, junk)
+        end
+        check(other.seq == 0 and other.bad == 3, 'racing: junk arguments are refused and change nothing')
+        try(5, point(2))
+        check(r.dnf and not race.racers[1].done, 'racing: five refused reports put a racer out')
+        check(env.Racing.Checkpoint(99, 1) == nil and r.seq == 1, 'racing: a sender who is not racing is ignored')
+        check(race.racers[2] and race.status == 'running', 'racing: the other racer is still in')
+        race.racers[2].dnf = true
+        env.Racing.Checkpoint(1, 1)
+        env.Racing.Leave(2)
+        check(mysql.db.racing.races[1].status == 'done' and credited(1) + credited(2) == 200 and states() == 'paid,paid', 'racing: nobody finished so every stake is refunded')
+    end
+
+    do -- a racer leaving mid race forfeits
+        local env, cb, app = scene(2)
+        local race = started(env, app, 2, 100, 1)
+        runLap(env, 2, 1, 6)
+        _G.source = 1
+        Handlers['playerDropped']()
+        _G.source = nil
+        check(mysql.db.racing.races[1].status == 'done' and credited(2) == 200 and credited(1) == 0, 'racing: dropping mid race forfeits the stake to the finisher')
+    end
+
+    -- Police, tracks ----------------------------------------------------------
+    do
+        local env, cb, app = scene(2)
+        env.Config.dispatch.chance = 1
+        started(env, app, 2, 0, 1)
+        check(Mocks.calls.dispatchAlert == 1 and Mocks.lastAlertType == 'streetRace', 'racing: the start raises one dispatch call')
+        check(not env.Racing.Start(1).success and Mocks.calls.dispatchAlert == 1, 'racing: a race starts once, whoever asks')
+        check(Mocks.lastAlertExtra.coords.x == 0 and not Mocks.lastAlertExtra.wanted, 'racing: the call carries the start line and nothing else')
+
+        local env2, cb2, app2 = scene(2)
+        started(env2, app2, 2, 0, 1)
+        check(Mocks.calls.dispatchAlert == 0, 'racing: no roll, no call')
+        check(Mocks.apps.racing.reads.view == true, 'racing: the phone view is a read')
+        check(env2.Racing.live[1].racers[1].alias == 'Racer1', 'racing: racers carry their alias, never their name')
+    end
+
+    do
+        local env, cb, app = scene(2)
+        local id = track()
+        check(not app(2, 'delete', { id = id }).success, 'racing: only the creator takes a track down')
+        app(1, 'host', { id = id, text = '1 0' })
+        check(not app(1, 'delete', { id = id }).success, 'racing: a track in use stays')
+        env.Racing.Cancel(1)
+        check(app(1, 'delete', { id = id }).success and mysql.db.racing.tracks[id].active == 0, 'racing: the creator takes it down')
+        check(not app(1, 'host', { id = id, text = '1 0' }).success, 'racing: a removed track cannot be hosted')
+        check(not app(1, 'nonsense').success and not app(1, 'pick', { id = 'x' }).success, 'racing: unknown actions and junk ids are refused')
+    end
+
+    _G.json = realJson
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))

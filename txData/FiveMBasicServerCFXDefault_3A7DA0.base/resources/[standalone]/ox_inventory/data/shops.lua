@@ -10,6 +10,7 @@ return {
 			{ name = 'water_bottle', price = 8 },
 			{ name = 'fishbait', price = 15 },
 			{ name = 'fishingrod', price = 120 },
+			{ name = 'pickaxe', price = 150 },
 			{ name = 'empty_weed_bag', price = 5 },
 		}, locations = {
 			vec3(25.7, -1347.3, 29.49),

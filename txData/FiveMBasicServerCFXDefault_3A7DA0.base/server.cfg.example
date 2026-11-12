@@ -63,6 +63,7 @@ set som_court_webhook "YOUR_DISCORD_WEBHOOK_URL"
 
 # som-jail: bookings, releases and escapes.
 set som_jail_webhook "YOUR_DISCORD_WEBHOOK_URL"
+set som_combatlog_webhook "YOUR_DISCORD_WEBHOOK_URL"
 
 set psmdt_webhook_mugshot "YOUR_DISCORD_WEBHOOK_URL"
 set psmdt_webhook_clockin "YOUR_DISCORD_WEBHOOK_URL"
