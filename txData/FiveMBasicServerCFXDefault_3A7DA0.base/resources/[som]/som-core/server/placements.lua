@@ -59,7 +59,12 @@ end
 local function decode(kind, raw)
     local ok, data = pcall(json.decode, raw)
     if not ok then return nil end
-    if kind == 'point' and type(data) == 'table' and data.x and data.y and data.z then return vec3(data.x + 0.0, data.y + 0.0, data.z + 0.0) end
+    if kind == 'point' and type(data) == 'table' and data.x and data.y and data.z then
+        local point = vec3(data.x + 0.0, data.y + 0.0, data.z + 0.0)
+        -- A labelled point is a search spot: { offset, label }, see som-burglary/server/survey.lua.
+        if type(data.label) == 'string' then return { offset = point, label = data.label } end
+        return point
+    end
     if kind == 'number' and type(data) == 'number' then return data end
     if kind == 'bool' and type(data) == 'boolean' then return data end
 end

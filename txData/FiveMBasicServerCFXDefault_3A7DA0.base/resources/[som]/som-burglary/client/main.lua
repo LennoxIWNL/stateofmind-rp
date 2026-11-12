@@ -22,10 +22,12 @@ local function say(result)
 end
 
 local function build(data)
+    -- A staff survey leaves through its own callback: it has no run.
+    local leaveName = data.survey and 'som-burglary:server:surveyLeave' or 'som-burglary:server:leave'
     local hash = joaat(data.shell)
     if not IsModelValid(hash) or not IsModelInCdimage(hash) or not lib.requestModel(hash, 10000) then
         TriggerEvent('som:client:notify', 'That interior failed to load', 'error')
-        lib.callback.await('som-burglary:server:leave', false)
+        lib.callback.await(leaveName, false)
         return
     end
 
@@ -78,7 +80,7 @@ local function build(data)
         options = { {
             name = 'som_burglary_leave', label = 'Leave', icon = 'fa-solid fa-door-open', distance = 1.8,
             onSelect = function()
-                local result = lib.callback.await('som-burglary:server:leave', false)
+                local result = lib.callback.await(leaveName, false)
                 if not result or not result.success then return say(result) end
 
                 clearInterior()
@@ -124,6 +126,10 @@ RegisterNetEvent('som-burglary:client:objective', function(goal)
             end,
         } },
     })
+end)
+
+RegisterNetEvent('som-burglary:client:survey', function(data)
+    if type(data) == 'table' and data.survey and data.shell and data.void and data.offset then build(data) end
 end)
 
 RegisterNetEvent('som-burglary:client:exit', function(coords)

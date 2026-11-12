@@ -9903,7 +9903,7 @@ local function burgScene(open)
     burgDefs = {}
     local realRegister = Mocks.exported.registerProvider
     Mocks.exported.registerProvider = function(d) burgDefs[d.id] = d; return realRegister(d) end
-    burgEnv = loader.loadResource(REPO .. 'som-burglary', { 'shared/config.lua', 'server/main.lua' })
+    burgEnv = loader.loadResource(REPO .. 'som-burglary', { 'shared/config.lua', 'server/main.lua', 'server/survey.lua' })
     Mocks.exported.registerProvider = realRegister
     Mocks.players[5] = { citizenid = 'P5', job = { name = 'police', onduty = true }, charinfo = { firstname = 'Po', lastname = 'Lice', phone = '555-0005' } }
     Mocks.inv = { [1] = {}, [2] = {} }
@@ -10874,6 +10874,124 @@ do
     check(cfg('som-welcome').desk.enabled == false and cfg('som-dmv').desk.enabled == false and cfg('som-licences').school.enabled == false, 'proposed coordinates: job centre, DMV and driving school stay closed')
     check(#cfg('som-licences').practical.route == 0 and #out.mining.sites[1].nodes == 0, 'proposed coordinates: the test route and the mining veins stay empty')
     check(#cfg('som-garbage').routes == 0 and #cfg('som-trucking').routes == 0 and #cfg('som-courier').routes == 0, 'proposed coordinates: routes that only need data to go live stay empty')
+end
+
+do
+    -- Staff measure the spots inside a shell: /burglarysurvey, /burglaryspot, /burglaryspots, /burglaryspotundo.
+    local env = burgScene(false)
+    mysql.db.staff = { reports = {}, audit = {} }
+    local cmd = Mocks.commands
+    local said, sent = {}, nil
+    local realT = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, _, a) if name == 'som:client:notify' then said[#said + 1] = a elseif name == 'som-burglary:client:survey' then sent = a end end
+    local function last() return said[#said] end
+    local ORIGIN = vec3(1150.0, 3000.0, -500.0)
+    local function stand(x, y, z) FakePeds[1] = vec3(ORIGIN.x + x, ORIGIN.y + y, ORIGIN.z + z) end
+
+    Mocks.admins = {}
+    FakePeds[1] = vec3(5, 5, 5)
+    cmd.burglarysurvey(1, { house = 'house_1' })
+    check(last() == 'You do not have permission to do that' and sent == nil and (Buckets[1] or 0) == 0, 'survey: a non admin cannot enter a shell')
+    cmd.burglaryspot(1, { label = 'Drawers' })
+    check(last() == 'You do not have permission to do that' and #mysql.db.placements == 0, 'survey: a non admin cannot save a spot')
+    cmd.burglarysurvey(0, { house = 'house_1' })
+    check(sent == nil, 'survey: the console has no body to measure with')
+
+    Mocks.admins = { [1] = true }
+    cmd.burglaryspot(1, { label = 'Drawers' })
+    check(last():find('Enter a shell first') and #mysql.db.placements == 0, 'survey: a spot needs a shell to stand in')
+    cmd.burglarysurvey(1, { house = 'nope' })
+    check(last():find('No such house') and sent == nil, 'survey: an unknown house is refused')
+
+    cmd.burglarysurvey(1, { house = 'house_1' })
+    check(sent and sent.survey == true and sent.shell == 'shell_frankaunt' and sent.void.x == ORIGIN.x and sent.void.y == ORIGIN.y and sent.void.z == ORIGIN.z and #sent.spots == 0,
+        'survey: the admin is sent into the shell at its origin, with no spots to search')
+    check(Buckets[1] == env.Config.bucketBase + env.Config.survey.bucketOffset + 1, 'survey: the admin gets a bucket of their own, apart from the runs')
+    check(#mysql.db.burglary.runs == 0, 'survey: no run row is created')
+    cmd.burglarysurvey(1, { house = 'house_1' })
+    check(last():find('already in a shell'), 'survey: one shell at a time')
+
+    stand(2.5, -1.25, 1.7)
+    cmd.burglaryspot(1, { label = '  Kitchen\1 drawers ' })
+    local spots = env.Config.shells.shell_frankaunt.spots
+    check(#spots == 1 and spots[1].label == 'Kitchen drawers' and spots[1].offset.x == 2.5 and spots[1].offset.y == -1.25 and spots[1].offset.z == 1.7,
+        'survey: the offset is the server read position minus the shell origin, label cleaned')
+    local row = mysql.db.placements[1]
+    check(#mysql.db.placements == 1 and row.resource == 'som-burglary' and row.path == 'shells.shell_frankaunt.spots+' and row.kind == 'point' and row.value:find('Kitchen drawers', 1, true),
+        'survey: the spot is stored in som_placements by path')
+    check(#mysql.db.staff.audit >= 2 and mysql.db.staff.audit[#mysql.db.staff.audit].action == 'burglaryspot', 'survey: every write is audited')
+
+    stand(1.0, 1.0, 1.0)
+    cmd.burglaryspot(1, { label = 'Caf\195\169 "quoted"' })
+    check(spots[2].label == 'Caf "quoted"' and #mysql.db.placements == 2, 'survey: a label keeps printable ASCII only, so the stored value fits its column')
+    cmd.burglaryspotundo(1)
+    stand(0.123456, 0.0, 0.0)
+    cmd.burglaryspot(1, { label = 'Safe' })
+    check(spots[2].offset.x == 0.12, 'survey: offsets are rounded to centimetres')
+
+    local before = #spots
+    cmd.burglaryspot(1, { label = '' })
+    check(#spots == before and last():find('1 to 40'), 'survey: an empty label is refused')
+    cmd.burglaryspot(1, { label = string.rep('x', 41) })
+    check(#spots == before and last():find('1 to 40'), 'survey: a long label is refused')
+    cmd.burglaryspot(1, { label = 42 })
+    check(#spots == before, 'survey: a label that is not text is refused')
+    stand(500.0, 0.0, 0.0)
+    cmd.burglaryspot(1, { label = 'Far away' })
+    check(#spots == before and last():find('too far'), 'survey: a position far from the shell is refused, so a wrong origin fails loudly')
+    Buckets[1] = 0
+    stand(1.0, 1.0, 1.0)
+    cmd.burglaryspot(1, { label = 'Outside' })
+    check(#spots == before and last():find('not inside'), 'survey: a spot is only taken from inside the shell bucket')
+    Buckets[1] = env.Config.bucketBase + env.Config.survey.bucketOffset + 1
+
+    env.Config.survey.maxSpots = 3
+    cmd.burglaryspot(1, { label = 'Third' })
+    cmd.burglaryspot(1, { label = 'Fourth' })
+    check(#spots == 3 and #mysql.db.placements == 3 and last():find('already has 3 spots'), 'survey: the number of spots per shell is capped')
+    env.Config.survey.maxSpots = 12
+
+    cmd.burglaryspots(1)
+    check(last():find('3%. Third'), 'survey: the spots of the shell can be listed')
+
+    cmd.burglaryspotundo(1)
+    check(#spots == 2 and #mysql.db.placements == 2 and spots[2].label == 'Safe', 'survey: undo removes the last saved spot from the list and the table')
+
+    -- The restart: a fresh resource has no spots until the stored rows are applied.
+    local stored = mysql.db.placements
+    local fresh = burgScene(false)
+    mysql.db.placements = stored
+    check(#fresh.Config.shells.shell_frankaunt.spots == 0, 'persistence: a fresh start has no spots before placements apply')
+    local core = loader.loadResource(REPO .. 'som-core', { 'server/placements.lua' })
+    check(core.SomPlacements.Apply(fresh.Config, 'som-burglary') == 2, 'persistence: both stored spots apply at boot')
+    local loaded = fresh.Config.shells.shell_frankaunt.spots
+    check(#loaded == 2 and loaded[1].label == 'Kitchen drawers' and loaded[1].offset.x == 2.5 and loaded[1].offset.z == 1.7 and loaded[2].offset.x == 0.12,
+        'persistence: the loaded spots keep their offsets and labels')
+    local low = burgDefs.burglary_low
+    Mocks.exported.shellOffset = function(model) return model == 'shell_frankaunt' and { x = 1.0, y = 2.0, z = 3.0, h = 90.0 } or nil end
+    giveBurg(1, 'lockpick')
+    check(select(2, low.canStart(burgInfo(1))) == 'no houses are open yet', 'persistence: measured spots alone do not open a house, it is still disabled')
+    fresh.Config.houses[1].enabled, fresh.Config.houses[1].coords = true, vec3(0, 0, 0)
+    check(low.canStart(burgInfo(1)) == true, 'persistence: an enabled house with measured spots can be picked')
+
+    -- The undo cannot remove a spot that came from the config file.
+    local cfgOnly = burgScene(false)
+    cmd = Mocks.commands
+    cfgOnly.Config.shells.shell_frankaunt.spots = { { offset = vec3(1, 1, 1), label = 'From config' } }
+    FakePeds[1] = vec3(5, 5, 5)
+    Mocks.admins = { [1] = true }
+    cmd.burglarysurvey(1, { house = 'house_1' })
+    cmd.burglaryspotundo(1)
+    check(#cfgOnly.Config.shells.shell_frankaunt.spots == 1 and last():find('no spot saved by staff'), 'survey: undo only removes spots staff saved')
+
+    local leave = RegisteredCallbacks['som-burglary:server:surveyLeave'](1)
+    check(leave.success and leave.coords.x == 5 and Buckets[1] == 0, 'survey: leaving puts the admin back where they were, in the world bucket')
+    check(RegisteredCallbacks['som-burglary:server:surveyLeave'](1).success == false, 'survey: leaving twice is refused')
+    check(RegisteredCallbacks['som-burglary:server:surveyLeave'](2).success == false, 'survey: a player who is not surveying cannot use the leave callback')
+
+    check(loader.loadResource(REPO .. 'som-staff', { 'shared/config.lua' }).Config.placeable['som-burglary'] == true, 'survey: staff can place and enable burglary houses with /place')
+    _G.TriggerClientEvent = realT
+    Mocks.admins = {}
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))

@@ -10,6 +10,10 @@ Config = {
     bucketBase = 40000,
     void = { origin = vec3(1000.0, 3000.0, -500.0), spacing = 150.0 },
 
+    -- Staff measure the spots inside a shell with /burglarysurvey and /burglaryspot. The survey
+    -- bucket is apart from the runs' (bucketBase + index), so staff never share a room with a crew.
+    survey = { maxSpots = 12, maxLabel = 40, maxRadius = 60.0, bucketOffset = 500 },
+
     -- Night is the game hour from som-core's server clock. `from` to `to` may wrap midnight.
     -- Enabled is safe to ship: nothing starts until a house is placed.
     night = { enabled = true, from = 22, to = 5, hour = function() return exports['som-core']:getGameHour() end },

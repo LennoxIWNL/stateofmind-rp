@@ -59,6 +59,9 @@ local function near(source, coords, distance)
     return ped ~= 0 and #(GetEntityCoords(ped) - coords) <= distance
 end
 
+---Where a house's shell is built (the void origin for its index), for staff surveying it.
+function Burglary.Origin(index) return voidOf({ index = index }) end
+
 local function policeOnDuty()
     return #core:getPlayersByJob('police', true)
 end
@@ -67,6 +70,8 @@ local function runOf(source)
     local player = core:getPlayer(source)
     return player and runs[byCitizen[player.citizenid]], player
 end
+
+Burglary.RunOf = runOf
 
 -- ---------------------------------------------------------------------------
 -- Run state

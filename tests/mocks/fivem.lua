@@ -129,7 +129,7 @@ _G.json = _G.json or {
     encode = function(v)
         if type(v) ~= 'table' then return tostring(v) end
         local parts = {}
-        for k, x in pairs(v) do parts[#parts + 1] = ('%s=%s'):format(k, tostring(x)) end
+        for k, x in pairs(v) do parts[#parts + 1] = ('%s=%s'):format(k, type(x) == 'string' and ('%q'):format(x) or tostring(x)) end
         table.sort(parts)
         return '{' .. table.concat(parts, ',') .. '}'
     end,
