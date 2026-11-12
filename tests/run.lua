@@ -4480,6 +4480,196 @@ do
 end
 
 -- ---------------------------------------------------------------------------
+-- Third party event guard (som-compat/server/guard.lua)
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    local realName = _G.GetCurrentResourceName
+    _G.GetCurrentResourceName = function() return 'som-compat' end
+    local env = loader.loadResource(REPO .. 'som-compat', { 'server/guard.lua' })
+    _G.GetCurrentResourceName = function() return 'ps-mdt' end
+    env.SomGuard.install()
+
+    local function cop(grade) return { citizenid = 'COP', job = { name = 'police', grade = grade or 1, onduty = true } } end
+    Mocks.players = {
+        [1] = cop(), [2] = { citizenid = 'CIV', job = { name = 'unemployed', grade = 0 } }, [3] = { citizenid = 'VIC', job = { name = 'unemployed', grade = 0 } },
+        [4] = { citizenid = 'EMS', job = { name = 'ambulance', grade = 0, onduty = true } },
+    }
+    FakePeds = { [1] = vec3(0, 0, 0), [2] = vec3(0, 0, 0), [3] = vec3(0, 0, 0), [4] = vec3(0, 0, 0) }
+    Mocks.clock = 9000000
+    Mocks.guarded = {}
+    local function reg(name, how)
+        local function seen(...) Mocks.guarded[#Mocks.guarded + 1] = { name = name, source = _G.source, args = { ... } } end
+        if how == 'handler' then env.RegisterNetEvent(name, seen)
+        elseif how == 'server' then env.RegisterServerEvent(name, seen)
+        else env.RegisterNetEvent(name); env.AddEventHandler(name, seen) end
+    end
+    local function fire(name, src, ...)
+        local before = #Mocks.guarded
+        -- The runtime sets `source` before every handler; the sandbox needs it set on both tables.
+        _G.source, env.source = src, src
+        if RegisteredEvents[name] then RegisteredEvents[name](...) else Handlers[name](...) end
+        _G.source, env.source = nil, nil
+        return #Mocks.guarded > before
+    end
+
+    reg('mdt:server:removeMoney', 'handler')
+    check(fire('mdt:server:removeMoney', 2, 'VIC', 500, 7) == false, 'guard: a civilian cannot fine anybody')
+    check(fire('mdt:server:removeMoney', 1, 'VIC', 500, 7) == true and Mocks.guarded[#Mocks.guarded].source == 1, 'guard: an allowed call reaches the handler with source intact')
+    check(fire('mdt:server:removeMoney', 1, 'VIC', 0, 7) == false and fire('mdt:server:removeMoney', 1, 'VIC', -5, 7) == false and fire('mdt:server:removeMoney', 1, 'VIC', 1e9, 7) == false
+        and fire('mdt:server:removeMoney', 1, 'VIC', 'lots', 7) == false and fire('mdt:server:removeMoney', 1, 'VIC', 50.5, 7) == false, 'guard: a fine must be a whole number inside the cap')
+    check(fire('mdt:server:removeMoney', 1, 'NOBODY', 500, 7) == false and fire('mdt:server:removeMoney', 1, {}, 500, 7) == false, 'guard: the fined citizen must be online and a text id')
+    check(fire('mdt:server:removeMoney', 9, 'VIC', 500, 7) == false, 'guard: a caller with no loaded character is refused')
+    check(fire('mdt:server:removeMoney', nil, 'VIC', 500, 7) == true and fire('mdt:server:removeMoney', '', 'VIC', 500, 7) == true, 'guard: the server triggering its own event is not blocked')
+
+    reg('mdt:server:saveProfile', 'server')
+    check(fire('mdt:server:saveProfile', 2, 'p', 'i', 'VIC', 'a', 'b', {}, {}, { driver = false }, 'f') == false, 'guard: a civilian cannot rewrite a profile or revoke licences')
+    check(fire('mdt:server:saveProfile', 1, 'p', 'i', 'VIC', 'a', 'b', {}, {}, { driver = false }, 'f') == true, 'guard: an officer can save a profile')
+    check(fire('mdt:server:saveProfile', 1, 'p', 'i', 'VIC', 'a', 'b', {}, {}, { driver = 'yes' }, 'f') == false and fire('mdt:server:saveProfile', 1, 'p', 'i', 'VIC', 'a', 'b', {}, {}, 'x', 'f') == false, 'guard: licences are booleans only')
+
+    reg('mdt:server:handleExistingConvictions', 'attach')
+    reg('mdt:server:removeIncidentCriminal', 'attach')
+    check(fire('mdt:server:handleExistingConvictions', 2, { Cid = 'VIC' }, 1, 'now') == false and fire('mdt:server:removeIncidentCriminal', 2, 'VIC', 1) == false,
+        'guard: a civilian cannot forge or delete convictions, even on a handler added with AddEventHandler')
+    check(fire('mdt:server:handleExistingConvictions', 1, { Cid = 'VIC' }, 1, 'now') == true and fire('mdt:server:removeIncidentCriminal', 1, 'VIC', 1) == true,
+        'guard: an officer can, through AddEventHandler too')
+
+    reg('mdt:server:setCallsign', 'handler')
+    check(fire('mdt:server:setCallsign', 1, 'COP', '12') == true and fire('mdt:server:setCallsign', 1, 'VIC', '12') == false, 'guard: a callsign is yours unless you supervise')
+    Mocks.players[1] = cop(5)
+    check(fire('mdt:server:setCallsign', 1, 'VIC', '12') == true and fire('mdt:server:setCallsign', 1, 'COP', 'much too long a callsign') == false and fire('mdt:server:setCallsign', 1, 'COP', nil) == false, 'guard: a supervisor can set another, and the callsign is bounded')
+    Mocks.players[1] = cop()
+
+    reg('mdt:server:AddLog', 'server')
+    check(fire('mdt:server:AddLog', 2, 'x') == false and fire('mdt:server:AddLog', 1, 'x') == true and fire('mdt:server:AddLog', nil, 'x') == true and fire('mdt:server:AddLog', 1, string.rep('x', 900)) == false, 'guard: a civilian cannot write MDT log lines, an officer or the MDT itself can, within a length')
+
+    reg('mdt:server:giveCitationItem', 'handler')
+    reg('mdt:server:updateLicense', 'handler')
+    reg('mdt:server:setRadio', 'handler')
+    reg('ps-mdt:dispatchStatus', 'server')
+    check(fire('mdt:server:giveCitationItem', 2, 'VIC', 100, 1) == false and fire('mdt:server:giveCitationItem', 1, 'VIC', 100, 1) == true, 'guard: citation items need an officer')
+    check(fire('mdt:server:updateLicense', 2, 'VIC', 'driver', 'revoke') == false and fire('mdt:server:updateLicense', 1, 'VIC', 'driver', 'revoke') == true and fire('mdt:server:updateLicense', 1, 'VIC', 'driver', 'nuke') == false, 'guard: licence changes need an officer and a real action')
+    check(fire('mdt:server:setRadio', 2, 'VIC', 5) == false and fire('mdt:server:setRadio', 4, 'VIC', 5) == true and fire('mdt:server:setRadio', 4, 'VIC', 'x') == false, 'guard: a responder can set a radio, a civilian cannot')
+    check(fire('ps-mdt:dispatchStatus', 2, false) == false and fire('ps-mdt:dispatchStatus', 1, false) == true, 'guard: a civilian cannot switch the MDT dispatch panel off')
+
+    Mocks.doorLockpick = { [5] = true }
+    Mocks.exported.getDoor = function(id) return (id == 5 or id == 7) and { id = id } or false end
+    mysql.doorQueries = 0
+    reg('ox_doorlock:setState', 'handler')
+    check(fire('ox_doorlock:setState', 2, 7, 0, true) == false, 'guard: a lockpick flag on a door that is not lockpickable is refused')
+    check(fire('ox_doorlock:setState', 2, 5, 0, true) == true, 'guard: a lockpickable door still takes a lockpick')
+    check(fire('ox_doorlock:setState', 2, 7, 0) == true and fire('ox_doorlock:setState', 2, 7, 0, false) == true, 'guard: the normal authorisation is left to ox_doorlock')
+    check(fire('ox_doorlock:setState', 2, 'x', 0, true) == false and fire('ox_doorlock:setState', 2, 99, 0, true) == false, 'guard: a bad or unknown door id is refused without a query')
+    local queries = mysql.doorQueries
+    for _ = 1, 50 do fire('ox_doorlock:setState', 2, 5, 0, true) end
+    check(mysql.doorQueries == queries, 'guard: repeated lockpick events on one door do not query again')
+
+    reg('wk_wars2x_sync:sendPowerState', 'attach')
+    check(fire('wk_wars2x_sync:sendPowerState', 2, 1, true) == false and fire('wk_wars2x_sync:sendPowerState', 1, 3, true) == false, 'guard: radar relays only go between police')
+    Mocks.players[3] = cop()
+    check(fire('wk_wars2x_sync:sendPowerState', 1, 3, true) == true, 'guard: an officer can relay to a nearby officer')
+    FakePeds[3] = vec3(500, 0, 0)
+    check(fire('wk_wars2x_sync:sendPowerState', 1, 3, true) == false, 'guard: and not to one far away')
+
+    reg('hud:server:RelieveStress', 'handler')
+    check(fire('hud:server:RelieveStress', 2, 10) == true and fire('hud:server:RelieveStress', 2, 5000) == false and fire('hud:server:RelieveStress', 2, 'x') == false, 'guard: stress amounts are bounded')
+
+    reg('cqc-mugshot:server:triggerSuspect', 'handler')
+    reg('psmdt-mugshot:server:MDTupload', 'handler')
+    reg('mdt:server:registerweapon', 'handler')
+    FakePeds[3] = vec3(2, 0, 0)
+    check(fire('cqc-mugshot:server:triggerSuspect', 2, 3) == false and fire('cqc-mugshot:server:triggerSuspect', 1, 3) == true, 'guard: only a nearby officer can trigger a mugshot')
+    check(fire('psmdt-mugshot:server:MDTupload', 2, 'VIC', { 'u' }) == false and fire('psmdt-mugshot:server:MDTupload', 1, 'VIC', { 'u' }) == true, 'guard: mugshots are uploaded by officers')
+    check(fire('mdt:server:registerweapon', 2, 'SER1') == false and fire('mdt:server:registerweapon', 1, 'SER1') == true, 'guard: the weapon registry is written by officers')
+
+    -- An event with no rule is left alone, and an error in a rule fails closed or open as marked.
+    reg('some:other:event', 'handler')
+    check(fire('some:other:event', 2) == true, 'guard: an event with no rule is untouched')
+    local playersReal = Mocks.players
+    Mocks.players = setmetatable({}, { __index = function() error('boom') end })
+    check(fire('mdt:server:removeMoney', 1, 'VIC', 500, 7) == false, 'guard: an error in a closed rule refuses the call')
+    check(fire('hud:server:RelieveStress', 2, 10) == true, 'guard: an error in a rule marked open lets the call through')
+    Mocks.players = playersReal
+    _G.GetCurrentResourceName = realName
+end
+
+do
+    resetDb()
+    local printed = {}
+    local realPrint = _G.print
+    _G.print = function(...) printed[#printed + 1] = table.concat({ ... }, ' ') end
+    local realName = _G.GetCurrentResourceName
+    _G.GetCurrentResourceName = function() return 'som-compat' end
+    local env = loader.loadResource(REPO .. 'som-compat', { 'server/guard.lua' })
+    _G.GetCurrentResourceName = function() return 'ps-mdt' end
+    env.SomGuard.install()
+    Mocks.players = { [2] = { citizenid = 'CIV', job = { name = 'unemployed', grade = 0 } } }
+    Mocks.clock = 1000
+    env.RegisterNetEvent('mdt:server:removeMoney', function() end)
+    for _ = 1, 200 do _G.source, env.source = 2, 2; RegisteredEvents['mdt:server:removeMoney']('VIC', 500, 7) end
+    check(#printed == 1, 'guard: a spamming client produces one log line, not one per call')
+    Mocks.clock = Mocks.clock + 31000
+    _G.source, env.source = 2, 2; RegisteredEvents['mdt:server:removeMoney']('VIC', 500, 7)
+    _G.source, env.source = nil, nil
+    check(#printed == 2, 'guard: it logs again after the gap')
+    _G.print = realPrint
+    _G.GetCurrentResourceName = realName
+end
+
+do
+    resetDb()
+    local realName, realThread = _G.GetCurrentResourceName, _G.CreateThread
+    _G.GetCurrentResourceName = function() return 'som-compat' end
+    _G.CreateThread = function() end
+    local env = loader.loadResource(REPO .. 'som-compat', { 'server/guard.lua' })
+    _G.CreateThread = realThread
+    check(#env.SomGuard.missing() == #env.SomGuard.expected, 'guard: every expected resource is reported missing until it announces itself')
+    Handlers['som-compat:guardInstalled']('ps-mdt')
+    Handlers['som-compat:guardInstalled']('ox_doorlock')
+    local gone = table.concat(env.SomGuard.missing(), ',')
+    check(gone == 'wk_wars2x,ps-hud', 'guard: the ones that announced are no longer missing (' .. gone .. ')')
+    _G.GetCurrentResourceName = realName
+    local rule = env.SomGuard.callbacks['mdt:server:getWarrants']
+    local cop = { job = { name = 'police' } }
+    check(rule(1, cop) == true and rule(1, { job = { name = 'unemployed' } }) == false and rule(1, nil) == false and env.SomGuard.callbacks['mdt:server:GetPlayerSourceId'](1, nil) == false,
+        'guard: the warrant list and the server id lookup are for police')
+end
+
+do
+    resetDb()
+    local realName = _G.GetCurrentResourceName
+    _G.GetCurrentResourceName = function() return 'som-compat' end
+    local env = loader.loadResource(REPO .. 'som-compat', { 'shared/lazy.lua', 'shared/items.lua', 'shared/vehicles.lua', 'server/guard.lua', 'server/qbcore.lua' })
+    _G.GetCurrentResourceName = realName
+    local qb = Mocks.exported.GetCoreObject()
+    Mocks.players = { [1] = { source = 1, citizenid = 'VIC', license = 'l', job = { name = 'unemployed', label = 'x', grade = 0 }, gang = { name = 'none', label = 'n', grade = 0 }, charinfo = {}, metadata = {}, money = {} } }
+    Mocks.bank = { [1] = 1000 }
+    Mocks.treasury = 0
+    Mocks.business = { lspd = 0 }
+    local fn = qb.Functions.GetPlayer(1).Functions
+    check(fn.AddMoney == nil and fn.AddItem == nil and fn.RemoveItem == nil and fn.SetJob == nil and fn.SetGang == nil and fn.SetDuty == nil, 'shim: no credit, item or job setter is exposed to a legacy resource')
+    check(fn.RemoveMoney('bank', 400, 'lspd-fine') == true and Mocks.bank[1] == 600 and Mocks.business.lspd == 400, 'shim: a fine is a debit with a matching credit to the police account')
+    Mocks.business.lspd = 400
+    check(fn.RemoveMoney('bank', 0, 'lspd-fine') == false and fn.RemoveMoney('bank', -9, 'lspd-fine') == false and fn.RemoveMoney('bank', 1e9, 'lspd-fine') == false and fn.RemoveMoney('bank', 12.5, 'lspd-fine') == false and Mocks.bank[1] == 600, 'shim: a fine is bounded')
+    Mocks.businessFails = true
+    local refunded = Mocks.calls.addMoney
+    check(fn.RemoveMoney('bank', 100, 'lspd-fine') == false and Mocks.calls.addMoney == refunded + 1, 'shim: a failed credit hands the fine back')
+    Mocks.businessFails = false
+    check(fn.SetMetaData('licences', { driver = 'yes' }) == false and fn.SetMetaData('licences', { driver = false }) == true, 'shim: a licence table is booleans only')
+    local realPromise, realCitizen = _G.promise, _G.Citizen
+    _G.promise = { new = function() local p = {}; function p:resolve(v) self.value = v end; return p end }
+    _G.Citizen = { Await = function(p) return p.value end }
+    local called = 0
+    qb.Functions.CreateCallback('mdt:server:getWarrants', function(_, reply) called = called + 1; reply({ 1 }) end)
+    Mocks.players[1].job.name = 'unemployed'
+    check(RegisteredCallbacks['mdt:server:getWarrants'](1) == nil and called == 0, 'shim: a civilian gets nothing from the warrant callback')
+    Mocks.players[1].job.name = 'police'
+    check(RegisteredCallbacks['mdt:server:getWarrants'](1) ~= nil and called == 1, 'shim: an officer does')
+    _G.promise, _G.Citizen = realPromise, realCitizen
+end
+
+-- ---------------------------------------------------------------------------
 -- Bans, kick and freeze
 -- ---------------------------------------------------------------------------
 

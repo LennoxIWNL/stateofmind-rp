@@ -444,6 +444,14 @@ local function boost(kind, query, params)
     return false
 end
 
+local function doorlock(kind, query, params)
+    if kind == 'scalar' and query:find("SELECT 1 FROM ox_doorlock WHERE id = ? AND JSON_EXTRACT(data, '$.lockpick') = 'true'", 1, true) then
+        M.doorQueries = (M.doorQueries or 0) + 1
+        return true, (_G.Mocks.doorLockpick or {})[params[1]] and 1 or nil
+    end
+    return false
+end
+
 local function charrows(kind, query, params)
     local C = M.db.charrows
     local function has(text) return query:find(text, 1, true) ~= nil end
@@ -2478,6 +2486,7 @@ function M.scalar(query, params)
     do local handled, value = sharedAccounts('scalar', query, params); if handled then return value end end
     do local handled, value = social('scalar', query, params); if handled then return value end end
     do local handled, value = city('scalar', query, params); if handled then return value end end
+    do local handled, value = doorlock('scalar', query, params); if handled then return value end end
     do local handled, value = charrows('scalar', query, params); if handled then return value end end
     do local handled, value = burglary('scalar', query, params); if handled then return value end end
     do local handled, value = heist('scalar', query, params); if handled then return value end end

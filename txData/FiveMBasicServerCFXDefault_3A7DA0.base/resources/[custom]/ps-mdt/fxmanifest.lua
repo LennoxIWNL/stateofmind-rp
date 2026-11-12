@@ -10,6 +10,9 @@ lua54 'yes'
 shared_script 'shared/config.lua'
 
 server_scripts {
+    -- SOM: FIRST, so its net events are authorised before any of this resource's scripts register them.
+    -- Put this line back after an upgrade. See som-compat/server/guard.lua.
+    '@som-compat/server/guard.lua',
     '@oxmysql/lib/MySQL.lua',
     'server/utils.lua',
     'server/dbm.lua',

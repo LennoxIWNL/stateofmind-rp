@@ -10,7 +10,8 @@
 -- new som-* code may use it: new code calls som-core exports directly.
 --
 -- Nothing here creates money or items. Money-adjacent members are intentionally
--- absent, so a legacy resource cannot mint currency through the shim.
+-- absent, so a legacy resource cannot mint currency through the shim. The
+-- events those resources register are authorised by server/guard.lua.
 
 -- Items, Weapons and Vehicles are deliberately ABSENT from this literal. They
 -- are built on first read (see shared/lazy.lua, shared/items.lua and
@@ -54,9 +55,9 @@ end
 ---wrapper returned only PlayerData, so every Player.Functions.* call errored.
 ---That is why setting a callsign in the MDT did nothing.
 ---
----Only what the preserved resources actually call is implemented, and nothing
----that mints money or items. ps-mdt needs SetMetaData and RemoveMoney;
----r14-evidence needs the same plus the shared item tables.
+---Only what the started preserved resources actually call is implemented, and
+---nothing that mints money, hands out items or sets a job. ps-mdt needs
+---SetMetaData and RemoveMoney, ps-hud SetMetaData.
 ---@param player table som-core player
 ---@return table|nil
 -- qb calls it `birthdate`, SOM calls it `dob`.
@@ -121,8 +122,13 @@ local function wrap(player)
         ---writes it under the qb spelling, which som-core would reject as an
         ---unknown key, so revoking a licence from the MDT would have silently
         ---done nothing.
+        ---Licences and the callsign are written only for an authorised MDT call, and a licence table
+        ---is only ever booleans under short keys, so a forged payload cannot fill a character's metadata.
         SetMetaData = function(key, value)
-            if key == 'licences' then key = 'licenses' end
+            if key == 'licences' then
+                if not SomGuard.flags(value, 8) then return false end
+                key = 'licenses'
+            end
             return core:setMetadata(source, key, value)
         end,
 
@@ -136,42 +142,27 @@ local function wrap(player)
             return core:getMoney(source, account == 'money' and 'cash' or account)
         end,
 
-        ---qb calls the cash account 'money'. Reason is required by the bus, so
-        ---the calling resource is recorded even when it does not supply one.
-        AddMoney = function(account, amount, reason)
-            return core:addMoney(source, account == 'money' and 'cash' or account,
-                amount, reason or 'compat')
-        end,
-
+        ---The only debit a legacy resource makes is ps-mdt's fine. It is a bounded transfer to the
+        ---police account, so the money goes somewhere; a failed credit hands it back. There is no
+        ---AddMoney: nothing in a started resource calls one, and a credit needs a matching debit.
         RemoveMoney = function(account, amount, reason)
-            return core:removeMoney(source, account == 'money' and 'cash' or account,
-                amount, reason or 'compat')
-        end,
+            account = account == 'money' and 'cash' or account
+            reason = reason or 'compat'
 
-        SetJob = function(job, grade)
-            return core:setJob(source, job, grade)
-        end,
+            if reason ~= 'lspd-fine' then return core:removeMoney(source, account, amount, reason) end
+            amount = tonumber(amount)
+            if not amount or amount % 1 ~= 0 or amount < 1 or amount > SomGuard.maxFine then return false end
+            amount = math.tointeger(amount)
+            if not core:removeMoney(source, account, amount, reason) then return false end
 
-        SetGang = function(gang, grade)
-            return core:setGang(source, gang, grade)
-        end,
+            if core:businessTransact(SomGuard.fineBusiness, amount, reason) then return true end
 
-        SetDuty = function(onduty)
-            return core:setDuty(source, onduty)
+            core:addMoney(source, account, amount, 'lspd-fine:refund')
+            return false
         end,
 
         Notify = function(text, notifyType, duration)
             TriggerClientEvent('som:client:notify', source, text, notifyType, duration)
-        end,
-
-        ---ox_inventory owns items. These exist because legacy resources call
-        ---them on the player object rather than on the inventory.
-        AddItem = function(item, amount, slot, info)
-            return exports.ox_inventory:AddItem(source, item, amount, info, slot)
-        end,
-
-        RemoveItem = function(item, amount, slot)
-            return exports.ox_inventory:RemoveItem(source, item, amount, nil, slot)
         end,
 
         GetItemByName = function(item)
@@ -226,7 +217,11 @@ exports('getUseableItem', function(name)
 end)
 
 function QBCore.Functions.CreateCallback(name, cb)
+    local rule = SomGuard.callbacks[name]
+
     lib.callback.register(name, function(source, ...)
+        if rule and not rule(source, core:getPlayer(source)) then return nil end
+
         -- QBCore callbacks take (source, cb, ...) and return by CALLING cb,
         -- possibly long after the handler body has finished. lib.callback
         -- returns by value. Bridging with a plain local would return nil for
