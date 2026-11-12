@@ -16,7 +16,9 @@ Config = {}
 -- an hour, so a new player is never stuck on foot, while the top of the market
 -- stays a genuine long-term goal.
 --
--- Wages work backwards from it, per 10 minute paycheck:
+-- Wages work backwards from it, per 10 minute paycheck. STALE: paychecks are
+-- hourly now (Config.Money.paycheckInterval = 60), so these figures no longer
+-- describe the wages. docs/ECONOMY-BALANCE.md has the measured numbers:
 --
 --   entry            ~400     ~2.4k/hour   a van inside an hour
 --   experienced      ~900     ~5.4k/hour
