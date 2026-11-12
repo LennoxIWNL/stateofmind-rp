@@ -73,6 +73,7 @@ Import `setup.sql` on a fresh database. A database created from an older version
 ## Courier run
 
 - [ ] `som-courier/shared/config.lua` `Config.routes` is empty, so the run is disabled. Add real pickup and drop coordinates.
+- [ ] Left empty on purpose: the route list is the only gate of the courier run, so filling it would open the run. The 21 shop stops in the GitHub table (`qbx_truckerjob` store list, vanilla) are a candidate for `drops`.
 - [ ] Pay (`payPerDrop` 120) comes from the `postop` business. Check its balance and the number are sensible; a broke company means unpaid drops.
 - [ ] The carry animation and the blip sprite 478 are unchecked guesses.
 - [ ] Not verified live: a crew doing a full run, the zone and progress bar, pay arriving per member.
@@ -80,7 +81,8 @@ Import `setup.sql` on a fresh database. A database created from an older version
 ## Heists
 
 - [ ] `setup.sql` 7j: `som_heist_dongles` and `som_heist_runs`.
-- [ ] EVERY site in `som-heists/shared/config.lua` is disabled with no coordinates. For each of store, small bank and vault: terminal, loot points, `ox_doorlock` door names, then set `enabled = true` and test a full run.
+- [ ] EVERY site in `som-heists/shared/config.lua` is disabled with no terminal and no door names. For each of store, small bank and vault: terminal, loot points, `ox_doorlock` door names, then set `enabled = true` and test a full run.
+- [ ] Loot points proposed, sites still disabled and unusable (no terminal, no doors): `store_1` two registers of the LTD in Davis (`qbx_storerobbery`, from GitHub, not checked in game, vanilla) and `bank_1` six points in the Legion Square Fleeca (`qbx_bankrobbery`, from GitHub, not checked in game, vanilla). `vault_1`, every terminal and every `ox_doorlock` door name stay empty: no public script gives a terminal spot or our door names. `/place ... lootPoints+` appends to these points, so correct them in the config file instead of placing on top.
 - [ ] Tier numbers (police 1 / 3 / 5, cooldowns 45 / 90 / 240 min, clean cash and hourly caps, marked bill counts) are my defaults. Tune them against the real economy.
 - [ ] The treasury balance starts at 0, so clean cash pays nothing until it holds money.
 - [ ] Dongles only come from `/givedongle` and `exports['som-heists']:mintDongle`. Decide the in-world source (fence, crafting with a ledger row, drug economy). ox_inventory's own crafting recipe for `trojan_usb` produces a copy with no ledger row, so it does nothing: remove or repoint it.
@@ -98,7 +100,7 @@ Import `setup.sql` on a fresh database. A database created from an older version
 
 Use `/pdcoords` in game to print a position formatted for a config file.
 
-- [ ] Proposed coordinates pass (installed and started resources only): two spots got a proposed value (the EMS hospital `desk` and the mechanic roadside desk, see their sections) and everything else stays empty and disabled. Why: the Gabz and `mrpd` map files are not in the repo, `ox_doorlock` has no door rows, and `som.cfg` does not start `qb-smallresources`, `cityhallv1`, `cdn-fuel`, `jim-mechanic`, `jim-recycle` or `som-towtruck`, so none of those can be a source. Still empty, no sensible location in a started resource: `som-fuel` stations 1 to 8, `som-boosting` pickups and drop-off, `som-ems` locker and hospital bed, `som-welcome` desk, `som-turf` zones, grow spots, bagging table, back room lab and chemical supplier, `som-licences` counter, test car spawn and route, `som-shops` (`alta`, `strawberry`), `som-dmv` desk, `som-outdoors` chop shop, smelter, mining nodes and fishing spots, `som-heists` terminals, doors and loot points, `som-launder` fronts, `som-fire` ambient locations.
+- [ ] Proposed coordinates pass, second round: many spots now carry a starting value taken from public GitHub scripts (see each feature's section: source, "from GitHub, not checked in game", map). Every feature stays `enabled = false` and nothing can go live from the values alone. Source table and the candidates that were not used: `stateofmind-plans/coordinates-github.md` (not in this repo). Rule used: vanilla GTA V locations only, or a map started in `som.cfg`. Still empty on purpose, and why: Burger Shot (every public script is written for a Burger Shot MLO), drug lab interiors (Online interiors need an IPL resource, `bob74_ipl` is not started), the chemical supplier and the gang labs (no vetted vanilla spot), burglary search spots inside the shells (nothing records them), the `som-ems` locker and hospital bed (Pillbox interior is an MLO, `elixir-pillbox` is on disk but not started), mining veins and the driving school route (see their sections), `som-turf` zones (no source), `som-fire` ambient locations (no source), and anything gated only by a data list (`som-courier`, `som-trucking`, `som-garbage` routes, the taxi cab garage, the fire station garage): filling those would open the feature, so they wait for a decision.
 
 - [ ] Courthouse desk: `som-court/shared/config.lua` `Config.Desk`.
 - [ ] Evidence locker and lab: `som-evidence/shared/config.lua` `Config.Stations.mrpd`.
@@ -127,6 +129,7 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 - [ ] Bank maps are not installed: Pacific Bank Extended and Fleeca (`som.cfg` lists them as a Phase 6 asset).
 - [ ] `ox_doorlock` door names for any vault or cage door are created and put in the config.
 - [ ] Laundering fronts (where marked bills are washed) are chosen and set.
+- [ ] `Config.Fronts.laundromat.coords` now holds the Strawberry laundromat entrance instead of the 0,0,0 placeholder (`s4t4n667_moneywash`, from GitHub, not checked in game, vanilla exterior). `enabled` and `set` stay false: someone has to walk to it and set it. Alternatives in the GitHub table: five vanilla car washes (`qbx_carwash`).
 - [ ] After the first week of play, read the economy sink/faucet report: heists and laundering are a measured faucet.
 
 ## Launch ops
@@ -178,7 +181,8 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 ## Weed growing (som-turf)
 
 - [ ] Import the `som_plants` table (end of `setup.sql`) on an existing database.
-- [ ] Every grow spot (`Config.grow.spots`) and bagging table (`Config.grow.bagTables`) ships disabled with no coordinates. Without a spot, plants can still go inside a zone a gang holds, so enable zones with care.
+- [ ] Every grow spot (`Config.grow.spots`) and bagging table (`Config.grow.bagTables`) ships disabled with a proposed, unchecked position (see below). Without a spot, plants can still go inside a zone a gang holds, so enable zones with care.
+- [ ] Proposed, still disabled: `grow_1` centre at the Grapeseed weed fields (`qb-weedpicking`, from GitHub, not checked in game, vanilla) with radius 40 (my choice, not from the source), and `bag_1` at the weed processing site east of Sandy Shores (`qb-weedpicking` and `xg-weedpick` agree, one lineage, from GitHub, not checked in game, vanilla).
 - [ ] Uses existing items: the five `weed_*_seed` seeds, `water_bottle`, `weed_nutrition`, `weedbud`, `empty_weed_bag` and the `weed_*` baggies (all have icons). Grow time 60 min, wither after 120 min without water, yield 3 to 6 buds (+2 fed), 3 buds per bag, 6 plants per character: defaults, untuned. Baggies are what the street sale already buys.
 - [ ] Planting raises the low-chance `drugDeal` dispatch call. The prop `prop_weed_01` and the progress bars have never been seen in a client.
 
@@ -186,6 +190,7 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 
 - [ ] Import the `som_lab_jobs` table (end of `setup.sql`) on an existing database.
 - [ ] `Config.labs` ships disabled with no coordinates. Enable and place one or more.
+- [ ] Left empty: every public lab script uses a GTA Online lab interior, which needs an IPL resource (`bob74_ipl` is not started), so there is no usable lab door.
 - [ ] Recipes: `press_brick` (coke_brick to 3 coke_small_brick, 15 min) and `cut_coke` (coke_small_brick to 4 cokebaggy, 10 min) use existing items. Nothing in the game hands out `coke_brick` yet (not a heist payout, not a shop), so decide the source, or the chain starts only from admin-issued items.
 - [ ] `cook_meth` is now enabled (2 ephedrine, acetone, lithium, hydrochloric acid for 5 meth, 30 min) and `refine_leaf` (4 coca leaves and sulfuric acid for a brick, 20 min). The six new items are in `ox_inventory/data/items.lua` with community-pack icons. The recipes only run at a lab you place.
 - [ ] One cook per lab at a time and one per character; a cook is collected only by whoever started it. Starting raises the low-chance `drugDeal` dispatch call.
@@ -194,6 +199,7 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 ## Chemical supplier (som-turf)
 
 - [ ] `Config.supplier` ships disabled with no coordinates. It is the only source of coca leaves and precursors, so place it deliberately (it is a gang-only shop). Prices (40 to 150 each) and `maxQty` 5 are defaults. Payment is from the buyer's bank into the treasury (a sink), so nothing is minted; the treasury then funds heists and city budgets.
+- [ ] Left empty: no public script has a vanilla spot for a chemical or coca supplier. The weed scripts' dealer spots in the GitHub table are only candidates.
 - [ ] Still no source for `coke_brick` other than `refine_leaf`; the old note about it is superseded.
 - [ ] Not run in a client: the supplier dialog and zone.
 
@@ -207,7 +213,8 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 ## Fishing and buyers (som-outdoors)
 
 - [ ] Import the `som_buyer_payouts` table (end of `setup.sql`) on an existing database.
-- [ ] Fishing spots (`Config.fishing.spots`) and the fish buyer (`Config.buyers.fish`) ship disabled with no coordinates. Place them.
+- [ ] Fishing spots (`Config.fishing.spots`) and the fish buyer (`Config.buyers.fish`) ship disabled with proposed, unchecked positions (see below). Walk them and correct.
+- [ ] Proposed, still disabled (`rf-fishing`, from GitHub, not checked in game, vanilla): fish buyer near the Del Perro pier; `pier_1` centre at the Chumash boat dock with radius 40; `deep_1` centre on the open sea west of Chumash with radius 150 (both radii are my choice, not from the source). Players are matched by distance to the centre, so `deep_1` only works from a boat.
 - [ ] Buyers pay from the **treasury**, capped per rolling hour (fish: 6000 for the whole server). The treasury starts at 0, so until fines and taxes fill it a buyer says "the city cannot pay right now". That is deliberate; decide whether the treasury needs a seeded balance.
 - [ ] Catch table (codfish 50, bass 30, fishingloot 15, fishinglootbig 5), prices (40, 55, 90, 180), bite wait 8 to 20 s, rod and bait items are defaults. Fish items and icons already existed.
 - [ ] Fishing rod (120) and bait (15) are sold at every General store; fish sell prices are 40 to 180, so a bait costs about a third of an average catch. Untuned.
@@ -215,7 +222,8 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 
 ## Hunting (som-outdoors)
 
-- [ ] The game buyer (`Config.buyers.hunt`, venison 60, deer pelt 120, antlers 150, cap 6000 an hour) ships disabled with no coordinates, and pays from the treasury like the fish buyer.
+- [ ] The game buyer (`Config.buyers.hunt`, venison 60, deer pelt 120, antlers 150, cap 6000 an hour) ships disabled with a proposed, unchecked position, and pays from the treasury like the fish buyer.
+- [ ] Proposed, still disabled: game buyer at the Cypress Flats meat packing spot (`xdopehunting`, from GitHub, not checked in game, vanilla).
 - [ ] Hunting has no zones: any deer or boar (`a_c_deer`, `a_c_boar`) killed by the player can be skinned anywhere, with a `hunting_knife`. Decide whether to restrict it to a hunting area. The knife (150) is sold at YouTool.
 - [ ] `requireLicense` is off. A `hunting_license` item exists but nothing issues it (the `som-id` licence flow is not built for it).
 - [ ] The server reads the carcass itself (model, health, killer ped, a `skinned` flag on the entity), so the client cannot invent a kill. Never run in a client: the ped target, skinning bar, and `GetPedSourceOfDeath` behaviour with real peds.
@@ -223,7 +231,8 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 ## Chop shop (som-outdoors)
 
 - [ ] Import the `som_chop_log` table (end of `setup.sql`) on an existing database.
-- [ ] `Config.chop.dropoffs` and the scrap buyer (`Config.buyers.scrap`, prices 8 to 30, cap 6000 an hour from the treasury) ship disabled with no coordinates.
+- [ ] `Config.chop.dropoffs` and the scrap buyer (`Config.buyers.scrap`, prices 8 to 30, cap 6000 an hour from the treasury) ship disabled with proposed, unchecked positions (see below).
+- [ ] Proposed, still disabled: `chop_1` and the scrap buyer at the Sandy Shores junkyard (`mt-chopshop` and `qbx_scrapyard` agree, from GitHub, not checked in game, vanilla).
 - [ ] A vehicle whose plate is in `som_vehicles` is refused, so players cannot lose an owned car; that also means a stolen player car cannot be chopped (a deliberate cut). Rental plates are NOT checked: confirm rentals use plates that never reach a chop, or add a check against `som-rentals`.
 - [ ] The VIN scrub is a progress bar with a server-enforced minimum time (25 s), not a skill check: the server cannot trust a client's skill result. 10 minute drop-off cooldown and 24 hour plate cooldown are defaults.
 - [ ] Calls dispatch `chopShop` at the shop with a 40% chance. Parts reuse existing items and icons. Never run in a client.
@@ -314,7 +323,8 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 
 ## Player shops (som-shops)
 
-- [ ] Every shop ships disabled with no coordinates. Place each (staff `/place som-shops shops.alta.coords`, or set `Config.shops` coordinates and `enabled = true`) and decide the real shop list and prices. The two entries (`alta`, `strawberry`) are placeholders.
+- [ ] Every shop ships disabled with a proposed, unchecked position. Place each (staff `/place som-shops shops.alta.coords`, or set `Config.shops` coordinates and `enabled = true`) and decide the real shop list and prices. The two entries (`alta`, `strawberry`) are placeholders.
+- [ ] Proposed, still disabled (`qbx_storerobbery` registers, from GitHub, not checked in game, vanilla interiors): `alta` at the Vinewood 24/7 and `strawberry` at the Strawberry 24/7. The names are still placeholders and the registers are where the counters are, so check the spot is not blocked by a customer path.
 - [ ] `setup.sql` gets three tables (`som_shops`, `som_shop_stock`, `som_shop_staff`). On start the resource creates one bank account (`SHOP-<ID>`) and one business row (`shop_<id>`) per configured shop; these are separate from the job businesses, so core paychecks never touch them.
 - [ ] Decide `Config.items` (what a shop may sell and the price range), the tax rate, the sell-back share, the withdrawal cap and cooldown, and the staff pay cap. They are first guesses, not tuned.
 - [ ] Not verified in a live server: the counter menu and the owner management menu (som-ui context and dialog shims), the hire offer dialog, the phone app, hourly payroll over a real restart, and concurrent sales. Only the mock suite and a scratch MariaDB ran the queries.
@@ -331,6 +341,7 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 
 - [ ] Existing databases: `ALTER TABLE som_licenses ADD COLUMN suspended_until TIMESTAMP NULL DEFAULT NULL;` and import the new `som_licence_attempts` table (`setup.sql` section 7m).
 - [ ] The school ships closed. In `som-licences/shared/config.lua` set `school.coords` (the counter), `school.spawn` (a vec4 for the test car) and `practical.route` (a list of vec3 checkpoints on public roads), then `school.enabled = true`. Fee, pass mark, retry wait, speed limit and fault count are untuned defaults.
+- [ ] Proposed, school still closed: `school.coords` and `school.spawn` at the Strawberry driving school (`ftw_drivingschool`, from GitHub, not checked in game, vanilla, outdoors; I could not confirm the building is vanilla). `practical.route` stays empty on purpose: the only public route with matching start (the same script) jumps about 2 km between two checkpoints, and the other (`sb_dmv`) starts at the Vespucci DMV, so neither is a usable loop from this school.
 - [ ] **Run the legacy backfill before this ships to a database with players** (commented SQL at the end of `setup.sql`, section 7m). Weapon licences bought from the old shop exist only as character metadata, and login now rebuilds metadata from `som_licenses`, so without the two `INSERT IGNORE` statements existing holders lose the licence.
 - [ ] `ox_inventory/data/licenses.lua` is now empty: the $5000 weapon licence shop is gone. A weapon licence comes from an officer of grade `Config.approveGrade` (3) with the buyer agreeing on screen within `Config.weapon.offerSeconds` (the officer's duty, rank and distance are checked again when they agree), fee `Config.weapon.fee` to the `lspd` account.
 - [ ] Review the 15 theory questions in `som-licences/server/questions.lua` (road rules are written for a generic left/right-agnostic setting; question 12 assumes driving on the right).
@@ -347,6 +358,7 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 ## Garbage round
 
 - [ ] Import the new seed rows on an existing database (they are `INSERT IGNORE`, section 9 of `setup.sql`): the `GOV-SAN` bank account and the `sanitation` business row (funding `treasury`, category `government`). The business cache loads at start, so restart `som-economy` after importing. Without the row the Jobs app says "the sanitation department is not set up".
+- [ ] Left empty: the route list is the only gate of the garbage job. Depot, truck spawns and 21 bins (`qbx_garbagejob`, from GitHub, not checked in game, vanilla) are in the GitHub table; there is no public landfill coordinate.
 - [ ] `som-garbage/shared/config.lua` `Config.routes` is empty, so the job is refused. Add a depot (vec4), the landfill and recycling centre (vec3) and stops with bins (`id`, `kind` general or recycle, `coords`).
 - [ ] Funding: Sanitation pays crews from its own account, which starts at 0. Short payouts are topped up from the city treasury (`fundFromTreasury`, now exported by `som-economy`), at most `monthlyBudget` (150000) per 30 days, counted from the treasury ledger rows with reason `budget:sanitation`. The treasury starts at 0 and fills from taxes, so until it holds money every round is refused at the board ("the city cannot fund a round right now") and nothing is created. Staff decide the monthly figure and whether to seed the treasury or the account.
 - [ ] A job is only offered when the account plus the allowed top-up covers a full round, so a crew is never sent out unpaid at the start; a round can still go unpaid if other payouts drain the account meanwhile.
@@ -376,6 +388,7 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 ## Trucking
 
 - [ ] `som-trucking/shared/config.lua` `Config.routes` is empty, so no freight contract is offered. Add routes: `{ id, label, depot = vec4, trailer = vec4, dropoff = vec3, base, minutes }`, at least `minDistance` (1500) apart. Each route is its own entry in the Jobs app after a restart.
+- [ ] Left empty: the route list is the only gate of the freight job, so filling it would open it. Depot and truck spawn at the Terminal docks (`qbx_truckerjob`, from GitHub, not checked in game, vanilla) and 21 delivery stops are in the GitHub table.
 - [ ] Trucking and courier draw from the same Post OP account, so heavy trucking can leave couriers unpaid. Staff decide who funds Post OP (or whether freight gets its own business account) before launch.
 - [ ] Pay comes from the `postop` business, the same account `som-courier` uses; nothing new funds it (no mint, no treasury top-up). Its balance is whatever Post OP earns from sales, so a broke company means unpaid hauls: check the balance against `base` and the `hourlyCap` (2500 per citizen per hour, held in memory, reset by a restart).
 - [ ] Untuned defaults: damage takes at most 50%, a late drop 25%, the floor is 25% of base, two drivers get +20% on the pool, abandon or timeout locks the crew out for 15 minutes.
@@ -387,7 +400,8 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 ## Fuel (som-fuel)
 
 - [ ] Existing databases: import the new seed from `setup.sql` (account `BUS-FUEL` and business `fuelco`, both `INSERT IGNORE`, opening balance 0). Without the `fuelco` business every fuel sale refunds the player. The account only ever holds what players paid at the pump, no seeded float and no treasury money. Decide who may withdraw from it.
-- [ ] Place the gas stations: `/place som-fuel stations.station_1.coords` (up to `station_8`; add more entries in `som-fuel/shared/config.lua`). None is open until placed, and a station may set its own `price` (default 4 a litre). Stand within 15 m of the point; pumps are detected by prop model (`prop_gas_pump_*`, `prop_vintage_pump`).
+- [ ] Stations 1 to 8 proposed, still disabled: the first eight stations of `ox_fuel` `data/stations.lua` (Davis, Strawberry, La Mesa, Mission Row, Mirror Park, Vinewood, Morningwood, Del Perro), from GitHub, not checked in game, vanilla. 19 more are in the GitHub table if more slots are added.
+- [ ] Place the gas stations: `/place som-fuel stations.station_1.coords` (up to `station_8`; add more entries in `som-fuel/shared/config.lua`). None is open until enabled, and a station may set its own `price` (default 4 a litre). Stand within 15 m of the point; pumps are detected by prop model (`prop_gas_pump_*`, `prop_vintage_pump`).
 - [ ] Numbers are untuned defaults: 100 unit tank, drain 0.012 per second plus 0.0016 per m/s, jerry can 120 for 25 units, 5 units per pour.
 - [ ] Not verified live: `SetVehicleFuelLevel` moving the ps-hud gauge (ps-hud reads it through `som-compat`'s `GetFuel`) and cutting the engine at zero, the pump model names, the `WEAPON_PETROLCAN` metadata (`durability` and `ammo` as 0 to 100, written by the server only), the state bag `fuel` handler on the other clients, drain balance. Known limit: the drain runs on the driver's client, so a cheater can avoid draining, but no fuel can be minted: every increase is a server approved sale or can pour.
 - [ ] Cut on purpose: player owned stations, electric charging, fuel types, siphoning. cdn-fuel stays unensured.
@@ -429,6 +443,7 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 ## DMV: registration and vanity plates (som-dmv)
 
 - [ ] Existing databases: import the two new tables `som_vehicle_registration` and `som_dmv_plate_log` (`setup.sql` section 7o).
+- [ ] Counter proposed, still closed: the city services desk at Legion Square (`qbx_cityhall`, from GitHub, not checked in game, street-level building, I could not confirm it is a vanilla interior and not an MLO). The same point is used for the job centre in `som-welcome`: walk in, and if it is not enterable pick another spot for both.
 - [ ] The counter ships closed. Stand at the DMV and run `/place som-dmv desk.coords`, then `restart som-dmv`. Until then nobody can renew or change a plate, and nothing is ever charged automatically.
 - [ ] Rules (untuned): registration lasts 14 days and costs $150 to the city treasury, a car the server has never seen is given 14 days from the first time anything asks (police plate run, ANPR or the counter), a plate change costs $2500 and each character can change one plate an hour. The blocked plate words are `Config.vanity.blocked` in `som-dmv/shared/config.lua` (Lua patterns on the upper case plate, spaces ignored); staff should read and extend that list. Short words like `COP` or `EMS` also block plates that merely contain them.
 - [ ] Police see REGISTRATION EXPIRED on a plate run, and an ANPR reader tells the officer "registration expired" but never calls dispatch for it alone. Whether to fine it is the officer's call (the "Driving without a licence"-style presets); no fine is automatic.
@@ -448,7 +463,8 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 
 ## Mining (som-outdoors)
 
-- [ ] Nothing is placed yet, so mining is off. Stand where each thing goes and use `/place som-outdoors <path>`, then `restart som-outdoors`: `mining.sites.copper_1.nodes+` (once per vein; also `iron_1`, `silver_1`, `gold_1`), `mining.smelter.coords`, `buyers.quarry.coords`.
+- [ ] No vein is placed yet, so mining is off. Stand where each thing goes and use `/place som-outdoors <path>`, then `restart som-outdoors`: `mining.sites.copper_1.nodes+` (once per vein; also `iron_1`, `silver_1`, `gold_1`), `mining.smelter.coords`, `buyers.quarry.coords`.
+- [ ] Proposed, still disabled: `smelter` and the quarry buyer at the Cypress Flats smelter and ore buyer (`jim-mining`, from GitHub, not checked in game, vanilla). Mining veins are left empty on purpose: a vein has no `enabled` switch, so any node would make mining live. Candidate nodes (five shaft veins and five quarry veins, `jim-mining`) are in the GitHub table.
 - [ ] The pickaxe is now sold in the general shops at 150 (`ox_inventory/data/shops.lua`). Ore, ingots and the pickaxe already had items and icons; nothing new was added. The pickaxe weighs 1000 and ore 1000 each, so a bag fills quickly: check the carry weight.
 - [ ] The quarry buyer pays from the treasury like fishing: it starts at 0, so nobody is paid until the treasury holds money, and the buyer cap is 6000 an hour for the whole server. It buys only refined metal (copper 30, iron 24, silver ingot 70, gold ingot 120), never raw ore. Per character ceiling at 40 strikes an hour and 2 ore a strike (3 with the nearby-friend bonus, 4 at most): copper about 1,600 (3,200 with friends), iron about 1,300, silver about 1,400 and gold about 2,400 an hour, before the 6000 server cap. All untuned.
 - [ ] The hourly strike count is held in memory and resets on restart. A vein rests 10 minutes after a strike, and the rest also resets on restart.
@@ -469,6 +485,7 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 ## New player onboarding (som-welcome)
 
 - [ ] Existing databases: import `som_welcome_claims` and `som_welcome_jobs` (`setup.sql` section 7p). Import run twice on a scratch MariaDB database without error; the claim insert with its cap subquery and the duplicate claim error (1062) were run there too.
+- [ ] Desk proposed, still closed: same point as the DMV counter (`qbx_cityhall`, from GitHub, not checked in game, street-level building, interior not confirmed, see the DMV section).
 - [ ] The job centre ships closed. Stand at the counter and run `/place som-welcome desk.coords`, then `restart som-welcome`. Without it there is still no way for an ordinary player to get a job. It hands out only the jobs in `Config.jobs` (`taxi` and `delivery`) at grade 0; whitelisted jobs stay admin only, and a character on a whitelisted job cannot leave it here.
 - [ ] The "Getting Started" phone app text is generic. Add where the DMV, driving school, job centre and estate agent really are to `Config.guide` in `som-welcome/shared/config.lua`.
 - [ ] Settling-in payment: $1000 once per PLAYER (the claim is keyed on the character and on the server-side licence identifier, so alts get nothing extra), only after a valid driver licence, a job held for 30 minutes in the city and a home (an owned property or a tenancy), from the treasury, at most $2000 in any 24 hours and $20000 in any 30 days across everyone. All untuned. New characters already start with $500 cash and $5000 in the bank, so check the total feels right. A griefer with many Rockstar accounts can still take the daily $2000 until the month cap, so watch `som_welcome_claims` and the economy report in the first weeks.
@@ -502,6 +519,7 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 ## Fire department (som-fire)
 
 - [ ] Nothing starts a fire by itself. Staff use `/startfire` (needs `som.admin`) where they stand and `/stopfires` to clear. For fires without staff, fill `Config.ambient.locations` in `som-fire/shared/config.lua` with measured coordinates and set `enabled = true`.
+- [ ] Left empty: no public script has a vetted list of ambient fire locations, and the fire station garage needs a `som-garage` job entry (data-gated), so it is not filled. Vanilla station coordinates are in the GitHub table (`qb-firefighterjob`: Rockford Hills HQ, Davis, La Mesa station 7).
 - [ ] The `firefighter` job (whitelisted, off duty by default) exists but nobody holds it. Hire the first Fire Chief by hand. The Fire Chief grade has no `isboss` on purpose: `Fines.Void` lets any boss job void any fine, so a boss menu needs that fixed first.
 - [ ] The department has its own business `fire` and account `GOV-FIRE` (so firefighters do not share the ambulance fleet or its authority). `setup.sql` seeds both on a fresh database with an opening float of 100000 for payroll: that is minted money, a decision for the owner. A database created earlier needs once: `INSERT IGNORE INTO som_bank_accounts (account_no, label, type, balance) VALUES ('GOV-FIRE', 'San Andreas Fire Department', 'business', 100000);` then `INSERT IGNORE INTO som_businesses (name, label, job, account_id, tax_rate, funding, category, active, treasury_cut) VALUES ('fire', 'San Andreas Fire Department', 'firefighter', (SELECT id FROM som_bank_accounts WHERE account_no = 'GOV-FIRE'), 0.0000, 'treasury', 'emergency', 1, 0.0000);` and restart `som-economy`. Fire payouts come from this account, topped up from the city treasury only for the shortfall, at most 4000 an hour server-wide (`Config.pay.drawCapHourly`) and 1500 an hour per character. An empty treasury means nobody is paid. If a payout credit fails and the debit cannot be given back, `[som-fire] MONEY LOST` is printed to the console: watch for it.
 - [ ] Station and trucks are not set up. `som-garage` job entries need measured coordinates, so no `firetruk` was added: add a `type = 'job'` entry with `groups = { firefighter = 0 }` and a bay once the station is placed. Spraying from the seat of a `firetruk` is accepted by the server.
@@ -512,6 +530,7 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 ## Vehicle contracts (som-boosting)
 
 - [ ] Existing databases: import `som_boost_runs` (`setup.sql` section 7q). Not run on a real MariaDB yet: the claim insert with its two subqueries (pickup cooldown and hourly face cap) and the delivery claim need a run on a scratch database.
+- [ ] Proposed, still disabled (`mythic-laptop` boosting config, from GitHub, not checked in game, vanilla streets and car parks): `pickup_1` and `pickup_2` in Vinewood and Mirror Park, `dropoff_1` in the Strawberry yard. The full list (103 pickups, 28 drop-offs) is in the GitHub table; the same file is copied unchanged into several forks, so that is one source, not several.
 - [ ] Everything ships closed. Stand at each pickup and drop-off and run `/place som-boosting pickups.pickup_1.coords` (and `dropoffs.dropoff_1.coords`), then `restart som-boosting`. Pickups also take a `heading` in `shared/config.lua` (placing stores a position only).
 - [ ] Class C and B are enabled, class A is present and off (`enabled = false`) until tuned. Models, bill counts, worths, police minimums and hourly caps are all untuned. The model names are GTA vehicle names and were not checked against the streamed vehicle list.
 - [ ] Pay is marked bills only, minted by `som-launder`. The mint creates a ledger row and an item, no balance; the faucet is the wash payout in `som-launder`, which the existing wash cut, daily cap and hourly budget throttle. Boosting adds to what enters the wash, so read the sink/faucet report after the first week.
@@ -550,6 +569,7 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 ## Player-run restaurants (som-restaurants)
 
 - [ ] Ships closed with nothing placed. For `burgershot`: stand at the counter and run `/place som-restaurants restaurants.burgershot.coords`, then each station (`restaurants.burgershot.stations.grill.coords`, and `prep`, `fryer`, `drinks`, `assemble`), the self-serve machine (`restaurants.burgershot.selfServe.coords`), the fridge (`restaurants.burgershot.fridge.coords`) and the wholesaler (`supplier.coords`, also set `supplier.enabled = true`), then `restart som-restaurants`. The fridge stash is registered at start.
+- [ ] Left empty: every public Burger Shot script is written for a Burger Shot MLO. `uniqx_burgershot` is on disk but not started, and no public script is written for that exact map, so the counter and stations have to be walked after starting it. The vanilla Burger Shot buildings have no interior.
 - [ ] Existing databases: import the `som_restaurants` and `som_restaurant_orders` tables (`setup.sql`, after the shop tables). The create statements and the buy, withdraw, order claim and pay statements were run on a scratch MariaDB database (not the live one); the refund and serve statements only ran against the mock.
 - [ ] The `burgershot` job exists in `som-core/shared/jobs.lua` and nobody holds it (grades Crew 120, Cook 160, Manager 200, Owner 0 an hour; the owner is paid by taking money out). Not whitelisted and not offered at the job centre. A buyer becomes Owner, and crew are hired by the boss next to them.
 - [ ] Untuned numbers in `som-restaurants/shared/config.lua`: restaurant price 150000, supplier unit prices, menu prices, cook durations, 15 minute serve window, 8 percent tax, 3000 withdrawal cap. The wholesaler is the city: supplier money goes to the treasury.
@@ -564,7 +584,8 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 
 - [ ] Existing databases: import `som_burglary_runs` and `som_burglary_loot` (`setup.sql` section 7r). Run on the dev MariaDB: the claim insert (house, active and the two cooldowns) and `INSERT IGNORE` on the loot primary key each gave one winner and one refusal. Not run under parallel load.
 - [ ] No server game clock exists (the hour is client only), so night only is off: `Config.night.enabled = false`. To turn it on, something must set `Config.night.hour` to a function that returns the game hour. Enabled with no such function, nobody can start a burglary. Until then houses can be picked at any hour.
-- [ ] Everything ships closed. Both houses (`house_1` low, `house_2` high) are disabled with no door. Stand at each door and run `/place som-burglary houses.house_1.coords`. A house also needs spots: `Config.shells.<model>.spots` is empty because nothing in the tree records where to stand inside a shell (som-housing only has the doorway). Stand in each shell and read the offsets from its origin. Without spots a house cannot be picked.
+- [ ] Everything ships closed. Both houses (`house_1` low, `house_2` high) are disabled with a proposed, unchecked door. Stand at each door and run `/place som-burglary houses.house_1.coords`. A house also needs spots: `Config.shells.<model>.spots` is empty because nothing in the tree records where to stand inside a shell (som-housing only has the doorway). Stand in each shell and read the offsets from its origin. Without spots a house cannot be picked.
+- [ ] Doors proposed, still disabled (`qbx_houserobbery`, from GitHub, not checked in game, vanilla house doors): `house_1` low tier at a house in Davis, `house_2` high tier at the Whispymound villa. Still no spots, so neither house can be picked. The GitHub table has 22 doors by tier. Check a door is not also a `som-housing` property door.
 - [ ] The shells are `shell_frankaunt` and `shell_michael` from som-housing's measured list. Not entered in a game: the shell spawn in its own bucket (40000 up) and void (y 3000), the arrival offset, leaving, and being stuck in the void if a player disconnects inside (the position saved on disconnect would be the void, as with housing).
 - [ ] The fence ships closed too: `/place som-outdoors buyers.fence.coords`. It pays from the treasury (cap 3000 an hour), which starts empty, so it pays nothing until the treasury holds money.
 - [ ] The market row for the chain was renamed from `gold_chain` to `goldchain` to match the inventory item (nothing else used the old name). A database that already has the old `gold_chain` row keeps it; it is unused and can be deleted. New market rows: `silverchain`, `gold_ring`, `silver_ring`, `diamond_ring`, `laptop`, `tablet`. `rolex` already existed. Loot odds, base prices, saturation and the cap are all untuned.
@@ -575,6 +596,7 @@ Use `/pdcoords` in game to print a position formatted for a config file.
 ## Street racing (som-racing)
 
 - [ ] Ships closed: set `Config.enabled = true` in `som-racing/shared/config.lua` once dongles can be obtained. There are no tracks and nothing to place; a player with a creator dongle records tracks in game (phone app, Record a track, then Page Up drops a checkpoint from the car, Page Down saves, End cancels).
+- [ ] Track starting points: tracks are saved by players, so nothing is seeded. Eight ordered checkpoint lists on vanilla roads (`sk_streetkings` data, from GitHub, not checked in game) are in `stateofmind-plans/coordinates-github.md`; a creator can drive them with the recorder.
 - [ ] Existing databases: import `som_race_dongles`, `som_race_aliases`, `som_race_tracks`, `som_races`, `som_race_entries`, `som_race_times` (`setup.sql` section 7s). Not run on a real MariaDB yet: the join `INSERT IGNORE ... SELECT` (with its subqueries on the table being inserted into), `INSERT IGNORE` returning an affected count for the alias claim, and the startup `UPDATE ... WHERE race_id IN (SELECT ...)` all need a run on a scratch database.
 - [ ] OPEN CHOICE FOR THE OWNER: who sells racing dongles. No player source exists. Staff issue them with `/giveracedongle <id> <creator|racer>` (needs `som.admin`) and void one with `/voidracedongle <uid>`; another resource can call `exports['som-racing']:mintDongle(source, tier, tag)`. Creator tier records tracks, hosts and joins; racer tier hosts and joins.
 - [ ] Dongle limit: it is not consumed. The first character to use a dongle owns it (`holder_cid`), so a copy of the item in another character's hands does nothing, but a copy held by the same character keeps working until staff void the row. Every race hosted and every track saved is logged with the dongle uid (`[som-racing] race 1 hosted by CITIZEN with dongle UID`), so one uid used by two characters shows up in the console log.

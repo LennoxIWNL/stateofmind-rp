@@ -15,15 +15,16 @@ Config = {
 
     pumpModels = { 'prop_gas_pump_1a', 'prop_gas_pump_1b', 'prop_gas_pump_1c', 'prop_gas_pump_1d', 'prop_gas_pump_old2', 'prop_gas_pump_old3', 'prop_vintage_pump' },
 
-    -- Ship closed and unplaced: staff set each point with `/place som-fuel stations.<name>.coords`.
+    -- Ship closed. Positions are proposed from a public script and not walked (LAUNCH-TODO.md);
+    -- staff correct a point with `/place som-fuel stations.<name>.coords`.
     stations = {
-        { name = 'station_1', label = 'Gas station 1', enabled = false, coords = nil },
-        { name = 'station_2', label = 'Gas station 2', enabled = false, coords = nil },
-        { name = 'station_3', label = 'Gas station 3', enabled = false, coords = nil },
-        { name = 'station_4', label = 'Gas station 4', enabled = false, coords = nil },
-        { name = 'station_5', label = 'Gas station 5', enabled = false, coords = nil },
-        { name = 'station_6', label = 'Gas station 6', enabled = false, coords = nil },
-        { name = 'station_7', label = 'Gas station 7', enabled = false, coords = nil },
-        { name = 'station_8', label = 'Gas station 8', enabled = false, coords = nil },
+        { name = 'station_1', label = 'Gas station 1', enabled = false, coords = vec3(-71.28, -1761.16, 29.48) },
+        { name = 'station_2', label = 'Gas station 2', enabled = false, coords = vec3(264.74, -1260.98, 29.18) },
+        { name = 'station_3', label = 'Gas station 3', enabled = false, coords = vec3(1208.66, -1402.64, 35.22) },
+        { name = 'station_4', label = 'Gas station 4', enabled = false, coords = vec3(818.83, -1029.89, 26.17) },
+        { name = 'station_5', label = 'Gas station 5', enabled = false, coords = vec3(1181.27, -329.57, 69.18) },
+        { name = 'station_6', label = 'Gas station 6', enabled = false, coords = vec3(621.07, 269.52, 103.04) },
+        { name = 'station_7', label = 'Gas station 7', enabled = false, coords = vec3(-1437.58, -276.38, 46.21) },
+        { name = 'station_8', label = 'Gas station 8', enabled = false, coords = vec3(-2096.6, -318.15, 13.02) },
     },
 }

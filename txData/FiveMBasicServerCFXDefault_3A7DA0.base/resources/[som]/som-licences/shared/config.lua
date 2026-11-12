@@ -13,9 +13,9 @@ Config = {
     -- Ships disabled. Set coords, spawn and a route (LAUNCH-TODO.md).
     school = {
         enabled = false,
-        coords = nil,  -- vec3 of the counter
+        coords = vec3(214.53, -1400.09, 30.58),  -- vec3 of the counter
         radius = 3.0,
-        spawn = nil,   -- vec4 where the test car appears
+        spawn = vec4(249.49, -1406.87, 30.56, 237.76),   -- vec4 where the test car appears
         model = 'asea',
         plate = 'LEARNER',
         fee = 400,     -- charged when the licence is issued, to the city treasury

@@ -28,8 +28,8 @@ Config.Fronts = {
         label = 'Laundromat',
         enabled = false,
         set = false,
-        -- UNVERIFIED placeholder. /pdcoords prints a position formatted for this file.
-        coords = vec3(0.0, 0.0, 0.0),
+        -- UNVERIFIED: from a public script, never walked. `set` stays false until someone checks it.
+        coords = vec3(84.293, -1552.013, 29.598),
         range = 2.5,
     },
 }

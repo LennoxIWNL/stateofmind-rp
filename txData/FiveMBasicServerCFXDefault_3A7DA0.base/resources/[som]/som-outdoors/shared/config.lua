@@ -5,25 +5,25 @@ Config = {
     -- pay nothing.
     buyers = {
         fish = {
-            label = 'Fish buyer', enabled = false, coords = nil, distance = 3.0, hourlyCap = 6000,
+            label = 'Fish buyer', enabled = false, coords = vec3(-1842.278, -1201.933, 14.303), distance = 3.0, hourlyCap = 6000,
             prices = { codfish = 40, bass = 55, fishingloot = 90, fishinglootbig = 180 },
         },
         scrap = {
-            label = 'Scrap yard', enabled = false, coords = nil, distance = 3.0, hourlyCap = 6000,
+            label = 'Scrap yard', enabled = false, coords = vec3(2351.5, 3132.96, 48.2), distance = 3.0, hourlyCap = 6000,
             prices = { scrapmetal = 8, steel = 20, aluminum = 22, plastic = 10, rubber = 12, copper = 30, glass = 12 },
         },
         quarry = {
-            label = 'Quarry buyer', enabled = false, coords = nil, distance = 3.0, hourlyCap = 6000,
+            label = 'Quarry buyer', enabled = false, coords = vec3(1085.7, -2001.04, 30.38), distance = 3.0, hourlyCap = 6000,
             prices = { copper = 30, iron = 24, silveringot = 70, goldingot = 120 },
         },
         -- Stolen goods. `market = true`: the price is som-economy's market quote
         -- (so it saturates), the amounts in `prices` are unused.
         fence = {
-            label = 'Fence', enabled = false, coords = nil, distance = 3.0, hourlyCap = 3000, market = true,
+            label = 'Fence', enabled = false, coords = vec3(412.34, 314.81, 103.13), distance = 3.0, hourlyCap = 3000, market = true,
             prices = { goldchain = true, silverchain = true, gold_ring = true, silver_ring = true, diamond_ring = true, rolex = true, laptop = true, tablet = true },
         },
         hunt = {
-            label = 'Game buyer', enabled = false, coords = nil, distance = 3.0, hourlyCap = 6000,
+            label = 'Game buyer', enabled = false, coords = vec3(969.164, -2107.903, 31.476), distance = 3.0, hourlyCap = 6000,
             prices = { venison = 60, deer_pelt = 120, antlers = 150 },
         },
     },
@@ -42,8 +42,8 @@ Config = {
         },
         -- EVERY spot ships disabled. A spot is a water area to cast into.
         spots = {
-            { name = 'pier_1', label = 'Pier', enabled = false, center = nil, radius = nil },
-            { name = 'deep_1', label = 'Deep water', enabled = false, center = nil, radius = nil, minLevel = 4 },
+            { name = 'pier_1', label = 'Pier', enabled = false, center = vec3(-3039.747, 23.342, 7.146), radius = 40.0 },
+            { name = 'deep_1', label = 'Deep water', enabled = false, center = vec3(-3316.197, -218.254, 1.066), radius = 150.0, minLevel = 4 },
         },
     },
 
@@ -72,7 +72,7 @@ Config = {
             { 'rubber', 2, 4 }, { 'copper', 1, 2 }, { 'glass', 1, 3 },
         },
         dropoffs = {
-            { name = 'chop_1', label = 'Chop shop', enabled = false, coords = nil },
+            { name = 'chop_1', label = 'Chop shop', enabled = false, coords = vec3(2354.35, 3134.15, 48.21) },
         },
     },
     -- Mining: strike a vein with a pickaxe, smelt the ore, sell the metal to the
@@ -94,7 +94,7 @@ Config = {
             { name = 'gold_1', label = 'Gold vein', ore = 'goldore', min = 1, max = 3, nodes = {} },
         },
         smelter = {
-            enabled = false, coords = nil, distance = 3.0, seconds = 10,
+            enabled = false, coords = vec3(1112.29, -2009.9, 31.46), distance = 3.0, seconds = 10,
             recipes = {
                 copper = { label = 'Smelt copper', input = { copperore = 3 }, output = { 'copper', 2 } },
                 iron = { label = 'Smelt iron', input = { ironore = 3 }, output = { 'iron', 2 } },

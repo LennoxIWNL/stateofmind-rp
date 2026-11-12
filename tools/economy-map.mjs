@@ -50,9 +50,11 @@ add(uses, 'fishingrod', 'fishing')
 add(uses, 'fishbait', 'fishing')
 for (const m of out.matchAll(/\{ '(\w+)', \d+, \d+, [\d.]+ \}/g)) add(sources, m[1], 'hunting')
 add(uses, 'hunting_knife', 'hunting')
+add(uses, 'pickaxe', 'mining')
+for (const m of out.matchAll(/output = \{ '(\w+)', \d+ \}/g)) add(sources, m[1], 'smelting')
 const chop = /parts = \{([\s\S]*?)\},\s*dropoffs/.exec(out)
 if (chop) for (const m of chop[1].matchAll(/\{ '(\w+)', \d+, \d+ \}/g)) add(sources, m[1], 'chopping vehicles')
-for (const b of out.matchAll(/(\w+) = \{\s*label = '[^']*', enabled = false, coords = nil, distance = [\d.]+, hourlyCap = (\d+),\s*prices = \{([^}]*)\}/g)) {
+for (const b of out.matchAll(/(\w+) = \{\s*label = '[^']*', enabled = false, coords = (?:nil|vec3\([^)]*\)), distance = [\d.]+, hourlyCap = (\d+),\s*prices = \{([^}]*)\}/g)) {
   for (const [i, p] of pairsOf(b[3])) add(uses, i, `sold to the ${b[1]} buyer ($${p}, cap $${b[2]}/h)`)
 }
 

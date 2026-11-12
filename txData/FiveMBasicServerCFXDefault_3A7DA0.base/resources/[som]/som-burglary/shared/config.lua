@@ -60,7 +60,7 @@ Config = {
     -- Every house ships disabled. Place the door with /place and fill the shell's
     -- spots above. A house with no spots cannot be picked.
     houses = {
-        { id = 'house_1', tier = 'low', label = 'Suburban house', shell = 'shell_frankaunt', enabled = false, coords = nil },
-        { id = 'house_2', tier = 'high', label = 'Hillside villa', shell = 'shell_michael', enabled = false, coords = nil },
+        { id = 'house_1', tier = 'low', label = 'Suburban house', shell = 'shell_frankaunt', enabled = false, coords = vec3(179.29, -1923.98, 21.37) },
+        { id = 'house_2', tier = 'high', label = 'Hillside villa', shell = 'shell_michael', enabled = false, coords = vec3(-174.65, 502.47, 137.42) },
     },
 }
