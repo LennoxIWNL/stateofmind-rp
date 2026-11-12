@@ -47,6 +47,7 @@ local function resetDb()
     mysql.db.notes = {}
     mysql.db.heist = { dongles = {}, runs = {} }
     mysql.db.boost = { runs = {}, ownedPlates = {} }
+    mysql.db.racing = { dongles = {}, aliases = {}, tracks = {}, races = {}, entries = {}, times = {} }
     mysql.db.turf = { zones = {}, events = {}, market = {} }
     mysql.db.whitelist = {}
     mysql.db.bans = {}
@@ -8956,6 +8957,434 @@ do
     check(#cb['som-fire:server:state'](1) == 0, 'fire: stopping the resource clears the fires')
     _G.TriggerClientEvent = function() end
     for k, v in pairs(saved) do _G[k] = v end
+end
+
+----------------------------------------------------------------------
+-- som-racing
+----------------------------------------------------------------------
+do
+    local realJson = _G.json
+    _G.json = {
+        encode = function(v)
+            local parts = {}
+            for i, p in ipairs(v) do parts[i] = ('{x=%s,y=%s,z=%s}'):format(p.x, p.y, p.z) end
+            return '{' .. table.concat(parts, ',') .. '}'
+        end,
+        decode = realJson.decode,
+    }
+    local DONGLE = 'racing_dongle'
+    local SQUARE = { vec3(0, 0, 0), vec3(150, 0, 0), vec3(300, 0, 0), vec3(300, 150, 0), vec3(150, 150, 0), vec3(0, 150, 0) }
+
+    -- A fresh resource and a few people standing on the start line with a racer dongle each.
+    local function scene(count, cash)
+        resetDb()
+        ResetHandlers()
+        mysql.fakeNow = 1800000000
+        Mocks.clock = 100000
+        Mocks.admins, Mocks.inv, Mocks.bank, Mocks.credits, Mocks.addMoneyFails = {}, {}, {}, {}, false
+        Mocks.calls.dispatchAlert, Mocks.players = 0, {}
+        _G.PedVehicle, _G.source = {}, nil
+        -- Earlier scenes replace these natives and do not always put them back.
+        _G.GetVehiclePedIsIn = function(ped) return PedVehicle[ped] or 0 end
+        _G.GetPlayerPed = function(src) return FakePeds[src] ~= nil and src or 0 end
+        _G.GetEntityCoords = function(ped) return FakePeds[ped] or vec3(0, 0, 0) end
+        _G.TriggerClientEvent = function() end
+        local env = loader.loadResource(REPO .. 'som-racing', { 'shared/config.lua', 'server/main.lua', 'server/race.lua', 'server/app.lua' })
+        env.Config.enabled = true
+        env.Config.dispatch.chance = 0
+        for i = 1, count or 0 do
+            Mocks.players[i] = { citizenid = 'R' .. i, charinfo = { firstname = 'Rac', lastname = 'Er' .. i } }
+            Mocks.bank[i] = cash or 1000
+            FakePeds[i] = vec3(0, 0, 0)
+            PedVehicle[i] = 900 + i
+            mysql.db.racing.aliases['R' .. i] = 'Racer' .. i
+            env.Racing.MintDongle(i, 'racer', 'test')
+        end
+        return env, RegisteredCallbacks, Mocks.apps.racing.handler
+    end
+
+    local function track(name)
+        local t = mysql.db.racing.tracks
+        t[#t + 1] = { id = #t + 1, name = name or 'Square', creator_cid = 'R1', points = _G.json.encode(SQUARE), length_m = 900, active = 1 }
+        return #t
+    end
+
+    local function credited(src)
+        local sum = 0
+        for _, c in ipairs(Mocks.credits) do if c.source == src then sum = sum + c.amount end end
+        return sum
+    end
+
+    local function states()
+        local out = {}
+        for _, e in ipairs(mysql.db.racing.entries) do out[#out + 1] = e.state end
+        return table.concat(out, ',')
+    end
+
+    -- The point a racer must be at to pass sequence number `seq` on a six point track.
+    local function point(seq) return SQUARE[seq % 6 + 1] end
+
+    local function runLap(env, src, from, to, step)
+        for seq = from, to do
+            Mocks.clock = Mocks.clock + (step or 20000)
+            FakePeds[src] = point(seq)
+            env.Racing.Checkpoint(src, seq)
+        end
+    end
+
+    local function started(env, handler, count, stake, laps)
+        local id = track()
+        check(handler(1, 'host', { id = id, text = ('%d %d'):format(laps or 1, stake) }).success, 'racing: setup host')
+        for i = 2, count do check(handler(i, 'join', { id = 1 }).success, 'racing: setup join') end
+        mysql.fakeNow = mysql.fakeNow + env.Config.joinSeconds + 1
+        env.Racing.Tick()
+        Mocks.clock = Mocks.clock + env.Config.countdownSeconds * 1000 + 1
+        return env.Racing.live[1]
+    end
+
+    -- Gates ------------------------------------------------------------
+    do
+        local env, cb, app = scene(2)
+        env.Config.enabled = false
+        check(app(1, 'view').view.empty == 'Street racing is closed', 'racing: ships closed')
+        check(not app(1, 'host', { id = track(), text = '1 100' }).success and #mysql.db.racing.races == 0, 'racing: nothing hosts while closed')
+        env.Config.enabled = true
+
+        Mocks.inv[3] = nil
+        Mocks.players[3] = { citizenid = 'R3', charinfo = { firstname = 'No', lastname = 'Dongle' } }
+        check(app(3, 'view').view.empty == 'You need a racing dongle', 'racing: no dongle, no app')
+        check(not app(3, 'host', { id = 1, text = '1 0' }).success, 'racing: no dongle, no hosting')
+
+        check(not app(1, 'record').success, 'racing: a racer dongle cannot record tracks')
+        check(env.Racing.MintDongle(1, 'bogus', 'x') == nil, 'racing: only two tiers exist')
+        local uid = env.Racing.MintDongle(1, 'creator', 'test')
+        check(uid and app(1, 'record').success, 'racing: a creator dongle records')
+        env.Racing.recording[1] = nil
+
+        Mocks.commands.voidracedongle(0, { uid = uid })
+        check(mysql.db.racing.dongles[uid].status == 'void' and not app(1, 'record').success, 'racing: a voided dongle stops working')
+
+        -- the first character to use a dongle owns it, so a copy in other hands does nothing
+        local row = (function() for _, i in pairs(Mocks.inv[2]) do return i end end)()
+        Mocks.inv[3] = { { name = DONGLE, count = 1, slot = 1, metadata = { uid = row.metadata.uid, tier = 'racer' } } }
+        check(app(2, 'view').view.sections ~= nil and mysql.db.racing.dongles[row.metadata.uid].holder_cid == 'R2', 'racing: first use binds the dongle to the character')
+        check(app(3, 'view').view.empty == 'You need a racing dongle', 'racing: a copy of a bound dongle does nothing')
+        Mocks.inv[3] = { { name = DONGLE, count = 1, slot = 1, metadata = { uid = 'nothex!!nothex!!', tier = 'creator' } } }
+        check(app(3, 'view').view.empty == 'You need a racing dongle', 'racing: a made up uid does nothing')
+
+        check(not Mocks.commands.giveracedongle(2, { target = 1, tier = 'racer' }) and #(function() local n = {} for k in pairs(mysql.db.racing.dongles) do n[#n + 1] = k end return n end)() == 3,
+            'racing: the give command needs the admin group')
+        Mocks.admins[2] = true
+        local before = 0
+        for _ in pairs(mysql.db.racing.dongles) do before = before + 1 end
+        Mocks.commands.giveracedongle(2, { target = 1, tier = 'creator' })
+        local after = 0
+        for _ in pairs(mysql.db.racing.dongles) do after = after + 1 end
+        check(after == before + 1, 'racing: an admin can issue a dongle')
+    end
+
+    -- Alias and track recording ------------------------------------------
+    do
+        local env, cb, app = scene(2)
+        mysql.db.racing.aliases = {}
+        check(not app(1, 'alias', { text = 'x' }).success and not app(1, 'alias', { text = '<b>hi</b>' }).success, 'racing: a short or markup alias is refused')
+        check(app(1, 'alias', { text = 'Fast Eddie' }).success and mysql.db.racing.aliases.R1 == 'Fast Eddie', 'racing: an alias is saved')
+        check(not app(1, 'alias', { text = 'Other' }).success, 'racing: one alias per character')
+        check(not app(2, 'alias', { text = 'fast eddie' }).success, 'racing: an alias is unique, case aside')
+
+        env.Racing.MintDongle(1, 'creator', 'test')
+        check(app(1, 'record').success, 'racing: recording starts')
+        check(not cb['som-racing:server:drop'](2).success, 'racing: nobody drops a point without recording')
+        local drop, save = cb['som-racing:server:drop'], cb['som-racing:server:save']
+
+        FakePeds[1] = SQUARE[1]
+        PedVehicle[1] = nil; check(not drop(1).success, 'racing: points are dropped from the car')
+        PedVehicle[1] = 901
+        check(drop(1).success, 'racing: the first point drops')
+        FakePeds[1] = vec3(10, 0, 0)
+        check(not drop(1).success, 'racing: points too close are refused')
+        FakePeds[1] = vec3(1500, 0, 0)
+        check(not drop(1).success, 'racing: points too far apart are refused')
+        check(not save(1, 'Short Run').success, 'racing: too few checkpoints refuse the save')
+        for i = 2, 6 do FakePeds[1] = SQUARE[i]; check(drop(1).success, 'racing: point ' .. i) end
+        check(not save(1, '<x>').success, 'racing: a track name is clean')
+        check(not save(1, 'ab').success, 'racing: a track name has a minimum')
+        local ok = save(1, 'Harbour Loop')
+        check(ok.success and mysql.db.racing.tracks[1].name == 'Harbour Loop' and mysql.db.racing.tracks[1].length_m == 900, 'racing: the track saves with its length from server positions')
+        check(env.Racing.recording[1] == nil, 'racing: saving ends the recording')
+
+        app(1, 'record')
+        for i = 1, 4 do FakePeds[1] = SQUARE[i]; drop(1) end
+        FakePeds[1] = SQUARE[5]; drop(1); FakePeds[1] = vec3(300, 150, 20); drop(1)
+        check(not save(1, 'harbour loop').success, 'racing: a duplicate name is refused')
+
+        env.Racing.recording[1] = nil
+        env.Config.track.maxPerPerson = 1
+        check(not app(1, 'record').success, 'racing: a person keeps a limited number of tracks')
+        env.Config.track.maxPerPerson = 5
+
+        app(1, 'record')
+        Mocks.clock = Mocks.clock + env.Config.track.recordSeconds * 1000 + 1
+        check(not drop(1).success, 'racing: a recording window runs out')
+    end
+
+    -- Escrow --------------------------------------------------------------
+    do
+        local env, cb, app = scene(4)
+        local id = track()
+        Mocks.bank[4] = 50
+        check(not app(1, 'host', { id = id, text = '0 100' }).success and not app(1, 'host', { id = id, text = '99 100' }).success, 'racing: laps are bounded')
+        check(not app(1, 'host', { id = id, text = '1 99999' }).success, 'racing: the stake is bounded')
+        check(app(1, 'host', { id = id, text = '2 500' }).success, 'racing: a race opens')
+        check(Mocks.bank[1] == 500 and states() == 'held', 'racing: the host pays the buy-in and it is held')
+        check(not app(1, 'host', { id = id, text = '1 100' }).success, 'racing: one race at a time per host')
+        check(not app(1, 'join', { id = 1 }).success and Mocks.bank[1] == 500, 'racing: nobody pays twice for one race')
+
+        check(not app(4, 'join', { id = 1 }).success and Mocks.bank[4] == 50 and states() == 'held,deleted', 'racing: a racer who cannot pay gets no seat and loses nothing')
+
+        FakePeds[2] = vec3(500, 0, 0)
+        check(not app(2, 'join', { id = 1 }).success and Mocks.bank[2] == 1000, 'racing: joining needs the start line')
+        FakePeds[2] = vec3(0, 0, 0)
+        PedVehicle[2] = nil
+        check(not app(2, 'join', { id = 1 }).success and Mocks.bank[2] == 1000, 'racing: joining needs a car')
+        PedVehicle[2] = 902
+        mysql.db.racing.aliases.R2 = nil
+        check(not app(2, 'join', { id = 1 }).success, 'racing: joining needs an alias')
+        mysql.db.racing.aliases.R2 = 'Racer2'
+        check(app(2, 'join', { id = 1 }).success and Mocks.bank[2] == 500, 'racing: a racer joins and is debited the stake')
+        Mocks.addMoneyFails = false
+
+        env.Config.maxRacers = 2
+        check(not app(3, 'join', { id = 1 }).success and Mocks.bank[3] == 1000, 'racing: a full race refuses a third racer')
+        env.Config.maxRacers = 8
+
+        mysql.fakeNow = mysql.fakeNow + env.Config.joinSeconds + 1
+        check(not app(3, 'join', { id = 1 }).success and Mocks.bank[3] == 1000, 'racing: the join window closes')
+        env.Racing.live[1].status = 'open'
+        check(app(1, 'view').view.sections[2] ~= nil, 'racing: the view builds for a racer in a race')
+    end
+
+    -- Payout --------------------------------------------------------------
+    do
+        local env, cb, app = scene(3)
+        local race = started(env, app, 3, 500, 2)
+        check(race and race.status == 'running' and mysql.db.racing.races[1].status == 'running', 'racing: the window closing starts the race')
+        check(Mocks.bank[1] == 500 and Mocks.bank[2] == 500 and Mocks.bank[3] == 500, 'racing: every stake is in escrow')
+
+        -- before the countdown ends nothing counts
+        Mocks.clock = Mocks.clock - env.Config.countdownSeconds * 1000 - 1
+        FakePeds[2] = point(1)
+        env.Racing.Checkpoint(2, 1)
+        check(env.Racing.live[1].racers[2].seq == 0, 'racing: a checkpoint before the start is ignored')
+        Mocks.clock = Mocks.clock + env.Config.countdownSeconds * 1000 + 1
+
+        runLap(env, 2, 1, 12)
+        check(race.racers[2].done and race.order[1] == race.racers[2], 'racing: the server decides who finished first')
+        runLap(env, 1, 1, 12, 25000)
+        check(#race.order == 2 and race.status == 'running', 'racing: the race waits for the others')
+        runLap(env, 3, 1, 5)
+        Mocks.clock = Mocks.clock + env.Config.graceSeconds * 1000 + 1
+        env.Racing.Tick()
+
+        check(mysql.db.racing.races[1].status == 'done' and env.Racing.live[1] == nil, 'racing: the race settles after the grace time')
+        check(credited(2) == 1050 and credited(1) == 450 and credited(3) == 0, 'racing: the pot pays 70 and 30 to the finishers and the third racer forfeits')
+        check(states() == 'paid,paid,paid', 'racing: every entry ends paid')
+        check(credited(1) + credited(2) == 1500, 'racing: what was paid is exactly what was taken')
+        check(mysql.db.racing.entries[2].position == 1 and mysql.db.racing.entries[1].position == 2, 'racing: finishing order is recorded')
+        check(mysql.db.racing.times['1:R2'].best_ms < mysql.db.racing.times['1:R1'].best_ms, 'racing: best times are kept per track')
+        check(not env.Racing.Settle(1) and credited(2) == 1050, 'racing: a second settle pays nothing')
+
+        local old = mysql.db.racing.times['1:R2'].best_ms
+        env.Racing.Checkpoint(2, 1)
+        check(mysql.db.racing.times['1:R2'].best_ms == old, 'racing: a slower run does not replace the best time')
+        check(#app(1, 'view').view.sections > 0, 'racing: the lap board view builds')
+    end
+
+    do -- the split rows and the remainder
+        for _, row in ipairs(loader.loadResource(REPO .. 'som-racing', { 'shared/config.lua' }).Config.split) do
+            local sum = 0
+            for _, pct in ipairs(row) do sum = sum + pct end
+            check(sum == 100, 'racing: a split row sums to 100')
+        end
+        local env, cb, app = scene(3, 1000)
+        env.Config.stake.max = 100
+        local race = started(env, app, 3, 33, 1)
+        runLap(env, 1, 1, 6)
+        runLap(env, 2, 1, 6)
+        runLap(env, 3, 1, 6)
+        check(credited(1) + credited(2) + credited(3) == 99, 'racing: odd pots pay out whole with the remainder to first')
+        check(credited(1) == 99 * 55 // 100 + (99 - (99 * 55 // 100 + 99 * 30 // 100 + 99 * 15 // 100)), 'racing: the remainder goes to first place')
+    end
+
+    -- Refunds -------------------------------------------------------------
+    do
+        local env, cb, app = scene(3)
+        local id = track()
+        app(1, 'host', { id = id, text = '1 300' }); app(2, 'join', { id = 1 }); app(3, 'join', { id = 1 })
+        check(app(2, 'leave').success and credited(2) == 300, 'racing: leaving before the start returns the stake')
+                check(app(1, 'leave').success and mysql.db.racing.races[1].status == 'cancelled', 'racing: the host leaving cancels the race')
+        check(credited(1) == 300 and credited(3) == 300 and states() == 'paid,paid,paid', 'racing: a cancelled race refunds everyone')
+        check(not env.Racing.Settle(1) and credited(1) == 300, 'racing: a cancelled race cannot then pay out')
+    end
+
+    do
+        local env, cb, app = scene(2)
+        local id = track()
+        app(1, 'host', { id = id, text = '1 300' })
+        mysql.fakeNow = mysql.fakeNow + env.Config.joinSeconds + 1
+        env.Racing.Tick()
+        check(mysql.db.racing.races[1].status == 'cancelled' and credited(1) == 300, 'racing: a race nobody joined refunds the host when the window ends')
+    end
+
+    do
+        local env, cb, app = scene(3)
+        local id = track()
+        app(1, 'host', { id = id, text = '1 300' }); app(2, 'join', { id = 1 })
+        FakePeds[2] = vec3(900, 0, 0)
+        mysql.fakeNow = mysql.fakeNow + env.Config.joinSeconds + 1
+        env.Racing.Tick()
+        check(mysql.db.racing.races[1].status == 'cancelled' and credited(1) == 300 and credited(2) == 300, 'racing: a racer who left the line is refunded and a race of one is cancelled')
+    end
+
+    do -- the race ends while a buy-in is being taken
+        local env, cb, app = scene(3)
+        local id = track()
+        app(1, 'host', { id = id, text = '1 300' })
+        local core = exports['som-core']
+        local real = core.removeMoney
+        core.removeMoney = function(self, ...) env.Racing.Cancel(1); return real(self, ...) end
+        local joined = app(2, 'join', { id = 1 })
+        core.removeMoney = real
+        check(not joined.success and credited(2) == 300 and env.Racing.byRacer[2] == nil, 'racing: a buy-in taken as the race ends is given back')
+        check(states() == 'paid,paid', 'racing: the late entry is refunded, not left held')
+    end
+
+    do -- a dongle voided mid recording cannot save
+        local env, cb, app = scene(1)
+        local uid = env.Racing.MintDongle(1, 'creator', 'test')
+        app(1, 'record')
+        for i = 1, 6 do FakePeds[1] = SQUARE[i]; cb['som-racing:server:drop'](1) end
+        Mocks.commands.voidracedongle(0, { uid = uid })
+        local res = cb['som-racing:server:save'](1, 'Voided Run')
+        check(not res.success and res.ended and #mysql.db.racing.tracks == 0, 'racing: a voided dongle cannot save a track')
+        check(cb['som-racing:server:drop'](2).ended == true, 'racing: the client is told when a recording is over')
+    end
+
+    do -- startup
+        local env, cb, app = scene(2)
+        local id = track()
+        app(1, 'host', { id = id, text = '1 300' }); app(2, 'join', { id = 1 })
+        local E = mysql.db.racing.entries
+        E[#E + 1] = { id = #E + 1, race_id = 1, citizenid = 'R9', alias = 'Ghost', stake = 300, state = 'pending', owed = 0 }
+        env.Racing.Reset()
+        check(E[3].state == 'void', 'racing: a restart voids an entry that was never confirmed debited')
+        check(E[1].state == 'owed' and E[2].state == 'owed' and E[1].owed == 300, 'racing: a restart turns held stakes into refunds')
+        check(mysql.db.racing.races[1].status == 'cancelled', 'racing: a restart cancels open races')
+        app(1, 'view')
+        check(credited(1) == 300 and credited(2) == 0, 'racing: the owner collects what they are owed when they open the app')
+        app(2, 'view')
+        check(credited(2) == 300, 'racing: the other owner too')
+        app(2, 'view')
+        check(credited(2) == 300, 'racing: collecting twice pays once')
+    end
+
+    do -- a failed credit keeps the money owed
+        local env, cb, app = scene(2)
+        local id = track()
+        app(1, 'host', { id = id, text = '1 300' }); app(2, 'join', { id = 1 })
+        Mocks.addMoneyFails = true
+        env.Racing.Cancel(1)
+        check(states() == 'owed,owed' and credited(1) == 0, 'racing: a failed credit leaves the money owed')
+        Mocks.addMoneyFails = false
+        check(app(1, 'view').view.sections[1].rows[1].title == 'Racer1' and credited(1) == 300 and states() == 'paid,owed', 'racing: it is paid the next time they look')
+        Mocks.players[2] = nil
+        app(1, 'view')
+        check(states() == 'paid,owed', 'racing: an offline racer is not paid and stays owed')
+    end
+
+    -- Checkpoint judging ----------------------------------------------------
+    do
+        local env, cb, app = scene(2)
+        local race = started(env, app, 2, 100, 1)
+        local r = race.racers[1]
+        local function try(seq, at, wait)
+            Mocks.clock = Mocks.clock + (wait or 20000)
+            FakePeds[1] = at
+            env.Racing.Checkpoint(1, seq)
+        end
+
+        try(2, point(2))
+        check(r.seq == 0 and r.bad == 1, 'racing: a skipped checkpoint is refused')
+        try(1, vec3(100, 100, 0))
+        check(r.seq == 0 and r.bad == 2, 'racing: the right checkpoint from the wrong place is refused')
+        PedVehicle[1] = nil
+        try(1, point(1))
+        check(r.seq == 0 and r.bad == 3, 'racing: a checkpoint on foot is refused')
+        PedVehicle[1] = 901
+        try(1, point(1), 100)
+        check(r.seq == 0 and r.bad == 3, 'racing: events closer than the rate limit are dropped without a strike')
+        r.acceptAt = Mocks.clock
+        try(1, point(1), 600)
+        check(r.seq == 0 and r.bad == 4, 'racing: a checkpoint faster than any car can drive is refused')
+        try(1, point(1))
+        check(r.seq == 1 and r.bad == 4, 'racing: the right checkpoint at the right place counts')
+        check(not r.dnf, 'racing: four strikes are not yet out')
+        local other = race.racers[2]
+        for _, junk in ipairs({ 'x', {}, 7.5 }) do
+            Mocks.clock = Mocks.clock + 20000
+            FakePeds[2] = point(1)
+            env.Racing.Checkpoint(2, junk)
+        end
+        check(other.seq == 0 and other.bad == 3, 'racing: junk arguments are refused and change nothing')
+        try(5, point(2))
+        check(r.dnf and not race.racers[1].done, 'racing: five refused reports put a racer out')
+        check(env.Racing.Checkpoint(99, 1) == nil and r.seq == 1, 'racing: a sender who is not racing is ignored')
+        check(race.racers[2] and race.status == 'running', 'racing: the other racer is still in')
+        race.racers[2].dnf = true
+        env.Racing.Checkpoint(1, 1)
+        env.Racing.Leave(2)
+        check(mysql.db.racing.races[1].status == 'done' and credited(1) + credited(2) == 200 and states() == 'paid,paid', 'racing: nobody finished so every stake is refunded')
+    end
+
+    do -- a racer leaving mid race forfeits
+        local env, cb, app = scene(2)
+        local race = started(env, app, 2, 100, 1)
+        runLap(env, 2, 1, 6)
+        _G.source = 1
+        Handlers['playerDropped']()
+        _G.source = nil
+        check(mysql.db.racing.races[1].status == 'done' and credited(2) == 200 and credited(1) == 0, 'racing: dropping mid race forfeits the stake to the finisher')
+    end
+
+    -- Police, tracks ----------------------------------------------------------
+    do
+        local env, cb, app = scene(2)
+        env.Config.dispatch.chance = 1
+        started(env, app, 2, 0, 1)
+        check(Mocks.calls.dispatchAlert == 1 and Mocks.lastAlertType == 'streetRace', 'racing: the start raises one dispatch call')
+        check(not env.Racing.Start(1).success and Mocks.calls.dispatchAlert == 1, 'racing: a race starts once, whoever asks')
+        check(Mocks.lastAlertExtra.coords.x == 0 and not Mocks.lastAlertExtra.wanted, 'racing: the call carries the start line and nothing else')
+
+        local env2, cb2, app2 = scene(2)
+        started(env2, app2, 2, 0, 1)
+        check(Mocks.calls.dispatchAlert == 0, 'racing: no roll, no call')
+        check(Mocks.apps.racing.reads.view == true, 'racing: the phone view is a read')
+        check(env2.Racing.live[1].racers[1].alias == 'Racer1', 'racing: racers carry their alias, never their name')
+    end
+
+    do
+        local env, cb, app = scene(2)
+        local id = track()
+        check(not app(2, 'delete', { id = id }).success, 'racing: only the creator takes a track down')
+        app(1, 'host', { id = id, text = '1 0' })
+        check(not app(1, 'delete', { id = id }).success, 'racing: a track in use stays')
+        env.Racing.Cancel(1)
+        check(app(1, 'delete', { id = id }).success and mysql.db.racing.tracks[id].active == 0, 'racing: the creator takes it down')
+        check(not app(1, 'host', { id = id, text = '1 0' }).success, 'racing: a removed track cannot be hosted')
+        check(not app(1, 'nonsense').success and not app(1, 'pick', { id = 'x' }).success, 'racing: unknown actions and junk ids are refused')
+    end
+
+    _G.json = realJson
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))

@@ -226,6 +226,18 @@ Config.Alerts = {
         blip = { sprite = 225, colour = 1, scale = 1.0, duration = 600 },
     },
 
+    -- Raised by som-racing once, when a race starts and its roll passes. NOT
+    -- `reportable`: the server raises it at the start line.
+    streetRace = {
+        label = 'Street Race Reported',
+        code = '10-85',
+        priority = 3,
+        chance = 1.0,
+        cooldown = 60,
+        jobs = { 'police' },
+        blip = { sprite = 225, colour = 47, scale = 0.9, duration = 300 },
+    },
+
     -- Raised by som-jail's yard-radius check, not by detection. NOT
     -- `reportable` for the same reason emergencyCall isn't: it has its own
     -- trigger with its own validation.
