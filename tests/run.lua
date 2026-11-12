@@ -7435,6 +7435,105 @@ do
     env.Tow.Sweep()
     check(tick(holdId).state == 'open' and tick(holdId).driver == nil, 'tow: a ticket taken and never delivered goes back on the board')
 
+    -- Review fixes: the sweep, the paid cap, a failing credit and a throwing impound
+    local T0 = mysql.fakeNow
+    local function ticketFor(plate, id, at)
+        spawn(id, plate, at); D.vehicles[#D.vehicles + 1] = { id = 50 + id, plate = plate, citizenid = 'OWNER1', state = 'out' }
+        env.Tow.Request(plate, 5, 'COP1', { x = at.x, y = at.y, z = at.z })
+        return #D.tickets
+    end
+
+    local movedId = ticketFor('MOV001', 910, vec3(5, 5, 0))
+    FakePeds[910] = vec3(300, 300, 0)
+    mysql.fakeNow = T0 + (C.ticketMinutes + 1) * 60
+    env.Tow.Sweep()
+    check(tick(movedId).state == 'cancelled' and _G.Vehicles[910] ~= nil and D.vehicles[#D.vehicles].state == 'out', 'tow: a stale ticket for a car that moved away closes without touching the car or its row')
+
+    local goneId = ticketFor('GON002', 911, vec3(5, 5, 0))
+    _G.Vehicles[911] = nil
+    mysql.fakeNow = mysql.fakeNow + (C.ticketMinutes + 1) * 60
+    local impoundsBefore = #D.impounds
+    env.Tow.Sweep()
+    check(tick(goneId).state == 'cancelled' and #D.impounds == impoundsBefore and D.vehicles[#D.vehicles].state == 'out', 'tow: a stale ticket for a car that is gone closes without impounding anything')
+
+    local slowId = ticketFor('SLW003', 912, vec3(5, 5, 0))
+    mysql.fakeNow = mysql.fakeNow + (C.ticketMinutes - 1) * 60
+    check(act(2, 'claim', slowId).success, 'tow: a driver takes a ticket late in its life')
+    mysql.fakeNow = mysql.fakeNow + (C.claimMinutes - 1) * 60
+    env.Tow.Sweep()
+    check(tick(slowId).state == 'claimed' and _G.Vehicles[912] ~= nil, 'tow: a ticket a driver still holds is not impounded, however old')
+    mysql.fakeNow = mysql.fakeNow + 2 * 60
+    env.Tow.Sweep()
+    check(tick(slowId).state == 'open' and _G.Vehicles[912] ~= nil and D.vehicles[#D.vehicles].state == 'out', 'tow: a ticket reopened in a sweep is not cancelled in the same run')
+    mysql.fakeNow = mysql.fakeNow + (C.ticketMinutes + 1) * 60
+    env.Tow.Sweep()
+    check(tick(slowId).state == 'cancelled' and _G.Vehicles[912] == nil and D.vehicles[#D.vehicles].state == 'impounded', 'tow: a reopened ticket nobody retakes is impounded a full window later')
+
+    -- Unpaid tows do not use up the paid cap
+    mysql.fakeNow = mysql.fakeNow + 7200
+    for i = 1, C.maxPaidPerHour do
+        D.tickets[#D.tickets + 1] = { id = 300 + i, plate = 'FREE' .. i, state = 'done', driver = 'TOW2', done_at = mysql.fakeNow - 60, paid = 0, created_at = mysql.fakeNow - 600 }
+    end
+    local freeId = ticketFor('PAY004', 913, lot)
+    act(2, 'claim', freeId)
+    placePed(2, lot.x, lot.y, lot.z)
+    local bank2 = bank[2]
+    local r1 = act(2, 'deliver', freeId)
+    check(r1.paid == C.fee and bank[2] == bank2 + C.fee, 'tow: unpaid tows do not count toward the hourly paid cap')
+
+    -- The driver is told when the department cannot pay
+    local brk2 = ticketFor('BRK005', 914, lot)
+    act(3, 'claim', brk2)
+    placePed(3, lot.x, lot.y, lot.z)
+    dept = 100
+    sent = {}
+    act(3, 'deliver', brk2)
+    local told = false
+    for _, e in ipairs(sent) do if e.name == 'som:client:notify' and e.target == 3 then told = true end end
+    check(told and tick(brk2).paid == 0, 'tow: the driver is told when the department cannot pay')
+    dept = 100000
+
+    -- A credit that throws refunds the department
+    local thr = ticketFor('THR006', 915, lot)
+    act(3, 'claim', thr)
+    local realAdd = core.addMoney
+    function core:addMoney() error('credit blew up') end
+    local deptBefore = dept
+    local r2 = act(3, 'deliver', thr)
+    core.addMoney = realAdd
+    check(r2.success and r2.paid == 0 and dept == deptBefore and tick(thr).paid == 0, 'tow: a credit that throws refunds the department and pays nobody')
+
+    -- An impound that throws puts the ticket back with the driver
+    local boom = ticketFor('BOM007', 916, lot)
+    act(3, 'claim', boom)
+    Mocks.exported.impoundPlate = function() error('db down') end
+    local bank3b = bank[3]
+    local r3 = act(3, 'deliver', boom)
+    Mocks.exported.impoundPlate = realPlate
+    check(r3.error == 'the impound could not be recorded' and tick(boom).state == 'claimed' and bank[3] == bank3b, 'tow: an impound that throws rolls the ticket back to the driver')
+
+    -- A sweep impound that throws leaves the ticket open to retry, and a driver past the cap is told why
+    local swId = ticketFor('SWT008', 917, vec3(5, 5, 0))
+    mysql.fakeNow = mysql.fakeNow + (C.ticketMinutes + 1) * 60
+    Mocks.exported.impoundPlate = function() error('db down') end
+    env.Tow.Sweep()
+    Mocks.exported.impoundPlate = realPlate
+    check(tick(swId).state == 'open' and _G.Vehicles[917] ~= nil, 'tow: a sweep impound that throws leaves the ticket open to retry')
+    env.Tow.Sweep()
+    check(tick(swId).state == 'cancelled' and _G.Vehicles[917] == nil, 'tow: and the next sweep impounds it')
+
+    for i = 1, C.maxPaidPerHour do
+        D.tickets[#D.tickets + 1] = { id = 400 + i, plate = 'CAPD' .. i, state = 'done', driver = 'TOW2', done_at = mysql.fakeNow - 60, paid = C.fee, created_at = mysql.fakeNow - 600 }
+    end
+    local lateId = ticketFor('LAT009', 918, lot)
+    act(2, 'claim', lateId)
+    placePed(2, lot.x, lot.y, lot.z)
+    sent = {}
+    act(2, 'deliver', lateId)
+    local capTold = false
+    for _, e in ipairs(sent) do if e.name == 'som:client:notify' and e.target == 2 then capTold = true end end
+    check(capTold and tick(lateId).paid == 0, 'tow: a driver past the hourly cap is told the tow is unpaid')
+
     -- Leave the shared mocks as found
     exports['som-core'].addMoney, exports['som-core'].businessTransact, _G.GetAllVehicles = saved.addMoney, saved.businessTransact, saved.gav
     _G.TriggerClientEvent = realTrigger

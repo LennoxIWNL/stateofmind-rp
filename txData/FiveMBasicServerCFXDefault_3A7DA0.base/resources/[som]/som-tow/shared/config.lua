@@ -11,6 +11,8 @@ Config = {
     claimMinutes = 10,
     maxClaimed = 2,
     sweepSeconds = 60,
+    -- An expired ticket impounds the car only if it is still this close to where it was requested.
+    sweepRadius = 25.0,
 
     -- Must be the same lot as Config.Stations.mrpd.impound.coords in som-police.
     yard = { coords = vec3(407.9, -1633.5, 29.29), radius = 40.0 },

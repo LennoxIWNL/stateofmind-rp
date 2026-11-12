@@ -596,9 +596,9 @@ local function towDb(kind, query, params)
         local n = 0
         for _, t in ipairs(D.tickets) do if t.state == 'claimed' and t.driver == params[1] then n = n + 1 end end
         return true, n
-    elseif kind == 'scalar' and has("SELECT COUNT(*) FROM som_tow_tickets WHERE driver = ? AND state = 'done'") then
+    elseif kind == 'scalar' and has("SELECT COUNT(*) FROM som_tow_tickets WHERE driver = ? AND state = 'done' AND paid > 0") then
         local n = 0
-        for _, t in ipairs(D.tickets) do if t.state == 'done' and t.driver == params[1] and t.done_at > now() - 3600 then n = n + 1 end end
+        for _, t in ipairs(D.tickets) do if t.state == 'done' and t.paid > 0 and t.driver == params[1] and t.done_at > now() - 3600 then n = n + 1 end end
         return true, n
     elseif kind == 'update' and has("SET state = 'claimed', driver = ?, claimed_at = NOW() WHERE id = ? AND state = 'open'") then
         local t = ticket(params[2])
@@ -618,10 +618,10 @@ local function towDb(kind, query, params)
     elseif kind == 'update' and has('UPDATE som_tow_tickets SET paid = ? WHERE id = ?') then
         ticket(params[2]).paid = params[1]
         return true, 1
-    elseif kind == 'update' and has("SET state = 'open', driver = NULL, claimed_at = NULL WHERE state = 'claimed' AND claimed_at < DATE_SUB(NOW(), INTERVAL ? MINUTE)") then
+    elseif kind == 'update' and has("SET state = 'open', driver = NULL WHERE state = 'claimed' AND claimed_at < DATE_SUB(NOW(), INTERVAL ? MINUTE)") then
         local n = 0
         for _, t in ipairs(D.tickets) do
-            if t.state == 'claimed' and t.claimed_at < now() - params[1] * 60 then t.state, t.driver, t.claimed_at = 'open', nil, nil; n = n + 1 end
+            if t.state == 'claimed' and t.claimed_at < now() - params[1] * 60 then t.state, t.driver = 'open', nil; n = n + 1 end
         end
         return true, n
     elseif kind == 'update' and has("SET state = 'cancelled' WHERE id = ? AND state = 'open'") then
@@ -633,10 +633,10 @@ local function towDb(kind, query, params)
         local t = ticket(params[1])
         if t and t.state == 'cancelled' then t.state = 'open' end
         return true, 1
-    elseif kind == 'query' and has("FROM som_tow_tickets WHERE state = 'open' AND created_at < DATE_SUB(NOW(), INTERVAL ? MINUTE)") then
+    elseif kind == 'query' and has("FROM som_tow_tickets WHERE state = 'open' AND COALESCE(claimed_at, created_at) < DATE_SUB(NOW(), INTERVAL ? MINUTE)") then
         local out = {}
         for _, t in ipairs(D.tickets) do
-            if t.state == 'open' and t.created_at < now() - params[1] * 60 then out[#out + 1] = { id = t.id, plate = t.plate, reason = t.reason, requested_by = t.requested_by } end
+            if t.state == 'open' and (t.claimed_at or t.created_at) < now() - params[1] * 60 then out[#out + 1] = { id = t.id, plate = t.plate, reason = t.reason, requested_by = t.requested_by, x = t.x, y = t.y, z = t.z } end
         end
         return true, out
     elseif kind == 'query' and has("FROM som_tow_tickets WHERE state = 'claimed' AND driver = ? ORDER BY id") then

@@ -72,6 +72,13 @@ end)
 -- Driver actions
 -- ---------------------------------------------------------------------------
 
+---False when the impound failed or raised, so every caller can undo its own step.
+local function seal(t)
+    local ok, sealed = pcall(function() return exports['som-police']:impoundPlate(t.plate, t.requested_by, t.reason) end)
+    if not ok then print(('[som-tow] impound of %s failed: %s'):format(t.plate, tostring(sealed))) end
+    return ok and sealed == true
+end
+
 local function ticketOf(id) return MySQL.single.await('SELECT * FROM som_tow_tickets WHERE id = ?', { id }) end
 
 ---The vehicle in the world with this plate, if any.
@@ -130,7 +137,7 @@ function actions.deliver(source, payload, player)
     if #(GetEntityCoords(ped) - GetEntityCoords(car)) > Config.driverRadius then return done(false, 'you have to be with the car') end
 
     -- Paid or not is decided before the ticket closes, so this delivery is not counted against itself.
-    local recent = MySQL.scalar.await("SELECT COUNT(*) FROM som_tow_tickets WHERE driver = ? AND state = 'done' AND done_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)", { player.citizenid })
+    local recent = MySQL.scalar.await("SELECT COUNT(*) FROM som_tow_tickets WHERE driver = ? AND state = 'done' AND paid > 0 AND done_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)", { player.citizenid })
     -- Only a player's car is paid for: its owner's release fee goes back to the department, so the fee
     -- cannot be farmed by towing street cars nobody will collect.
     local owned = MySQL.scalar.await('SELECT 1 FROM som_vehicles WHERE plate = ?', { t.plate }) ~= nil
@@ -139,18 +146,29 @@ function actions.deliver(source, payload, player)
     local closed = MySQL.update.await("UPDATE som_tow_tickets SET state = 'done', done_at = NOW() WHERE id = ? AND state = 'claimed' AND driver = ?", { id, player.citizenid })
     if (closed or 0) < 1 then return done(false, 'that is not your ticket') end
 
-    if not exports['som-police']:impoundPlate(t.plate, t.requested_by, t.reason) then
+    if not seal(t) then
         MySQL.update.await("UPDATE som_tow_tickets SET state = 'claimed', done_at = NULL WHERE id = ? AND state = 'done' AND driver = ?", { id, player.citizenid })
         return done(false, 'the impound could not be recorded')
     end
 
     local paid = 0
-    if pay and core:businessTransact(Config.payer, -Config.fee, ('tow:%d'):format(id)) then
-        if core:addMoney(source, 'bank', Config.fee, ('tow:%d'):format(id)) then
-            paid = Config.fee
+    if pay then
+        local reason = ('tow:%d'):format(id)
+        if core:businessTransact(Config.payer, -Config.fee, reason) then
+            local ok, credited = pcall(function() return core:addMoney(source, 'bank', Config.fee, reason) end)
+            if ok and credited then
+                paid = Config.fee
+            else
+                if not ok then print(('[som-tow] paying %s for %s failed: %s'):format(player.citizenid, reason, tostring(credited))) end
+                if not core:businessTransact(Config.payer, Config.fee, reason .. ':refund') then
+                    print(('[som-tow] %s could not be refunded to %s, put %d back by hand'):format(reason, Config.payer, Config.fee))
+                end
+            end
         else
-            core:businessTransact(Config.payer, Config.fee, ('tow:%d:refund'):format(id))
+            TriggerClientEvent('som:client:notify', source, 'The department could not pay for this tow right now', 'error')
         end
+    elseif owned then
+        TriggerClientEvent('som:client:notify', source, 'You reached the paid tow limit for this hour, so this one is unpaid', 'inform')
     end
     MySQL.update.await('UPDATE som_tow_tickets SET paid = ? WHERE id = ?', { paid, id })
 
@@ -174,13 +192,19 @@ phone:registerApp({
 -- ---------------------------------------------------------------------------
 
 function Tow.Sweep()
-    MySQL.update.await("UPDATE som_tow_tickets SET state = 'open', driver = NULL, claimed_at = NULL WHERE state = 'claimed' AND claimed_at < DATE_SUB(NOW(), INTERVAL ? MINUTE)", { Config.claimMinutes })
+    -- A reopened ticket keeps claimed_at, so "last touched" is one clock for both steps below: a ticket
+    -- reopened here is young by it and cannot be cancelled in the same run, and a held ticket is never stale.
+    MySQL.update.await("UPDATE som_tow_tickets SET state = 'open', driver = NULL WHERE state = 'claimed' AND claimed_at < DATE_SUB(NOW(), INTERVAL ? MINUTE)", { Config.claimMinutes })
 
-    local stale = MySQL.query.await("SELECT id, plate, reason, requested_by FROM som_tow_tickets WHERE state = 'open' AND created_at < DATE_SUB(NOW(), INTERVAL ? MINUTE)", { Config.ticketMinutes }) or {}
+    local stale = MySQL.query.await("SELECT id, plate, reason, requested_by, x, y, z FROM som_tow_tickets WHERE state = 'open' AND COALESCE(claimed_at, created_at) < DATE_SUB(NOW(), INTERVAL ? MINUTE)", { Config.ticketMinutes }) or {}
     for _, t in ipairs(stale) do
         local taken = MySQL.update.await("UPDATE som_tow_tickets SET state = 'cancelled' WHERE id = ? AND state = 'open'", { t.id })
-        if (taken or 0) > 0 and not exports['som-police']:impoundPlate(t.plate, t.requested_by, t.reason) then
-            MySQL.update.await("UPDATE som_tow_tickets SET state = 'open' WHERE id = ? AND state = 'cancelled'", { t.id })
+        if (taken or 0) > 0 then
+            -- Only a car still where the officer asked for the tow is impounded; one that moved or left is not ours to remove.
+            local car = findCar(normalise(t.plate))
+            if car and #(GetEntityCoords(car) - vec3(t.x, t.y, t.z)) <= Config.sweepRadius and not seal(t) then
+                MySQL.update.await("UPDATE som_tow_tickets SET state = 'open' WHERE id = ? AND state = 'cancelled'", { t.id })
+            end
         end
     end
 end
