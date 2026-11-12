@@ -109,6 +109,13 @@ Config.ItemStatus = {
     sprunk = { thirst = 20 },
     mustard = { hunger = 2.5, thirst = 2.5 },
     panties = { thirst = -10, stress = -2.5 },
+    burgershot_bigking = { hunger = 45, stress = -3 },
+    burgershot_bleeder = { hunger = 35, stress = -2 },
+    burgershot_patatob = { hunger = 15 },
+    burgershot_patatos = { hunger = 10 },
+    burgershot_colab = { thirst = 35 },
+    burgershot_colas = { thirst = 25 },
+    burgershot_coffee = { thirst = 15, stress = -3 },
 }
 
 -- Metadata keys created on every new character. Anything not listed here is

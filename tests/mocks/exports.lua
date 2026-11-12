@@ -111,6 +111,12 @@ function core:transferToCitizen(from, toCitizenId, account, amount, reason)
     Mocks.credited[toCitizenId] = (Mocks.credited[toCitizenId] or 0) + amount
     return true
 end
+function core:creditCitizen(citizenid, account, amount, reason)
+    if Mocks.creditFails or type(reason) ~= 'string' then return false, 'refused' end
+    Mocks.credited = Mocks.credited or {}
+    Mocks.credited[citizenid] = (Mocks.credited[citizenid] or 0) + amount
+    return true
+end
 function core:removeMoney(source, account, amount, reason)
     if (Mocks.bank[source] or 0) < amount then return false, 'insufficient funds' end
     Mocks.bank[source] = Mocks.bank[source] - amount

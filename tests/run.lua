@@ -5719,6 +5719,15 @@ do
     check(paid == true and player.money.bank == 95 and credit and credit[1].query:find('+ ? WHERE', 1, true) and credit[1].values[1] == 25 and credit[2].query:find('FROM som_character_money', 1, true),
         'money: an offline credit is added in the database and the ledger reads the balance from it')
 
+    mysql.transactions = {}
+    check(env.Money.CreditCitizen('OFFLINE1', 'bank', 30, 'test:refund') == true and mysql.transactions[1] and mysql.transactions[1][1].values[1] == 30 and player.money.bank == 95,
+        'money: creditCitizen pays an offline character from the database without touching anyone else')
+    check(env.Money.CreditCitizen('NOBODY', 'bank', 30, 'test:refund') == false and env.Money.CreditCitizen('OFFLINE1', 'bank', 0.5, 'x') == false
+        and env.Money.CreditCitizen('OFFLINE1', 'bank', 5, '') == false and env.Money.CreditCitizen(7, 'bank', 5, 'x') == false,
+        'money: creditCitizen refuses an unknown character, a bad amount, no reason and a non citizenid')
+    check(env.Money.CreditCitizen(player.citizenid, 'bank', 5, 'test:refund') == true and player.money.bank == 100, 'money: creditCitizen pays an online character in memory')
+    player.money.bank = 95
+
     mysql.failTransaction = 'throw'
     local thrown = env.Money.Add(41, 'bank', 10, 'test:throw')
     mysql.failTransaction = false
@@ -5877,6 +5886,8 @@ do
     end
     for name in pairs(env.Config.ItemStatus) do if not defined[name] then problems[#problems + 1] = name .. ' is not in items.lua' end end
     check(#problems == 0, 'status: Config.ItemStatus matches every client.status in ox_inventory items.lua ' .. table.concat(problems, ', '))
+    local S = env.Config.ItemStatus
+    check(S.burgershot_bigking.hunger > S.burger.hunger and S.burgershot_colab.thirst > S.cola.thirst and S.burgershot_bigking.stress < 0, 'status: restaurant food restores more than shop food and carries a small stress relief')
 end
 
 do
@@ -8956,6 +8967,331 @@ do
     check(#cb['som-fire:server:state'](1) == 0, 'fire: stopping the resource clears the fires')
     _G.TriggerClientEvent = function() end
     for k, v in pairs(saved) do _G[k] = v end
+end
+
+-- ---------------------------------------------------------------------------
+-- Player-run restaurants
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    mysql.fakeNow = 2000000
+    local env = loader.loadResource(REPO .. 'som-restaurants', { 'shared/config.lua', 'server/restaurants.lua', 'server/kitchen.lua', 'server/orders.lua' })
+    local cb = RegisteredCallbacks
+    local core = exports['som-core']
+    local C = env.Config
+    local D = mysql.db.restDb
+    D.owner, D.orders, D.nextId, D.balance, D.withdrawAt = nil, {}, 0, 0, nil
+
+    local rest = C.restaurants[1]
+    rest.enabled, rest.coords = false, vec3(0, 0, 0)
+    for _, st in ipairs(rest.stations) do st.coords = vec3(0, 0, 0) end
+    C.supplier.enabled, C.supplier.coords = true, vec3(0, 0, 0)
+    rest.selfServe.coords = vec3(0, 0, 0)
+
+    Mocks.jobs = {
+        unemployed = { defaultDuty = true },
+        burgershot = { defaultDuty = false },
+        police = { defaultDuty = true, whitelisted = true },
+    }
+    local function person(src, cid, job, grade, onduty)
+        return { citizenid = cid, source = src, charinfo = { firstname = 'P' .. src, lastname = 'Q' .. src }, job = { name = job, grade = grade or 0, onduty = onduty ~= false } }
+    end
+    Mocks.players = {
+        [1] = person(1, 'OWN1', 'unemployed'), [2] = person(2, 'CUS2', 'unemployed'),
+        [3] = person(3, 'STF3', 'burgershot', 0, true), [4] = person(4, 'FAR4', 'unemployed'), [5] = person(5, 'COP5', 'police'),
+    }
+    Mocks.inv = { [1] = {}, [2] = {}, [3] = {}, [4] = {}, [5] = {} }
+    FakePeds[1], FakePeds[2], FakePeds[3], FakePeds[4], FakePeds[5] = vec3(0, 0, 0), vec3(1, 0, 0), vec3(1, 1, 0), vec3(500, 0, 0), vec3(0, 1, 0)
+    Mocks.bank = { [1] = 1000000, [2] = 500, [3] = 0, [4] = 100000, [5] = 1000000 }
+    Mocks.treasury, Mocks.credited = 0, {}
+    Mocks.invFull, Mocks.addMoneyFails, Mocks.taxFails, Mocks.creditFails = {}, false, false, false
+
+    -- ox_inventory keeps these as slots; the shared mock removes whatever one stack holds.
+    local function count(src, item) return exports.ox_inventory:Search(src, 'count', item) end
+    function exports.ox_inventory:RemoveItem(inv, item, n)
+        if count(inv, item) < n then return false end
+        local left = n
+        for k, stack in pairs(Mocks.inv[inv]) do
+            if stack.name == item and left > 0 then
+                local take = math.min(stack.count, left)
+                stack.count = stack.count - take
+                left = left - take
+                if stack.count == 0 then Mocks.inv[inv][k] = nil end
+            end
+        end
+        return true
+    end
+    local function give(src, item, n) exports.ox_inventory:AddItem(src, item, n) end
+
+    local saved = { addMoney = core.addMoney, businessTransact = core.businessTransact, json = _G.json }
+    function core:addMoney(source, _, amount)
+        if Mocks.addMoneyFails then return false, 'refused' end
+        Mocks.bank[source] = (Mocks.bank[source] or 0) + amount
+        return true
+    end
+    function core:businessTransact(_, amount)
+        if Mocks.bizFails or D.balance + amount < 0 then return false, 'refused' end
+        D.balance = D.balance + amount
+        return true
+    end
+    -- Orders hold lists of tables, which the shared json mock cannot round trip.
+    local blobs = {}
+    _G.json = { encode = function(v) blobs[#blobs + 1] = v; return 'blob' .. #blobs end, decode = function(t) return blobs[tonumber(tostring(t):match('^blob(%d+)$'))] end }
+    local notes = {}
+    local realT = _G.TriggerClientEvent
+    _G.TriggerClientEvent = function(name, target, ...) notes[#notes + 1] = { name = name, target = target, args = { ... } } end
+
+    -- Ships disabled
+    check(cb['som-restaurants:server:buy'](1, 'burgershot').error == 'not available', 'restaurants: a restaurant that is not switched on cannot be bought')
+    check(cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, { { item = 'bigking', qty = 1 } }).error == 'not available', 'restaurants: an unplaced counter takes no orders')
+    rest.enabled = true
+
+    -- Buying
+    check(cb['som-restaurants:server:buy'](1, 'nope').error == 'not available', 'restaurants: an unknown id is refused')
+    check(cb['som-restaurants:server:buy'](4, 'burgershot').error == 'you are too far away', 'restaurants: buying needs the counter')
+    check(cb['som-restaurants:server:buy'](5, 'burgershot').error == 'leave your current job first', 'restaurants: a whitelisted job is never swapped away')
+    Mocks.bank[1] = 10
+    check(cb['som-restaurants:server:buy'](1, 'burgershot').error == 'not enough in your bank' and D.owner == nil, 'restaurants: without the money nothing is claimed')
+    Mocks.bank[1] = 1000000
+    Mocks.taxFails = true
+    check(cb['som-restaurants:server:buy'](1, 'burgershot').error == 'the sale fell through' and Mocks.bank[1] == 1000000 and D.owner == nil, 'restaurants: a refused payment to the city refunds the buyer and frees it')
+    Mocks.taxFails = false
+    check(cb['som-restaurants:server:buy'](1, 'burgershot').success and D.owner == 'OWN1', 'restaurants: a buyer becomes the owner')
+    check(Mocks.players[1].job.name == 'burgershot' and Mocks.players[1].job.grade == C.manageGrade, 'restaurants: the owner gets the boss grade of the job')
+    check(Mocks.treasury == rest.price and Mocks.bank[1] == 1000000 - rest.price, 'restaurants: the price moves from the buyer to the treasury')
+    check(cb['som-restaurants:server:buy'](2, 'burgershot').error == 'this restaurant is not for sale, or you already own one', 'restaurants: a second buyer loses')
+    Mocks.players[1].job.onduty = true
+
+    -- Hiring and firing
+    check(cb['som-restaurants:server:hire'](3, 'burgershot', 2).error == 'not available', 'restaurants: crew cannot hire')
+    check(cb['som-restaurants:server:hire'](1, 'burgershot', 4).error == 'they need to be next to you', 'restaurants: a hire must be next to the boss')
+    check(cb['som-restaurants:server:hire'](1, 'burgershot', 'x').error == 'there is nobody to hire', 'restaurants: a non number target is refused')
+    notes = {}
+    check(cb['som-restaurants:server:hire'](1, 'burgershot', 2).success, 'restaurants: the boss can offer a job')
+    check(cb['som-restaurants:server:answerHire'](2, 'yes').error == 'not available', 'restaurants: an answer must be a boolean')
+    check(cb['som-restaurants:server:answerHire'](2, true).success and Mocks.players[2].job.name == 'burgershot' and Mocks.players[2].job.grade == 0, 'restaurants: accepting puts them on the job')
+    check(cb['som-restaurants:server:answerHire'](2, true).error == 'that offer is gone', 'restaurants: an offer works once')
+    check(cb['som-restaurants:server:fire'](1, 'burgershot', 1).error == 'they do not work here', 'restaurants: the boss cannot fire themselves')
+    check(cb['som-restaurants:server:fire'](1, 'burgershot', 2).success and Mocks.players[2].job.name == 'unemployed', 'restaurants: the boss lets crew go')
+
+    -- Taking money out
+    D.balance = 5000
+    check(cb['som-restaurants:server:withdraw'](3, 'burgershot', 100).error == 'not available', 'restaurants: crew cannot take money out')
+    check(cb['som-restaurants:server:withdraw'](1, 'burgershot', 99999).error:find('at a time') ~= nil, 'restaurants: a withdrawal has a cap')
+    check(cb['som-restaurants:server:withdraw'](1, 'burgershot', 1.5).error:find('at a time') ~= nil, 'restaurants: a fractional withdrawal is refused')
+    local bankBefore = Mocks.bank[1]
+    check(cb['som-restaurants:server:withdraw'](1, 'burgershot', 1000).success and D.balance == 4000 and Mocks.bank[1] == bankBefore + 1000, 'restaurants: a withdrawal moves account money to the owner')
+    check(cb['som-restaurants:server:withdraw'](1, 'burgershot', 10).error == 'you took money out recently, try again later', 'restaurants: withdrawals have a cooldown')
+    D.withdrawAt = nil
+    D.orders[99] = { id = 99, restaurant_id = 'burgershot', customer_cid = 'X', state = 'paid', total = 3500, items = '', paid_at = mysql.fakeNow, created_at = mysql.fakeNow }
+    check(cb['som-restaurants:server:withdraw'](1, 'burgershot', 1000).error == 'that money is needed for unserved orders', 'restaurants: money owed for unserved orders cannot be withdrawn')
+    D.orders[99] = nil
+
+    -- An owner who quit the job keeps the restaurant and can take their place back
+    D.withdrawAt = nil
+    Mocks.players[1].job = { name = 'unemployed', grade = 0, onduty = true }
+    check(cb['som-restaurants:server:withdraw'](1, 'burgershot', 100).success, 'restaurants: an owner who left the job can still take money out')
+    check(cb['som-restaurants:server:open'](1, 'burgershot').away == true, 'restaurants: the counter tells the owner they are away from the job')
+    Mocks.players[1].job = { name = 'police', grade = 0, onduty = true }
+    check(cb['som-restaurants:server:resume'](1, 'burgershot').error == 'leave your current job first', 'restaurants: resuming never swaps a whitelisted job')
+    Mocks.players[1].job = { name = 'unemployed', grade = 0, onduty = true }
+    check(cb['som-restaurants:server:resume'](3, 'burgershot').error == 'not available', 'restaurants: only the owner can resume')
+    check(cb['som-restaurants:server:resume'](1, 'burgershot').success and Mocks.players[1].job.name == 'burgershot' and Mocks.players[1].job.grade == C.manageGrade, 'restaurants: the owner goes back to the boss grade')
+    Mocks.players[1].job.onduty = true
+    D.balance = D.balance - 100
+
+    -- Supplier
+    local treasury0 = Mocks.treasury
+    D.balance = 1000
+    check(cb['som-restaurants:server:supplier'](2, 'burgershot', 'burgershot_bread', 2).error == 'not available', 'supplier: only staff on duty can buy')
+    Mocks.players[3].job.onduty = false
+    check(cb['som-restaurants:server:supplier'](3, 'burgershot', 'burgershot_bread', 2).error == 'not available', 'supplier: staff off duty cannot buy')
+    Mocks.players[3].job.onduty = true
+    check(cb['som-restaurants:server:supplier'](3, 'burgershot', 'sprunk', 2).error == 'bad request', 'supplier: an item the wholesaler does not sell is refused')
+    check(cb['som-restaurants:server:supplier'](3, 'burgershot', 'burgershot_bread', 2.5).error == 'bad request', 'supplier: a fractional quantity is refused')
+    check(cb['som-restaurants:server:supplier'](3, 'burgershot', 'burgershot_bread', 999).error == 'bad request', 'supplier: an oversized quantity is refused')
+    check(cb['som-restaurants:server:supplier'](3, 'burgershot', 'burgershot_bread', 4).success, 'supplier: staff can buy ingredients')
+    check(D.balance == 1000 - 8 and Mocks.treasury == treasury0 + 8 and count(3, 'burgershot_bread') == 4, 'supplier: the restaurant account pays the city and the goods arrive')
+    Mocks.invFull[3] = true
+    check(cb['som-restaurants:server:supplier'](3, 'burgershot', 'burgershot_bread', 1).error == 'you cannot carry that' and D.balance == 992, 'supplier: a full bag buys nothing')
+    Mocks.invFull[3] = nil
+    Mocks.taxFails = true
+    check(cb['som-restaurants:server:supplier'](3, 'burgershot', 'burgershot_bread', 1).error == 'the supplier could not take the payment' and D.balance == 992, 'supplier: a refused payment puts the money back in the account')
+    Mocks.taxFails = false
+    D.balance = 1
+    check(cb['som-restaurants:server:supplier'](3, 'burgershot', 'burgershot_frozenmeat', 1).error == 'the restaurant account cannot pay for that' and count(3, 'burgershot_frozenmeat') == 0, 'supplier: an account that cannot pay buys nothing')
+    D.balance = 0
+
+    -- Cooking
+    Mocks.inv[3] = {}
+    check(cb['som-restaurants:server:cookStart'](3, 'burgershot', 'prep', 'thaw').error == 'you are missing ingredients', 'cook: a step without its ingredients does not start')
+    give(3, 'burgershot_frozenmeat', 1)
+    check(cb['som-restaurants:server:cookStart'](3, 'burgershot', 'grill', 'thaw').error == 'bad request', 'cook: a recipe belongs to its own station')
+    check(cb['som-restaurants:server:cookStart'](3, 'burgershot', 'prep', 'nope').error == 'bad request', 'cook: an unknown recipe is refused')
+    check(cb['som-restaurants:server:cookStart'](2, 'burgershot', 'prep', 'thaw').error == 'not available', 'cook: only staff on duty cook')
+    check(cb['som-restaurants:server:cookFinish'](3).error == 'you were not cooking', 'cook: a finish without a start does nothing')
+    check(cb['som-restaurants:server:cookStart'](3, 'burgershot', 'prep', 'thaw').success, 'cook: a step starts with its ingredients')
+    check(cb['som-restaurants:server:cookStart'](3, 'burgershot', 'prep', 'thaw').error == 'you are already cooking', 'cook: one step at a time')
+    Mocks.clock = Mocks.clock + C.recipes.thaw.duration + 31000
+    check(cb['som-restaurants:server:cookStart'](3, 'burgershot', 'prep', 'thaw').success, 'cook: a run whose finish never came expires instead of blocking the cook')
+    Mocks.clock = Mocks.clock + 1000
+    check(cb['som-restaurants:server:cookFinish'](3).error == 'that was not finished yet' and count(3, 'burgershot_frozenmeat') == 1 and count(3, 'burgershot_meat') == 0, 'cook: an early finish takes nothing and gives nothing')
+    cb['som-restaurants:server:cookStart'](3, 'burgershot', 'prep', 'thaw')
+    Mocks.clock = Mocks.clock + 5000
+    local realAdd = exports.ox_inventory.AddItem
+    function exports.ox_inventory:AddItem(inv, item, n, md) if Mocks.failOutput == item then return false end return realAdd(self, inv, item, n, md) end
+    Mocks.failOutput = 'burgershot_meat'
+    check(cb['som-restaurants:server:cookFinish'](3).error == 'you cannot carry that' and count(3, 'burgershot_frozenmeat') == 1 and count(3, 'burgershot_meat') == 0, 'cook: a failed handover puts the ingredients back')
+    Mocks.failOutput = nil
+    cb['som-restaurants:server:cookStart'](3, 'burgershot', 'prep', 'thaw')
+    Mocks.clock = Mocks.clock + 5000
+    check(cb['som-restaurants:server:cookFinish'](3).success and count(3, 'burgershot_frozenmeat') == 0 and count(3, 'burgershot_meat') == 2, 'cook: a full step turns the input into exactly its output')
+    check(cb['som-restaurants:server:cookFinish'](3).error == 'you were not cooking', 'cook: a step finishes once')
+    give(3, 'burgershot_meat', 0)
+    cb['som-restaurants:server:cookStart'](3, 'burgershot', 'grill', 'patty')
+    Mocks.inv[3] = {}
+    Mocks.clock = Mocks.clock + 9000
+    check(cb['som-restaurants:server:cookFinish'](3).error == 'you are missing ingredients' and count(3, 'burgershot_patty') == 0, 'cook: ingredients dropped meanwhile give no dish')
+    -- assemble a Big King: partial ingredient removal is undone when a later one is missing
+    give(3, 'burgershot_patty', 2); give(3, 'burgershot_bread', 1); give(3, 'burgershot_tomato', 1); give(3, 'burgershot_cheddar', 1); give(3, 'burgershot_sauce', 1)
+    cb['som-restaurants:server:cookStart'](3, 'burgershot', 'assemble', 'bigking')
+    Mocks.clock = Mocks.clock + 7000
+    check(cb['som-restaurants:server:cookFinish'](3).success and count(3, 'burgershot_bigking') == 1 and count(3, 'burgershot_patty') == 0, 'cook: assembling consumes every part and yields the dish')
+
+    -- Orders
+    Mocks.bank[2] = 500
+    D.balance = 0
+    local lines = { { item = 'bigking', qty = 2, price = 1 }, { item = 'colab', qty = 1 } }
+    check(cb['som-restaurants:server:orderCreate'](2, 'burgershot', 2, lines).error == 'not available', 'order: a customer cannot make their own order')
+    check(cb['som-restaurants:server:orderCreate'](3, 'burgershot', 4, lines).error == 'the customer needs to be at the counter', 'order: the customer must be at the counter')
+    check(cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, { { item = 'sprunk', qty = 1 } }).error == 'bad order', 'order: an item off the menu is refused')
+    check(cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, { { item = 'bigking', qty = 9 } }).error == 'bad order', 'order: a quantity over the cap is refused')
+    check(cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, { { item = 'bigking', qty = 1 }, { item = 'bigking', qty = 1 } }).error == 'bad order', 'order: a repeated line is refused')
+    check(cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, {}).error == 'bad order', 'order: an empty order is refused')
+    local made = cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, lines)
+    check(made.success and made.total == 2 * C.menu.bigking.price + C.menu.colab.price, 'order: the total comes from the menu, not from anything the client sent')
+    check(cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, lines).error == 'they already have an order waiting', 'order: one open offer per customer')
+    check(cb['som-restaurants:server:orderPay'](1, made.orderId).error == 'that order is gone', 'order: only the named customer can pay it')
+    check(cb['som-restaurants:server:orderPay'](2, 'x').error == 'not available', 'order: a non number order id is refused')
+
+    Mocks.bank[2] = 10
+    check(cb['som-restaurants:server:orderPay'](2, made.orderId).error == 'not enough in your bank' and D.orders[made.orderId].state == 'cancelled' and D.balance == 0, 'order: a customer who cannot pay cancels it with nothing moved')
+    Mocks.bank[2] = 500
+    made = cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, lines)
+    Mocks.bizFails = true
+    check(cb['som-restaurants:server:orderPay'](2, made.orderId).error == 'the restaurant could not take the payment' and Mocks.bank[2] == 500 and D.orders[made.orderId].state == 'cancelled', 'order: a failed credit to the restaurant refunds the customer')
+    Mocks.bizFails = false
+    made = cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, lines)
+    mysql.fakeNow = mysql.fakeNow + C.offerSeconds + 1
+    check(cb['som-restaurants:server:orderPay'](2, made.orderId).error == 'that order is gone' and Mocks.bank[2] == 500, 'order: an offer that waited too long cannot be paid')
+    made = cb['som-restaurants:server:orderCreate'](3, 'burgershot', 2, lines)
+    Mocks.players[3].job.onduty, Mocks.players[1].job.onduty = false, false
+    check(cb['som-restaurants:server:orderPay'](2, made.orderId).error == 'nobody is on duty to make that' and Mocks.bank[2] == 500, 'order: nobody pays a restaurant with nobody working')
+    Mocks.players[3].job.onduty, Mocks.players[1].job.onduty = true, true
+    notes = {}
+    check(cb['som-restaurants:server:orderPay'](2, made.orderId).success, 'order: the customer accepts and pays')
+    check(Mocks.bank[2] == 500 - made.total and D.balance == made.total and D.orders[made.orderId].state == 'paid', 'order: the debit and the credit are the same amount')
+    check(cb['som-restaurants:server:orderPay'](2, made.orderId).error == 'that order is gone' and Mocks.bank[2] == 500 - made.total, 'order: a second payment of the same order moves nothing')
+    local ticket
+    for _, n in ipairs(notes) do if n.name == 'som-restaurants:client:ticket' then ticket = n end end
+    check(ticket and ticket.target == 3, 'order: the kitchen gets a ticket')
+    local staffView, guestView = cb['som-restaurants:server:open'](3, 'burgershot'), cb['som-restaurants:server:open'](2, 'burgershot')
+    check(staffView and #staffView.queue == 1 and guestView and guestView.queue == nil, 'order: the ticket queue is shown to staff only')
+
+    -- Serving
+    local treasury1 = Mocks.treasury
+    check(cb['som-restaurants:server:orderServe'](3, 'burgershot', made.orderId).error == 'you do not have everything for that order', 'serve: the cook needs every item')
+    give(3, 'burgershot_bigking', 1); give(3, 'burgershot_colab', 1)
+    FakePeds[2] = vec3(500, 0, 0)
+    check(cb['som-restaurants:server:orderServe'](3, 'burgershot', made.orderId).error == 'the customer is not at the counter', 'serve: the customer must be there')
+    FakePeds[2] = vec3(1, 0, 0)
+    Mocks.invFull[2] = true
+    check(cb['som-restaurants:server:orderServe'](3, 'burgershot', made.orderId).error == 'they cannot carry all that' and D.orders[made.orderId].state == 'paid' and count(3, 'burgershot_bigking') == 2, 'serve: a customer who cannot carry it leaves the order open and the food with the cook')
+    Mocks.invFull[2] = nil
+    check(cb['som-restaurants:server:orderServe'](3, 'burgershot', made.orderId).success, 'serve: the cook hands it over')
+    check(count(2, 'burgershot_bigking') == 2 and count(2, 'burgershot_colab') == 1 and count(3, 'burgershot_bigking') == 0, 'serve: the customer gets exactly the order')
+    check(D.orders[made.orderId].state == 'served' and Mocks.treasury == treasury1 + math.floor(made.total * C.taxRate) and D.balance == made.total - math.floor(made.total * C.taxRate), 'serve: the city share leaves the account when the food is handed over')
+    check(cb['som-restaurants:server:orderServe'](3, 'burgershot', made.orderId).error == 'that order is gone', 'serve: an order is served once')
+
+    -- Orders nobody serves are refunded; serve and refund race on one claim
+    Mocks.bank[2] = 500
+    D.balance = 0
+    local function paidOrder(customerSrc, total)
+        mysql.fakeNow = mysql.fakeNow + 100
+        D.balance = D.balance + total
+        D.nextId = D.nextId + 1
+        D.orders[D.nextId] = { id = D.nextId, restaurant_id = 'burgershot', cashier_cid = 'STF3', customer_cid = Mocks.players[customerSrc] and Mocks.players[customerSrc].citizenid or 'GONE9', items = json.encode({ { item = 'bleeder', qty = 1 } }), total = total, state = 'paid', created_at = mysql.fakeNow, paid_at = mysql.fakeNow }
+        return D.nextId
+    end
+    local o1 = paidOrder(2, 20)
+    env.Orders.RefundTick()
+    check(D.orders[o1].state == 'paid' and Mocks.credited.CUS2 == nil, 'refund: an order inside the window is left alone')
+    mysql.fakeNow = mysql.fakeNow + C.serveWindowMinutes * 60 + 1
+    notes = {}
+    env.Orders.RefundTick()
+    check(D.orders[o1].state == 'refunded' and Mocks.credited.CUS2 == 20 and D.balance == 0, 'refund: an unserved order goes back from the account to the customer')
+    check(cb['som-restaurants:server:orderServe'](3, 'burgershot', o1).error == 'that order is gone', 'refund: a refunded order cannot be served afterwards')
+    env.Orders.RefundTick()
+    check(Mocks.credited.CUS2 == 20, 'refund: an order is refunded once')
+
+    local o2 = paidOrder(2, 20)
+    give(3, 'burgershot_bleeder', 1)
+    check(cb['som-restaurants:server:orderServe'](3, 'burgershot', o2).success, 'race: serve wins an order that is still paid')
+    mysql.fakeNow = mysql.fakeNow + C.serveWindowMinutes * 60 + 1
+    check(env.Orders.Refund({ id = o2, restaurant_id = 'burgershot', customer_cid = 'CUS2', total = 20 }) == false and Mocks.credited.CUS2 == 20, 'race: refund loses to a serve, nothing is paid back')
+
+    local o3 = paidOrder(2, 20)
+    mysql.fakeNow = mysql.fakeNow + C.serveWindowMinutes * 60 + 1
+    check(env.Orders.Refund({ id = o3, restaurant_id = 'burgershot', customer_cid = 'CUS2', total = 20 }) == true, 'race: refund wins an expired paid order')
+    give(3, 'burgershot_bleeder', 1)
+    check(cb['som-restaurants:server:orderServe'](3, 'burgershot', o3).error == 'that order is gone' and count(3, 'burgershot_bleeder') == 1 and Mocks.credited.CUS2 == 40, 'race: serve loses to a refund, the food stays and the customer is paid once')
+
+    local o4 = paidOrder(0, 30)
+    mysql.fakeNow = mysql.fakeNow + C.serveWindowMinutes * 60 + 1
+    env.Orders.RefundTick()
+    check(D.orders[o4].state == 'refunded' and Mocks.credited.GONE9 == 30, 'refund: a customer who is offline is refunded too')
+
+    local o5 = paidOrder(2, 50)
+    D.balance = 10
+    mysql.fakeNow = mysql.fakeNow + C.serveWindowMinutes * 60 + 1
+    env.Orders.RefundTick()
+    check(D.orders[o5].state == 'paid' and D.balance == 10 and (Mocks.credited.CUS2 or 0) == 40, 'refund: an account that cannot cover it leaves the order paid for a retry')
+    D.balance = 50
+    Mocks.creditFails = true
+    env.Orders.RefundTick()
+    check(D.orders[o5].state == 'paid' and D.balance == 50, 'refund: a failed credit puts the money back in the account and keeps the order paid')
+    Mocks.creditFails = false
+    env.Orders.RefundTick()
+    check(D.orders[o5].state == 'refunded' and D.balance == 0 and Mocks.credited.CUS2 == 90, 'refund: the retry pays the customer')
+
+    -- Self-serve
+    Mocks.bank[2] = 500
+    check(cb['som-restaurants:server:selfServe'](2, 'burgershot', 'burger', 1).error == 'the kitchen is open, order at the counter', 'selfserve: closed while staff are on duty')
+    local open = cb['som-restaurants:server:open'](2, 'burgershot')
+    check(open and open.fallback == nil, 'selfserve: the counter shows no machine while staffed')
+    Mocks.players[3].job.onduty = false
+    Mocks.players[1].job.onduty = false
+    open = cb['som-restaurants:server:open'](2, 'burgershot')
+    check(open and open.fallback ~= nil, 'selfserve: the machine appears once nobody is on duty')
+    check(cb['som-restaurants:server:selfServe'](2, 'burgershot', 'bigking', 1).error == 'bad request', 'selfserve: only the plain goods are sold')
+    check(cb['som-restaurants:server:selfServe'](2, 'burgershot', 'burger', 0).error == 'bad request', 'selfserve: a zero quantity is refused')
+    local t2, b2 = Mocks.treasury, D.balance
+    check(cb['som-restaurants:server:selfServe'](2, 'burgershot', 'burger', 2).success, 'selfserve: a customer can buy when nobody works')
+    check(Mocks.bank[2] == 500 - 2 * C.fallback.goods.burger.price and Mocks.treasury == t2 + 2 * C.fallback.goods.burger.price and D.balance == b2 and count(2, 'burger') == 2, 'selfserve: the city gets the money, not the restaurant')
+    Mocks.taxFails = true
+    check(cb['som-restaurants:server:selfServe'](2, 'burgershot', 'cola', 1).error == 'the machine would not take it' and Mocks.bank[2] == 500 - 2 * C.fallback.goods.burger.price, 'selfserve: a refused payment refunds the customer')
+    Mocks.taxFails = false
+    Mocks.invFull[2] = true
+    local bank2 = Mocks.bank[2]
+    check(cb['som-restaurants:server:selfServe'](2, 'burgershot', 'cola', 1).error == 'you cannot carry that' and Mocks.bank[2] == bank2, 'selfserve: a full bag buys nothing')
+    Mocks.invFull[2] = nil
+
+    _G.json = saved.json
+    exports.ox_inventory.AddItem = realAdd
+    _G.TriggerClientEvent = realT
+    core.addMoney, core.businessTransact = saved.addMoney, saved.businessTransact
+    Mocks.jobs, Mocks.credited, Mocks.invFull, Mocks.taxFails, Mocks.creditFails, Mocks.bizFails = nil, nil, {}, false, false, false
 end
 
 print(('%d passed, %d failed'):format(results.pass, results.fail))
