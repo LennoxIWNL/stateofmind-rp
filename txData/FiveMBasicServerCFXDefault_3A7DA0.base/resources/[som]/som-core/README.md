@@ -49,6 +49,13 @@ core:hasPermission(source, 'som.admin')
 core:getPermissionTier(source)
 ```
 
+### Game clock
+
+```lua
+local hour, minute = core:getGameTime()   -- server owned, from os.time and Config.Clock
+local hour = core:getGameHour()
+```
+
 ### Money
 
 ```lua

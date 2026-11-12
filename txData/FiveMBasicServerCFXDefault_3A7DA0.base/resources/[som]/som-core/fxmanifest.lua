@@ -11,6 +11,7 @@ shared_scripts {
     '@ox_lib/init.lua',
     'shared/trace.lua',
     'shared/config.lua',
+    'shared/clock.lua',
     'shared/tiers.lua',
     'shared/jobs.lua',
     'shared/gangs.lua',
@@ -18,6 +19,7 @@ shared_scripts {
 
 client_scripts {
     'client/main.lua',
+    'client/clock.lua',
 }
 
 server_scripts {
@@ -28,6 +30,7 @@ server_scripts {
     'server/money.lua',
     'server/characters.lua',
     'server/main.lua',
+    'server/clock.lua',
 }
 
 dependencies {
