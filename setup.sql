@@ -2078,3 +2078,25 @@ CREATE TABLE IF NOT EXISTS `som_boost_runs` (
   KEY `idx_pickup` (`pickup`, `created_at`),
   KEY `idx_class` (`class`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Tow tickets (som-tow). The state is the lock: a driver takes an open ticket with one conditional UPDATE,
+-- and delivery closes a claimed one. Times come from the database clock.
+CREATE TABLE IF NOT EXISTS `som_tow_tickets` (
+  `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `plate`        VARCHAR(12) NOT NULL,
+  `reason`       TINYINT UNSIGNED NOT NULL,
+  `requested_by` VARCHAR(16) NOT NULL,
+  `x`            FLOAT NOT NULL DEFAULT 0,
+  `y`            FLOAT NOT NULL DEFAULT 0,
+  `z`            FLOAT NOT NULL DEFAULT 0,
+  `driver`       VARCHAR(16) DEFAULT NULL,
+  `state`        ENUM('open','claimed','done','cancelled') NOT NULL DEFAULT 'open',
+  `paid`         BIGINT NOT NULL DEFAULT 0,
+  `created_at`   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `claimed_at`   TIMESTAMP NULL DEFAULT NULL,
+  `done_at`      TIMESTAMP NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_state` (`state`, `created_at`),
+  KEY `idx_plate` (`plate`, `state`),
+  KEY `idx_driver` (`driver`, `state`, `done_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

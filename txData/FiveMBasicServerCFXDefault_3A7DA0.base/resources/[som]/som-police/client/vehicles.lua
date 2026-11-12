@@ -100,40 +100,54 @@ CreateThread(function()
                 local netId = netIdOf(data.entity)
                 if not netId then return end
 
-                local options = {}
-                for index, reason in ipairs(Config.Impound.reasons) do
-                    options[#options + 1] = {
-                        title = reason,
-                        icon = 'truck-ramp-box',
-                        onSelect = function()
-                            local ok = lib.progressBar({
-                                duration = 5000,
-                                label = 'Arranging a tow',
-                                canCancel = true,
-                                disable = { move = true, combat = true },
-                            })
+                local function pickReason(tow)
+                    local options = {}
+                    for index, reason in ipairs(Config.Impound.reasons) do
+                        options[#options + 1] = {
+                            title = reason,
+                            icon = 'truck-ramp-box',
+                            onSelect = function()
+                                local ok = lib.progressBar({
+                                    duration = 5000,
+                                    label = 'Arranging a tow',
+                                    canCancel = true,
+                                    disable = { move = true, combat = true },
+                                })
 
-                            if not ok then return end
+                                if not ok then return end
 
-                            local res = lib.callback.await('som-police:server:impound', false, {
-                                netId = netId, reason = index,
-                            })
+                                local res = lib.callback.await('som-police:server:impound', false, {
+                                    netId = netId, reason = index, tow = tow,
+                                })
 
-                            if not handle(res) then return end
+                                if not handle(res) then return end
 
-                            TriggerEvent('som:client:notify',
-                                ('%s impounded'):format(res.plate), 'success')
-                        end,
-                    }
+                                TriggerEvent('som:client:notify',
+                                    res.towed and ('Tow requested for %s'):format(res.plate)
+                                        or ('%s impounded'):format(res.plate), 'success')
+                            end,
+                        }
+                    end
+
+                    lib.registerContext({
+                        id = 'som_police_impound_reason',
+                        title = 'Reason for impound',
+                        options = options,
+                    })
+
+                    lib.showContext('som_police_impound_reason')
                 end
 
                 lib.registerContext({
-                    id = 'som_police_impound_reason',
-                    title = 'Reason for impound',
-                    options = options,
+                    id = 'som_police_impound_mode',
+                    title = 'Impound',
+                    options = {
+                        { title = 'Ask for a tow truck', description = 'A tow driver on duty collects it. Impounded at once if nobody is on.', icon = 'truck-ramp-box', onSelect = function() pickReason(true) end },
+                        { title = 'Impound now', icon = 'ban', onSelect = function() pickReason(false) end },
+                    },
                 })
 
-                lib.showContext('som_police_impound_reason')
+                lib.showContext('som_police_impound_mode')
             end,
         },
     })
