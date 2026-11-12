@@ -71,17 +71,22 @@ AddEventHandler('som:server:playerUnloaded', function(source, citizenid)
 
     local at = os.time()
     if lastRow[citizenid] and at - lastRow[citizenid] < C.cooldown then return end
-    lastRow[citizenid] = at
 
     local where = pos and ('%d,%d,%d'):format(pos.x, pos.y, pos.z) or 'unknown'
     CreateThread(function()
         Wait(0)
         local detail = ('%s | %s %s | %s'):format(table.concat(found, ','), live and 'live' or 'saved', where, clean(reasons[source]))
-        MySQL.insert.await('INSERT INTO som_staff_audit (staff, action, target, detail) VALUES (?, ?, ?, ?)', { 'system', 'combatlog', citizenid, detail:sub(1, 200) })
+        local saved, id = pcall(MySQL.insert.await, 'INSERT INTO som_staff_audit (staff, action, target, detail) VALUES (?, ?, ?, ?)', { 'system', 'combatlog', citizenid, detail:sub(1, 200) })
+        if saved and id then
+            lastRow[citizenid] = at
+        else
+            print(('[som-staff] combat log row for %s was not saved: %s'):format(citizenid, saved and 'no row id' or tostring(id)))
+        end
 
         local url = GetConvar('som_combatlog_webhook', '')
         if url == '' then return end
-        local count = MySQL.scalar.await("SELECT COUNT(*) FROM som_staff_audit WHERE action = 'combatlog' AND target = ? AND created_at > NOW() - INTERVAL 24 HOUR", { citizenid }) or 1
+        local counted, count = pcall(MySQL.scalar.await, "SELECT COUNT(*) FROM som_staff_audit WHERE action = 'combatlog' AND target = ? AND created_at > NOW() - INTERVAL 24 HOUR", { citizenid })
+        if not counted or not count then count = 1 end
         local text = ('Combat log: %s | %s | %s%s'):format(citizenid, table.concat(found, ','), where, count >= C.repeatCount and (' | repeat x%d'):format(count) or '')
         PerformHttpRequest(url, function() end, 'POST', json.encode({ content = text }), { ['Content-Type'] = 'application/json' })
     end)

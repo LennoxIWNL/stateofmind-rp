@@ -29,7 +29,7 @@ end
 local function totals(minutes)
     local out = { faucet = 0, sink = 0 }
     local rows = MySQL.query.await(
-        "SELECT flow, COALESCE(SUM(amount), 0) AS total FROM som_transactions WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE) AND flow IN ('faucet', 'sink') GROUP BY flow",
+        "SELECT flow, COALESCE(SUM(amount), 0) AS total FROM som_transactions WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE) AND citizenid IS NOT NULL AND flow IN ('faucet', 'sink') GROUP BY flow",
         { minutes }) or {}
     for _, row in ipairs(rows) do out[row.flow] = num(row.total) end
     return out
@@ -38,24 +38,35 @@ end
 local function sources(minutes, flow)
     local parts = {}
     local rows = MySQL.query.await(
-        "SELECT SUBSTRING_INDEX(reason, ':', 1) AS reason, COALESCE(SUM(amount), 0) AS total FROM som_transactions WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE) AND flow = ? GROUP BY SUBSTRING_INDEX(reason, ':', 1) ORDER BY total DESC LIMIT ?",
+        "SELECT SUBSTRING_INDEX(reason, ':', 1) AS reason, COALESCE(SUM(amount), 0) AS total FROM som_transactions WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE) AND citizenid IS NOT NULL AND flow = ? GROUP BY SUBSTRING_INDEX(reason, ':', 1) ORDER BY total DESC LIMIT ?",
         { minutes, flow, Config.Watch.top }) or {}
     for _, row in ipairs(rows) do parts[#parts + 1] = ('%s %d'):format(plain(row.reason), num(row.total)) end
     return #parts > 0 and table.concat(parts, ', ') or 'none'
 end
 
----Characters who took in at least `least` through `flow` in the window, biggest first.
+---Characters who took in at least `least` through `flow` in the window, biggest first, with the reason that paid most.
+---Two bounded queries: the top `limit` totals, then the reasons of just those characters.
 local function earners(minutes, flow, least, limit)
-    local out = {}
-    local rows = MySQL.query.await(
+    local out, byCitizen, marks = {}, {}, {}
+    local top = MySQL.query.await(
         "SELECT citizenid, COALESCE(SUM(amount), 0) AS total FROM som_transactions WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE) AND citizenid IS NOT NULL AND flow = ? AND direction = 'credit' GROUP BY citizenid HAVING total >= ? ORDER BY total DESC LIMIT ?",
         { minutes, flow, least, limit }) or {}
+    if #top == 0 then return out end
 
-    for _, row in ipairs(rows) do
-        local top = MySQL.single.await(
-            "SELECT SUBSTRING_INDEX(reason, ':', 1) AS reason FROM som_transactions WHERE citizenid = ? AND flow = ? AND direction = 'credit' AND created_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE) GROUP BY SUBSTRING_INDEX(reason, ':', 1) ORDER BY SUM(amount) DESC LIMIT 1",
-            { row.citizenid, flow, minutes })
-        out[#out + 1] = { citizenid = plain(row.citizenid), total = num(row.total), reason = plain(top and top.reason) }
+    local params = { minutes, flow }
+    for _, row in ipairs(top) do
+        local e = { citizenid = plain(row.citizenid), total = num(row.total), best = -1 }
+        out[#out + 1], byCitizen[row.citizenid] = e, e
+        marks[#marks + 1] = '?'
+        params[#params + 1] = row.citizenid
+    end
+
+    local parts = MySQL.query.await(
+        "SELECT citizenid, SUBSTRING_INDEX(reason, ':', 1) AS reason, COALESCE(SUM(amount), 0) AS total FROM som_transactions WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE) AND flow = ? AND direction = 'credit' AND citizenid IN (" .. table.concat(marks, ', ') .. ") GROUP BY citizenid, SUBSTRING_INDEX(reason, ':', 1)",
+        params) or {}
+    for _, row in ipairs(parts) do
+        local e, part = byCitizen[row.citizenid], num(row.total)
+        if e and part > e.best then e.best, e.reason = part, plain(row.reason) end
     end
     return out
 end

@@ -652,47 +652,52 @@ local function economyWatch(kind, query, params)
     local function prefix(reason) return reason:match('^[^:]*') end
     local function inWindow(row, minutes) return row.ts >= now() - minutes * 60 end
 
-    if kind == 'query' and has('SELECT flow, COALESCE(SUM(amount), 0) AS total FROM som_transactions') then
+    if kind == 'query' and has("AND citizenid IS NOT NULL AND flow IN ('faucet', 'sink') GROUP BY flow") then
         local sums = {}
         for _, r in ipairs(L) do
-            if inWindow(r, params[1]) and (r.flow == 'faucet' or r.flow == 'sink') then sums[r.flow] = (sums[r.flow] or 0) + r.amount end
+            if inWindow(r, params[1]) and r.citizenid and (r.flow == 'faucet' or r.flow == 'sink') then sums[r.flow] = (sums[r.flow] or 0) + r.amount end
         end
         local out = {}
         for flow, total in pairs(sums) do out[#out + 1] = { flow = flow, total = tostring(total) } end
         return true, out
-    elseif kind == 'query' and has("SELECT SUBSTRING_INDEX(reason, ':', 1) AS reason, COALESCE(SUM(amount), 0) AS total") then
+    elseif kind == 'query' and has("AND citizenid IS NOT NULL AND flow = ? GROUP BY SUBSTRING_INDEX(reason, ':', 1) ORDER BY total DESC LIMIT ?") then
         local sums = {}
         for _, r in ipairs(L) do
-            if inWindow(r, params[1]) and r.flow == params[2] then sums[prefix(r.reason)] = (sums[prefix(r.reason)] or 0) + r.amount end
+            if inWindow(r, params[1]) and r.citizenid and r.flow == params[2] then sums[prefix(r.reason)] = (sums[prefix(r.reason)] or 0) + r.amount end
         end
         local out = {}
         for reason, total in pairs(sums) do out[#out + 1] = { reason = reason, total = tostring(total) } end
         table.sort(out, function(a, b) return tonumber(a.total) > tonumber(b.total) end)
         while #out > params[3] do table.remove(out) end
         return true, out
-    elseif kind == 'query' and has('SELECT citizenid, COALESCE(SUM(amount), 0) AS total FROM som_transactions') then
-        local sums = {}
+    elseif kind == 'query' and has("AND direction = 'credit' GROUP BY citizenid HAVING total >= ? ORDER BY total DESC LIMIT ?") then
+        local sums, out = {}, {}
         for _, r in ipairs(L) do
             if inWindow(r, params[1]) and r.citizenid and r.flow == params[2] and r.direction == 'credit' then
                 sums[r.citizenid] = (sums[r.citizenid] or 0) + r.amount
             end
         end
-        local out = {}
         for cid, total in pairs(sums) do
             if total >= params[3] then out[#out + 1] = { citizenid = cid, total = tostring(total) } end
         end
-        table.sort(out, function(a, b) return tonumber(a.total) > tonumber(b.total) end)
+        table.sort(out, function(a, b) if tonumber(a.total) ~= tonumber(b.total) then return tonumber(a.total) > tonumber(b.total) end return a.citizenid < b.citizenid end)
         while #out > params[4] do table.remove(out) end
+        M.watchEarnerQueries = (M.watchEarnerQueries or 0) + 1
         return true, out
-    elseif kind == 'single' and has("SELECT SUBSTRING_INDEX(reason, ':', 1) AS reason FROM som_transactions WHERE citizenid = ?") then
-        local sums, best = {}, nil
+    elseif kind == 'query' and has("AND citizenid IN (") and has("GROUP BY citizenid, SUBSTRING_INDEX(reason, ':', 1)") then
+        local wanted = {}
+        for i = 3, #params do wanted[params[i]] = true end
+        local sums, out = {}, {}
         for _, r in ipairs(L) do
-            if r.citizenid == params[1] and r.flow == params[2] and r.direction == 'credit' and inWindow(r, params[3]) then
-                sums[prefix(r.reason)] = (sums[prefix(r.reason)] or 0) + r.amount
-                if not best or sums[prefix(r.reason)] > sums[best] then best = prefix(r.reason) end
+            if inWindow(r, params[1]) and wanted[r.citizenid] and r.flow == params[2] and r.direction == 'credit' then
+                local key = r.citizenid .. '|' .. prefix(r.reason)
+                if not sums[key] then sums[key] = { citizenid = r.citizenid, reason = prefix(r.reason), total = 0 }; out[#out + 1] = sums[key] end
+                sums[key].total = sums[key].total + r.amount
             end
         end
-        return true, best and { reason = best } or nil
+        for _, e in ipairs(out) do e.total = tostring(e.total) end
+        M.watchEarnerQueries = (M.watchEarnerQueries or 0) + 1
+        return true, out
     elseif kind == 'single' and has('SELECT citizenid, amount, reason FROM som_transactions WHERE created_at') then
         local best
         for _, r in ipairs(L) do
@@ -794,7 +799,8 @@ local function towDb(kind, query, params)
     elseif kind == 'update' and has('UPDATE som_vehicles SET state = ?, garage = ? WHERE id = ?') then
         for _, v in ipairs(D.vehicles) do if v.id == params[3] then v.state, v.garage = params[1], params[2] end end
         return true, 1
-    elseif kind == 'insert' and has('INSERT INTO som_police_impound (plate, citizenid, officer_cid, reason, fee)') then
+    elseif kind == 'insert' and has('WHERE NOT EXISTS (SELECT 1 FROM som_police_impound WHERE plate = ? AND released_at IS NULL)') then
+        for _, i in ipairs(D.impounds) do if i.plate == params[6] and not i.released_at then return true, 0 end end
         D.impounds[#D.impounds + 1] = { plate = params[1], citizenid = params[2], officer_cid = params[3], reason = params[4], fee = params[5] }
         return true, #D.impounds
     end

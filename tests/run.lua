@@ -9070,6 +9070,28 @@ do
 
     cid = scene()
     Mocks.downed[cid] = true
+    n = #rows()
+    local realInsert = _G.MySQL.insert.await
+    _G.MySQL.insert.await = function() return nil end
+    drop(cid, 'a')
+    _G.MySQL.insert.await = realInsert
+    drop(cid, 'b')
+    check(#rows() == n + 1, 'combat log: a failed insert does not mute the character for the cooldown')
+
+    cid = scene()
+    Mocks.downed[cid] = true
+    Mocks.convars.som_combatlog_webhook = 'https://example.invalid/hook'
+    _G.MySQL.insert.await = function() error('db down') end
+    local realPrintCl = _G.print
+    local saidFailure = false
+    _G.print = function(text) if tostring(text):find('was not saved', 1, true) then saidFailure = true end end
+    drop(cid, 'a')
+    _G.print = realPrintCl
+    _G.MySQL.insert.await = realInsert
+    check(#posted == 1 and posted[1].body:find(cid, 1, true) and saidFailure, 'combat log: when the row cannot be saved the webhook still posts and the failure is printed')
+
+    cid = scene()
+    Mocks.downed[cid] = true
     drop(cid, 'ok\1\2' .. string.rep('x', 300))
     local d = rows()[#rows()].detail
     check(#d <= 200 and not d:find('[%c]'), 'combat log: reason text is cleaned and cut')
@@ -9188,6 +9210,21 @@ do
     check(text:find('top earners: E1 75000 (paycheck), E2 20000 (news)', 1, true) and text:find('treasury 100000', 1, true), 'watch: the digest lists the top earners and the treasury')
     check(not text:find('shop:purchase', 1, true) and not text:find('license', 1, true), 'watch: nothing beyond citizenids, amounts and reasons is in the digest')
     check(env.Watch.Digest(1):find('top earners: E1 75000', 1, true), 'watch: the digest window is the hours asked for')
+
+    -- Business account and treasury rows have no citizen and are not player faucets or sinks
+    row(nil, 500000, 'faucet', 'treasury:payout', 3600)
+    row(nil, 300000, 'sink', 'business:tax', 3600, 'debit')
+    local again = env.Watch.Digest(24)
+    check(again:find('faucet 95000, sink 20000', 1, true) and not again:find('treasury:payout', 1, true) and not again:find('top faucets: treasury', 1, true), 'watch: the digest counts player faucets and sinks once and leaves business and treasury rows out')
+    row('E3', 1000, 'faucet', 'a:1', 3600); row('E4', 2000, 'faucet', 'b:1', 3600); row('E5', 3000, 'faucet', 'c:1', 3600)
+    local queries = mysql.watchEarnerQueries or 0
+    env.Watch.Digest(24)
+    check((mysql.watchEarnerQueries or 0) - queries == 2, 'watch: the earners take two queries however many characters there are')
+    row('E6', 4000, 'faucet', 'd:1', 3600); row('E7', 5000, 'faucet', 'e:1', 3600); row('E8', 6000, 'faucet', 'f:1', 3600)
+    local listed = env.Watch.Digest(168):match('top earners: ([^\n]*)')
+    local count = 0
+    for _ in listed:gmatch('%(') do count = count + 1 end
+    check(count == 5 and not listed:find('E3', 1, true), 'watch: a long window lists only the top five earners, the rest are cut in the query')
 
     -- The command
     posts = {}
@@ -9464,6 +9501,42 @@ do
     local capTold = false
     for _, e in ipairs(sent) do if e.name == 'som:client:notify' and e.target == 2 then capTold = true end end
     check(capTold and tick(lateId).paid == 0, 'tow: a driver past the hourly cap is told the tow is unpaid')
+
+    -- A passed car with the wrong plate is ignored in favour of the plate's own car
+    spawn(920, 'WRG012', vec3(5, 5, 0)); spawn(921, 'RGT013', vec3(6, 6, 0))
+    D.vehicles[#D.vehicles + 1] = { id = 71, plate = 'RGT013', citizenid = 'OWNER1', state = 'out' }
+    check(Mocks.exported.impoundPlate('RGT013', 'COP1', 5, 920) == true and _G.Vehicles[921] == nil and _G.Vehicles[920] ~= nil, 'tow: a car passed in with another plate is not removed, the right car is found by plate')
+    check(Mocks.exported.impoundPlate('WRG012', 'COP1', 5, 920) == true and _G.Vehicles[920] == nil, 'tow: a car passed in with the matching plate is the one removed')
+
+    -- One impound row per plate, even if the seal is repeated
+    D.vehicles[#D.vehicles + 1] = { id = 70, plate = 'IDM010', citizenid = 'OWNER1', state = 'out' }
+    local sealed = 0
+    for _ = 1, 2 do if police.Police.SealImpound('IDM010', 'COP1', 5, nil) then sealed = sealed + 1 end end
+    local rowsFor = 0
+    for _, i in ipairs(D.impounds) do if i.plate == 'IDM010' then rowsFor = rowsFor + 1 end end
+    check(sealed == 2 and rowsFor == 1 and D.vehicles[#D.vehicles].state == 'impounded', 'tow: sealing the same plate twice leaves one impound row')
+
+    -- The sweep looks through the vehicles once per stale ticket
+    ticketFor('SCN011', 919, vec3(5, 5, 0))
+    mysql.fakeNow = mysql.fakeNow + (C.ticketMinutes + 1) * 60
+    local scans, realScan = 0, _G.GetAllVehicles
+    _G.GetAllVehicles = function() scans = scans + 1; return realScan() end
+    env.Tow.Sweep()
+    _G.GetAllVehicles = realScan
+    check(scans == 1 and _G.Vehicles[919] == nil, 'tow: a stale ticket scans the vehicles once and still impounds the car')
+
+    -- A hold as long as the wait is clamped at load
+    local f = assert(io.open(REPO .. 'som-tow/server/tow.lua', 'rb'))
+    local source = f:read('a')
+    f:close()
+    local tuned = loader.loadResource(REPO .. 'som-tow', { 'shared/config.lua' })
+    tuned.Config.claimMinutes, tuned.Config.ticketMinutes = 30, 20
+    local realPrint = _G.print
+    local warned = false
+    _G.print = function(text) if tostring(text):find('claimMinutes', 1, true) then warned = true end end
+    assert(load(source, '@som-tow/server/tow.lua', 't', tuned))()
+    _G.print = realPrint
+    check(tuned.Config.claimMinutes == 19 and warned, 'tow: a claim time at or above the ticket time is clamped below it, loudly')
 
     -- Leave the shared mocks as found
     exports['som-core'].addMoney, exports['som-core'].businessTransact, _G.GetAllVehicles = saved.addMoney, saved.businessTransact, saved.gav
