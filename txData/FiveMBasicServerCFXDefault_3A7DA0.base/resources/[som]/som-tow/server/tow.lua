@@ -9,6 +9,12 @@ local phone = exports['som-phone']
 
 Tow = {}
 
+-- The sweep's "reopened this run is never cancelled this run" rule needs the hold to be shorter than the wait.
+if Config.claimMinutes >= Config.ticketMinutes then
+    Config.claimMinutes = math.max(1, Config.ticketMinutes - 1)
+    print(('[som-tow] claimMinutes must be below ticketMinutes, using %d'):format(Config.claimMinutes))
+end
+
 local function done(ok, err, extra)
     local out = extra or {}
     out.success = ok == true
@@ -73,8 +79,8 @@ end)
 -- ---------------------------------------------------------------------------
 
 ---False when the impound failed or raised, so every caller can undo its own step.
-local function seal(t)
-    local ok, sealed = pcall(function() return exports['som-police']:impoundPlate(t.plate, t.requested_by, t.reason) end)
+local function seal(t, car)
+    local ok, sealed = pcall(function() return exports['som-police']:impoundPlate(t.plate, t.requested_by, t.reason, car) end)
     if not ok then print(('[som-tow] impound of %s failed: %s'):format(t.plate, tostring(sealed))) end
     return ok and sealed == true
 end
@@ -146,7 +152,7 @@ function actions.deliver(source, payload, player)
     local closed = MySQL.update.await("UPDATE som_tow_tickets SET state = 'done', done_at = NOW() WHERE id = ? AND state = 'claimed' AND driver = ?", { id, player.citizenid })
     if (closed or 0) < 1 then return done(false, 'that is not your ticket') end
 
-    if not seal(t) then
+    if not seal(t, car) then
         MySQL.update.await("UPDATE som_tow_tickets SET state = 'claimed', done_at = NULL WHERE id = ? AND state = 'done' AND driver = ?", { id, player.citizenid })
         return done(false, 'the impound could not be recorded')
     end
@@ -202,7 +208,7 @@ function Tow.Sweep()
         if (taken or 0) > 0 then
             -- Only a car still where the officer asked for the tow is impounded; one that moved or left is not ours to remove.
             local car = findCar(normalise(t.plate))
-            if car and #(GetEntityCoords(car) - vec3(t.x, t.y, t.z)) <= Config.sweepRadius and not seal(t) then
+            if car and #(GetEntityCoords(car) - vec3(t.x, t.y, t.z)) <= Config.sweepRadius and not seal(t, car) then
                 MySQL.update.await("UPDATE som_tow_tickets SET state = 'open' WHERE id = ? AND state = 'cancelled'", { t.id })
             end
         end

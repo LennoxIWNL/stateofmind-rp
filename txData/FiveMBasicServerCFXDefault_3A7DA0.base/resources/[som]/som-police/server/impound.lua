@@ -41,11 +41,13 @@ function Police.SealImpound(plate, officerCid, reasonIndex, entity)
             { 'impounded', 'impound', owned.id })
     end
 
+    -- One open row per plate, so a retry after a failure part way through does not charge the owner twice.
     MySQL.insert.await([[
         INSERT INTO som_police_impound (plate, citizenid, officer_cid, reason, fee)
-        VALUES (?, ?, ?, ?, ?)
+        SELECT ?, ?, ?, ?, ? FROM DUAL
+        WHERE NOT EXISTS (SELECT 1 FROM som_police_impound WHERE plate = ? AND released_at IS NULL)
     ]], { plate, owned and owned.citizenid or nil, officerCid, reason,
-          Config.Impound.fee })
+          Config.Impound.fee, plate })
 
     if entity and DoesEntityExist(entity) then DeleteEntity(entity) end
 
@@ -60,16 +62,21 @@ function Police.SealImpound(plate, officerCid, reasonIndex, entity)
     return true
 end
 
----For som-tow: seals a towed car that was delivered to the lot, or whose ticket ran out.
-exports('impoundPlate', function(plate, officerCid, reasonIndex)
+---For som-tow: seals a towed car that was delivered to the lot, or whose ticket ran out. `entity` is the car when the
+---caller already has it, which saves another scan of every vehicle.
+exports('impoundPlate', function(plate, officerCid, reasonIndex, entity)
     if type(plate) ~= 'string' or plate == '' or #plate > 12 or type(officerCid) ~= 'string' then return false end
     reasonIndex = tonumber(reasonIndex)
     if not reasonIndex or not Config.Impound.reasons[reasonIndex] then return false end
 
+    local function plateOf(vehicle) return ((GetVehicleNumberPlateText(vehicle) or ''):upper():gsub('%s+', '')) end
     local key = plate:upper():gsub('%s+', '')
-    local car
-    for _, entity in ipairs(GetAllVehicles()) do
-        if ((GetVehicleNumberPlateText(entity) or ''):upper():gsub('%s+', '')) == key then car = entity break end
+    local car = tonumber(entity)
+    if not car or not DoesEntityExist(car) or plateOf(car) ~= key then
+        car = nil
+        for _, vehicle in ipairs(GetAllVehicles()) do
+            if plateOf(vehicle) == key then car = vehicle break end
+        end
     end
     return Police.SealImpound(plate, officerCid, reasonIndex, car)
 end)
