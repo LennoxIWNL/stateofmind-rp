@@ -9108,5 +9108,104 @@ do
     Mocks.convars = {}
 end
 
+-- ---------------------------------------------------------------------------
+-- som-economy: the watch (alerts and digest)
+-- ---------------------------------------------------------------------------
+
+do
+    resetDb()
+    resetMocks()
+    mysql.fakeNow = 3000000
+    mysql.db.ledger = {}
+    local realThread = _G.CreateThread
+    _G.CreateThread = function() end
+    local env = loader.loadResource(REPO .. 'som-economy', { 'shared/config.lua', 'server/watch.lua' })
+    _G.CreateThread = realThread
+    local C, L = env.Config, mysql.db.ledger
+
+    local posts, realHttp = {}, _G.PerformHttpRequest
+    _G.PerformHttpRequest = function(url, _, _, body) posts[#posts + 1] = { url = url, body = body } end
+    local function row(cid, amount, flow, reason, ago, direction)
+        L[#L + 1] = { citizenid = cid, amount = amount, flow = flow, reason = reason, ts = mysql.fakeNow - (ago or 60),
+            direction = direction or (flow == 'sink' and 'debit' or 'credit') }
+    end
+    local function minutes(n) Mocks.clock = (Mocks.clock or 0) + n * 60000 end
+
+    Mocks.treasury = 100000
+    Mocks.convars = Mocks.convars or {}
+    Mocks.convars.som_economy_webhook = nil
+    row('NORMAL1', 10000, 'faucet', 'paycheck:taxi')
+    row('OLD1', 90000, 'faucet', 'heist:store', 7200)
+    check(env.Watch.Check() == 0 and #posts == 0, 'watch: a quiet hour raises no alert, and rows outside the window are ignored')
+
+    row('RICH1', 30000, 'faucet', 'heist:store')
+    row('RICH1', 30000, 'faucet', 'heist:store')
+    check(env.Watch.Check() == 1 and #posts == 0, 'watch: a character over the faucet limit is flagged, and with no webhook it only prints')
+    minutes(C.Watch.alertCooldownMinutes + 1)
+
+    Mocks.convars.som_economy_webhook = 'https://example.invalid/hook'
+    check(env.Watch.Check() == 1 and #posts == 1 and posts[1].url == 'https://example.invalid/hook', 'watch: the alert goes to the webhook convar')
+    check(posts[1].body:find('RICH1', 1, true) and posts[1].body:find('60000', 1, true) and posts[1].body:find('heist', 1, true) and not posts[1].body:find('store', 1, true),
+        'watch: the alert names the citizenid, the amount and the reason prefix')
+    check(env.Watch.Check() == 0 and #posts == 1, 'watch: the same alert is not repeated inside the cooldown')
+    minutes(C.Watch.alertCooldownMinutes + 1)
+    check(env.Watch.Check() == 1, 'watch: it can be raised again after the cooldown')
+
+    row('BIG1', 300000, 'faucet', '@everyone payout')
+    row('LINE1', 56000, 'faucet', 'x\n[som-economy] ALERT fake line\r\ny')
+    row('TICK1', 55000, 'faucet', 'a\96b\96:x')
+    row('TRADER1', 150000, 'transfer', 'trade:sale:77')
+    row(nil, 400000, 'faucet', 'budget:sanitation')
+    posts = {}
+    minutes(C.Watch.alertCooldownMinutes + 1)
+    local sent = env.Watch.Check()
+    local all = ''
+    for _, p in ipairs(posts) do all = all .. p.body end
+    check(sent == 6 and all:find('TRADER1', 1, true) and all:find('transfers', 1, true) and all:find('one faucet payment of 400000 to treasury', 1, true),
+        'watch: incoming transfers and a single huge faucet row are flagged, a treasury row is named as the treasury')
+    check(not all:find('@', 1, true) and not all:find('\96', 1, true), 'watch: mentions and backticks are stripped from what goes to Discord')
+    check(not all:find('[\r\n]') and all:find('x [som-economy] ALERT fake line y', 1, true), 'watch: a line break in a reason cannot start a fake line')
+
+    C.Watch.treasuryFloor = 200000
+    posts = {}
+    minutes(C.Watch.alertCooldownMinutes + 1)
+    env.Watch.Check()
+    all = ''
+    for _, p in ipairs(posts) do all = all .. p.body end
+    check(all:find('the treasury holds 100000', 1, true), 'watch: a treasury under the floor is flagged')
+    C.Watch.treasuryFloor = 0
+
+    -- The digest
+    L = {}
+    mysql.db.ledger = L
+    row('E1', 70000, 'faucet', 'paycheck:police', 3600)
+    row('E1', 5000, 'faucet', 'buyer:fish', 3600)
+    row('E2', 20000, 'faucet', 'news:story:4', 3600)
+    row('E1', 20000, 'sink', 'shop:purchase', 3600, 'debit')
+    local text = env.Watch.Digest(24)
+    check(text:find('faucet 95000, sink 20000, ratio 0.21', 1, true) and text:find('WARNING', 1, true), 'watch: the digest totals string valued sums and warns when the ratio is off target')
+    check(text:find('top faucets: paycheck 70000, news 20000, buyer 5000', 1, true) and text:find('top sinks: shop 20000', 1, true), 'watch: the digest lists the biggest sources by reason prefix')
+    check(text:find('top earners: E1 75000 (paycheck), E2 20000 (news)', 1, true) and text:find('treasury 100000', 1, true), 'watch: the digest lists the top earners and the treasury')
+    check(not text:find('shop:purchase', 1, true) and not text:find('license', 1, true), 'watch: nothing beyond citizenids, amounts and reasons is in the digest')
+    check(env.Watch.Digest(1):find('top earners: E1 75000', 1, true), 'watch: the digest window is the hours asked for')
+
+    -- The command
+    posts = {}
+    Mocks.admins = {}
+    Mocks.commands.economyreport(5, { hours = 24 })
+    check(#posts == 0, 'watch: a non staff player cannot ask for the report')
+    Mocks.admins = { [5] = true }
+    Mocks.commands.economyreport(5, { hours = 24 })
+    check(#posts == 1 and posts[1].body:find('top faucets', 1, true), 'watch: an admin can post the report')
+    Mocks.commands.economyreport(0, { hours = 100000 })
+    check(#posts == 2 and posts[2].body:find('last 24 h', 1, true), 'watch: the console can run it and an absurd window falls back to a day')
+
+    Mocks.admins = {}
+    Mocks.convars.som_economy_webhook = nil
+    _G.PerformHttpRequest = realHttp
+end
+
+
+
 print(('%d passed, %d failed'):format(results.pass, results.fail))
 os.exit(results.fail == 0 and 0 or 1)
