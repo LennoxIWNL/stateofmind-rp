@@ -1823,6 +1823,7 @@ CREATE TABLE IF NOT EXISTS `som_shop_staff` (
   PRIMARY KEY (`citizenid`),
   KEY `idx_shop` (`shop_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ===========================================================================
 --  7n. COURT SERVICE (som-serving)
 --
@@ -1992,7 +1993,10 @@ CREATE TABLE IF NOT EXISTS `som_insurance_claims` (
   PRIMARY KEY (`id`),
   KEY `idx_vehicle` (`vehicle_id`, `created_at`),
   KEY `idx_citizen` (`citizenid`, `created_at`)
--- ====================================================================--  7p. NEW PLAYER ONBOARDING (som-welcome)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===========================================================================
+--  7p. NEW PLAYER ONBOARDING (som-welcome)
 --
 --  The settling-in payment: one row per character AND per licence (the primary
 --  key and the unique licence key are the once only rule, so alts on one
@@ -2017,7 +2021,8 @@ CREATE TABLE IF NOT EXISTS `som_welcome_jobs` (
   `minutes`   INT UNSIGNED NOT NULL DEFAULT 0,
   `centre_at` TIMESTAMP NULL DEFAULT NULL,
   PRIMARY KEY (`citizenid`)
-=======
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Weazel News (som-news). A story is public until staff remove it. Payouts are the hourly cap:
 -- the cap is the sum of the last hour, so a restart cannot reset it.
 CREATE TABLE IF NOT EXISTS `som_news_stories` (
@@ -2044,7 +2049,8 @@ CREATE TABLE IF NOT EXISTS `som_news_payouts` (
   PRIMARY KEY (`id`),
   KEY `idx_time` (`created_at`),
   KEY `idx_citizen_time` (`citizenid`, `created_at`)
-=======
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ===========================================================================
 --  7q. VEHICLE CONTRACTS (som-boosting)
 --
